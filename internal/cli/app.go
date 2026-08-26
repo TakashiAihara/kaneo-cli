@@ -23,7 +23,7 @@ type App struct {
 }
 
 // ErrNoAPIKey is returned when nothing supplied a credential.
-var ErrNoAPIKey = errors.New("no API key: set KANEO_API_KEY, or run `kaneo login`")
+var ErrNoAPIKey = errors.New("no API key: set KANEO_API_KEY, or pass --api-key")
 
 // Client builds an API client from the resolved settings.
 func (a *App) Client() (*api.Client, error) {
@@ -36,7 +36,7 @@ func (a *App) Client() (*api.Client, error) {
 // Workspace returns the resolved workspace, or an actionable error.
 func (a *App) Workspace() (string, error) {
 	if a.Cfg.WorkspaceID == "" {
-		return "", errors.New("no workspace: pass --workspace, set KANEO_WORKSPACE, or run `kaneo link`")
+		return "", errors.New("no workspace: pass --workspace, set KANEO_WORKSPACE, or add one to .kaneo.json")
 	}
 	return a.Cfg.WorkspaceID, nil
 }
@@ -44,7 +44,7 @@ func (a *App) Workspace() (string, error) {
 // Project returns the resolved project, or an actionable error.
 func (a *App) Project() (string, error) {
 	if a.Cfg.ProjectID == "" {
-		return "", errors.New("no project: pass --project, set KANEO_PROJECT, or run `kaneo link`")
+		return "", errors.New("no project: pass --project, set KANEO_PROJECT, or add one to .kaneo.json")
 	}
 	return a.Cfg.ProjectID, nil
 }

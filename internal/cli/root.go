@@ -73,6 +73,8 @@ func NewRootCommand(version string) *cobra.Command {
 		newWorkspaceCommand(app),
 		newProjectCommand(app),
 		newTaskCommand(app),
+		newBoardCommand(app),
+		newSessionCommand(app),
 	)
 	return root
 }

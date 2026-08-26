@@ -1,6 +1,11 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"strings"
+
+	"github.com/TakashiAihara/kaneo-cli/internal/api"
+	"github.com/spf13/cobra"
+)
 
 func newProjectCommand(app *App) *cobra.Command {
 	cmd := &cobra.Command{
@@ -67,5 +72,48 @@ func newProjectCommand(app *App) *cobra.Command {
 		},
 	})
 
+	cmd.AddCommand(newProjectCreateCommand(app))
+
+	return cmd
+}
+
+func newProjectCreateCommand(app *App) *cobra.Command {
+	var icon, slug, description string
+
+	cmd := &cobra.Command{
+		Use:   "create <name>",
+		Short: "Create a project in a workspace",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			client, err := app.Client()
+			if err != nil {
+				return err
+			}
+			workspace, err := app.Workspace()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := app.Context()
+			defer cancel()
+
+			project, err := client.CreateProject(ctx, api.NewProject{
+				Name:        strings.Join(args, " "),
+				WorkspaceID: workspace,
+				Icon:        icon,
+				Slug:        slug,
+				Description: description,
+			})
+			if err != nil {
+				return err
+			}
+			app.Out.Human("created %s  %s", project.ID, project.Name)
+			return app.Out.Data(project)
+		},
+	}
+
+	f := cmd.Flags()
+	f.StringVar(&icon, "icon", "", "icon name (default Layers)")
+	f.StringVar(&slug, "slug", "", "url slug")
+	f.StringVarP(&description, "description", "d", "", "project description")
 	return cmd
 }

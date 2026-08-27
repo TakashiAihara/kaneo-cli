@@ -75,6 +75,23 @@ kaneo task status <task-id> <status>
 
 A status is a column id. The defaults are `to-do`, `in-progress`, `in-review` and `done`.
 
+Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing.
+
+### Agent sessions
+
+Tasks carry no custom fields, so the link between a session and a task is written into a task comment:
+
+```bash
+kaneo session attach 7 "what happens next"
+kaneo session next "what happens after that"
+kaneo session close
+kaneo board                     # open tasks, and which sessions hold them
+```
+
+The session is identified by `KANEO_SESSION_ID`, falling back to `CLAUDE_CODE_SESSION_ID`.
+
+`board` and the `session` commands are **fail-open**: on failure they print nothing and exit 0, so a session-start hook is not broken by an unreachable server. `--strict` turns that off and `KANEO_DEBUG=1` prints the reason.
+
 ## Output
 
 Human-readable on a terminal, JSON through a pipe:
@@ -97,6 +114,10 @@ make snapshot   # build the release archives exactly as the release job does
 ```
 
 `kaneo api-check` compares the operations this client calls against the server's OpenAPI document and exits non-zero if the server is missing one, so it works as a CI gate against a specific deployment.
+
+## Glossary
+
+`docs/glossary.md` covers the vocabulary, including where this CLI's names differ from the API's — task number against id, status against column, and what a session marker is.
 
 ## License
 

@@ -95,7 +95,7 @@ func formatTaskLine(t api.Task) string {
 
 func newTaskGetCommand(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "get <task-id>",
+		Use:   "get <task>",
 		Short: "Show one task",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
@@ -103,10 +103,11 @@ func newTaskGetCommand(app *App) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			project, _ := app.Project()
 			ctx, cancel := app.Context()
 			defer cancel()
 
-			t, err := client.GetTask(ctx, args[0])
+			t, err := resolveTask(ctx, client, project, args[0])
 			if err != nil {
 				return err
 			}
@@ -124,7 +125,7 @@ func newTaskGetCommand(app *App) *cobra.Command {
 
 func newTaskStatusCommand(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "status <task-id> <status>",
+		Use:   "status <task> <status>",
 		Short: "Move a task to another column",
 		Long: "Move a task to another column.\n\n" +
 			"A status is a column id. `kaneo project get` lists the columns a project has;\n" +
@@ -135,15 +136,20 @@ func newTaskStatusCommand(app *App) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			project, _ := app.Project()
 			ctx, cancel := app.Context()
 			defer cancel()
 
-			taskID, status := args[0], strings.TrimSpace(args[1])
-			if err := client.SetTaskStatus(ctx, taskID, status); err != nil {
+			task, err := resolveTask(ctx, client, project, args[0])
+			if err != nil {
 				return err
 			}
-			app.Out.Human("%s -> %s", taskID, status)
-			return app.Out.Data(map[string]string{"id": taskID, "status": status})
+			status := strings.TrimSpace(args[1])
+			if err := client.SetTaskStatus(ctx, task.ID, status); err != nil {
+				return err
+			}
+			app.Out.Human("#%d -> %s", task.Number, status)
+			return app.Out.Data(map[string]any{"id": task.ID, "number": task.Number, "status": status})
 		},
 	}
 }

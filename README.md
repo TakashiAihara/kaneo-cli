@@ -10,7 +10,19 @@ Early. The command surface below is what exists today; the rest of the API is no
 
 ## Install
 
-Download a binary from the releases page and put it on your `PATH`, or build from source:
+```bash
+curl -fsSL https://raw.githubusercontent.com/TakashiAihara/kaneo-cli/main/install.sh | sh
+```
+
+Installs into `$HOME/.local/bin`. The script verifies the archive against the release's `checksums.txt` and runs the installed binary before reporting success, so a partial install fails rather than looking like it worked.
+
+| variable | effect |
+| --- | --- |
+| `KANEO_VERSION` | install a specific tag instead of the latest release |
+| `KANEO_INSTALL_DIR` | install somewhere other than `$HOME/.local/bin` |
+| `KANEO_RELEASE_BASE` | fetch archives from a mirror |
+
+Or build from source:
 
 ```bash
 make build
@@ -79,9 +91,12 @@ Data goes to stdout and progress goes to stderr, so piping into `jq` is always s
 ## Develop
 
 ```bash
-make check   # go vet + go test
-make cross   # build every release target into dist/
+make check      # go vet + go test
+make cross      # build every release target into dist/
+make snapshot   # build the release archives exactly as the release job does
 ```
+
+`kaneo api-check` compares the operations this client calls against the server's OpenAPI document and exits non-zero if the server is missing one, so it works as a CI gate against a specific deployment.
 
 ## License
 

@@ -3,7 +3,7 @@ PKG    := ./cmd/kaneo
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: build test vet fmt check clean cross
+.PHONY: build test vet fmt check clean cross snapshot
 
 build:
 	go build -ldflags '$(LDFLAGS)' -o $(BINARY) $(PKG)
@@ -30,6 +30,10 @@ cross:
 			go build -ldflags '$(LDFLAGS)' -o dist/$(BINARY)-$$os-$$arch $(PKG) || exit 1; \
 	done
 	@ls -la dist
+
+# Build every release archive locally, exactly as the release job would.
+snapshot:
+	goreleaser release --snapshot --clean --skip=publish
 
 clean:
 	rm -rf dist $(BINARY)

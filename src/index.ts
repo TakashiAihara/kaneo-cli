@@ -1,8 +1,10 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { registerWhoami } from "./commands/whoami";
+import { registerTask } from "./commands/task";
 import { ConfigError } from "./config";
 import { ApiError } from "./api/client";
+import { TaskNotFoundError } from "./api/board";
 import { log } from "./output";
 import pkg from "../package.json";
 
@@ -18,11 +20,12 @@ program
   .option("--json", "output raw JSON to stdout");
 
 registerWhoami(program);
+registerTask(program);
 
 try {
   await program.parseAsync();
 } catch (e) {
-  if (e instanceof ConfigError || e instanceof ApiError) {
+  if (e instanceof ConfigError || e instanceof ApiError || e instanceof TaskNotFoundError) {
     log(`kaneo: ${e.message}`);
     process.exit(1);
   }

@@ -5,6 +5,7 @@ import { join } from "node:path";
 export type Profile = {
   url?: string;
   token?: string;
+  workspace?: string;
 };
 
 export type ConfigFile = {
@@ -19,12 +20,15 @@ export type ResolvedConfig = {
   urlSource: "flag" | "env" | "profile";
   tokenSource: "flag" | "env" | "profile";
   profileName?: string;
+  // url/token と違い必須ではない。無くても resolve 時点では通し、要る場面で requireWorkspace が言う
+  workspace?: string;
 };
 
 export type GlobalFlags = {
   url?: string;
   token?: string;
   profile?: string;
+  workspace?: string;
   json?: boolean;
 };
 
@@ -100,7 +104,20 @@ export function resolveConfig(flags: GlobalFlags, file = loadConfigFile()): Reso
     );
   }
 
-  return { url: normalizeUrl(url), token, urlSource, tokenSource, profileName };
+  const workspace = flags.workspace ?? process.env.KANEO_WORKSPACE ?? profile?.workspace;
+
+  return { url: normalizeUrl(url), token, urlSource, tokenSource, profileName, workspace };
+}
+
+// project / workspace / search など workspace が要るコマンドから呼ぶ。
+// resolveConfig 自体は workspace 無しでも通すので、必要な場所でだけ throw する
+export function requireWorkspace(config: ResolvedConfig): string {
+  if (!config.workspace) {
+    throw new ConfigError(
+      'no workspace configured. Pass --workspace, set KANEO_WORKSPACE, or add "workspace" to your profile',
+    );
+  }
+  return config.workspace;
 }
 
 // 受け付ける形: https://kaneo.example.com / https://kaneo.example.com/ / .../api

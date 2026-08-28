@@ -2,6 +2,11 @@
 import { Command } from "commander";
 import { registerWhoami } from "./commands/whoami";
 import { registerTask } from "./commands/task";
+import { registerProject } from "./commands/project";
+import { registerWorkspace } from "./commands/workspace";
+import { registerComment } from "./commands/comment";
+import { registerActivity } from "./commands/activity";
+import { registerSearch } from "./commands/search";
 import { ConfigError } from "./config";
 import { ApiError } from "./api/client";
 import { TaskNotFoundError } from "./api/board";
@@ -17,10 +22,16 @@ program
   .option("--url <url>", "Kaneo instance URL (overrides KANEO_URL and config)")
   .option("--token <token>", "API token (overrides KANEO_TOKEN and config)")
   .option("--profile <name>", "config profile to use (overrides KANEO_PROFILE)")
+  .option("--workspace <id>", "workspace id (overrides KANEO_WORKSPACE and config)")
   .option("--json", "output raw JSON to stdout");
 
 registerWhoami(program);
 registerTask(program);
+registerProject(program);
+registerWorkspace(program);
+registerComment(program);
+registerActivity(program);
+registerSearch(program);
 
 try {
   await program.parseAsync();

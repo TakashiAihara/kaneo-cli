@@ -1,0 +1,33 @@
+{
+  "name": "kaneo-cli",
+  "version": "0.1.0",
+  "description": "Command-line interface for Kaneo, the open source project management tool",
+  "type": "module",
+  "bin": {
+    "kaneo": "src/index.ts"
+  },
+  "scripts": {
+    "generate": "openapi-typescript openapi.json -o src/api/schema.d.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "install-bin": "bun run scripts/install-bin.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TakashiAihara/kaneo-cli.git"
+  },
+  "keywords": ["kaneo", "cli", "project-management", "kanban", "tasks"],
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "openapi-fetch": "^0.17.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.0",
+    "@types/node": "^26.4.0",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.0"
+  }
+}

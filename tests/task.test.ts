@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 
 const TOKEN = "valid-token";
 
-type Call = { method: string; path: string; body: unknown };
+type Call = { method: string; path: string; query: URLSearchParams; body: unknown };
 let calls: Call[] = [];
 
 const boardTask = (over: Record<string, unknown>) => ({
@@ -64,7 +64,7 @@ beforeAll(() => {
         return Response.json({ message: "Unauthorized" }, { status: 401 });
       }
       const body = req.method === "GET" || req.method === "DELETE" ? undefined : await req.json();
-      calls.push({ method: req.method, path, body });
+      calls.push({ method: req.method, path, query: new URLSearchParams(url.search), body });
 
       if (path === "/api/task/tasks/p-1") {
         return Response.json({
@@ -134,9 +134,15 @@ describe("task list", () => {
   });
 
   test("filters are passed through as query params", async () => {
-    await runCli(["task", "list", "--project", "p-1", "--priority", "high", "--status", "to-do"]);
+    await runCli([
+      "task", "list", "--project", "p-1",
+      "--priority", "high", "--status", "to-do", "--assignee", "u-1",
+    ]);
     const boardCall = calls.find((c) => c.path === "/api/task/tasks/p-1");
     expect(boardCall).toBeDefined();
+    expect(boardCall!.query.get("priority")).toBe("high");
+    expect(boardCall!.query.get("status")).toBe("to-do");
+    expect(boardCall!.query.get("assigneeId")).toBe("u-1");
   });
 
   test("invalid priority is a usage error, not an API call", async () => {

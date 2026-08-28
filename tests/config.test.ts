@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ConfigError, loadConfigFile, normalizeUrl, resolveConfig } from "../src/config";
+import { ConfigError, loadConfigFile, normalizeUrl, requireWorkspace, resolveConfig } from "../src/config";
 
 const FILE = {
   defaultProfile: "home",
@@ -29,7 +29,12 @@ function withEnv<T>(env: Record<string, string | undefined>, fn: () => T): T {
   }
 }
 
-const noEnv = { KANEO_URL: undefined, KANEO_TOKEN: undefined, KANEO_PROFILE: undefined };
+const noEnv = {
+  KANEO_URL: undefined,
+  KANEO_TOKEN: undefined,
+  KANEO_PROFILE: undefined,
+  KANEO_WORKSPACE: undefined,
+};
 
 describe("resolveConfig precedence", () => {
   test("flag beats env and profile", () => {
@@ -139,6 +144,63 @@ describe("missing profile names (CR finding: point at the right cause)", () => {
       expect(() => resolveConfig({}, { profiles: { other: { url: "https://x.example.com" } } })).toThrow(
         /no Kaneo URL/,
       );
+    });
+  });
+});
+
+describe("workspace resolution", () => {
+  const FILE_WITH_WORKSPACE = {
+    defaultProfile: "home",
+    profiles: {
+      home: { url: "https://kaneo.example.com", token: "profile-token", workspace: "w-profile" },
+    },
+  };
+
+  test("missing workspace is not an error at resolve time", () => {
+    withEnv(noEnv, () => {
+      const c = resolveConfig({}, FILE);
+      expect(c.workspace).toBeUndefined();
+    });
+  });
+
+  test("--workspace flag beats env and profile", () => {
+    withEnv({ ...noEnv, KANEO_WORKSPACE: "w-env" }, () => {
+      const c = resolveConfig(
+        { url: "https://kaneo.example.com", token: "t", workspace: "w-flag" },
+        FILE_WITH_WORKSPACE,
+      );
+      expect(c.workspace).toBe("w-flag");
+    });
+  });
+
+  test("KANEO_WORKSPACE env beats profile", () => {
+    withEnv({ ...noEnv, KANEO_WORKSPACE: "w-env" }, () => {
+      const c = resolveConfig({}, FILE_WITH_WORKSPACE);
+      expect(c.workspace).toBe("w-env");
+    });
+  });
+
+  test("falls back to the profile's workspace", () => {
+    withEnv(noEnv, () => {
+      const c = resolveConfig({}, FILE_WITH_WORKSPACE);
+      expect(c.workspace).toBe("w-profile");
+    });
+  });
+});
+
+describe("requireWorkspace", () => {
+  test("returns the resolved workspace when present", () => {
+    withEnv({ ...noEnv, KANEO_WORKSPACE: "w-env" }, () => {
+      const c = resolveConfig({}, FILE);
+      expect(requireWorkspace(c)).toBe("w-env");
+    });
+  });
+
+  test("throws a ConfigError with a hint when absent", () => {
+    withEnv(noEnv, () => {
+      const c = resolveConfig({}, FILE);
+      expect(() => requireWorkspace(c)).toThrow(ConfigError);
+      expect(() => requireWorkspace(c)).toThrow(/no workspace configured/);
     });
   });
 });

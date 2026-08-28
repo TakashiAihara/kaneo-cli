@@ -55,11 +55,14 @@ export function loadConfigFile(path = configPath()): ConfigFile {
 export class ConfigError extends Error {}
 
 export function resolveConfig(flags: GlobalFlags, file = loadConfigFile()): ResolvedConfig {
-  const profileName = flags.profile ?? process.env.KANEO_PROFILE ?? file.defaultProfile ?? "default";
+  const requestedProfile = flags.profile ?? process.env.KANEO_PROFILE ?? file.defaultProfile;
+  const profileName = requestedProfile ?? "default";
   const profile = file.profiles?.[profileName];
 
-  if (flags.profile && !profile) {
-    throw new ConfigError(`profile not found in ${configPath()}: ${flags.profile}`);
+  // 明示的に名指しされた profile が無いのは設定ミスなので、後段の "no URL" に化けさせず即座に言う。
+  // 暗黙の "default" フォールバックだけは合成名なので黙って続行してよい
+  if (requestedProfile && !profile) {
+    throw new ConfigError(`profile not found in ${configPath()}: ${requestedProfile}`);
   }
 
   let url: string | undefined;

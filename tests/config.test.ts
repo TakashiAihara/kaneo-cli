@@ -118,3 +118,27 @@ describe("loadConfigFile", () => {
     expect(() => loadConfigFile(path)).toThrow(/not valid JSON/);
   });
 });
+
+describe("missing profile names (CR finding: point at the right cause)", () => {
+  test("KANEO_PROFILE naming a missing profile fails as profile-not-found", () => {
+    withEnv({ ...noEnv, KANEO_PROFILE: "ghost" }, () => {
+      expect(() => resolveConfig({}, FILE)).toThrow(/profile not found/);
+    });
+  });
+
+  test("defaultProfile naming a missing profile fails as profile-not-found", () => {
+    withEnv(noEnv, () => {
+      expect(() => resolveConfig({}, { defaultProfile: "ghost", profiles: {} })).toThrow(
+        /profile not found/,
+      );
+    });
+  });
+
+  test("implicit default profile missing stays silent and reports missing URL", () => {
+    withEnv(noEnv, () => {
+      expect(() => resolveConfig({}, { profiles: { other: { url: "https://x.example.com" } } })).toThrow(
+        /no Kaneo URL/,
+      );
+    });
+  });
+});

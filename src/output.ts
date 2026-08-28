@@ -16,7 +16,7 @@ export type Column<T> = {
 export function printTable<T>(rows: T[], columns: Column<T>[]): void {
   const cells = rows.map((r) => columns.map((c) => c.value(r)));
   const widths = columns.map((c, i) =>
-    Math.max(c.header.length, ...cells.map((row) => visibleWidth(row[i] ?? ""))),
+    Math.max(visibleWidth(c.header), ...cells.map((row) => visibleWidth(row[i] ?? ""))),
   );
   const line = (parts: string[]) =>
     parts.map((p, i) => pad(p, widths[i] ?? 0)).join("  ").trimEnd();

@@ -64,8 +64,13 @@ func newBoardCommand(app *App) *cobra.Command {
 			}
 			open = append(open, t)
 		}
+		// An empty board still owes a script its document. Printing nothing
+		// is reserved for "no project is configured here", which is a
+		// different thing and is decided above.
 		if len(open) == 0 && done == 0 {
-			return nil
+			return app.Out.Data(boardReport{
+				Project: board.ProjectName, Open: []api.Task{}, Sessions: []boardSession{},
+			})
 		}
 
 		sessions := collectSessions(ctx, client, open)

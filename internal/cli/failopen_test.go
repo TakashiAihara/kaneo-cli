@@ -28,8 +28,9 @@ func TestFailOpenSurfacesHardFailures(t *testing.T) {
 	if err == nil {
 		t.Fatal("a hard failure was swallowed")
 	}
-	if !errors.Is(err, err) || err.Error() == "" {
-		t.Errorf("unexpected error value: %v", err)
+	var hardErr hardError
+	if !errors.As(err, &hardErr) {
+		t.Errorf("err = %v; want a hardError to reach the caller", err)
 	}
 }
 

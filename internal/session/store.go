@@ -1,12 +1,14 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Attachment records which task the current session took, so that closing it
@@ -136,9 +138,24 @@ func Describe(env func(string) string, dir string, state State) Marker {
 	}
 }
 
+// branchTimeout bounds the git call. The branch name is a nicety on a marker,
+// so waiting for it is never worth stalling the caller.
+const branchTimeout = 2 * time.Second
+
 func currentBranch(dir string) string {
-	cmd := exec.Command("git", "branch", "--show-current")
+	// A deadline rather than a bare exec: git can block indefinitely on an
+	// unresponsive network mount or waiting for credentials, and this runs
+	// from a session-start hook. Fail-open covers errors, not hangs.
+	ctx, cancel := context.WithTimeout(context.Background(), branchTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", "branch", "--show-current")
 	cmd.Dir = dir
+	// Killing the process is not enough on its own: Output waits for the
+	// stdout pipe to close, and a grandchild that inherited it keeps it open.
+	// WaitDelay closes the pipes shortly after the kill so this actually
+	// returns.
+	cmd.WaitDelay = 500 * time.Millisecond
 	out, err := cmd.Output()
 	if err != nil {
 		return ""

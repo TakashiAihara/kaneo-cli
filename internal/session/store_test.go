@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // The session id comes from the environment, so it is not this program's to
@@ -72,5 +73,48 @@ func TestStoreFilePermissions(t *testing.T) {
 	}
 	if perm := info.Mode().Perm(); perm != 0o600 {
 		t.Errorf("mode = %o, want 600", perm)
+	}
+}
+
+// git can block indefinitely — an unresponsive network mount, or a prompt for
+// credentials. This runs from a session-start hook, where a hang stops the
+// session outright, and fail-open cannot help: it handles errors, not hangs.
+func TestCurrentBranchGivesUpOnAHangingGit(t *testing.T) {
+	stub := t.TempDir()
+	script := filepath.Join(stub, "git")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nsleep 30\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", stub+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	done := make(chan string, 1)
+	start := time.Now()
+	go func() { done <- currentBranch(t.TempDir()) }()
+
+	select {
+	case got := <-done:
+		if elapsed := time.Since(start); elapsed > branchTimeout*3 {
+			t.Errorf("took %s, want about %s", elapsed, branchTimeout)
+		}
+		if got != "" {
+			t.Errorf("branch = %q, want empty when git did not answer", got)
+		}
+	case <-time.After(branchTimeout * 5):
+		t.Fatalf("currentBranch did not return within %s", branchTimeout*5)
+	}
+}
+
+// The stub must not make the test pass for the wrong reason: a git that
+// answers promptly still has to be read.
+func TestCurrentBranchReadsAResponsiveGit(t *testing.T) {
+	stub := t.TempDir()
+	script := filepath.Join(stub, "git")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\necho feature/x\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", stub+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if got := currentBranch(t.TempDir()); got != "feature/x" {
+		t.Errorf("branch = %q, want feature/x", got)
 	}
 }

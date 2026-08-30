@@ -148,3 +148,54 @@ func killRecorded(t *testing.T, pidFile string) {
 		time.Sleep(50 * time.Millisecond)
 	}
 }
+
+// A legacy directory is a migration aid, not a fallback for a damaged current
+// record. Returning the stale attachment would let the next close act on a
+// task this session never took.
+func TestLoadDoesNotFallBackToLegacyOnACorruptCurrentRecord(t *testing.T) {
+	root := t.TempDir()
+	store := &Store{
+		Dir:        filepath.Join(root, "current"),
+		LegacyDirs: []string{filepath.Join(root, "legacy")},
+	}
+	if err := os.MkdirAll(store.Dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(store.LegacyDirs[0], 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(store.Dir, "s1.json"), []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(store.LegacyDirs[0], "s1.json"),
+		[]byte(`{"taskId":"stale","number":99}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := store.Load("s1")
+	if ok {
+		t.Errorf("Load returned %+v from the legacy directory despite a corrupt current record", got)
+	}
+}
+
+// With no current record at all, the legacy directory is still read: that is
+// what carries a session attached by the previous implementation.
+func TestLoadFallsBackToLegacyWhenNothingIsRecorded(t *testing.T) {
+	root := t.TempDir()
+	store := &Store{
+		Dir:        filepath.Join(root, "current"),
+		LegacyDirs: []string{filepath.Join(root, "legacy")},
+	}
+	if err := os.MkdirAll(store.LegacyDirs[0], 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(store.LegacyDirs[0], "s1.json"),
+		[]byte(`{"taskId":"from-legacy","number":7}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := store.Load("s1")
+	if !ok || got.TaskID != "from-legacy" {
+		t.Errorf("Load = %+v, %v; want the legacy record", got, ok)
+	}
+}

@@ -101,7 +101,22 @@ func (s *Store) Load(sessionID string) (Attachment, bool) {
 	if !validSessionID(sessionID) {
 		return Attachment{}, false
 	}
-	for _, dir := range append([]string{s.Dir}, s.LegacyDirs...) {
+	// The current record is authoritative. Falling back to a legacy directory
+	// after failing to read or parse it would hand back a stale attachment,
+	// and the next close would act on whatever task that named.
+	b, err := os.ReadFile(s.path(s.Dir, sessionID))
+	switch {
+	case err == nil:
+		var a Attachment
+		if err := json.Unmarshal(b, &a); err != nil {
+			return Attachment{}, false
+		}
+		return a, true
+	case !errors.Is(err, os.ErrNotExist):
+		return Attachment{}, false
+	}
+
+	for _, dir := range s.LegacyDirs {
 		b, err := os.ReadFile(s.path(dir, sessionID))
 		if err != nil {
 			continue

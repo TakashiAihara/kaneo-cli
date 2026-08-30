@@ -32,9 +32,19 @@ detect_arch() {
     esac
 }
 
+# fetch writes a URL to stdout using whichever downloader is present.
+fetch() {
+    if have curl; then
+        curl -fsSL "$1"
+    elif have wget; then
+        wget -qO- "$1"
+    else
+        die "neither curl nor wget is available"
+    fi
+}
+
 latest_version() {
-    have curl || die "curl is required to look up the latest release"
-    curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
+    fetch "https://api.github.com/repos/$REPO/releases/latest" \
         | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
         | head -n 1
 }

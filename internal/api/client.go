@@ -10,8 +10,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -52,9 +54,54 @@ func New(baseURL, apiKey string, timeout time.Duration) *Client {
 	return &Client{
 		BaseURL: NormalizeBaseURL(baseURL),
 		APIKey:  apiKey,
-		HTTP:    &http.Client{Timeout: timeout},
+		HTTP: &http.Client{
+			Timeout:       timeout,
+			CheckRedirect: dropCredentialOnDowngrade,
+		},
 	}
 }
+
+// dropCredentialOnDowngrade removes the API key from a redirected request that
+// is no longer protected by TLS.
+//
+// Go strips sensitive headers when a redirect changes hostname, but not when
+// it only changes scheme, so an https endpoint redirecting to http on the same
+// host would put the key on the wire in the clear. Verified rather than
+// assumed: a redirect between two URLs sharing a hostname forwards
+// Authorization, and one that changes the hostname does not.
+func dropCredentialOnDowngrade(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	if !isSecure(req.URL) {
+		req.Header.Del("Authorization")
+	}
+	return nil
+}
+
+// isSecure reports whether a URL protects what is sent over it. Loopback is
+// treated as secure: a self-hosted instance on localhost has no network to
+// expose the key to, and requiring TLS there would make local use impossible.
+func isSecure(u *url.URL) bool {
+	if u.Scheme == "https" {
+		return true
+	}
+	return isLoopback(u.Hostname())
+}
+
+func isLoopback(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
+}
+
+// ErrInsecureCredential is returned rather than sending a key in the clear.
+var ErrInsecureCredential = errors.New(
+	"refusing to send the API key over plain HTTP; use https, or a loopback address for a local instance")
 
 // Error is a failed API call.
 type Error struct {
@@ -101,6 +148,16 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 	endpoint := c.BaseURL + path
 	if len(query) > 0 {
 		endpoint += "?" + query.Encode()
+	}
+
+	if c.APIKey != "" {
+		parsed, err := url.Parse(endpoint)
+		if err != nil {
+			return fmt.Errorf("%s %s: %w", method, path, err)
+		}
+		if !isSecure(parsed) {
+			return fmt.Errorf("%s: %w", parsed.Scheme+"://"+parsed.Host, ErrInsecureCredential)
+		}
 	}
 
 	var reader io.Reader

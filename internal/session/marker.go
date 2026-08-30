@@ -81,12 +81,22 @@ func (m Marker) Format() string {
 		"branch=" + encodeValue(m.Branch),
 		"state=" + string(m.State),
 	}
+	// enc marks this marker as carrying encoded values. Without it a marker
+	// written by the older implementation, which stores values raw, would have
+	// a literal %20 in a path silently turned into a space on the way back.
+	// The older reader collects key=value pairs into a map and ignores keys it
+	// does not know, so the extra field costs it nothing.
+	fields = append(fields, encField+"=1")
+
 	out := "<!-- kn:session " + strings.Join(fields, " ") + " -->"
 	if step := strings.TrimSpace(m.NextStep); step != "" {
 		out += "\n" + step
 	}
 	return out
 }
+
+// encField names the flag that says a marker's values are encoded.
+const encField = "enc"
 
 // encodeValue makes a value safe to sit between two space-separated fields.
 //
@@ -99,7 +109,6 @@ func (m Marker) Format() string {
 //
 // The percent sign itself is encoded first so decoding is unambiguous.
 func encodeValue(s string) string {
-	s = strings.ReplaceAll(s, "-->", "--")
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return "-"
@@ -107,15 +116,21 @@ func encodeValue(s string) string {
 
 	var b strings.Builder
 	for _, r := range s {
-		switch {
-		case r == '%':
+		switch r {
+		case '%':
 			b.WriteString("%25")
-		case r == ' ':
+		case ' ':
 			b.WriteString("%20")
-		case r == '\t':
+		case '\t':
 			b.WriteString("%09")
-		case r == '\n' || r == '\r':
+		case '\n', '\r':
 			b.WriteString("%0A")
+		// Encoded rather than stripped, so that a value containing --> is
+		// recovered intact instead of coming back as --.
+		case '>':
+			b.WriteString("%3E")
+		case '<':
+			b.WriteString("%3C")
 		default:
 			b.WriteRune(r)
 		}
@@ -123,12 +138,12 @@ func encodeValue(s string) string {
 	return b.String()
 }
 
-// decodeValue reverses encodeValue. An unrecognised escape is left alone: a
-// marker written by the Python implementation carries raw values, and mangling
-// a literal percent sign would be worse than leaving it.
+// decodeValue reverses encodeValue. It is applied only to markers that
+// declare themselves encoded, because a raw value may legitimately contain a
+// percent sequence of its own.
 func decodeValue(s string) string {
 	replacements := []struct{ from, to string }{
-		{"%20", " "}, {"%09", "\t"}, {"%0A", "\n"},
+		{"%20", " "}, {"%09", "\t"}, {"%0A", "\n"}, {"%3E", ">"}, {"%3C", "<"},
 	}
 	for _, r := range replacements {
 		s = strings.ReplaceAll(s, r.from, r.to)
@@ -145,12 +160,17 @@ func Parse(content, createdAt string) (Marker, bool) {
 	}
 	body := content[loc[2]:loc[3]]
 
+	fields := parseFields(body)
+	encoded := fields[encField] == "1"
+
 	m := Marker{CreatedAt: createdAt}
-	for key, value := range parseFields(body) {
+	for key, value := range fields {
 		if value == "-" {
 			value = ""
 		}
-		value = decodeValue(value)
+		if encoded {
+			value = decodeValue(value)
+		}
 		switch key {
 		case "id":
 			m.SessionID = value

@@ -2,10 +2,13 @@ package api
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestNormalizeBaseURL(t *testing.T) {
@@ -192,5 +195,82 @@ func TestWriteOperationsUseDedicatedEndpoints(t *testing.T) {
 	}
 	if gotBody != `{"status":"in-progress"}` {
 		t.Errorf("body = %q", gotBody)
+	}
+}
+
+// A key sent over plain HTTP is on the wire in the clear. The check happens
+// before the request, so nothing leaves the process.
+func TestRefusesToSendTheKeyOverPlainHTTP(t *testing.T) {
+	c := New("http://kaneo.example.invalid", "secret", time.Second)
+	err := c.VerifyKey(context.Background())
+	if !errors.Is(err, ErrInsecureCredential) {
+		t.Fatalf("err = %v, want ErrInsecureCredential", err)
+	}
+	if strings.Contains(err.Error(), "secret") {
+		t.Errorf("the key appeared in the error: %v", err)
+	}
+}
+
+// The check must not fire where it would only get in the way.
+func TestPlainHTTPIsAllowedWithoutAKeyOrOnLoopback(t *testing.T) {
+	t.Run("no key", func(t *testing.T) {
+		c := New("http://kaneo.example.invalid", "", time.Second)
+		if err := c.VerifyKey(context.Background()); errors.Is(err, ErrInsecureCredential) {
+			t.Error("refused a request that carried no key")
+		}
+	})
+
+	// A local instance has no network to expose the key to, and requiring TLS
+	// there would make local use impossible.
+	for _, host := range []string{"127.0.0.1", "localhost", "[::1]"} {
+		t.Run(host, func(t *testing.T) {
+			c := New("http://"+host+":9999", "secret", time.Second)
+			if err := c.VerifyKey(context.Background()); errors.Is(err, ErrInsecureCredential) {
+				t.Errorf("refused a loopback request to %s", host)
+			}
+		})
+	}
+
+	t.Run("https", func(t *testing.T) {
+		c := New("https://kaneo.example.invalid", "secret", time.Second)
+		if err := c.VerifyKey(context.Background()); errors.Is(err, ErrInsecureCredential) {
+			t.Error("refused an https request")
+		}
+	})
+}
+
+// Go strips sensitive headers when a redirect changes hostname, but not when
+// it only changes scheme. A same-host https to http redirect would otherwise
+// carry the key in the clear.
+func TestRedirectDropsTheCredentialOnASchemeDowngrade(t *testing.T) {
+	cases := []struct {
+		target   string
+		wantKept bool
+	}{
+		{"https://kaneo.example/api", true},
+		{"http://kaneo.example/api", false},
+		{"http://127.0.0.1:5173/api", true},
+		{"http://localhost:5173/api", true},
+	}
+	for _, tc := range cases {
+		req, err := http.NewRequest(http.MethodGet, tc.target, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Authorization", "Bearer secret")
+		if err := dropCredentialOnDowngrade(req, nil); err != nil {
+			t.Fatal(err)
+		}
+		kept := req.Header.Get("Authorization") != ""
+		if kept != tc.wantKept {
+			t.Errorf("%s: credential kept = %v, want %v", tc.target, kept, tc.wantKept)
+		}
+	}
+}
+
+func TestRedirectChainIsBounded(t *testing.T) {
+	req, _ := http.NewRequest(http.MethodGet, "https://kaneo.example", nil)
+	if err := dropCredentialOnDowngrade(req, make([]*http.Request, 10)); err == nil {
+		t.Error("an unbounded redirect chain was allowed")
 	}
 }

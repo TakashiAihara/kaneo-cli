@@ -45,7 +45,7 @@ func TestFormatIsReadableByThePythonParser(t *testing.T) {
 	}
 	got := m.Format()
 
-	want := "<!-- kn:session id=abc-123 host=d1 cwd=/root/repo branch=main state=running -->\nCI を待つ"
+	want := "<!-- kn:session id=abc-123 host=d1 cwd=/root/repo branch=main state=running enc=1 -->\nCI を待つ"
 	if got != want {
 		t.Errorf("Format() =\n%q\nwant\n%q", got, want)
 	}
@@ -184,5 +184,53 @@ func TestRawValuesFromTheOtherImplementationAreUnchanged(t *testing.T) {
 	}
 	if m.Cwd != "/root/x" {
 		t.Errorf("cwd = %q, want /root/x", m.Cwd)
+	}
+}
+
+// A marker written by the older implementation stores values raw, so a path
+// that legitimately contains a percent sequence must come back unchanged.
+// Decoding it would turn /repo/100%20done into /repo/100 done.
+func TestLegacyMarkerValuesAreNotDecoded(t *testing.T) {
+	raw := "<!-- kn:session id=s1 host=d1 cwd=/repo/100%20done branch=feature%2Fx state=running -->"
+	m, ok := Parse(raw, "t0")
+	if !ok {
+		t.Fatal("did not parse")
+	}
+	if m.Cwd != "/repo/100%20done" {
+		t.Errorf("cwd = %q, want the raw value unchanged", m.Cwd)
+	}
+	if m.Branch != "feature%2Fx" {
+		t.Errorf("branch = %q, want the raw value unchanged", m.Branch)
+	}
+}
+
+// The same bytes, declared as encoded, must decode.
+func TestDeclaredEncodedMarkerIsDecoded(t *testing.T) {
+	raw := "<!-- kn:session id=s1 host=d1 cwd=/repo/100%20done branch=main state=running enc=1 -->"
+	m, ok := Parse(raw, "t0")
+	if !ok {
+		t.Fatal("did not parse")
+	}
+	if m.Cwd != "/repo/100 done" {
+		t.Errorf("cwd = %q, want the decoded value", m.Cwd)
+	}
+}
+
+// A value containing the comment terminator has to survive rather than be
+// mangled into "--".
+func TestValueContainingCommentTerminatorRoundTrips(t *testing.T) {
+	for _, cwd := range []string{"/work/a-->b", "/work/a>b", "/work/<x>"} {
+		in := Marker{SessionID: "s1", Cwd: cwd, Branch: "main", State: StateRunning}
+		formatted := in.Format()
+		if strings.Count(formatted, "-->") != 1 {
+			t.Errorf("cwd %q produced a marker with a stray terminator: %s", cwd, formatted)
+		}
+		out, ok := Parse(formatted, "t0")
+		if !ok {
+			t.Fatalf("cwd %q: did not parse: %s", cwd, formatted)
+		}
+		if out.Cwd != cwd {
+			t.Errorf("cwd = %q, want %q", out.Cwd, cwd)
+		}
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 // Mode is the resolved rendering decision for one invocation.
@@ -39,6 +40,47 @@ func IsTTY(f *os.File) bool {
 	return info.Mode()&os.ModeCharDevice != 0
 }
 
+// SanitizeControl replaces control characters with a visible placeholder.
+//
+// Tab and newline are kept: they are ordinary in the text this renders, and
+// neither can move the cursor arbitrarily. Everything else in the C0 and C1
+// ranges, including ESC, becomes U+FFFD.
+func SanitizeControl(s string) string {
+	if !strings.ContainsFunc(s, isControl) {
+		return s
+	}
+	return strings.Map(func(r rune) rune {
+		if isControl(r) {
+			return '\uFFFD'
+		}
+		return r
+	}, s)
+}
+
+func isControl(r rune) bool {
+	if r == '\t' || r == '\n' {
+		return false
+	}
+	return r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f)
+}
+
+// sanitizeArgs cleans the string-shaped arguments of a format call, leaving
+// other types to their own formatting.
+func sanitizeArgs(args []any) []any {
+	out := make([]any, len(args))
+	for i, a := range args {
+		switch v := a.(type) {
+		case string:
+			out[i] = SanitizeControl(v)
+		case error:
+			out[i] = SanitizeControl(v.Error())
+		default:
+			out[i] = a
+		}
+	}
+	return out
+}
+
 // Writer renders results according to a Mode.
 type Writer struct {
 	Mode Mode
@@ -63,11 +105,16 @@ func (w *Writer) Data(v any) error {
 
 // Human writes human-readable payload to stdout. Suppressed in JSON mode so that
 // Data stays the sole stdout producer.
+//
+// Arguments are stripped of control characters. Task titles, branch names and
+// session notes come from the server, and an escape sequence in one of them
+// would otherwise be handed straight to the terminal, where it can repaint the
+// screen or rewrite what the reader thinks they are looking at.
 func (w *Writer) Human(format string, args ...any) {
 	if w.Mode.JSON {
 		return
 	}
-	fmt.Fprintf(w.Out, format+"\n", args...)
+	fmt.Fprintf(w.Out, format+"\n", sanitizeArgs(args)...)
 }
 
 // Status writes progress and headings to stderr. Suppressed in JSON mode.
@@ -75,7 +122,7 @@ func (w *Writer) Status(format string, args ...any) {
 	if w.Mode.JSON {
 		return
 	}
-	fmt.Fprintf(w.Err, format+"\n", args...)
+	fmt.Fprintf(w.Err, format+"\n", sanitizeArgs(args)...)
 }
 
 // Error reports a failure. stderr always gets the readable form; JSON mode
@@ -84,7 +131,7 @@ func (w *Writer) Error(err error) {
 	if err == nil {
 		return
 	}
-	fmt.Fprintf(w.Err, "Error: %v\n", err)
+	fmt.Fprintf(w.Err, "Error: %v\n", SanitizeControl(err.Error()))
 	if w.Mode.JSON {
 		enc := json.NewEncoder(w.Out)
 		enc.SetIndent("", "  ")

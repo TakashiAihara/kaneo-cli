@@ -100,3 +100,64 @@ func TestErrorReachesStderrInBothModes(t *testing.T) {
 		}
 	}
 }
+
+// Task titles, branch names and session notes come from the server. An escape
+// sequence in one of them would otherwise reach the terminal, where it can
+// repaint the screen or rewrite what the reader believes they are looking at.
+func TestHumanOutputStripsControlCharacters(t *testing.T) {
+	w, out, _ := newTestWriter(false)
+	w.Human("#%d %s", 7, "innocent\x1b[2K\x1b[1Ghijacked")
+
+	got := out.String()
+	if strings.ContainsRune(got, 0x1b) {
+		t.Errorf("an escape sequence reached stdout: %q", got)
+	}
+	if !strings.Contains(got, "innocent") || !strings.Contains(got, "hijacked") {
+		t.Errorf("the visible text was lost: %q", got)
+	}
+}
+
+func TestSanitizeControl(t *testing.T) {
+	const repl = "\uFFFD"
+	tests := []struct{ in, want string }{
+		{"plain", "plain"},
+		{"tab\there", "tab\there"},
+		{"line\nbreak", "line\nbreak"},
+		{"esc\x1b[31m", "esc" + repl + "[31m"},
+		{"bell\x07", "bell" + repl},
+		{"del\x7f", "del" + repl},
+		{"c1\u0090", "c1" + repl},
+		{"carriage\rreturn", "carriage" + repl + "return"},
+		{"日本語はそのまま", "日本語はそのまま"},
+	}
+	for _, tc := range tests {
+		if got := SanitizeControl(tc.in); got != tc.want {
+			t.Errorf("SanitizeControl(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+// The JSON path must not be touched: the encoder escapes control characters
+// itself, and rewriting them would corrupt the value a script reads.
+func TestJSONOutputKeepsValuesIntact(t *testing.T) {
+	w, out, _ := newTestWriter(true)
+	original := "with\x1bescape"
+	if err := w.Data(map[string]string{"title": original}); err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]string
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["title"] != original {
+		t.Errorf("title = %q, want the value unchanged", got["title"])
+	}
+}
+
+func TestErrorOutputStripsControlCharacters(t *testing.T) {
+	w, _, errBuf := newTestWriter(false)
+	w.Error(errors.New("boom\x1b[2Jcleared"))
+	if strings.ContainsRune(errBuf.String(), 0x1b) {
+		t.Errorf("an escape sequence reached stderr: %q", errBuf.String())
+	}
+}

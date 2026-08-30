@@ -274,3 +274,47 @@ func TestRedirectChainIsBounded(t *testing.T) {
 		t.Error("an unbounded redirect chain was allowed")
 	}
 }
+
+// The shape a failure arrives in is the server's choice. Declaring it as one
+// fixed structure means anything else fails to decode and the server's own
+// message is lost behind a complaint about types.
+func TestServerMessageSurvivesWhateverShapeItArrivesIn(t *testing.T) {
+	cases := []struct {
+		name, body, wantMessage string
+	}{
+		{"array of objects", `{"success":false,"error":[{"message":"expected workspaceId"}]}`, "expected workspaceId"},
+		{"single object", `{"success":false,"error":{"message":"nested object"}}`, "nested object"},
+		{"bare string", `{"success":false,"error":"Unauthorized workspace access"}`, "Unauthorized workspace access"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(tc.body))
+			})
+			_, err := c.ListProjects(context.Background(), "ws")
+			if err == nil {
+				t.Fatal("success:false was treated as a success")
+			}
+			apiErr, ok := err.(*Error)
+			if !ok {
+				t.Fatalf("error type = %T, want *Error", err)
+			}
+			// Asserted on the extracted messages, not on the formatted
+			// string: Error() falls back to printing the raw body, so a
+			// string match would pass even with extraction broken.
+			if len(apiErr.Messages) != 1 || apiErr.Messages[0] != tc.wantMessage {
+				t.Errorf("messages = %v, want [%q]", apiErr.Messages, tc.wantMessage)
+			}
+		})
+	}
+}
+
+// success:false with no usable message must still be a failure.
+func TestSuccessFalseWithoutAMessageIsStillAnError(t *testing.T) {
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"success":false}`))
+	})
+	if _, err := c.ListProjects(context.Background(), "ws"); err == nil {
+		t.Error("success:false without a message was treated as a success")
+	}
+}

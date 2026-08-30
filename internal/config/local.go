@@ -90,7 +90,14 @@ func MergeLocals(locals []Local) Local {
 	for _, l := range locals {
 		if out.Workspace == "" && l.Workspace != "" {
 			out.Workspace = l.Workspace
-			out.Path = l.Path
+			// Only the first file to contribute anything is recorded, and
+			// never overwritten. Path answers "which file did this come from"
+			// for `kaneo context`, and the list is nearest-first, so letting a
+			// parent overwrite it would name a file the reader did not get
+			// their project from.
+			if out.Path == "" {
+				out.Path = l.Path
+			}
 		}
 		if out.Project == "" && l.Project != "" {
 			out.Project = l.Project

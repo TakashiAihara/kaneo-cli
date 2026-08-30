@@ -132,11 +132,48 @@ func (e *Error) Unauthorized() bool {
 }
 
 // errorEnvelope is the server's failure shape.
+//
+// Error is held as raw JSON because the shape it arrives in is the server's
+// choice, not this client's. Declaring it as an array means a failure reported
+// any other way fails to decode, and the server's message is lost behind a
+// complaint about types.
 type errorEnvelope struct {
-	Success *bool `json:"success"`
-	Error   []struct {
+	Success *bool           `json:"success"`
+	Error   json.RawMessage `json:"error"`
+}
+
+// messages pulls whatever human-readable text the envelope carries, whichever
+// shape it came in.
+func (e errorEnvelope) messages() []string {
+	if len(e.Error) == 0 {
+		return nil
+	}
+
+	var list []struct {
 		Message string `json:"message"`
-	} `json:"error"`
+	}
+	if err := json.Unmarshal(e.Error, &list); err == nil {
+		out := make([]string, 0, len(list))
+		for _, item := range list {
+			if item.Message != "" {
+				out = append(out, item.Message)
+			}
+		}
+		return out
+	}
+
+	var single struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(e.Error, &single); err == nil && single.Message != "" {
+		return []string{single.Message}
+	}
+
+	var text string
+	if err := json.Unmarshal(e.Error, &text); err == nil && text != "" {
+		return []string{text}
+	}
+	return nil
 }
 
 // Do issues a request and decodes the body into out, which may be nil.
@@ -233,12 +270,7 @@ func newAPIError(method, path string, status int, raw []byte) *Error {
 }
 
 func newAPIErrorFromEnvelope(method, path string, status int, raw []byte, env errorEnvelope) *Error {
-	msgs := make([]string, 0, len(env.Error))
-	for _, e := range env.Error {
-		if e.Message != "" {
-			msgs = append(msgs, e.Message)
-		}
-	}
+	msgs := env.messages()
 	return &Error{
 		StatusCode: status,
 		Method:     method,

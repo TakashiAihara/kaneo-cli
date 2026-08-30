@@ -34,10 +34,19 @@ Settings resolve from strongest to weakest:
 
 1. command-line flags — `--api-url`, `--api-key`, `--workspace`, `--project`
 2. environment — `KANEO_API_URL`, `KANEO_API_KEY`, `KANEO_WORKSPACE`, `KANEO_PROJECT`
-3. `.kaneo.json` in the current directory or any parent, up to `$HOME`
+3. `.kaneo.json` in the current directory or any parent, up to `$HOME` — workspace and project only
 4. the active profile in `~/.config/kaneo/config.json`
-5. the `repos` map in that same file, keyed by the git remote's `owner/repo` — supplies a project
-6. the `owners` map in that same file, keyed by the remote's owner — supplies a workspace
+5. the `repos` map in that same file, keyed by the git remote's `owner/repo` — project only
+6. the `owners` map in that same file, keyed by the remote's owner — workspace only
+
+Not every layer answers every setting:
+
+| setting | comes from |
+| --- | --- |
+| api url | flag, environment, profile, then the hosted default |
+| api key | flag, environment, profile |
+| workspace | flag, environment, `.kaneo.json`, profile, `owners` |
+| project | flag, environment, `.kaneo.json`, profile, `repos` |
 
 `kaneo context` prints the resolved values and names the layer each one came from.
 
@@ -112,7 +121,9 @@ kaneo board                     # open tasks, and which sessions hold them
 
 The session is identified by `KANEO_SESSION_ID`, falling back to `CLAUDE_CODE_SESSION_ID`.
 
-`board` and the `session` commands are **fail-open**: on failure they print nothing and exit 0, so a session-start hook is not broken by an unreachable server. `--strict` turns that off and `KANEO_DEBUG=1` prints the reason.
+`board` and the `session` commands are **fail-open**: an unreachable server, a missing key or an unconfigured project makes them print nothing and exit 0, so a session-start hook is not broken by any of them. `--strict` turns that off and `KANEO_DEBUG=1` prints the reason that was swallowed.
+
+A failure that already changed something elsewhere is reported regardless — `session attach` that wrote the comment but could not record it locally, for instance. Staying quiet there would leave `session next` believing nothing is attached.
 
 ## Output
 

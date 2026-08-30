@@ -60,12 +60,19 @@ type Inputs struct {
 
 // Resolve applies the precedence chain, from strongest to weakest:
 //
-//	flag > environment > .kaneo.json > active profile > repo map > owner map > default
+//	flag > environment > .kaneo.json > active profile > repo map / owner map > default
 //
-// The last two layers are narrow on purpose. The repo map supplies only a
-// project, mapping owner/repo to a project id; the owner map supplies only a
-// workspace, mapping an owner to a workspace id. Neither can supply a
-// credential.
+// Not every layer answers every setting, so the chain is shorter for some:
+//
+//	api url    flag, environment, profile, default
+//	api key    flag, environment, profile
+//	workspace  flag, environment, .kaneo.json, profile, owner map
+//	project    flag, environment, .kaneo.json, profile, repo map
+//
+// The last two layers are narrow on purpose. The repo map maps owner/repo to a
+// project id and supplies nothing else; the owner map maps an owner to a
+// workspace id and supplies nothing else. Neither can supply a credential, and
+// .kaneo.json cannot either — it is a file meant to be committed.
 func Resolve(in Inputs) Resolved {
 	r := Resolved{Origin: map[string]Source{}, Repo: in.Repo}
 

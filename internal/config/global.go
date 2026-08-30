@@ -96,7 +96,32 @@ func (g *Global) Save() error {
 		return err
 	}
 	b = append(b, '\n')
-	return os.WriteFile(g.path, b, 0o600)
+
+	// Written to a sibling and renamed over the target. os.WriteFile truncates
+	// first, so an interrupted write would leave the config empty and every
+	// later run would fail to parse it until someone repaired the file by hand.
+	tmp, err := os.CreateTemp(filepath.Dir(g.path), ".config-*.json")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(b); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), g.path)
 }
 
 // Path reports where this config was loaded from.

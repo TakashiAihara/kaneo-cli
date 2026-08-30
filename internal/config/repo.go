@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // scpLikePattern matches git's scp-style remote: user@host:owner/repo.
@@ -39,14 +40,26 @@ func ParseRemote(url string) (string, bool) {
 	return "", false
 }
 
+// remoteTimeout bounds the git call. Knowing the remote is a convenience for
+// resolving a project, never worth stalling a command over.
+const remoteTimeout = 2 * time.Second
+
 // CurrentRepo reports the owner/repo of the git remote in dir.
 //
 // It is derived from the remote rather than the working copy's path because a
 // checkout lives at a different absolute path on every machine, while the
 // remote is the same everywhere.
 func CurrentRepo(ctx context.Context, dir string) (string, bool) {
+	// Bounded independently of the caller's context, and with WaitDelay set:
+	// cancelling kills git but Output waits for the stdout pipe to close, and
+	// a grandchild that inherited it holds it open. Without this the deadline
+	// passes and the call still does not return.
+	ctx, cancel := context.WithTimeout(ctx, remoteTimeout)
+	defer cancel()
+
 	cmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
 	cmd.Dir = dir
+	cmd.WaitDelay = 500 * time.Millisecond
 	out, err := cmd.Output()
 	if err != nil {
 		return "", false

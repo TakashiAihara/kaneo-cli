@@ -1,11 +1,14 @@
 package config
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func writeFile(t *testing.T, path, body string) {
@@ -435,5 +438,100 @@ func TestParseRemoteAcceptsHostedForms(t *testing.T) {
 		if !ok || got != want {
 			t.Errorf("ParseRemote(%q) = %q, %v; want %q", url, got, ok, want)
 		}
+	}
+}
+
+// Path answers "which file did this come from" for `kaneo context`. The list
+// is nearest-first, so a parent contributing a workspace must not rename the
+// file the reader got their project from.
+func TestMergeLocalsRecordsTheNearestContributingFile(t *testing.T) {
+	got := MergeLocals([]Local{
+		{Project: "p1", Path: "/repo/sub/.kaneo.json"},
+		{Workspace: "w1", Project: "p2", Path: "/repo/.kaneo.json"},
+	})
+	if got.Project != "p1" || got.Workspace != "w1" {
+		t.Fatalf("merge = %+v", got)
+	}
+	if got.Path != "/repo/sub/.kaneo.json" {
+		t.Errorf("Path = %q, want the nearest contributing file", got.Path)
+	}
+}
+
+// git can block on an unresponsive mount or a credential prompt, and killing
+// it is not enough: Output waits for the stdout pipe, which a grandchild keeps
+// open. Same failure as currentBranch, in the other place that runs git.
+func TestCurrentRepoGivesUpOnAHangingGit(t *testing.T) {
+	stub := t.TempDir()
+	pidFile := filepath.Join(stub, "sleeper.pid")
+	body := "#!/bin/sh\nsleep 30 &\necho $! > " + pidFile + "\nwait\n"
+	if err := os.WriteFile(filepath.Join(stub, "git"), []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { killRecordedProcess(t, pidFile) })
+	t.Setenv("PATH", stub+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	done := make(chan struct{})
+	go func() { CurrentRepo(context.Background(), t.TempDir()); close(done) }()
+
+	select {
+	case <-done:
+	case <-time.After(remoteTimeout * 5):
+		t.Fatalf("CurrentRepo did not return within %s", remoteTimeout*5)
+	}
+}
+
+func killRecordedProcess(t *testing.T, pidFile string) {
+	t.Helper()
+	for i := 0; i < 20; i++ {
+		b, err := os.ReadFile(pidFile)
+		if err == nil {
+			if pid, convErr := strconv.Atoi(strings.TrimSpace(string(b))); convErr == nil {
+				if proc, findErr := os.FindProcess(pid); findErr == nil {
+					_ = proc.Kill()
+				}
+			}
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// An interrupted write must not leave the config unparseable, since every
+// later run reads it.
+func TestSaveIsAtomic(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nested", "config.json")
+
+	g := &Global{path: path}
+	g.SetProfile("p", Profile{APIURL: "https://kaneo.example", APIKey: "k"})
+	if err := g.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("mode = %o, want 600", perm)
+	}
+
+	// No temporary file may be left next to it.
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name() != "config.json" {
+			t.Errorf("left behind %q", e.Name())
+		}
+	}
+
+	back, err := LoadGlobal(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, p, ok := back.ActiveProfile(); !ok || p.APIKey != "k" {
+		t.Errorf("round trip lost the profile: %+v", back)
 	}
 }

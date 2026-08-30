@@ -36,7 +36,8 @@ Settings resolve from strongest to weakest:
 2. environment — `KANEO_API_URL`, `KANEO_API_KEY`, `KANEO_WORKSPACE`, `KANEO_PROJECT`
 3. `.kaneo.json` in the current directory or any parent, up to `$HOME`
 4. the active profile in `~/.config/kaneo/config.json`
-5. the `repos` map in that same file, keyed by the git remote's `owner/repo`
+5. the `repos` map in that same file, keyed by the git remote's `owner/repo` — supplies a project
+6. the `owners` map in that same file, keyed by the remote's owner — supplies a workspace
 
 `kaneo context` prints the resolved values and names the layer each one came from.
 
@@ -50,6 +51,27 @@ Settings resolve from strongest to weakest:
 ```
 
 The nearest file wins per field, so a parent can supply a workspace while a subdirectory overrides the project. This file is meant to be committed, so it carries no credentials.
+
+### Global config
+
+```json
+{
+  "default_profile": "self",
+  "profiles": {
+    "self": { "api_url": "https://kaneo.example.com" }
+  },
+  "owners": {
+    "some-org": "workspace-id-for-that-org"
+  },
+  "repos": {
+    "some-org/some-repo": "project-id"
+  }
+}
+```
+
+`owners` states a rule once for a whole organisation: every repository under it belongs to that workspace. It supplies a workspace only — a workspace does not imply a project, so `repos` or `.kaneo.json` still names that.
+
+Written with mode `0600`, since a profile may hold a key.
 
 ### Self-hosted instances
 

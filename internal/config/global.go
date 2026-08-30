@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Profile is one named set of connection settings.
@@ -28,6 +29,14 @@ type Global struct {
 	// key would not survive being synced.
 	Repos map[string]string `json:"repos,omitempty"`
 
+	// Owners maps a git remote's owner to a workspace id, so that a rule like
+	// "everything under this organisation belongs to that workspace" can be
+	// stated once instead of per repository.
+	//
+	// It supplies a workspace only. A workspace does not imply a project, so
+	// the project still comes from .kaneo.json or Repos.
+	Owners map[string]string `json:"owners,omitempty"`
+
 	path string
 }
 
@@ -42,7 +51,12 @@ func GlobalPath(home string, env func(string) string) string {
 // LoadGlobal reads the config. A missing file is not an error — it is an empty
 // config, so a fresh install works with flags and environment alone.
 func LoadGlobal(path string) (*Global, error) {
-	g := &Global{Profiles: map[string]Profile{}, Repos: map[string]string{}, path: path}
+	g := &Global{
+		Profiles: map[string]Profile{},
+		Repos:    map[string]string{},
+		Owners:   map[string]string{},
+		path:     path,
+	}
 
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -59,6 +73,9 @@ func LoadGlobal(path string) (*Global, error) {
 	}
 	if g.Repos == nil {
 		g.Repos = map[string]string{}
+	}
+	if g.Owners == nil {
+		g.Owners = map[string]string{}
 	}
 	g.path = path
 	return g, nil
@@ -84,6 +101,15 @@ func (g *Global) Save() error {
 
 // Path reports where this config was loaded from.
 func (g *Global) Path() string { return g.path }
+
+// WorkspaceForOwner returns the workspace an owner's repositories belong to.
+func (g *Global) WorkspaceForOwner(repo string) string {
+	owner, _, ok := strings.Cut(repo, "/")
+	if !ok || owner == "" {
+		return ""
+	}
+	return g.Owners[owner]
+}
 
 // ActiveProfile returns the profile named by DefaultProfile, or the sole
 // profile when exactly one exists and no default was recorded.

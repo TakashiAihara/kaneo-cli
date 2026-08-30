@@ -14,13 +14,14 @@ const DefaultAPIURL = "https://cloud.kaneo.app"
 type Source string
 
 const (
-	SourceFlag    Source = "flag"
-	SourceEnv     Source = "env"
-	SourceLocal   Source = "local"   // .kaneo.json
-	SourceProfile Source = "profile" // ~/.config/kaneo/config.json
-	SourceRepoMap Source = "repo-map"
-	SourceDefault Source = "default"
-	SourceUnset   Source = "unset"
+	SourceFlag     Source = "flag"
+	SourceEnv      Source = "env"
+	SourceLocal    Source = "local"   // .kaneo.json
+	SourceProfile  Source = "profile" // ~/.config/kaneo/config.json
+	SourceRepoMap  Source = "repo-map"
+	SourceOwnerMap Source = "owner-map"
+	SourceDefault  Source = "default"
+	SourceUnset    Source = "unset"
 )
 
 // Flags holds the command-line overrides.
@@ -59,10 +60,12 @@ type Inputs struct {
 
 // Resolve applies the precedence chain, from strongest to weakest:
 //
-//	flag > environment > .kaneo.json > active profile > repo map > default
+//	flag > environment > .kaneo.json > active profile > repo map > owner map > default
 //
-// The repo map only ever supplies a project: it maps owner/repo to a project id
-// and knows nothing about workspaces or credentials.
+// The last two layers are narrow on purpose. The repo map supplies only a
+// project, mapping owner/repo to a project id; the owner map supplies only a
+// workspace, mapping an owner to a workspace id. Neither can supply a
+// credential.
 func Resolve(in Inputs) Resolved {
 	r := Resolved{Origin: map[string]Source{}, Repo: in.Repo}
 
@@ -116,11 +119,16 @@ func Resolve(in Inputs) Resolved {
 		c(env("KANEO_API_KEY"), SourceEnv),
 		c(profile.APIKey, SourceProfile),
 	)
+	var fromOwnerMap string
+	if in.Global != nil && in.Repo != "" {
+		fromOwnerMap = in.Global.WorkspaceForOwner(in.Repo)
+	}
 	r.WorkspaceID = pick("workspace",
 		c(in.Flags.WorkspaceID, SourceFlag),
 		c(env("KANEO_WORKSPACE"), SourceEnv),
 		c(local.Workspace, SourceLocal),
 		c(profile.WorkspaceID, SourceProfile),
+		c(fromOwnerMap, SourceOwnerMap),
 	)
 
 	var fromRepoMap string

@@ -244,3 +244,110 @@ func TestParseRemote(t *testing.T) {
 		t.Error("ParseRemote accepted a non-remote string")
 	}
 }
+
+// The owner map states a rule once for an organisation instead of per
+// repository. It is the weakest layer, and it supplies a workspace only.
+func TestOwnerMap(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, "repo")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	g := &Global{Owners: map[string]string{
+		"micoworks":     "ws-work",
+		"TakashiAihara": "ws-private",
+	}}
+	base := Inputs{Dir: dir, Home: home, Global: g}
+
+	t.Run("supplies a workspace from the repo owner", func(t *testing.T) {
+		in := base
+		in.Repo = "micoworks/delivery-foundation"
+		r := Resolve(in)
+		if r.WorkspaceID != "ws-work" {
+			t.Errorf("workspace = %q, want ws-work", r.WorkspaceID)
+		}
+		if r.Origin["workspace"] != SourceOwnerMap {
+			t.Errorf("origin = %q, want owner-map", r.Origin["workspace"])
+		}
+	})
+
+	t.Run("a different owner selects a different workspace", func(t *testing.T) {
+		in := base
+		in.Repo = "TakashiAihara/kaneo-cli"
+		if got := Resolve(in).WorkspaceID; got != "ws-private" {
+			t.Errorf("workspace = %q, want ws-private", got)
+		}
+	})
+
+	t.Run("an unlisted owner supplies nothing", func(t *testing.T) {
+		in := base
+		in.Repo = "someone-else/repo"
+		r := Resolve(in)
+		if r.WorkspaceID != "" {
+			t.Errorf("workspace = %q, want empty", r.WorkspaceID)
+		}
+	})
+
+	// A workspace does not imply a project, so this layer must never fill one
+	// in: a wrong project would send writes to the wrong board.
+	t.Run("never supplies a project", func(t *testing.T) {
+		in := base
+		in.Repo = "micoworks/delivery-foundation"
+		r := Resolve(in)
+		if r.ProjectID != "" {
+			t.Errorf("project = %q, want empty", r.ProjectID)
+		}
+		if r.Origin["project"] != SourceUnset {
+			t.Errorf("origin = %q, want unset", r.Origin["project"])
+		}
+	})
+
+	t.Run("never supplies a credential", func(t *testing.T) {
+		in := base
+		in.Repo = "micoworks/delivery-foundation"
+		if got := Resolve(in).APIKey; got != "" {
+			t.Errorf("api key = %q, want empty", got)
+		}
+	})
+
+	// The owner map is a fallback for repositories nothing more specific
+	// covers, so anything explicit has to beat it.
+	t.Run("every other layer beats it", func(t *testing.T) {
+		local := filepath.Join(home, "explicit")
+		writeFile(t, filepath.Join(local, LocalFileName), `{"workspace":"ws-local"}`)
+
+		for _, tc := range []struct {
+			name string
+			in   Inputs
+			want string
+		}{
+			{"flag", Inputs{Dir: dir, Home: home, Global: g, Repo: "micoworks/x",
+				Flags: Flags{WorkspaceID: "ws-flag"}}, "ws-flag"},
+			{"env", Inputs{Dir: dir, Home: home, Global: g, Repo: "micoworks/x",
+				Env: envFrom(map[string]string{"KANEO_WORKSPACE": "ws-env"})}, "ws-env"},
+			{"local", Inputs{Dir: local, Home: home, Global: g, Repo: "micoworks/x"}, "ws-local"},
+			{"profile", Inputs{Dir: dir, Home: home, Repo: "micoworks/x", Global: &Global{
+				DefaultProfile: "p",
+				Profiles:       map[string]Profile{"p": {WorkspaceID: "ws-profile"}},
+				Owners:         g.Owners,
+			}}, "ws-profile"},
+		} {
+			if got := Resolve(tc.in).WorkspaceID; got != tc.want {
+				t.Errorf("%s: workspace = %q, want %q", tc.name, got, tc.want)
+			}
+		}
+	})
+}
+
+func TestWorkspaceForOwner(t *testing.T) {
+	g := &Global{Owners: map[string]string{"micoworks": "ws-work"}}
+	if got := g.WorkspaceForOwner("micoworks/anything"); got != "ws-work" {
+		t.Errorf("= %q, want ws-work", got)
+	}
+	if got := g.WorkspaceForOwner("micoworks"); got != "" {
+		t.Errorf("= %q; a bare owner with no repo is not a valid key", got)
+	}
+	if got := g.WorkspaceForOwner(""); got != "" {
+		t.Errorf("= %q, want empty", got)
+	}
+}

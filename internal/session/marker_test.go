@@ -1,6 +1,9 @@
 package session
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // The exact bytes the Python `kn` writes. Both implementations read the same
 // board while one replaces the other, so this must keep parsing.
@@ -130,5 +133,56 @@ func TestFormatKeepsTheMarkerOnOneLine(t *testing.T) {
 	}
 	if out.Branch != "main" {
 		t.Errorf("branch = %q; a newline in an earlier field corrupted the parse", out.Branch)
+	}
+}
+
+// A value containing a space followed by something shaped like a key would
+// otherwise end the field early, and the round trip would silently lose the
+// rest of the path.
+func TestValueContainingAFieldSeparatorSurvives(t *testing.T) {
+	for _, cwd := range []string{
+		"/work/client foo=bar",
+		"/work/my client",
+		"/work/100% sure",
+		"/work/a\tb",
+		"/work/trailing branch=notreal",
+	} {
+		in := Marker{SessionID: "s1", Host: "h", Cwd: cwd, Branch: "main", State: StateRunning}
+		out, ok := Parse(in.Format(), "t0")
+		if !ok {
+			t.Fatalf("cwd %q: did not parse:\n%s", cwd, in.Format())
+		}
+		if out.Cwd != cwd {
+			t.Errorf("cwd = %q, want %q (marker: %s)", out.Cwd, cwd, in.Format())
+		}
+		if out.Branch != "main" {
+			t.Errorf("cwd %q: branch = %q, want main; the field boundary moved", cwd, out.Branch)
+		}
+	}
+}
+
+// The encoded form must stay on one whitespace-separated token, because the
+// Python implementation splits the marker body on whitespace.
+func TestEncodedValueHasNoWhitespace(t *testing.T) {
+	m := Marker{SessionID: "s1", Cwd: "/work/my client", Branch: "main", State: StateRunning}
+	body := m.Format()
+	body = body[strings.Index(body, "kn:session ")+len("kn:session ") : strings.Index(body, "-->")]
+
+	for _, field := range strings.Fields(body) {
+		if !strings.Contains(field, "=") {
+			t.Errorf("field %q has no key; a value was split across tokens: %q", field, body)
+		}
+	}
+}
+
+// Markers written by the Python implementation carry raw values and no
+// escapes, so decoding must leave them untouched.
+func TestRawValuesFromTheOtherImplementationAreUnchanged(t *testing.T) {
+	m, ok := Parse("<!-- kn:session id=abc host=d1 cwd=/root/x branch=main state=running -->", "t0")
+	if !ok {
+		t.Fatal("did not parse")
+	}
+	if m.Cwd != "/root/x" {
+		t.Errorf("cwd = %q, want /root/x", m.Cwd)
 	}
 }

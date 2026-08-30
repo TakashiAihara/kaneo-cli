@@ -75,7 +75,10 @@ func newSessionAttachCommand(app *App) *cobra.Command {
 		if err := sessionStore().Save(sessionID, session.Attachment{
 			TaskID: task.ID, TaskNumber: task.Number, Title: task.Title,
 		}); err != nil {
-			return err
+			// The marker is already on the server. Reporting success here
+			// would leave `session next` believing nothing is attached, and a
+			// retry would post a second marker.
+			return hard("attached #%d on the server, but could not record it locally: %w", task.Number, err)
 		}
 
 		app.Out.Human("attached: #%d %s", task.Number, task.Title)
@@ -89,11 +92,15 @@ func newSessionAttachCommand(app *App) *cobra.Command {
 func newSessionNextCommand(app *App) *cobra.Command {
 	var strict bool
 
+	var taskRef string
+
 	cmd := &cobra.Command{
-		Use:   "next [task] <next step...>",
+		Use:   "next <next step...> [--task <task>]",
 		Short: "Record what this session will do next",
 		Long: "Record what this session will do next.\n\n" +
-			"With no task, the one this session attached to is used.",
+			"Without --task, the task this session attached to is used. The task is\n" +
+			"named by a flag rather than a leading argument so that a next step which\n" +
+			"happens to start with a number is not mistaken for one.",
 		Args: cobra.MinimumNArgs(1),
 	}
 	cmd.RunE = failOpen(app, &strict, func(c *cobra.Command, args []string) error {
@@ -106,12 +113,12 @@ func newSessionNextCommand(app *App) *cobra.Command {
 		ctx, cancel := app.Context()
 		defer cancel()
 
-		taskID, number, err := targetTask(ctx, client, project, args)
+		taskID, number, err := targetTask(ctx, client, project, taskRef)
 		if err != nil {
 			return err
 		}
-		step := strings.Join(argsAfterTask(args), " ")
-		if strings.TrimSpace(step) == "" {
+		step := strings.TrimSpace(strings.Join(args, " "))
+		if step == "" {
 			return fmt.Errorf("no next step given")
 		}
 
@@ -125,39 +132,16 @@ func newSessionNextCommand(app *App) *cobra.Command {
 		return app.Out.Data(map[string]any{"taskId": taskID, "number": number, "nextStep": step})
 	})
 
+	cmd.Flags().StringVar(&taskRef, "task", "", "task to record against, by number or id; defaults to the attached one")
 	addStrictFlag(cmd, &strict)
 	return cmd
 }
 
-// looksLikeTaskRef reports whether the first argument names a task rather than
-// being the first word of the next step.
-func looksLikeTaskRef(s string) bool {
-	if strings.HasPrefix(s, "#") {
-		return true
-	}
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-func argsAfterTask(args []string) []string {
-	if len(args) > 1 && looksLikeTaskRef(args[0]) {
-		return args[1:]
-	}
-	return args
-}
-
-// targetTask picks the task a command acts on: the one named in the arguments,
+// targetTask picks the task a command acts on: the one named explicitly,
 // otherwise the one this session attached to.
-func targetTask(ctx context.Context, client *api.Client, project string, args []string) (string, int, error) {
-	if len(args) > 0 && looksLikeTaskRef(args[0]) {
-		task, err := resolveTask(ctx, client, project, args[0])
+func targetTask(ctx context.Context, client *api.Client, project, ref string) (string, int, error) {
+	if strings.TrimSpace(ref) != "" {
+		task, err := resolveTask(ctx, client, project, ref)
 		if err != nil {
 			return "", 0, err
 		}

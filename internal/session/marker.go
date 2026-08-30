@@ -75,10 +75,10 @@ type Marker struct {
 // an unlabelled line reads correctly there while staying language-neutral here.
 func (m Marker) Format() string {
 	fields := []string{
-		"id=" + oneLine(m.SessionID),
-		"host=" + oneLine(m.Host),
-		"cwd=" + oneLine(m.Cwd),
-		"branch=" + oneLine(m.Branch),
+		"id=" + encodeValue(m.SessionID),
+		"host=" + encodeValue(m.Host),
+		"cwd=" + encodeValue(m.Cwd),
+		"branch=" + encodeValue(m.Branch),
 		"state=" + string(m.State),
 	}
 	out := "<!-- kn:session " + strings.Join(fields, " ") + " -->"
@@ -88,17 +88,52 @@ func (m Marker) Format() string {
 	return out
 }
 
-// oneLine keeps a field on a single line and free of the marker terminator.
-// Spaces are preserved: the reader here handles them, and a value containing
-// one is rare enough that degrading it for the older reader is the better
-// trade than silently rewriting the user's path.
-func oneLine(s string) string {
-	s = strings.NewReplacer("\n", " ", "\r", " ", "-->", "--").Replace(s)
+// encodeValue makes a value safe to sit between two space-separated fields.
+//
+// Whitespace is percent-encoded rather than kept. A value containing a space
+// is otherwise indistinguishable from the start of the next field: a path like
+// "/work/client foo=bar" would be read back as "/work/client". The Python
+// implementation splits the marker body on whitespace, so encoding keeps the
+// value in one piece for that reader too — it renders the escapes literally
+// where it displays the value, which is cosmetic, rather than truncating it.
+//
+// The percent sign itself is encoded first so decoding is unambiguous.
+func encodeValue(s string) string {
+	s = strings.ReplaceAll(s, "-->", "--")
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return "-"
 	}
-	return s
+
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r == '%':
+			b.WriteString("%25")
+		case r == ' ':
+			b.WriteString("%20")
+		case r == '\t':
+			b.WriteString("%09")
+		case r == '\n' || r == '\r':
+			b.WriteString("%0A")
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// decodeValue reverses encodeValue. An unrecognised escape is left alone: a
+// marker written by the Python implementation carries raw values, and mangling
+// a literal percent sign would be worse than leaving it.
+func decodeValue(s string) string {
+	replacements := []struct{ from, to string }{
+		{"%20", " "}, {"%09", "\t"}, {"%0A", "\n"},
+	}
+	for _, r := range replacements {
+		s = strings.ReplaceAll(s, r.from, r.to)
+	}
+	return strings.ReplaceAll(s, "%25", "%")
 }
 
 // Parse extracts a marker from a comment body. The second result is false when
@@ -115,6 +150,7 @@ func Parse(content, createdAt string) (Marker, bool) {
 		if value == "-" {
 			value = ""
 		}
+		value = decodeValue(value)
 		switch key {
 		case "id":
 			m.SessionID = value

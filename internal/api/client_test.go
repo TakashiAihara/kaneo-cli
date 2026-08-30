@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -175,8 +176,7 @@ func TestWriteOperationsUseDedicatedEndpoints(t *testing.T) {
 	var gotMethod, gotPath, gotBody string
 	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
 		gotMethod, gotPath = r.Method, r.URL.Path
-		buf := make([]byte, r.ContentLength)
-		_, _ = r.Body.Read(buf)
+		buf, _ := io.ReadAll(r.Body)
 		gotBody = string(buf)
 		w.WriteHeader(http.StatusOK)
 	})

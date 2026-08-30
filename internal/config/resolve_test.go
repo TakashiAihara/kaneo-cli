@@ -351,3 +351,89 @@ func TestWorkspaceForOwner(t *testing.T) {
 		t.Errorf("= %q, want empty", got)
 	}
 }
+
+// A checkout can sit outside $HOME. Walking up from there would run to the
+// filesystem root, where a .kaneo.json belonging to nobody in particular could
+// name a workspace and send later writes to the wrong board.
+func TestWalkUpDoesNotEscapeWhenDirIsOutsideStopAt(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	outside := filepath.Join(root, "work", "repo")
+	writeFile(t, filepath.Join(root, LocalFileName), `{"project":"proj-above"}`)
+	writeFile(t, filepath.Join(root, "work", LocalFileName), `{"project":"proj-work"}`)
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	r := Resolve(Inputs{Dir: outside, Home: home, Global: &Global{}})
+	if r.ProjectID != "" {
+		t.Errorf("project = %q; the walk left the boundary", r.ProjectID)
+	}
+}
+
+// Inside the boundary the walk still behaves as before.
+func TestWalkUpStillWalksInsideStopAt(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, "a", "b")
+	writeFile(t, filepath.Join(home, "a", LocalFileName), `{"project":"proj-a"}`)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := Resolve(Inputs{Dir: dir, Home: home, Global: &Global{}}).ProjectID; got != "proj-a" {
+		t.Errorf("project = %q, want proj-a", got)
+	}
+}
+
+// A .kaneo.json in the directory itself is still read when that directory is
+// outside the boundary; only the walk upwards is refused.
+func TestLocalFileInDirIsReadEvenOutsideStopAt(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	outside := filepath.Join(root, "work", "repo")
+	writeFile(t, filepath.Join(outside, LocalFileName), `{"project":"proj-here"}`)
+
+	if got := Resolve(Inputs{Dir: outside, Home: home, Global: &Global{}}).ProjectID; got != "proj-here" {
+		t.Errorf("project = %q, want proj-here", got)
+	}
+}
+
+// git accepts a local path as a remote, and its trailing components look
+// exactly like owner/repo. Treating one as hosted would resolve an unrelated
+// checkout to a real workspace.
+func TestParseRemoteRejectsLocalPaths(t *testing.T) {
+	for _, url := range []string{
+		"/srv/micoworks/project",
+		"file:///srv/micoworks/project",
+		"/home/user/micoworks/delivery-foundation",
+		"../sibling/repo",
+		"./micoworks/thing",
+		"C:\\src\\micoworks\\thing",
+		"",
+		"   ",
+		"not-a-remote",
+	} {
+		if got, ok := ParseRemote(url); ok {
+			t.Errorf("ParseRemote(%q) = %q, true; want rejected", url, got)
+		}
+	}
+}
+
+func TestParseRemoteAcceptsHostedForms(t *testing.T) {
+	tests := map[string]string{
+		"https://github.com/TakashiAihara/kaneo-cli.git": "TakashiAihara/kaneo-cli",
+		"https://github.com/TakashiAihara/kaneo-cli":     "TakashiAihara/kaneo-cli",
+		"http://git.example.com/owner/repo.git":          "owner/repo",
+		"git@github.com:TakashiAihara/kaneo-cli.git":     "TakashiAihara/kaneo-cli",
+		"git@github.com:TakashiAihara/kaneo-cli.git\n":   "TakashiAihara/kaneo-cli",
+		"ssh://git@example.com:2222/owner/repo.git":      "owner/repo",
+		"git://example.com/owner/repo.git":               "owner/repo",
+		"https://user@dev.azure.com/owner/repo":          "owner/repo",
+	}
+	for url, want := range tests {
+		got, ok := ParseRemote(url)
+		if !ok || got != want {
+			t.Errorf("ParseRemote(%q) = %q, %v; want %q", url, got, ok, want)
+		}
+	}
+}

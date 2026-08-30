@@ -7,16 +7,36 @@ import (
 	"strings"
 )
 
-// remotePattern pulls owner and repo out of both SSH and HTTPS remote URLs.
-var remotePattern = regexp.MustCompile(`[:/]([^/:]+)/([^/]+?)(?:\.git)?/?$`)
+// scpLikePattern matches git's scp-style remote: user@host:owner/repo.
+var scpLikePattern = regexp.MustCompile(`^[^/@]+@[^/:]+:/?([^/]+)/([^/]+?)(?:\.git)?/?$`)
+
+// urlPattern matches a remote given as a URL, for the schemes that name a
+// hosted repository.
+var urlPattern = regexp.MustCompile(`^(?:ssh|git|https?)://(?:[^/@]+@)?[^/]+/([^/]+)/([^/]+?)(?:\.git)?/?$`)
 
 // ParseRemote turns a git remote URL into "owner/repo".
+//
+// Only hosted forms are accepted: scp-style SSH, and ssh/git/http/https URLs.
+// A local path is rejected even though git accepts it as a remote, because its
+// trailing components look exactly like owner/repo — /home/me/micoworks/thing
+// would otherwise resolve to the micoworks workspace and send writes to a
+// board that has nothing to do with it.
 func ParseRemote(url string) (string, bool) {
-	m := remotePattern.FindStringSubmatch(strings.TrimSpace(url))
-	if m == nil {
+	url = strings.TrimSpace(url)
+	if url == "" {
 		return "", false
 	}
-	return m[1] + "/" + m[2], true
+
+	for _, p := range []*regexp.Regexp{urlPattern, scpLikePattern} {
+		if m := p.FindStringSubmatch(url); m != nil {
+			owner, repo := m[1], m[2]
+			if owner == "" || repo == "" {
+				return "", false
+			}
+			return owner + "/" + repo, true
+		}
+	}
+	return "", false
 }
 
 // CurrentRepo reports the owner/repo of the git remote in dir.

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // LocalFileName is the per-directory config a repo may carry.
@@ -21,24 +22,29 @@ type Local struct {
 	Path string `json:"-"`
 }
 
-// FindLocals walks from dir towards the filesystem root, collecting every
-// .kaneo.json it passes. The result is ordered nearest-first.
+// FindLocals walks from dir towards stopAt, collecting every .kaneo.json it
+// passes. The result is ordered nearest-first.
 //
-// stopAt bounds the walk (normally $HOME). The directory named by stopAt is
-// itself inspected, then the walk ends. An unreadable or malformed file is
-// skipped rather than failing the walk: a broken config should not stop a
-// session, and the layer below it is still a valid answer.
+// stopAt bounds the walk (normally $HOME) and is itself inspected. When dir is
+// not inside stopAt the walk covers dir alone: continuing would run to the
+// filesystem root, where a stray .kaneo.json belonging to nobody in particular
+// could name a workspace and send later writes to the wrong board.
+//
+// An unreadable or malformed file is skipped rather than failing the walk. A
+// broken config should not stop a session, and the layer below it is still a
+// valid answer.
 func FindLocals(dir, stopAt string) []Local {
 	var found []Local
 
 	dir = filepath.Clean(dir)
 	stopAt = filepath.Clean(stopAt)
+	bounded := within(dir, stopAt)
 
 	for {
 		if l, ok := readLocal(filepath.Join(dir, LocalFileName)); ok {
 			found = append(found, l)
 		}
-		if dir == stopAt {
+		if !bounded || dir == stopAt {
 			break
 		}
 		parent := filepath.Dir(dir)
@@ -48,6 +54,15 @@ func FindLocals(dir, stopAt string) []Local {
 		dir = parent
 	}
 	return found
+}
+
+// within reports whether dir is root or sits underneath it.
+func within(dir, root string) bool {
+	rel, err := filepath.Rel(root, dir)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (!strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != "..")
 }
 
 func readLocal(path string) (Local, bool) {

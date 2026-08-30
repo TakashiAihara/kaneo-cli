@@ -90,17 +90,26 @@ main() {
     tar -xzf "$tmp/$name" -C "$tmp" || die "could not unpack $name"
     [ -f "$tmp/kaneo" ] || die "the archive did not contain a kaneo binary"
 
-    mkdir -p "$INSTALL_DIR"
-    install -m 0755 "$tmp/kaneo" "$INSTALL_DIR/kaneo" 2>/dev/null \
-        || { cp "$tmp/kaneo" "$INSTALL_DIR/kaneo" && chmod 0755 "$INSTALL_DIR/kaneo"; } \
-        || die "could not write to $INSTALL_DIR"
+    mkdir -p "$INSTALL_DIR" || die "could not create $INSTALL_DIR"
 
-    # Run what was just installed. Reporting success without this is how an
-    # install ends up claiming to have worked while placing nothing.
-    "$INSTALL_DIR/kaneo" --version >/dev/null 2>&1 \
-        || die "installed $INSTALL_DIR/kaneo but it does not run"
+    # Stage beside the destination, verify, then move into place. Writing to
+    # the final path first would destroy a working kaneo whenever the new one
+    # turns out not to run.
+    staged=$INSTALL_DIR/.kaneo.incoming.$$
+    # shellcheck disable=SC2064
+    trap "rm -rf '$tmp' '$staged'" EXIT INT TERM
 
-    printf 'installed %s to %s\n' "$("$INSTALL_DIR/kaneo" --version)" "$INSTALL_DIR/kaneo" >&2
+    cp "$tmp/kaneo" "$staged" || die "could not write to $INSTALL_DIR"
+    chmod 0755 "$staged" || die "could not make $staged executable"
+
+    # Run what is about to be installed. Reporting success without this is how
+    # an install ends up claiming to have worked while placing nothing.
+    version=$("$staged" --version 2>/dev/null) \
+        || die "the downloaded binary does not run; leaving $INSTALL_DIR/kaneo as it was"
+
+    mv -f "$staged" "$INSTALL_DIR/kaneo" || die "could not move the binary into $INSTALL_DIR"
+
+    printf 'installed %s to %s\n' "$version" "$INSTALL_DIR/kaneo" >&2
 
     case ":$PATH:" in
         *":$INSTALL_DIR:"*) ;;

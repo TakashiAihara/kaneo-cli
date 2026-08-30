@@ -20,8 +20,9 @@ type globalFlags struct {
 	timeout   time.Duration
 }
 
-// NewRootCommand builds the whole command tree.
-func NewRootCommand(version string) *cobra.Command {
+// NewRootCommand builds the whole command tree. The App is returned so that
+// main can report a failure through the same output mode the commands used.
+func NewRootCommand(version string) (*cobra.Command, *App) {
 	var flags globalFlags
 	app := &App{}
 
@@ -78,5 +79,5 @@ func NewRootCommand(version string) *cobra.Command {
 		newCommentCommand(app),
 		newAPICheckCommand(app),
 	)
-	return root
+	return root, app
 }

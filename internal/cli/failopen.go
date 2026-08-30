@@ -1,6 +1,26 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"errors"
+	"fmt"
+
+	"github.com/spf13/cobra"
+)
+
+// hardError marks a failure that must be reported even by a fail-open command.
+//
+// Fail-open exists so an unreachable server cannot break a session. It is not
+// a licence to hide a failure that leaves things inconsistent — a comment
+// written to the server with no local record of it, for instance.
+type hardError struct{ err error }
+
+func (e hardError) Error() string { return e.err.Error() }
+func (e hardError) Unwrap() error { return e.err }
+
+// hard wraps an error so fail-open will not swallow it.
+func hard(format string, args ...any) error {
+	return hardError{err: fmt.Errorf(format, args...)}
+}
 
 // failOpen wraps a command so that a failure produces no output and exit 0.
 //
@@ -17,6 +37,13 @@ func failOpen(app *App, strict *bool, run func(*cobra.Command, []string) error) 
 			return nil
 		}
 		if *strict {
+			return err
+		}
+		// A failure that already changed something elsewhere has to surface:
+		// staying quiet would leave the caller believing a half-done operation
+		// succeeded.
+		var hardErr hardError
+		if errors.As(err, &hardErr) {
 			return err
 		}
 		debugf("%v", err)

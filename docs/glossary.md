@@ -88,6 +88,8 @@ The prefix is `kn:` rather than `kaneo:` because that is what is already written
 
 `state` is `running` or `closed`. Each of attach, next and close appends its own comment, so a session leaves a trail; only the newest marker per session id describes the current state.
 
+Values are percent-encoded where they contain whitespace. Fields are separated by spaces, so a raw space inside a value is indistinguishable from the start of the next field — a path like `/work/client foo=bar` would otherwise be read back as `/work/client`. Markers written by the older implementation carry raw values and are still read as-is.
+
 ### fail-open
 
 Producing no output and exiting 0 on failure. `board` and the `session` commands do this because they run from a session-start hook, where a missing board is a smaller harm than a broken session. Every other command reports failures normally.
@@ -103,3 +105,4 @@ Producing no output and exiting 0 on failure. `board` and the `session` commands
 | status and column | The same string. A status *is* a column id |
 | site root and API root | The root serves the web app and answers 200 with HTML for any path. Only `/api/...` is the API, which is why the configured URL is normalised to end in `/api` |
 | `/auth/get-session` and `/auth/organization/list` | The first answers 200 with `null` for a valid key, an invalid key and no key, so it cannot check a credential. The second answers 401 on a bad key |
+| a hosted remote and a local one | git accepts a filesystem path as a remote, and its trailing components look exactly like `owner/repo`. `/home/me/acme/thing` must not resolve to the `acme` workspace, so only SSH and URL remotes are parsed |

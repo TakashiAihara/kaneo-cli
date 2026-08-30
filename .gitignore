@@ -2,6 +2,3 @@
 /kaneo
 *.test
 coverage.out
-
-# Local Kaneo binding. Not committed: this repo is public and the ids name a private instance.
-.kaneo.json

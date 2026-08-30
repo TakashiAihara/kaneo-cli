@@ -11,9 +11,9 @@ import (
 var version = "dev"
 
 func main() {
-	root := cli.NewRootCommand(version)
+	root, app := cli.NewRootCommand(version)
 	if err := root.ExecuteContext(context.Background()); err != nil {
-		cli.ReportError(root, err)
+		cli.ReportError(app, os.Args[1:], err)
 		os.Exit(1)
 	}
 }

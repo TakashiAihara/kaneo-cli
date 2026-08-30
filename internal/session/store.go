@@ -50,6 +50,27 @@ func CurrentID(env func(string) string) string {
 	return strings.TrimSpace(env("CLAUDE_CODE_SESSION_ID"))
 }
 
+// ErrBadSessionID is returned for a session id that cannot safely name a file.
+var ErrBadSessionID = errors.New("session id may not contain a path separator or a path element of . or ..")
+
+// validSessionID rejects anything that could escape the store.
+//
+// The id arrives from the environment, so it is not this program's to trust.
+// filepath.Join resolves ".." rather than refusing it, which would let an id
+// like "../../x" read, overwrite and delete files anywhere the process can
+// reach.
+func validSessionID(id string) bool {
+	if id == "" || id == "." || id == ".." {
+		return false
+	}
+	if strings.ContainsAny(id, `/\`) || strings.ContainsRune(id, os.PathSeparator) {
+		return false
+	}
+	// Rejected outright rather than sanitised: a silently rewritten id would
+	// point at a different session's file.
+	return !strings.Contains(id, "..")
+}
+
 func (s *Store) path(dir, sessionID string) string {
 	return filepath.Join(dir, sessionID+".json")
 }
@@ -58,6 +79,9 @@ func (s *Store) path(dir, sessionID string) string {
 func (s *Store) Save(sessionID string, a Attachment) error {
 	if sessionID == "" {
 		return errors.New("no session id")
+	}
+	if !validSessionID(sessionID) {
+		return ErrBadSessionID
 	}
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
 		return err
@@ -72,7 +96,7 @@ func (s *Store) Save(sessionID string, a Attachment) error {
 // Load returns the attachment for a session, looking in the legacy locations
 // when this implementation has nothing recorded.
 func (s *Store) Load(sessionID string) (Attachment, bool) {
-	if sessionID == "" {
+	if !validSessionID(sessionID) {
 		return Attachment{}, false
 	}
 	for _, dir := range append([]string{s.Dir}, s.LegacyDirs...) {
@@ -91,7 +115,7 @@ func (s *Store) Load(sessionID string) (Attachment, bool) {
 
 // Clear removes the attachment from every location it may live in.
 func (s *Store) Clear(sessionID string) {
-	if sessionID == "" {
+	if !validSessionID(sessionID) {
 		return
 	}
 	for _, dir := range append([]string{s.Dir}, s.LegacyDirs...) {

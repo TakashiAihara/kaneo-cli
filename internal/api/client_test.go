@@ -1,0 +1,351 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestNormalizeBaseURL(t *testing.T) {
+	tests := map[string]string{
+		"https://kaneo.example":         "https://kaneo.example/api",
+		"https://kaneo.example/":        "https://kaneo.example/api",
+		"https://kaneo.example/api":     "https://kaneo.example/api",
+		"https://kaneo.example/api/":    "https://kaneo.example/api",
+		"  https://kaneo.example/api  ": "https://kaneo.example/api",
+		"https://kaneo.example/sub":     "https://kaneo.example/sub/api",
+		"":                              "",
+	}
+	for in, want := range tests {
+		if got := NormalizeBaseURL(in); got != want {
+			t.Errorf("NormalizeBaseURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// newServer starts a test server and returns a client pointed at its root, the
+// way a user would configure one: the site root, without /api.
+func newServer(t *testing.T, h http.HandlerFunc) (*Client, *httptest.Server) {
+	t.Helper()
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	return New(srv.URL, "test-key", 0), srv
+}
+
+// The site root answers 200 with the web app's HTML for any path, so a request
+// that forgets /api looks successful and returns markup. Every call must land
+// under /api.
+func TestRequestsLandUnderAPIPrefix(t *testing.T) {
+	var gotPath string
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[]`))
+	})
+
+	if _, err := c.ListWorkspaces(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != "/api/auth/organization/list" {
+		t.Errorf("path = %q, want /api/auth/organization/list", gotPath)
+	}
+}
+
+func TestSendsBearerToken(t *testing.T) {
+	var gotAuth string
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`[]`))
+	})
+
+	if _, err := c.ListWorkspaces(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if gotAuth != "Bearer test-key" {
+		t.Errorf("Authorization = %q, want Bearer test-key", gotAuth)
+	}
+}
+
+func TestListProjectsRequiresWorkspaceQuery(t *testing.T) {
+	var gotQuery string
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query().Get("workspaceId")
+		_, _ = w.Write([]byte(`[{"id":"p1","name":"One","workspaceId":"ws1"}]`))
+	})
+
+	got, err := c.ListProjects(context.Background(), "ws1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotQuery != "ws1" {
+		t.Errorf("workspaceId query = %q, want ws1", gotQuery)
+	}
+	if len(got) != 1 || got[0].ID != "p1" {
+		t.Errorf("projects = %+v", got)
+	}
+}
+
+const boardBody = `{"data":{"id":"p1","name":"Board","columns":[
+  {"id":"to-do","name":"To Do","tasks":[
+    {"id":"t2","number":2,"title":"low one","priority":"low","status":"to-do"},
+    {"id":"t1","number":1,"title":"urgent one","priority":"urgent","status":"to-do"}]},
+  {"id":"done","name":"Done","tasks":[
+    {"id":"t3","number":3,"title":"high one","priority":"high","status":"done"}]}]}}`
+
+func TestGetBoardUnnestsColumns(t *testing.T) {
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(boardBody))
+	})
+
+	b, err := c.GetBoard(context.Background(), "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.ProjectName != "Board" {
+		t.Errorf("project name = %q, want Board", b.ProjectName)
+	}
+	if len(b.Columns) != 2 {
+		t.Fatalf("columns = %d, want 2", len(b.Columns))
+	}
+
+	tasks := b.Tasks()
+	if len(tasks) != 3 {
+		t.Fatalf("tasks = %d, want 3", len(tasks))
+	}
+	want := []string{"t1", "t3", "t2"} // urgent, high, low
+	for i, id := range want {
+		if tasks[i].ID != id {
+			t.Errorf("tasks[%d] = %q, want %q (order: %v)", i, tasks[i].ID, id, ids(tasks))
+		}
+	}
+}
+
+func ids(tasks []Task) []string {
+	out := make([]string, len(tasks))
+	for i, t := range tasks {
+		out[i] = t.ID
+	}
+	return out
+}
+
+// The server reports validation failures with HTTP 200 and success:false.
+// Treating status alone as the verdict would silently return an empty result.
+func TestSuccessFalseOn200IsAnError(t *testing.T) {
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{},"error":[{"message":"Invalid key: Expected \"workspaceId\""}],"success":false}`))
+	})
+
+	_, err := c.ListProjects(context.Background(), "")
+	if err == nil {
+		t.Fatal("expected an error for success:false, got nil")
+	}
+	apiErr, ok := err.(*Error)
+	if !ok {
+		t.Fatalf("error type = %T, want *Error", err)
+	}
+	if len(apiErr.Messages) != 1 || apiErr.Messages[0] == "" {
+		t.Errorf("messages = %v, want the server's message", apiErr.Messages)
+	}
+}
+
+func TestHTTPErrorStatusIsReported(t *testing.T) {
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`Unauthorized`))
+	})
+
+	err := c.VerifyKey(context.Background())
+	if err == nil {
+		t.Fatal("expected an error for 401, got nil")
+	}
+	apiErr, ok := err.(*Error)
+	if !ok {
+		t.Fatalf("error type = %T, want *Error", err)
+	}
+	if apiErr.StatusCode != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", apiErr.StatusCode)
+	}
+	if !apiErr.Unauthorized() {
+		t.Error("Unauthorized() = false, want true")
+	}
+}
+
+func TestWriteOperationsUseDedicatedEndpoints(t *testing.T) {
+	var gotMethod, gotPath, gotBody string
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath = r.Method, r.URL.Path
+		buf, _ := io.ReadAll(r.Body)
+		gotBody = string(buf)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	if err := c.SetTaskStatus(context.Background(), "t1", "in-progress"); err != nil {
+		t.Fatal(err)
+	}
+	if gotMethod != http.MethodPut {
+		t.Errorf("method = %q, want PUT", gotMethod)
+	}
+	if gotPath != "/api/task/status/t1" {
+		t.Errorf("path = %q, want /api/task/status/t1", gotPath)
+	}
+	if gotBody != `{"status":"in-progress"}` {
+		t.Errorf("body = %q", gotBody)
+	}
+}
+
+// A key sent over plain HTTP is on the wire in the clear. The check happens
+// before the request, so nothing leaves the process.
+func TestRefusesToSendTheKeyOverPlainHTTP(t *testing.T) {
+	c := New("http://kaneo.example.invalid", "secret", time.Second)
+	err := c.VerifyKey(context.Background())
+	if !errors.Is(err, ErrInsecureCredential) {
+		t.Fatalf("err = %v, want ErrInsecureCredential", err)
+	}
+	if strings.Contains(err.Error(), "secret") {
+		t.Errorf("the key appeared in the error: %v", err)
+	}
+}
+
+// The check must not fire where it would only get in the way.
+func TestPlainHTTPIsAllowedWithoutAKeyOrOnLoopback(t *testing.T) {
+	t.Run("no key", func(t *testing.T) {
+		c := New("http://kaneo.example.invalid", "", time.Second)
+		if err := c.VerifyKey(context.Background()); errors.Is(err, ErrInsecureCredential) {
+			t.Error("refused a request that carried no key")
+		}
+	})
+
+	// A local instance has no network to expose the key to, and requiring TLS
+	// there would make local use impossible. Driven against a controlled
+	// server rather than a fixed port: the request carries a credential, and
+	// aiming it at whatever happens to be listening would hand the key over.
+	t.Run("loopback", func(t *testing.T) {
+		var gotAuth string
+		c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotAuth = r.Header.Get("Authorization")
+			_, _ = w.Write([]byte(`[]`))
+		})
+		if err := c.VerifyKey(context.Background()); err != nil {
+			t.Fatalf("refused a loopback request: %v", err)
+		}
+		if gotAuth != "Bearer test-key" {
+			t.Errorf("Authorization = %q; the request did not carry the key", gotAuth)
+		}
+	})
+
+	t.Run("https", func(t *testing.T) {
+		c := New("https://kaneo.example.invalid", "secret", time.Second)
+		if err := c.VerifyKey(context.Background()); errors.Is(err, ErrInsecureCredential) {
+			t.Error("refused an https request")
+		}
+	})
+}
+
+// Go strips sensitive headers when a redirect changes hostname, but not when
+// it only changes scheme. A same-host https to http redirect would otherwise
+// carry the key in the clear.
+func TestRedirectDropsTheCredentialOnASchemeDowngrade(t *testing.T) {
+	cases := []struct {
+		target   string
+		wantKept bool
+	}{
+		{"https://kaneo.example/api", true},
+		{"http://kaneo.example/api", false},
+		{"http://127.0.0.1:5173/api", true},
+		{"http://localhost:5173/api", true},
+	}
+	for _, tc := range cases {
+		req, err := http.NewRequest(http.MethodGet, tc.target, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Authorization", "Bearer secret")
+		if err := dropCredentialOnDowngrade(req, nil); err != nil {
+			t.Fatal(err)
+		}
+		kept := req.Header.Get("Authorization") != ""
+		if kept != tc.wantKept {
+			t.Errorf("%s: credential kept = %v, want %v", tc.target, kept, tc.wantKept)
+		}
+	}
+}
+
+func TestRedirectChainIsBounded(t *testing.T) {
+	req, _ := http.NewRequest(http.MethodGet, "https://kaneo.example", nil)
+	if err := dropCredentialOnDowngrade(req, make([]*http.Request, 10)); err == nil {
+		t.Error("an unbounded redirect chain was allowed")
+	}
+}
+
+// The shape a failure arrives in is the server's choice. Declaring it as one
+// fixed structure means anything else fails to decode and the server's own
+// message is lost behind a complaint about types.
+func TestServerMessageSurvivesWhateverShapeItArrivesIn(t *testing.T) {
+	cases := []struct {
+		name, body, wantMessage string
+	}{
+		{"array of objects", `{"success":false,"error":[{"message":"expected workspaceId"}]}`, "expected workspaceId"},
+		{"single object", `{"success":false,"error":{"message":"nested object"}}`, "nested object"},
+		{"bare string", `{"success":false,"error":"Unauthorized workspace access"}`, "Unauthorized workspace access"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(tc.body))
+			})
+			_, err := c.ListProjects(context.Background(), "ws")
+			if err == nil {
+				t.Fatal("success:false was treated as a success")
+			}
+			apiErr, ok := err.(*Error)
+			if !ok {
+				t.Fatalf("error type = %T, want *Error", err)
+			}
+			// Asserted on the extracted messages, not on the formatted
+			// string: Error() falls back to printing the raw body, so a
+			// string match would pass even with extraction broken.
+			if len(apiErr.Messages) != 1 || apiErr.Messages[0] != tc.wantMessage {
+				t.Errorf("messages = %v, want [%q]", apiErr.Messages, tc.wantMessage)
+			}
+		})
+	}
+}
+
+// success:false with no usable message must still be a failure.
+func TestSuccessFalseWithoutAMessageIsStillAnError(t *testing.T) {
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"success":false}`))
+	})
+	if _, err := c.ListProjects(context.Background(), "ws"); err == nil {
+		t.Error("success:false without a message was treated as a success")
+	}
+}
+
+// The hostnames that count as loopback, checked without making a request.
+func TestIsSecure(t *testing.T) {
+	cases := map[string]bool{
+		"https://kaneo.example": true,
+		"http://kaneo.example":  false,
+		"http://127.0.0.1:5173": true,
+		"http://localhost:5173": true,
+		"http://[::1]:5173":     true,
+		"http://127.0.0.2:5173": true,
+		"http://10.0.0.5:5173":  false,
+		"http://192.168.0.5":    false,
+	}
+	for raw, want := range cases {
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := isSecure(u); got != want {
+			t.Errorf("isSecure(%q) = %v, want %v", raw, got, want)
+		}
+	}
+}

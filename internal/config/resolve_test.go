@@ -1,0 +1,541 @@
+package config
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+)
+
+func writeFile(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func envFrom(m map[string]string) func(string) string {
+	return func(k string) string { return m[k] }
+}
+
+func TestPrecedence(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, "repo", "packages", "api")
+	writeFile(t, filepath.Join(home, "repo", LocalFileName), `{"workspace":"ws-local","project":"proj-local"}`)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	g := &Global{
+		DefaultProfile: "p",
+		Profiles: map[string]Profile{"p": {
+			APIURL: "https://profile.example", APIKey: "key-profile",
+			WorkspaceID: "ws-profile", ProjectID: "proj-profile",
+		}},
+		Repos: map[string]string{"owner/repo": "proj-repomap"},
+	}
+	base := Inputs{Dir: dir, Home: home, Global: g, Repo: "owner/repo"}
+
+	t.Run("flag beats everything", func(t *testing.T) {
+		in := base
+		in.Env = envFrom(map[string]string{"KANEO_PROJECT": "proj-env"})
+		in.Flags = Flags{ProjectID: "proj-flag"}
+		r := Resolve(in)
+		if r.ProjectID != "proj-flag" {
+			t.Errorf("project = %q, want proj-flag", r.ProjectID)
+		}
+		if r.Origin["project"] != SourceFlag {
+			t.Errorf("origin = %q, want flag", r.Origin["project"])
+		}
+	})
+
+	t.Run("env beats local file", func(t *testing.T) {
+		in := base
+		in.Env = envFrom(map[string]string{"KANEO_PROJECT": "proj-env"})
+		r := Resolve(in)
+		if r.ProjectID != "proj-env" {
+			t.Errorf("project = %q, want proj-env", r.ProjectID)
+		}
+		if r.Origin["project"] != SourceEnv {
+			t.Errorf("origin = %q, want env", r.Origin["project"])
+		}
+	})
+
+	t.Run("local file beats profile", func(t *testing.T) {
+		r := Resolve(base)
+		if r.ProjectID != "proj-local" {
+			t.Errorf("project = %q, want proj-local", r.ProjectID)
+		}
+		if r.WorkspaceID != "ws-local" {
+			t.Errorf("workspace = %q, want ws-local", r.WorkspaceID)
+		}
+		if r.Origin["project"] != SourceLocal {
+			t.Errorf("origin = %q, want local", r.Origin["project"])
+		}
+	})
+
+	t.Run("profile beats repo map", func(t *testing.T) {
+		in := base
+		in.Dir = t.TempDir() // no .kaneo.json anywhere
+		in.Home = in.Dir
+		r := Resolve(in)
+		if r.ProjectID != "proj-profile" {
+			t.Errorf("project = %q, want proj-profile", r.ProjectID)
+		}
+		if r.Origin["project"] != SourceProfile {
+			t.Errorf("origin = %q, want profile", r.Origin["project"])
+		}
+	})
+
+	t.Run("repo map is the last resort for project", func(t *testing.T) {
+		in := base
+		in.Dir = t.TempDir()
+		in.Home = in.Dir
+		in.Global = &Global{Repos: map[string]string{"owner/repo": "proj-repomap"}}
+		r := Resolve(in)
+		if r.ProjectID != "proj-repomap" {
+			t.Errorf("project = %q, want proj-repomap", r.ProjectID)
+		}
+		if r.Origin["project"] != SourceRepoMap {
+			t.Errorf("origin = %q, want repo-map", r.Origin["project"])
+		}
+	})
+
+	t.Run("repo map never supplies a workspace", func(t *testing.T) {
+		in := base
+		in.Dir = t.TempDir()
+		in.Home = in.Dir
+		in.Global = &Global{Repos: map[string]string{"owner/repo": "proj-repomap"}}
+		r := Resolve(in)
+		if r.WorkspaceID != "" {
+			t.Errorf("workspace = %q, want empty", r.WorkspaceID)
+		}
+		if r.Origin["workspace"] != SourceUnset {
+			t.Errorf("origin = %q, want unset", r.Origin["workspace"])
+		}
+	})
+
+	t.Run("api url falls back to the hosted default", func(t *testing.T) {
+		in := base
+		in.Global = &Global{}
+		r := Resolve(in)
+		if r.APIURL != DefaultAPIURL {
+			t.Errorf("api url = %q, want %q", r.APIURL, DefaultAPIURL)
+		}
+		if r.Origin["api_url"] != SourceDefault {
+			t.Errorf("origin = %q, want default", r.Origin["api_url"])
+		}
+	})
+}
+
+// A .kaneo.json is committed, so a credential written into it would leak with
+// the repo. The guarantee is structural: Local carries exactly two serialised
+// fields and neither is a secret. Asserting on a resolved value instead would
+// be vacuous, because a Local field that MergeLocals does not copy can never
+// reach the resolver at all.
+func TestLocalCarriesOnlyNonSecretFields(t *testing.T) {
+	want := map[string]bool{"workspace": true, "project": true}
+
+	typ := reflect.TypeOf(Local{})
+	got := map[string]bool{}
+	for i := 0; i < typ.NumField(); i++ {
+		tag := typ.Field(i).Tag.Get("json")
+		name, _, _ := strings.Cut(tag, ",")
+		if name == "" || name == "-" {
+			continue
+		}
+		got[name] = true
+	}
+
+	for name := range got {
+		if !want[name] {
+			t.Errorf("Local gained serialised field %q; .kaneo.json is committed, so it must stay free of secrets", name)
+		}
+	}
+	for name := range want {
+		if !got[name] {
+			t.Errorf("Local lost serialised field %q", name)
+		}
+	}
+}
+
+// MergeLocals is the only way a Local reaches the resolver, so it is the other
+// half of the same guarantee: it must copy nothing beyond those two fields.
+func TestMergeLocalsCopiesOnlyWorkspaceAndProject(t *testing.T) {
+	merged := MergeLocals([]Local{{Workspace: "ws", Project: "proj", Path: "/a/.kaneo.json"}})
+
+	typ := reflect.TypeOf(merged)
+	val := reflect.ValueOf(merged)
+	allowed := map[string]bool{"Workspace": true, "Project": true, "Path": true}
+	for i := 0; i < typ.NumField(); i++ {
+		name := typ.Field(i).Name
+		if allowed[name] {
+			continue
+		}
+		if !val.Field(i).IsZero() {
+			t.Errorf("MergeLocals propagated unexpected field %q", name)
+		}
+	}
+}
+
+func TestWalkUpNearestWinsAndParentFillsGaps(t *testing.T) {
+	home := t.TempDir()
+	child := filepath.Join(home, "mono", "apps", "web")
+	writeFile(t, filepath.Join(home, "mono", LocalFileName), `{"workspace":"ws-root","project":"proj-root"}`)
+	writeFile(t, filepath.Join(child, LocalFileName), `{"project":"proj-child"}`)
+
+	r := Resolve(Inputs{Dir: child, Home: home, Global: &Global{}})
+	if r.ProjectID != "proj-child" {
+		t.Errorf("project = %q, want proj-child (nearest wins)", r.ProjectID)
+	}
+	if r.WorkspaceID != "ws-root" {
+		t.Errorf("workspace = %q, want ws-root (parent fills the gap)", r.WorkspaceID)
+	}
+}
+
+func TestWalkUpStopsAtHome(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	dir := filepath.Join(home, "repo")
+	// Above $HOME. If the walk overshoots it will pick this up.
+	writeFile(t, filepath.Join(root, LocalFileName), `{"project":"proj-above-home"}`)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	r := Resolve(Inputs{Dir: dir, Home: home, Global: &Global{}})
+	if r.ProjectID != "" {
+		t.Errorf("project = %q, want empty; the walk went past $HOME", r.ProjectID)
+	}
+}
+
+// A broken config must not stop the run: the layer below it is still an answer.
+func TestMalformedLocalFileIsSkipped(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, "a", "b")
+	writeFile(t, filepath.Join(home, "a", LocalFileName), `{"project":"proj-parent"}`)
+	writeFile(t, filepath.Join(dir, LocalFileName), `{not json`)
+
+	r := Resolve(Inputs{Dir: dir, Home: home, Global: &Global{}})
+	if r.ProjectID != "proj-parent" {
+		t.Errorf("project = %q, want proj-parent", r.ProjectID)
+	}
+}
+
+func TestParseRemote(t *testing.T) {
+	tests := map[string]string{
+		"https://github.com/TakashiAihara/kaneo-cli.git": "TakashiAihara/kaneo-cli",
+		"https://github.com/TakashiAihara/kaneo-cli":     "TakashiAihara/kaneo-cli",
+		"git@github.com:TakashiAihara/kaneo-cli.git":     "TakashiAihara/kaneo-cli",
+		"ssh://git@example.com:2222/owner/repo.git":      "owner/repo",
+		"git@github.com:TakashiAihara/kaneo-cli.git\n":   "TakashiAihara/kaneo-cli",
+	}
+	for url, want := range tests {
+		got, ok := ParseRemote(url)
+		if !ok || got != want {
+			t.Errorf("ParseRemote(%q) = %q, %v; want %q", url, got, ok, want)
+		}
+	}
+	if _, ok := ParseRemote("not-a-remote"); ok {
+		t.Error("ParseRemote accepted a non-remote string")
+	}
+}
+
+// The owner map states a rule once for an organisation instead of per
+// repository. It is the weakest layer, and it supplies a workspace only.
+func TestOwnerMap(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, "repo")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	g := &Global{Owners: map[string]string{
+		"micoworks":     "ws-work",
+		"TakashiAihara": "ws-private",
+	}}
+	base := Inputs{Dir: dir, Home: home, Global: g}
+
+	t.Run("supplies a workspace from the repo owner", func(t *testing.T) {
+		in := base
+		in.Repo = "micoworks/delivery-foundation"
+		r := Resolve(in)
+		if r.WorkspaceID != "ws-work" {
+			t.Errorf("workspace = %q, want ws-work", r.WorkspaceID)
+		}
+		if r.Origin["workspace"] != SourceOwnerMap {
+			t.Errorf("origin = %q, want owner-map", r.Origin["workspace"])
+		}
+	})
+
+	t.Run("a different owner selects a different workspace", func(t *testing.T) {
+		in := base
+		in.Repo = "TakashiAihara/kaneo-cli"
+		if got := Resolve(in).WorkspaceID; got != "ws-private" {
+			t.Errorf("workspace = %q, want ws-private", got)
+		}
+	})
+
+	t.Run("an unlisted owner supplies nothing", func(t *testing.T) {
+		in := base
+		in.Repo = "someone-else/repo"
+		r := Resolve(in)
+		if r.WorkspaceID != "" {
+			t.Errorf("workspace = %q, want empty", r.WorkspaceID)
+		}
+	})
+
+	// A workspace does not imply a project, so this layer must never fill one
+	// in: a wrong project would send writes to the wrong board.
+	t.Run("never supplies a project", func(t *testing.T) {
+		in := base
+		in.Repo = "micoworks/delivery-foundation"
+		r := Resolve(in)
+		if r.ProjectID != "" {
+			t.Errorf("project = %q, want empty", r.ProjectID)
+		}
+		if r.Origin["project"] != SourceUnset {
+			t.Errorf("origin = %q, want unset", r.Origin["project"])
+		}
+	})
+
+	t.Run("never supplies a credential", func(t *testing.T) {
+		in := base
+		in.Repo = "micoworks/delivery-foundation"
+		if got := Resolve(in).APIKey; got != "" {
+			t.Errorf("api key = %q, want empty", got)
+		}
+	})
+
+	// The owner map is a fallback for repositories nothing more specific
+	// covers, so anything explicit has to beat it.
+	t.Run("every other layer beats it", func(t *testing.T) {
+		local := filepath.Join(home, "explicit")
+		writeFile(t, filepath.Join(local, LocalFileName), `{"workspace":"ws-local"}`)
+
+		for _, tc := range []struct {
+			name string
+			in   Inputs
+			want string
+		}{
+			{"flag", Inputs{Dir: dir, Home: home, Global: g, Repo: "micoworks/x",
+				Flags: Flags{WorkspaceID: "ws-flag"}}, "ws-flag"},
+			{"env", Inputs{Dir: dir, Home: home, Global: g, Repo: "micoworks/x",
+				Env: envFrom(map[string]string{"KANEO_WORKSPACE": "ws-env"})}, "ws-env"},
+			{"local", Inputs{Dir: local, Home: home, Global: g, Repo: "micoworks/x"}, "ws-local"},
+			{"profile", Inputs{Dir: dir, Home: home, Repo: "micoworks/x", Global: &Global{
+				DefaultProfile: "p",
+				Profiles:       map[string]Profile{"p": {WorkspaceID: "ws-profile"}},
+				Owners:         g.Owners,
+			}}, "ws-profile"},
+		} {
+			if got := Resolve(tc.in).WorkspaceID; got != tc.want {
+				t.Errorf("%s: workspace = %q, want %q", tc.name, got, tc.want)
+			}
+		}
+	})
+}
+
+func TestWorkspaceForOwner(t *testing.T) {
+	g := &Global{Owners: map[string]string{"micoworks": "ws-work"}}
+	if got := g.WorkspaceForOwner("micoworks/anything"); got != "ws-work" {
+		t.Errorf("= %q, want ws-work", got)
+	}
+	if got := g.WorkspaceForOwner("micoworks"); got != "" {
+		t.Errorf("= %q; a bare owner with no repo is not a valid key", got)
+	}
+	if got := g.WorkspaceForOwner(""); got != "" {
+		t.Errorf("= %q, want empty", got)
+	}
+}
+
+// A checkout can sit outside $HOME. Walking up from there would run to the
+// filesystem root, where a .kaneo.json belonging to nobody in particular could
+// name a workspace and send later writes to the wrong board.
+func TestWalkUpDoesNotEscapeWhenDirIsOutsideStopAt(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	outside := filepath.Join(root, "work", "repo")
+	writeFile(t, filepath.Join(root, LocalFileName), `{"project":"proj-above"}`)
+	writeFile(t, filepath.Join(root, "work", LocalFileName), `{"project":"proj-work"}`)
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	r := Resolve(Inputs{Dir: outside, Home: home, Global: &Global{}})
+	if r.ProjectID != "" {
+		t.Errorf("project = %q; the walk left the boundary", r.ProjectID)
+	}
+}
+
+// Inside the boundary the walk still behaves as before.
+func TestWalkUpStillWalksInsideStopAt(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, "a", "b")
+	writeFile(t, filepath.Join(home, "a", LocalFileName), `{"project":"proj-a"}`)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := Resolve(Inputs{Dir: dir, Home: home, Global: &Global{}}).ProjectID; got != "proj-a" {
+		t.Errorf("project = %q, want proj-a", got)
+	}
+}
+
+// A .kaneo.json in the directory itself is still read when that directory is
+// outside the boundary; only the walk upwards is refused.
+func TestLocalFileInDirIsReadEvenOutsideStopAt(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	outside := filepath.Join(root, "work", "repo")
+	writeFile(t, filepath.Join(outside, LocalFileName), `{"project":"proj-here"}`)
+
+	if got := Resolve(Inputs{Dir: outside, Home: home, Global: &Global{}}).ProjectID; got != "proj-here" {
+		t.Errorf("project = %q, want proj-here", got)
+	}
+}
+
+// git accepts a local path as a remote, and its trailing components look
+// exactly like owner/repo. Treating one as hosted would resolve an unrelated
+// checkout to a real workspace.
+func TestParseRemoteRejectsLocalPaths(t *testing.T) {
+	for _, url := range []string{
+		"/srv/micoworks/project",
+		"file:///srv/micoworks/project",
+		"/home/user/micoworks/delivery-foundation",
+		"../sibling/repo",
+		"./micoworks/thing",
+		"C:\\src\\micoworks\\thing",
+		"",
+		"   ",
+		"not-a-remote",
+	} {
+		if got, ok := ParseRemote(url); ok {
+			t.Errorf("ParseRemote(%q) = %q, true; want rejected", url, got)
+		}
+	}
+}
+
+func TestParseRemoteAcceptsHostedForms(t *testing.T) {
+	tests := map[string]string{
+		"https://github.com/TakashiAihara/kaneo-cli.git": "TakashiAihara/kaneo-cli",
+		"https://github.com/TakashiAihara/kaneo-cli":     "TakashiAihara/kaneo-cli",
+		"http://git.example.com/owner/repo.git":          "owner/repo",
+		"git@github.com:TakashiAihara/kaneo-cli.git":     "TakashiAihara/kaneo-cli",
+		"git@github.com:TakashiAihara/kaneo-cli.git\n":   "TakashiAihara/kaneo-cli",
+		"ssh://git@example.com:2222/owner/repo.git":      "owner/repo",
+		"git://example.com/owner/repo.git":               "owner/repo",
+		"https://user@dev.azure.com/owner/repo":          "owner/repo",
+	}
+	for url, want := range tests {
+		got, ok := ParseRemote(url)
+		if !ok || got != want {
+			t.Errorf("ParseRemote(%q) = %q, %v; want %q", url, got, ok, want)
+		}
+	}
+}
+
+// Path answers "which file did this come from" for `kaneo context`. The list
+// is nearest-first, so a parent contributing a workspace must not rename the
+// file the reader got their project from.
+func TestMergeLocalsRecordsTheNearestContributingFile(t *testing.T) {
+	got := MergeLocals([]Local{
+		{Project: "p1", Path: "/repo/sub/.kaneo.json"},
+		{Workspace: "w1", Project: "p2", Path: "/repo/.kaneo.json"},
+	})
+	if got.Project != "p1" || got.Workspace != "w1" {
+		t.Fatalf("merge = %+v", got)
+	}
+	if got.Path != "/repo/sub/.kaneo.json" {
+		t.Errorf("Path = %q, want the nearest contributing file", got.Path)
+	}
+}
+
+// git can block on an unresponsive mount or a credential prompt, and killing
+// it is not enough: Output waits for the stdout pipe, which a grandchild keeps
+// open. Same failure as currentBranch, in the other place that runs git.
+func TestCurrentRepoGivesUpOnAHangingGit(t *testing.T) {
+	stub := t.TempDir()
+	pidFile := filepath.Join(stub, "sleeper.pid")
+	// The path reaches the script through the environment and is quoted
+	// there. Interpolating it would break on a directory containing a space,
+	// and the sleep would then outlive the test unreaped.
+	t.Setenv("KANEO_TEST_PID_FILE", pidFile)
+	body := "#!/bin/sh\nsleep 30 &\necho $! > \"$KANEO_TEST_PID_FILE\"\nwait\n"
+	if err := os.WriteFile(filepath.Join(stub, "git"), []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { killRecordedProcess(t, pidFile) })
+	t.Setenv("PATH", stub+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	done := make(chan struct{})
+	go func() { CurrentRepo(context.Background(), t.TempDir()); close(done) }()
+
+	select {
+	case <-done:
+	case <-time.After(remoteTimeout * 5):
+		t.Fatalf("CurrentRepo did not return within %s", remoteTimeout*5)
+	}
+}
+
+func killRecordedProcess(t *testing.T, pidFile string) {
+	t.Helper()
+	for i := 0; i < 20; i++ {
+		b, err := os.ReadFile(pidFile)
+		if err == nil {
+			if pid, convErr := strconv.Atoi(strings.TrimSpace(string(b))); convErr == nil {
+				if proc, findErr := os.FindProcess(pid); findErr == nil {
+					_ = proc.Kill()
+				}
+			}
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// An interrupted write must not leave the config unparseable, since every
+// later run reads it.
+func TestSaveIsAtomic(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nested", "config.json")
+
+	g := &Global{path: path}
+	g.SetProfile("p", Profile{APIURL: "https://kaneo.example", APIKey: "k"})
+	if err := g.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("mode = %o, want 600", perm)
+	}
+
+	// No temporary file may be left next to it.
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name() != "config.json" {
+			t.Errorf("left behind %q", e.Name())
+		}
+	}
+
+	back, err := LoadGlobal(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, p, ok := back.ActiveProfile(); !ok || p.APIKey != "k" {
+		t.Errorf("round trip lost the profile: %+v", back)
+	}
+}

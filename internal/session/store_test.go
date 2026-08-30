@@ -1,0 +1,202 @@
+package session
+
+import (
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+)
+
+// The session id comes from the environment, so it is not this program's to
+// trust. filepath.Join resolves ".." rather than refusing it, which would let
+// an id reach any file the process can.
+func TestStoreRejectsSessionIDsThatEscape(t *testing.T) {
+	root := t.TempDir()
+	store := &Store{Dir: filepath.Join(root, "store")}
+	victim := filepath.Join(root, "victim.json")
+	original := `{"taskId":"do-not-touch"}`
+	if err := os.WriteFile(victim, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, id := range []string{"../victim", "../../victim", "a/../../victim", "sub/victim", `sub\victim`, "..", ".", ""} {
+		if err := store.Save(id, Attachment{TaskID: "OVERWRITTEN"}); err == nil {
+			t.Errorf("Save(%q) was accepted", id)
+		}
+		if _, ok := store.Load(id); ok {
+			t.Errorf("Load(%q) was accepted", id)
+		}
+		store.Clear(id)
+	}
+
+	b, err := os.ReadFile(victim)
+	if err != nil {
+		t.Fatalf("the file outside the store was removed: %v", err)
+	}
+	if string(b) != original {
+		t.Errorf("the file outside the store was rewritten: %s", b)
+	}
+}
+
+// The check must not reject the ids actually in use.
+func TestStoreAcceptsOrdinarySessionIDs(t *testing.T) {
+	store := &Store{Dir: t.TempDir()}
+	for _, id := range []string{
+		"54c76464-299c-460e-9e3f-77556f55a02b",
+		"01M0Y1VTEME00B",
+		"plain",
+	} {
+		if err := store.Save(id, Attachment{TaskID: "t", TaskNumber: 1, Title: "x"}); err != nil {
+			t.Errorf("Save(%q) = %v, want nil", id, err)
+			continue
+		}
+		got, ok := store.Load(id)
+		if !ok || got.TaskID != "t" {
+			t.Errorf("Load(%q) = %+v, %v", id, got, ok)
+		}
+		store.Clear(id)
+		if _, ok := store.Load(id); ok {
+			t.Errorf("Clear(%q) did not remove the record", id)
+		}
+	}
+}
+
+func TestStoreFilePermissions(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "store")
+	store := &Store{Dir: dir}
+	if err := store.Save("s1", Attachment{TaskID: "t"}); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(filepath.Join(dir, "s1.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("mode = %o, want 600", perm)
+	}
+}
+
+// git can block indefinitely — an unresponsive network mount, or a prompt for
+// credentials. This runs from a session-start hook, where a hang stops the
+// session outright, and fail-open cannot help: it handles errors, not hangs.
+func TestCurrentBranchGivesUpOnAHangingGit(t *testing.T) {
+	stub := t.TempDir()
+	script := filepath.Join(stub, "git")
+	pidFile := filepath.Join(stub, "sleeper.pid")
+
+	// The sleep is a grandchild on purpose: killing the shell does not close
+	// the stdout pipe it inherited, and that is the condition WaitDelay
+	// exists for. An `exec sleep` stub would leave nothing holding the pipe
+	// and the test would pass whether or not WaitDelay is set.
+	//
+	// It is reaped afterwards so repeated runs do not accumulate sleepers.
+	t.Setenv("KANEO_TEST_PID_FILE", pidFile)
+	body := "#!/bin/sh\nsleep 30 &\necho $! > \"$KANEO_TEST_PID_FILE\"\nwait\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { killRecorded(t, pidFile) })
+	t.Setenv("PATH", stub+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	done := make(chan string, 1)
+	start := time.Now()
+	go func() { done <- currentBranch(t.TempDir()) }()
+
+	select {
+	case got := <-done:
+		if elapsed := time.Since(start); elapsed > branchTimeout*3 {
+			t.Errorf("took %s, want about %s", elapsed, branchTimeout)
+		}
+		if got != "" {
+			t.Errorf("branch = %q, want empty when git did not answer", got)
+		}
+	case <-time.After(branchTimeout * 5):
+		t.Fatalf("currentBranch did not return within %s", branchTimeout*5)
+	}
+}
+
+// The stub must not make the test pass for the wrong reason: a git that
+// answers promptly still has to be read.
+func TestCurrentBranchReadsAResponsiveGit(t *testing.T) {
+	stub := t.TempDir()
+	script := filepath.Join(stub, "git")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\necho feature/x\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", stub+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if got := currentBranch(t.TempDir()); got != "feature/x" {
+		t.Errorf("branch = %q, want feature/x", got)
+	}
+}
+
+// killRecorded reaps the grandchild the stub left behind.
+func killRecorded(t *testing.T, pidFile string) {
+	t.Helper()
+	// The stub writes the pid asynchronously, so it may not be there yet.
+	for i := 0; i < 20; i++ {
+		b, err := os.ReadFile(pidFile)
+		if err == nil {
+			if pid, convErr := strconv.Atoi(strings.TrimSpace(string(b))); convErr == nil {
+				if proc, findErr := os.FindProcess(pid); findErr == nil {
+					_ = proc.Kill()
+				}
+			}
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// A legacy directory is a migration aid, not a fallback for a damaged current
+// record. Returning the stale attachment would let the next close act on a
+// task this session never took.
+func TestLoadDoesNotFallBackToLegacyOnACorruptCurrentRecord(t *testing.T) {
+	root := t.TempDir()
+	store := &Store{
+		Dir:        filepath.Join(root, "current"),
+		LegacyDirs: []string{filepath.Join(root, "legacy")},
+	}
+	if err := os.MkdirAll(store.Dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(store.LegacyDirs[0], 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(store.Dir, "s1.json"), []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(store.LegacyDirs[0], "s1.json"),
+		[]byte(`{"taskId":"stale","number":99}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := store.Load("s1")
+	if ok {
+		t.Errorf("Load returned %+v from the legacy directory despite a corrupt current record", got)
+	}
+}
+
+// With no current record at all, the legacy directory is still read: that is
+// what carries a session attached by the previous implementation.
+func TestLoadFallsBackToLegacyWhenNothingIsRecorded(t *testing.T) {
+	root := t.TempDir()
+	store := &Store{
+		Dir:        filepath.Join(root, "current"),
+		LegacyDirs: []string{filepath.Join(root, "legacy")},
+	}
+	if err := os.MkdirAll(store.LegacyDirs[0], 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(store.LegacyDirs[0], "s1.json"),
+		[]byte(`{"taskId":"from-legacy","number":7}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := store.Load("s1")
+	if !ok || got.TaskID != "from-legacy" {
+		t.Errorf("Load = %+v, %v; want the legacy record", got, ok)
+	}
+}

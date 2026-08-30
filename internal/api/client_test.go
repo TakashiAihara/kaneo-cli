@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -221,15 +222,22 @@ func TestPlainHTTPIsAllowedWithoutAKeyOrOnLoopback(t *testing.T) {
 	})
 
 	// A local instance has no network to expose the key to, and requiring TLS
-	// there would make local use impossible.
-	for _, host := range []string{"127.0.0.1", "localhost", "[::1]"} {
-		t.Run(host, func(t *testing.T) {
-			c := New("http://"+host+":9999", "secret", time.Second)
-			if err := c.VerifyKey(context.Background()); errors.Is(err, ErrInsecureCredential) {
-				t.Errorf("refused a loopback request to %s", host)
-			}
+	// there would make local use impossible. Driven against a controlled
+	// server rather than a fixed port: the request carries a credential, and
+	// aiming it at whatever happens to be listening would hand the key over.
+	t.Run("loopback", func(t *testing.T) {
+		var gotAuth string
+		c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotAuth = r.Header.Get("Authorization")
+			_, _ = w.Write([]byte(`[]`))
 		})
-	}
+		if err := c.VerifyKey(context.Background()); err != nil {
+			t.Fatalf("refused a loopback request: %v", err)
+		}
+		if gotAuth != "Bearer test-key" {
+			t.Errorf("Authorization = %q; the request did not carry the key", gotAuth)
+		}
+	})
 
 	t.Run("https", func(t *testing.T) {
 		c := New("https://kaneo.example.invalid", "secret", time.Second)
@@ -316,5 +324,28 @@ func TestSuccessFalseWithoutAMessageIsStillAnError(t *testing.T) {
 	})
 	if _, err := c.ListProjects(context.Background(), "ws"); err == nil {
 		t.Error("success:false without a message was treated as a success")
+	}
+}
+
+// The hostnames that count as loopback, checked without making a request.
+func TestIsSecure(t *testing.T) {
+	cases := map[string]bool{
+		"https://kaneo.example": true,
+		"http://kaneo.example":  false,
+		"http://127.0.0.1:5173": true,
+		"http://localhost:5173": true,
+		"http://[::1]:5173":     true,
+		"http://127.0.0.2:5173": true,
+		"http://10.0.0.5:5173":  false,
+		"http://192.168.0.5":    false,
+	}
+	for raw, want := range cases {
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := isSecure(u); got != want {
+			t.Errorf("isSecure(%q) = %v, want %v", raw, got, want)
+		}
 	}
 }

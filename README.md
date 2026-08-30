@@ -14,13 +14,33 @@ Early. The command surface below is what exists today; the rest of the API is no
 curl -fsSL https://raw.githubusercontent.com/TakashiAihara/kaneo-cli/main/install.sh | sh
 ```
 
-Installs into `$HOME/.local/bin`. The script verifies the archive against the release's `checksums.txt` and runs the installed binary before reporting success, so a partial install fails rather than looking like it worked.
+Installs the latest release into `$HOME/.local/bin`, and tells you if that is not on your `PATH`. `wget` works in place of `curl` throughout.
+
+The script does two things that matter more than they sound:
+
+- the archive is checked against the release's `checksums.txt`, and refuses to install if it does not match
+- the new binary is staged, run, and only then moved into place — a bad download fails without costing you the copy you already had
 
 | variable | effect |
 | --- | --- |
 | `KANEO_VERSION` | install a specific tag instead of the latest release |
 | `KANEO_INSTALL_DIR` | install somewhere other than `$HOME/.local/bin` |
 | `KANEO_RELEASE_BASE` | fetch archives from a mirror |
+
+```bash
+# a specific version, somewhere else
+curl -fsSL https://raw.githubusercontent.com/TakashiAihara/kaneo-cli/main/install.sh \
+  | KANEO_VERSION=v0.1.0 KANEO_INSTALL_DIR=/usr/local/bin sh
+```
+
+Piping a script into a shell is worth being uneasy about. To read it first:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/TakashiAihara/kaneo-cli/main/install.sh
+less install.sh && sh install.sh
+```
+
+Or take the archive for your platform straight from the [releases page](https://github.com/TakashiAihara/kaneo-cli/releases) — `linux/amd64`, `linux/arm64`, `darwin/arm64` and `darwin/amd64`, each with a checksum.
 
 Or build from source:
 

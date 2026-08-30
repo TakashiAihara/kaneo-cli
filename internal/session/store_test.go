@@ -92,7 +92,8 @@ func TestCurrentBranchGivesUpOnAHangingGit(t *testing.T) {
 	// and the test would pass whether or not WaitDelay is set.
 	//
 	// It is reaped afterwards so repeated runs do not accumulate sleepers.
-	body := "#!/bin/sh\nsleep 30 &\necho $! > " + pidFile + "\nwait\n"
+	t.Setenv("KANEO_TEST_PID_FILE", pidFile)
+	body := "#!/bin/sh\nsleep 30 &\necho $! > \"$KANEO_TEST_PID_FILE\"\nwait\n"
 	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}

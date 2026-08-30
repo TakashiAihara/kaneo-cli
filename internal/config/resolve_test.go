@@ -463,7 +463,11 @@ func TestMergeLocalsRecordsTheNearestContributingFile(t *testing.T) {
 func TestCurrentRepoGivesUpOnAHangingGit(t *testing.T) {
 	stub := t.TempDir()
 	pidFile := filepath.Join(stub, "sleeper.pid")
-	body := "#!/bin/sh\nsleep 30 &\necho $! > " + pidFile + "\nwait\n"
+	// The path reaches the script through the environment and is quoted
+	// there. Interpolating it would break on a directory containing a space,
+	// and the sleep would then outlive the test unreaped.
+	t.Setenv("KANEO_TEST_PID_FILE", pidFile)
+	body := "#!/bin/sh\nsleep 30 &\necho $! > \"$KANEO_TEST_PID_FILE\"\nwait\n"
 	if err := os.WriteFile(filepath.Join(stub, "git"), []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}

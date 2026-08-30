@@ -104,18 +104,21 @@ func (g *Global) Save() error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmp.Name())
+	// Removing the temporary file is best-effort: after a successful rename
+	// there is nothing left to remove, and on any earlier failure the write
+	// error is the one worth returning.
+	defer func() { _ = os.Remove(tmp.Name()) }()
 
 	if err := tmp.Chmod(0o600); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return err
 	}
 	if _, err := tmp.Write(b); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return err
 	}
 	if err := tmp.Sync(); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return err
 	}
 	if err := tmp.Close(); err != nil {

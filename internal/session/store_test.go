@@ -3,6 +3,8 @@ package session
 import (
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -82,9 +84,19 @@ func TestStoreFilePermissions(t *testing.T) {
 func TestCurrentBranchGivesUpOnAHangingGit(t *testing.T) {
 	stub := t.TempDir()
 	script := filepath.Join(stub, "git")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\nsleep 30\n"), 0o755); err != nil {
+	pidFile := filepath.Join(stub, "sleeper.pid")
+
+	// The sleep is a grandchild on purpose: killing the shell does not close
+	// the stdout pipe it inherited, and that is the condition WaitDelay
+	// exists for. An `exec sleep` stub would leave nothing holding the pipe
+	// and the test would pass whether or not WaitDelay is set.
+	//
+	// It is reaped afterwards so repeated runs do not accumulate sleepers.
+	body := "#!/bin/sh\nsleep 30 &\necho $! > " + pidFile + "\nwait\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { killRecorded(t, pidFile) })
 	t.Setenv("PATH", stub+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	done := make(chan string, 1)
@@ -116,5 +128,23 @@ func TestCurrentBranchReadsAResponsiveGit(t *testing.T) {
 
 	if got := currentBranch(t.TempDir()); got != "feature/x" {
 		t.Errorf("branch = %q, want feature/x", got)
+	}
+}
+
+// killRecorded reaps the grandchild the stub left behind.
+func killRecorded(t *testing.T, pidFile string) {
+	t.Helper()
+	// The stub writes the pid asynchronously, so it may not be there yet.
+	for i := 0; i < 20; i++ {
+		b, err := os.ReadFile(pidFile)
+		if err == nil {
+			if pid, convErr := strconv.Atoi(strings.TrimSpace(string(b))); convErr == nil {
+				if proc, findErr := os.FindProcess(pid); findErr == nil {
+					_ = proc.Kill()
+				}
+			}
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }

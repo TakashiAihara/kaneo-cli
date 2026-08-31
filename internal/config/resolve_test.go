@@ -25,6 +25,10 @@ func envFrom(m map[string]string) func(string) string {
 	return func(k string) string { return m[k] }
 }
 
+// projectOf renders the resolved projects as one string so an assertion that
+// expects a single answer fails loudly when the chain produced several.
+func projectOf(r Resolved) string { return strings.Join(r.ProjectIDs, ",") }
+
 func TestPrecedence(t *testing.T) {
 	home := t.TempDir()
 	dir := filepath.Join(home, "repo", "packages", "api")
@@ -39,7 +43,7 @@ func TestPrecedence(t *testing.T) {
 			APIURL: "https://profile.example", APIKey: "key-profile",
 			WorkspaceID: "ws-profile", ProjectID: "proj-profile",
 		}},
-		Repos: map[string]string{"owner/repo": "proj-repomap"},
+		Repos: map[string]ProjectIDs{"owner/repo": {"proj-repomap"}},
 	}
 	base := Inputs{Dir: dir, Home: home, Global: g, Repo: "owner/repo"}
 
@@ -48,8 +52,8 @@ func TestPrecedence(t *testing.T) {
 		in.Env = envFrom(map[string]string{"KANEO_PROJECT": "proj-env"})
 		in.Flags = Flags{ProjectID: "proj-flag"}
 		r := Resolve(in)
-		if r.ProjectID != "proj-flag" {
-			t.Errorf("project = %q, want proj-flag", r.ProjectID)
+		if projectOf(r) != "proj-flag" {
+			t.Errorf("project = %q, want proj-flag", projectOf(r))
 		}
 		if r.Origin["project"] != SourceFlag {
 			t.Errorf("origin = %q, want flag", r.Origin["project"])
@@ -60,8 +64,8 @@ func TestPrecedence(t *testing.T) {
 		in := base
 		in.Env = envFrom(map[string]string{"KANEO_PROJECT": "proj-env"})
 		r := Resolve(in)
-		if r.ProjectID != "proj-env" {
-			t.Errorf("project = %q, want proj-env", r.ProjectID)
+		if projectOf(r) != "proj-env" {
+			t.Errorf("project = %q, want proj-env", projectOf(r))
 		}
 		if r.Origin["project"] != SourceEnv {
 			t.Errorf("origin = %q, want env", r.Origin["project"])
@@ -70,8 +74,8 @@ func TestPrecedence(t *testing.T) {
 
 	t.Run("local file beats profile", func(t *testing.T) {
 		r := Resolve(base)
-		if r.ProjectID != "proj-local" {
-			t.Errorf("project = %q, want proj-local", r.ProjectID)
+		if projectOf(r) != "proj-local" {
+			t.Errorf("project = %q, want proj-local", projectOf(r))
 		}
 		if r.WorkspaceID != "ws-local" {
 			t.Errorf("workspace = %q, want ws-local", r.WorkspaceID)
@@ -86,8 +90,8 @@ func TestPrecedence(t *testing.T) {
 		in.Dir = t.TempDir() // no .kaneo.json anywhere
 		in.Home = in.Dir
 		r := Resolve(in)
-		if r.ProjectID != "proj-profile" {
-			t.Errorf("project = %q, want proj-profile", r.ProjectID)
+		if projectOf(r) != "proj-profile" {
+			t.Errorf("project = %q, want proj-profile", projectOf(r))
 		}
 		if r.Origin["project"] != SourceProfile {
 			t.Errorf("origin = %q, want profile", r.Origin["project"])
@@ -98,10 +102,10 @@ func TestPrecedence(t *testing.T) {
 		in := base
 		in.Dir = t.TempDir()
 		in.Home = in.Dir
-		in.Global = &Global{Repos: map[string]string{"owner/repo": "proj-repomap"}}
+		in.Global = &Global{Repos: map[string]ProjectIDs{"owner/repo": {"proj-repomap"}}}
 		r := Resolve(in)
-		if r.ProjectID != "proj-repomap" {
-			t.Errorf("project = %q, want proj-repomap", r.ProjectID)
+		if projectOf(r) != "proj-repomap" {
+			t.Errorf("project = %q, want proj-repomap", projectOf(r))
 		}
 		if r.Origin["project"] != SourceRepoMap {
 			t.Errorf("origin = %q, want repo-map", r.Origin["project"])
@@ -112,7 +116,7 @@ func TestPrecedence(t *testing.T) {
 		in := base
 		in.Dir = t.TempDir()
 		in.Home = in.Dir
-		in.Global = &Global{Repos: map[string]string{"owner/repo": "proj-repomap"}}
+		in.Global = &Global{Repos: map[string]ProjectIDs{"owner/repo": {"proj-repomap"}}}
 		r := Resolve(in)
 		if r.WorkspaceID != "" {
 			t.Errorf("workspace = %q, want empty", r.WorkspaceID)
@@ -192,8 +196,8 @@ func TestWalkUpNearestWinsAndParentFillsGaps(t *testing.T) {
 	writeFile(t, filepath.Join(child, LocalFileName), `{"project":"proj-child"}`)
 
 	r := Resolve(Inputs{Dir: child, Home: home, Global: &Global{}})
-	if r.ProjectID != "proj-child" {
-		t.Errorf("project = %q, want proj-child (nearest wins)", r.ProjectID)
+	if projectOf(r) != "proj-child" {
+		t.Errorf("project = %q, want proj-child (nearest wins)", projectOf(r))
 	}
 	if r.WorkspaceID != "ws-root" {
 		t.Errorf("workspace = %q, want ws-root (parent fills the gap)", r.WorkspaceID)
@@ -211,8 +215,8 @@ func TestWalkUpStopsAtHome(t *testing.T) {
 	}
 
 	r := Resolve(Inputs{Dir: dir, Home: home, Global: &Global{}})
-	if r.ProjectID != "" {
-		t.Errorf("project = %q, want empty; the walk went past $HOME", r.ProjectID)
+	if projectOf(r) != "" {
+		t.Errorf("project = %q, want empty; the walk went past $HOME", projectOf(r))
 	}
 }
 
@@ -224,8 +228,8 @@ func TestMalformedLocalFileIsSkipped(t *testing.T) {
 	writeFile(t, filepath.Join(dir, LocalFileName), `{not json`)
 
 	r := Resolve(Inputs{Dir: dir, Home: home, Global: &Global{}})
-	if r.ProjectID != "proj-parent" {
-		t.Errorf("project = %q, want proj-parent", r.ProjectID)
+	if projectOf(r) != "proj-parent" {
+		t.Errorf("project = %q, want proj-parent", projectOf(r))
 	}
 }
 
@@ -297,8 +301,8 @@ func TestOwnerMap(t *testing.T) {
 		in := base
 		in.Repo = "micoworks/delivery-foundation"
 		r := Resolve(in)
-		if r.ProjectID != "" {
-			t.Errorf("project = %q, want empty", r.ProjectID)
+		if projectOf(r) != "" {
+			t.Errorf("project = %q, want empty", projectOf(r))
 		}
 		if r.Origin["project"] != SourceUnset {
 			t.Errorf("origin = %q, want unset", r.Origin["project"])
@@ -369,8 +373,8 @@ func TestWalkUpDoesNotEscapeWhenDirIsOutsideStopAt(t *testing.T) {
 	}
 
 	r := Resolve(Inputs{Dir: outside, Home: home, Global: &Global{}})
-	if r.ProjectID != "" {
-		t.Errorf("project = %q; the walk left the boundary", r.ProjectID)
+	if projectOf(r) != "" {
+		t.Errorf("project = %q; the walk left the boundary", projectOf(r))
 	}
 }
 
@@ -383,7 +387,7 @@ func TestWalkUpStillWalksInsideStopAt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := Resolve(Inputs{Dir: dir, Home: home, Global: &Global{}}).ProjectID; got != "proj-a" {
+	if got := projectOf(Resolve(Inputs{Dir: dir, Home: home, Global: &Global{}})); got != "proj-a" {
 		t.Errorf("project = %q, want proj-a", got)
 	}
 }
@@ -396,7 +400,7 @@ func TestLocalFileInDirIsReadEvenOutsideStopAt(t *testing.T) {
 	outside := filepath.Join(root, "work", "repo")
 	writeFile(t, filepath.Join(outside, LocalFileName), `{"project":"proj-here"}`)
 
-	if got := Resolve(Inputs{Dir: outside, Home: home, Global: &Global{}}).ProjectID; got != "proj-here" {
+	if got := projectOf(Resolve(Inputs{Dir: outside, Home: home, Global: &Global{}})); got != "proj-here" {
 		t.Errorf("project = %q, want proj-here", got)
 	}
 }

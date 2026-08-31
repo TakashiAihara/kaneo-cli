@@ -24,6 +24,15 @@ const (
 	SourceUnset    Source = "unset"
 )
 
+// one lifts a single-valued layer into the list shape the project chain works
+// in. An unset layer stays empty so that it does not answer.
+func one(value string) []string {
+	if value == "" {
+		return nil
+	}
+	return []string{value}
+}
+
 // Flags holds the command-line overrides.
 type Flags struct {
 	APIURL      string
@@ -37,7 +46,11 @@ type Resolved struct {
 	APIURL      string
 	APIKey      string
 	WorkspaceID string
-	ProjectID   string
+
+	// ProjectIDs is a list because the repo map can tie one repository to
+	// several projects. Every other layer names exactly one, and contributes a
+	// single-element list, so a caller reads one field either way.
+	ProjectIDs []string
 
 	Origin map[string]Source
 
@@ -68,6 +81,10 @@ type Inputs struct {
 //	api key    flag, environment, profile
 //	workspace  flag, environment, .kaneo.json, profile, owner map
 //	project    flag, environment, .kaneo.json, profile, repo map
+//
+// Only the repo map can answer with more than one project. The layers above it
+// each hold a single id, so whichever one answers, the result is a list of one
+// and the ordering of the chain is unchanged.
 //
 // The last two layers are narrow on purpose. The repo map maps owner/repo to a
 // project id and supplies nothing else; the owner map maps an owner to a
@@ -115,6 +132,29 @@ func Resolve(in Inputs) Resolved {
 		}{value, source}
 	}
 
+	pickList := func(field string, candidates ...struct {
+		value  []string
+		source Source
+	}) []string {
+		for _, candidate := range candidates {
+			if len(candidate.value) > 0 {
+				r.Origin[field] = candidate.source
+				return candidate.value
+			}
+		}
+		r.Origin[field] = SourceUnset
+		return nil
+	}
+	cl := func(value []string, source Source) struct {
+		value  []string
+		source Source
+	} {
+		return struct {
+			value  []string
+			source Source
+		}{value, source}
+	}
+
 	r.APIURL = pick("api_url",
 		c(in.Flags.APIURL, SourceFlag),
 		c(env("KANEO_API_URL"), SourceEnv),
@@ -138,16 +178,16 @@ func Resolve(in Inputs) Resolved {
 		c(fromOwnerMap, SourceOwnerMap),
 	)
 
-	var fromRepoMap string
-	if in.Global != nil && in.Repo != "" {
-		fromRepoMap = in.Global.Repos[in.Repo]
+	var fromRepoMap []string
+	if in.Global != nil {
+		fromRepoMap = in.Global.ProjectsForRepo(in.Repo)
 	}
-	r.ProjectID = pick("project",
-		c(in.Flags.ProjectID, SourceFlag),
-		c(env("KANEO_PROJECT"), SourceEnv),
-		c(local.Project, SourceLocal),
-		c(profile.ProjectID, SourceProfile),
-		c(fromRepoMap, SourceRepoMap),
+	r.ProjectIDs = pickList("project",
+		cl(one(in.Flags.ProjectID), SourceFlag),
+		cl(one(env("KANEO_PROJECT")), SourceEnv),
+		cl(one(local.Project), SourceLocal),
+		cl(one(profile.ProjectID), SourceProfile),
+		cl(fromRepoMap, SourceRepoMap),
 	)
 
 	return r

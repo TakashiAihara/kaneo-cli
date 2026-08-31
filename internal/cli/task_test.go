@@ -26,7 +26,7 @@ func newTestApp(t *testing.T, h http.HandlerFunc) *App {
 
 	return &App{
 		Cfg: config.Resolved{
-			APIURL: srv.URL, APIKey: "k", ProjectID: "proj1",
+			APIURL: srv.URL, APIKey: "k", ProjectIDs: []string{"proj1"},
 			Origin: map[string]config.Source{},
 		},
 		Out:     &output.Writer{Mode: output.Mode{JSON: false}, Out: &strings.Builder{}, Err: &strings.Builder{}},

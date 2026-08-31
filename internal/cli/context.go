@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"strings"
+
 	"github.com/TakashiAihara/kaneo-cli/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -8,7 +10,7 @@ import (
 type contextReport struct {
 	APIURL     string                   `json:"api_url"`
 	Workspace  string                   `json:"workspace"`
-	Project    string                   `json:"project"`
+	Projects   []string                 `json:"projects"`
 	Repo       string                   `json:"repo,omitempty"`
 	Profile    string                   `json:"profile,omitempty"`
 	LocalFile  string                   `json:"local_file,omitempty"`
@@ -28,7 +30,7 @@ func newContextCommand(app *App) *cobra.Command {
 			r := contextReport{
 				APIURL:    app.Cfg.APIURL,
 				Workspace: app.Cfg.WorkspaceID,
-				Project:   app.Cfg.ProjectID,
+				Projects:  app.Cfg.ProjectIDs,
 				Repo:      app.Cfg.Repo,
 				Profile:   app.Cfg.ProfileName,
 				LocalFile: app.Cfg.LocalPath,
@@ -42,7 +44,7 @@ func newContextCommand(app *App) *cobra.Command {
 			app.Out.Human("api url    %s  (%s)", or(r.APIURL, "-"), app.Cfg.Origin["api_url"])
 			app.Out.Human("api key    %s  (%s)", presence(r.HasAPIKey), app.Cfg.Origin["api_key"])
 			app.Out.Human("workspace  %s  (%s)", or(r.Workspace, "-"), app.Cfg.Origin["workspace"])
-			app.Out.Human("project    %s  (%s)", or(r.Project, "-"), app.Cfg.Origin["project"])
+			app.Out.Human("project    %s  (%s)", or(strings.Join(r.Projects, ", "), "-"), app.Cfg.Origin["project"])
 			app.Out.Human("")
 			app.Out.Human("repo       %s", or(r.Repo, "-"))
 			app.Out.Human("profile    %s", or(r.Profile, "-"))

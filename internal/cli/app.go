@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/TakashiAihara/kaneo-cli/internal/api"
@@ -41,12 +42,35 @@ func (a *App) Workspace() (string, error) {
 	return a.Cfg.WorkspaceID, nil
 }
 
-// Project returns the resolved project, or an actionable error.
-func (a *App) Project() (string, error) {
-	if a.Cfg.ProjectID == "" {
-		return "", errors.New("no project: pass --project, set KANEO_PROJECT, or add one to .kaneo.json")
+// Projects returns every project the settings resolved to.
+//
+// Only the repo map can name more than one; a flag, the environment, a
+// .kaneo.json and a profile each name exactly one.
+func (a *App) Projects() ([]string, error) {
+	if len(a.Cfg.ProjectIDs) == 0 {
+		return nil, errors.New("no project: pass --project, set KANEO_PROJECT, or add one to .kaneo.json")
 	}
-	return a.Cfg.ProjectID, nil
+	return a.Cfg.ProjectIDs, nil
+}
+
+// Project returns the single project a command should act on.
+//
+// A repository tied to several projects has no single answer, and taking the
+// first would write to a board nobody named. The repo map states no order of
+// precedence among its entries, so there is nothing to read a default out of;
+// the caller has to say which. This is the same reason the owner map supplies
+// a workspace but never a project.
+func (a *App) Project() (string, error) {
+	ids, err := a.Projects()
+	if err != nil {
+		return "", err
+	}
+	if len(ids) > 1 {
+		return "", fmt.Errorf(
+			"%s is mapped to %d projects (%s): pass --project or set KANEO_PROJECT to choose one",
+			or(a.Cfg.Repo, "this repository"), len(ids), strings.Join(ids, ", "))
+	}
+	return ids[0], nil
 }
 
 // Context returns a context bounded by the configured timeout.

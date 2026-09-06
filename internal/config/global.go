@@ -9,6 +9,64 @@ import (
 	"strings"
 )
 
+// ProjectIDs is the value side of the repo map.
+//
+// A workspace holds any number of projects, and one repository can have work
+// on several of them, so the value is a list. It decodes from a bare string as
+// well: every config written before this existed holds one, and a config file
+// is synced between machines that may not all be running the same build.
+type ProjectIDs []string
+
+// UnmarshalJSON accepts either a project id or a list of them.
+//
+// Empty ids are dropped rather than kept. An empty string is not a project,
+// and letting one through would make a repository look configured while every
+// request built from it named nothing.
+func (p *ProjectIDs) UnmarshalJSON(b []byte) error {
+	var one string
+	if err := json.Unmarshal(b, &one); err == nil {
+		*p = nil
+		if one != "" {
+			*p = ProjectIDs{one}
+		}
+		return nil
+	}
+
+	var many []string
+	if err := json.Unmarshal(b, &many); err != nil {
+		return fmt.Errorf("repo map value must be a project id or a list of project ids: %w", err)
+	}
+	out := ProjectIDs{}
+	for _, id := range many {
+		if id != "" {
+			out = append(out, id)
+		}
+	}
+	*p = out
+	return nil
+}
+
+// MarshalJSON writes anything but a genuine list back as a bare string.
+//
+// Save rewrites the whole file, so an entry is widened to a list only when it
+// holds more than one id. An older build reading the same synced config parses
+// every value as a string and fails the whole file on the first one it cannot,
+// so every entry that can stay a string does.
+//
+// That includes the empty one. An entry of "" carries no project, and so does
+// [], but only the first is readable by a build that predates this — writing
+// [] would make a config that was fine before this ran unreadable afterwards.
+func (p ProjectIDs) MarshalJSON() ([]byte, error) {
+	if len(p) < 2 {
+		one := ""
+		if len(p) == 1 {
+			one = p[0]
+		}
+		return json.Marshal(one)
+	}
+	return json.Marshal([]string(p))
+}
+
 // Profile is one named set of connection settings.
 type Profile struct {
 	APIURL      string `json:"api_url,omitempty"`
@@ -22,12 +80,12 @@ type Global struct {
 	DefaultProfile string             `json:"default_profile,omitempty"`
 	Profiles       map[string]Profile `json:"profiles,omitempty"`
 
-	// Repos maps a git remote's "owner/repo" to a project id. It exists for
-	// repositories that cannot carry a .kaneo.json — a work repo owned by
-	// someone else, for instance. The key is deliberately owner/repo and not a
-	// path: a working copy's absolute path differs between machines, so a path
-	// key would not survive being synced.
-	Repos map[string]string `json:"repos,omitempty"`
+	// Repos maps a git remote's "owner/repo" to the projects it is tied to. It
+	// exists for repositories that cannot carry a .kaneo.json — a work repo
+	// owned by someone else, for instance. The key is deliberately owner/repo
+	// and not a path: a working copy's absolute path differs between machines,
+	// so a path key would not survive being synced.
+	Repos map[string]ProjectIDs `json:"repos,omitempty"`
 
 	// Owners maps a git remote's owner to a workspace id, so that a rule like
 	// "everything under this organisation belongs to that workspace" can be
@@ -53,7 +111,7 @@ func GlobalPath(home string, env func(string) string) string {
 func LoadGlobal(path string) (*Global, error) {
 	g := &Global{
 		Profiles: map[string]Profile{},
-		Repos:    map[string]string{},
+		Repos:    map[string]ProjectIDs{},
 		Owners:   map[string]string{},
 		path:     path,
 	}
@@ -72,7 +130,7 @@ func LoadGlobal(path string) (*Global, error) {
 		g.Profiles = map[string]Profile{}
 	}
 	if g.Repos == nil {
-		g.Repos = map[string]string{}
+		g.Repos = map[string]ProjectIDs{}
 	}
 	if g.Owners == nil {
 		g.Owners = map[string]string{}
@@ -137,6 +195,21 @@ func (g *Global) WorkspaceForOwner(repo string) string {
 		return ""
 	}
 	return g.Owners[owner]
+}
+
+// ProjectsForRepo returns the projects a repository is tied to, in the order
+// the config lists them.
+func (g *Global) ProjectsForRepo(repo string) []string {
+	if repo == "" {
+		return nil
+	}
+	ids := g.Repos[repo]
+	if len(ids) == 0 {
+		return nil
+	}
+	// Copied so that a caller cannot reach back into the loaded config and
+	// change what a later lookup answers.
+	return append([]string(nil), ids...)
 }
 
 // ActiveProfile returns the profile named by DefaultProfile, or the sole

@@ -56,7 +56,7 @@ Settings resolve from strongest to weakest:
 2. environment — `KANEO_API_URL`, `KANEO_API_KEY`, `KANEO_WORKSPACE`, `KANEO_PROJECT`
 3. `.kaneo.json` in the current directory or any parent, up to `$HOME` — workspace and project only
 4. the active profile in `~/.config/kaneo/config.json`
-5. the `repos` map in that same file, keyed by the git remote's `owner/repo` — project only
+5. the `repos` map in that same file, keyed by the git remote's `owner/repo` — project only, and the one layer that can name more than one
 6. the `owners` map in that same file, keyed by the remote's owner — workspace only
 
 Not every layer answers every setting:
@@ -93,12 +93,24 @@ The nearest file wins per field, so a parent can supply a workspace while a subd
     "some-org": "workspace-id-for-that-org"
   },
   "repos": {
-    "some-org/some-repo": "project-id"
+    "some-org/some-repo": "project-id",
+    "some-org/another-repo": ["project-id", "another-project-id"]
   }
 }
 ```
 
 `owners` states a rule once for a whole organisation: every repository under it belongs to that workspace. It supplies a workspace only — a workspace does not imply a project, so `repos` or `.kaneo.json` still names that.
+
+A `repos` entry takes either one project id or a list of them, because a workspace holds any number of projects and one repository can have work on several. `board` then shows a section per project. Everything else acts on one board, so in a repository mapped to several it asks which: `--project` or `KANEO_PROJECT` names it, and either of those also narrows `board` to that one.
+
+A finished project leaves the board by being archived, not by being edited out of `repos`:
+
+```bash
+kaneo project archive <project-id>     # off the board; nothing is deleted
+kaneo project unarchive <project-id>   # back again
+kaneo project ls --archived            # find one to bring back
+kaneo board --archived                 # show them anyway
+```
 
 Written with mode `0600`, since a profile may hold a key.
 

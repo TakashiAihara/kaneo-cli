@@ -68,9 +68,17 @@ It carries **no credentials**: the file is meant to be committed, and a secret i
 
 ### repo map
 
-The `repos` table in the global config, mapping a git remote's `owner/repo` to a project id. It exists for repositories that cannot carry a `.kaneo.json` — one owned by someone else, for instance.
+The `repos` table in the global config, mapping a git remote's `owner/repo` to the projects it is tied to. It exists for repositories that cannot carry a `.kaneo.json` — one owned by someone else, for instance.
+
+The value is either one project id or a list of them; both forms mean the same thing, and a lone id is written back as it was read. It is the only layer that can answer with more than one project, and `board` is the only command that takes more than one.
 
 The key is `owner/repo` rather than a path because a working copy sits at a different absolute path on every machine, while the remote is the same everywhere.
+
+### archived project
+
+A project the server has stamped with `archivedAt`. `board` leaves it out, `project ls` leaves it out unless asked, and everything about it stays where it was.
+
+It exists because projects are made per plan rather than per repository, so a repository accumulates finished ones. Dropping a finished project from the repo map would clear the board too, but it would also lose the record that the repository ever had that work. Archiving is reversible; editing the map is not.
 
 ### origin
 
@@ -104,6 +112,7 @@ It covers failures that changed nothing: an unreachable server, a missing key, n
 | --- | --- |
 | task `number` and task `id` | The number is per-project and human-facing; the id is opaque and what the API takes. Sending a number as an id makes the server answer `400 Workspace ID could not be determined`, which names neither |
 | workspace and project | A workspace holds projects. `repos` maps a repo to a *project*; the workspace follows from it |
+| reading a board and writing to one | `board` reads, so it can cover several projects at once. Everything else writes, and a write has to name the board it lands on — so a repository mapped to several projects makes those commands ask for `--project` rather than pick |
 | status and column | The same string. A status *is* a column id |
 | site root and API root | The root serves the web app and answers 200 with HTML for any path. Only `/api/...` is the API, which is why the configured URL is normalised to end in `/api` |
 | `/auth/get-session` and `/auth/organization/list` | The first answers 200 with `null` for a valid key, an invalid key and no key, so it cannot check a credential. The second answers 401 on a bad key |

@@ -17,7 +17,15 @@ type Project struct {
 	Description string `json:"description"`
 	WorkspaceID string `json:"workspaceId"`
 	IsPublic    bool   `json:"isPublic"`
+
+	// ArchivedAt is set once a project is finished. Archiving is how a
+	// project leaves a board without anything being deleted, so the field is
+	// a timestamp rather than a flag: it also says when.
+	ArchivedAt *string `json:"archivedAt"`
 }
+
+// Archived reports whether this project has been put away.
+func (p Project) Archived() bool { return p.ArchivedAt != nil }
 
 // Column is a board column. Its ID doubles as the status value carried by every
 // task in it, so there is no separate status vocabulary.

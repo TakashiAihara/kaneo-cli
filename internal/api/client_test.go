@@ -79,7 +79,7 @@ func TestListProjectsRequiresWorkspaceQuery(t *testing.T) {
 		_, _ = w.Write([]byte(`[{"id":"p1","name":"One","workspaceId":"ws1"}]`))
 	})
 
-	got, err := c.ListProjects(context.Background(), "ws1")
+	got, err := c.ListProjects(context.Background(), "ws1", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestSuccessFalseOn200IsAnError(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":{},"error":[{"message":"Invalid key: Expected \"workspaceId\""}],"success":false}`))
 	})
 
-	_, err := c.ListProjects(context.Background(), "")
+	_, err := c.ListProjects(context.Background(), "", false)
 	if err == nil {
 		t.Fatal("expected an error for success:false, got nil")
 	}
@@ -299,7 +299,7 @@ func TestServerMessageSurvivesWhateverShapeItArrivesIn(t *testing.T) {
 			c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte(tc.body))
 			})
-			_, err := c.ListProjects(context.Background(), "ws")
+			_, err := c.ListProjects(context.Background(), "ws", false)
 			if err == nil {
 				t.Fatal("success:false was treated as a success")
 			}
@@ -322,7 +322,7 @@ func TestSuccessFalseWithoutAMessageIsStillAnError(t *testing.T) {
 	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"success":false}`))
 	})
-	if _, err := c.ListProjects(context.Background(), "ws"); err == nil {
+	if _, err := c.ListProjects(context.Background(), "ws", false); err == nil {
 		t.Error("success:false without a message was treated as a success")
 	}
 }

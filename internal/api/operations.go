@@ -29,14 +29,34 @@ func (c *Client) VerifyKey(ctx context.Context) error {
 
 // ListProjects returns the projects in a workspace. workspaceId is a required
 // query parameter; omitting it is a 400, not an unfiltered listing.
-func (c *Client) ListProjects(ctx context.Context, workspaceID string) ([]Project, error) {
+//
+// Archived projects are left out unless asked for, which is the same view the
+// board takes.
+func (c *Client) ListProjects(ctx context.Context, workspaceID string, includeArchived bool) ([]Project, error) {
 	op := operation("listProjects")
 	var out []Project
 	q := url.Values{"workspaceId": {workspaceID}}
+	if includeArchived {
+		q.Set("includeArchived", "true")
+	}
 	if err := c.Do(ctx, op.Method, op.Expand(), q, nil, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
+}
+
+// SetProjectArchived puts a project away, or brings it back.
+//
+// Archiving is the alternative to editing a project out of the repo map: the
+// mapping and every task on it stay where they are, and only the board stops
+// showing it. Nothing is deleted, so the change is reversible.
+func (c *Client) SetProjectArchived(ctx context.Context, projectID string, archived bool) error {
+	id := "unarchiveProject"
+	if archived {
+		id = "archiveProject"
+	}
+	op := operation(id)
+	return c.Do(ctx, op.Method, op.Expand(projectID), nil, nil, nil)
 }
 
 // GetProject fetches one project by id.

@@ -16,11 +16,27 @@ import (
 // boardServer answers the board endpoint for the named projects and returns
 // nothing at all for any other. Comments are always empty, so a board's
 // content is decided by this table alone.
-func boardServer(t *testing.T, names map[string]string, broken map[string]bool) *httptest.Server {
+func boardServer(t *testing.T, names map[string]string, broken map[string]bool, archived ...string) *httptest.Server {
 	t.Helper()
+	isArchived := map[string]bool{}
+	for _, id := range archived {
+		isArchived[id] = true
+	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/comment/") {
 			fmt.Fprint(w, `{"data":[]}`)
+			return
+		}
+		if id := strings.TrimPrefix(r.URL.Path, "/api/project/"); id != r.URL.Path {
+			if broken[id] {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			at := "null"
+			if isArchived[id] {
+				at = `"2026-01-01T00:00:00Z"`
+			}
+			fmt.Fprintf(w, `{"id":%q,"name":%q,"archivedAt":%s}`, id, names[id], at)
 			return
 		}
 		id := strings.TrimPrefix(r.URL.Path, "/api/task/tasks/")
@@ -211,5 +227,83 @@ func TestBoardHonoursAChosenProject(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "## Two") {
 		t.Errorf("board is missing the chosen project:\n%s", out.String())
+	}
+}
+
+// Projects are made per plan, so a repository accumulates finished ones. They
+// leave the board by being archived rather than by being edited out of the
+// repo map, which would lose the record that the repository had that work.
+func TestBoardLeavesOutArchivedProjects(t *testing.T) {
+	srv := boardServer(t, map[string]string{"proj-one": "One", "proj-two": "Two"}, nil, "proj-one")
+	app, out, _ := appFor(srv, false, "proj-one", "proj-two")
+
+	if err := run(t, newBoardCommand(app), "--strict"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "## One") {
+		t.Errorf("an archived project is still on the board:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "## Two") {
+		t.Errorf("the live project is missing:\n%s", out.String())
+	}
+}
+
+// Archiving hides, it does not delete, so there has to be a way to see what
+// was put away.
+func TestBoardShowsArchivedProjectsWhenAsked(t *testing.T) {
+	srv := boardServer(t, map[string]string{"proj-one": "One"}, nil, "proj-one")
+	app, out, _ := appFor(srv, false, "proj-one")
+
+	if err := run(t, newBoardCommand(app), "--strict", "--archived"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "## One") {
+		t.Errorf("--archived did not bring the project back:\n%s", out.String())
+	}
+}
+
+// Every mapped project being archived is not a failure: the repository has no
+// live work, which is the same silence as a repository nobody mapped.
+func TestBoardIsSilentWhenEveryProjectIsArchived(t *testing.T) {
+	srv := boardServer(t, map[string]string{"proj-one": "One"}, nil, "proj-one")
+	app, out, errOut := appFor(srv, false, "proj-one")
+
+	if err := run(t, newBoardCommand(app)); err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if out.String() != "" || errOut.String() != "" {
+		t.Errorf("wrote %q / %q, want nothing", out.String(), errOut.String())
+	}
+}
+
+// archive and unarchive differ only in the endpoint they call, so nothing else
+// would notice the two being swapped — and a swap would leave a finished
+// project on every board while quietly reviving the one being put away.
+func TestArchiveAndUnarchiveHitTheirOwnEndpoints(t *testing.T) {
+	for _, tc := range []struct {
+		verb    string
+		archive bool
+		want    string
+	}{
+		{"archive", true, "/api/project/proj-one/archive"},
+		{"unarchive", false, "/api/project/proj-one/unarchive"},
+	} {
+		var got, method string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			got, method = r.URL.Path, r.Method
+			fmt.Fprint(w, `{}`)
+		}))
+		t.Cleanup(srv.Close)
+
+		app, _, _ := appFor(srv, false, "proj-one")
+		if err := run(t, newProjectArchiveCommand(app, tc.archive), "proj-one"); err != nil {
+			t.Fatalf("%s: %v", tc.verb, err)
+		}
+		if got != tc.want {
+			t.Errorf("%s called %s, want %s", tc.verb, got, tc.want)
+		}
+		if method != http.MethodPut {
+			t.Errorf("%s used %s, want PUT", tc.verb, method)
+		}
 	}
 }

@@ -74,6 +74,12 @@ The value is either one project id or a list of them; both forms mean the same t
 
 The key is `owner/repo` rather than a path because a working copy sits at a different absolute path on every machine, while the remote is the same everywhere.
 
+### archived project
+
+A project the server has stamped with `archivedAt`. `board` leaves it out, `project ls` leaves it out unless asked, and everything about it stays where it was.
+
+It exists because projects are made per plan rather than per repository, so a repository accumulates finished ones. Dropping a finished project from the repo map would clear the board too, but it would also lose the record that the repository ever had that work. Archiving is reversible; editing the map is not.
+
 ### origin
 
 Which layer of the resolution chain supplied a given setting. Reported by `kaneo context` so a surprising value can be traced rather than guessed at.

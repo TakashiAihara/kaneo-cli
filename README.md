@@ -103,6 +103,15 @@ The nearest file wins per field, so a parent can supply a workspace while a subd
 
 A `repos` entry takes either one project id or a list of them, because a workspace holds any number of projects and one repository can have work on several. `board` then shows a section per project. Everything else acts on one board, so in a repository mapped to several it asks which: `--project` or `KANEO_PROJECT` names it, and either of those also narrows `board` to that one.
 
+A finished project leaves the board by being archived, not by being edited out of `repos`:
+
+```bash
+kaneo project archive <project-id>     # off the board; nothing is deleted
+kaneo project unarchive <project-id>   # back again
+kaneo project ls --archived            # find one to bring back
+kaneo board --archived                 # show them anyway
+```
+
 Written with mode `0600`, since a profile may hold a key.
 
 ### Self-hosted instances

@@ -34,8 +34,13 @@ type boardReport struct {
 // A repository mapped to several projects gets one section per project. board
 // is the only command that takes more than one: it reads, so there is no
 // question of which board a write lands on.
+//
+// Archived projects are left out. Projects are made per plan, so a repository
+// accumulates finished ones, and the alternative — dropping them from the repo
+// map — would lose the record that the repository ever had that work.
 func newBoardCommand(app *App) *cobra.Command {
 	var strict bool
+	var includeArchived bool
 
 	cmd := &cobra.Command{
 		Use:   "board",
@@ -57,6 +62,24 @@ func newBoardCommand(app *App) *cobra.Command {
 		reports := make([]boardReport, 0, len(projects))
 		var firstErr error
 		for _, project := range projects {
+			// The board listing does not carry the archived flag, so the
+			// project itself is read first. An archived project is not a
+			// failure — it is finished work that has been put away, and
+			// skipping it is the whole point of archiving it.
+			if !includeArchived {
+				p, err := client.GetProject(ctx, project)
+				if err != nil {
+					debugf("project %s: %v", project, err)
+					if firstErr == nil {
+						firstErr = err
+					}
+					continue
+				}
+				if p.Archived() {
+					continue
+				}
+			}
+
 			report, err := buildBoard(ctx, client, project)
 			if err != nil {
 				// One project that cannot be read should not cost the others
@@ -91,6 +114,8 @@ func newBoardCommand(app *App) *cobra.Command {
 		return app.Out.Data(reports)
 	})
 
+	cmd.Flags().BoolVar(&includeArchived, "archived", false,
+		"include archived projects, which are left out by default")
 	addStrictFlag(cmd, &strict)
 	return cmd
 }

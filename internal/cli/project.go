@@ -14,7 +14,8 @@ func newProjectCommand(app *App) *cobra.Command {
 		Short:   "Work with projects",
 	}
 
-	cmd.AddCommand(&cobra.Command{
+	var listArchived bool
+	list := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List the projects in a workspace",
@@ -31,16 +32,23 @@ func newProjectCommand(app *App) *cobra.Command {
 			ctx, cancel := app.Context()
 			defer cancel()
 
-			projects, err := client.ListProjects(ctx, workspace)
+			projects, err := client.ListProjects(ctx, workspace, listArchived)
 			if err != nil {
 				return err
 			}
 			for _, p := range projects {
+				if p.Archived() {
+					app.Out.Human("%s  %s  (archived)", p.ID, p.Name)
+					continue
+				}
 				app.Out.Human("%s  %s", p.ID, p.Name)
 			}
 			return app.Out.Data(projects)
 		},
-	})
+	}
+	list.Flags().BoolVar(&listArchived, "archived", false,
+		"include archived projects, so one can be found again to unarchive")
+	cmd.AddCommand(list)
 
 	cmd.AddCommand(&cobra.Command{
 		Use:   "get [project-id]",
@@ -73,6 +81,7 @@ func newProjectCommand(app *App) *cobra.Command {
 	})
 
 	cmd.AddCommand(newProjectCreateCommand(app))
+	cmd.AddCommand(newProjectArchiveCommand(app, true), newProjectArchiveCommand(app, false))
 
 	return cmd
 }
@@ -116,4 +125,43 @@ func newProjectCreateCommand(app *App) *cobra.Command {
 	f.StringVar(&slug, "slug", "", "url slug")
 	f.StringVarP(&description, "description", "d", "", "project description")
 	return cmd
+}
+
+// newProjectArchiveCommand builds `project archive` and its inverse.
+//
+// Archiving is how a finished project leaves the board. Dropping it from the
+// repo map would do that too, but it would also lose the record that the
+// repository ever had that work, so the board filters on the server's own
+// archived flag instead and the mapping stays put. Nothing is deleted, and
+// unarchive puts it back.
+func newProjectArchiveCommand(app *App, archive bool) *cobra.Command {
+	verb, past := "archive", "archived"
+	if !archive {
+		verb, past = "unarchive", "unarchived"
+	}
+	return &cobra.Command{
+		Use:   verb + " [project-id]",
+		Short: strings.ToUpper(verb[:1]) + verb[1:] + " a project",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			client, err := app.Client()
+			if err != nil {
+				return err
+			}
+			id := ""
+			if len(args) == 1 {
+				id = args[0]
+			} else if id, err = app.Project(); err != nil {
+				return err
+			}
+			ctx, cancel := app.Context()
+			defer cancel()
+
+			if err := client.SetProjectArchived(ctx, id, archive); err != nil {
+				return err
+			}
+			app.Out.Human("%s %s", past, id)
+			return app.Out.Data(map[string]any{"project": id, "archived": archive})
+		},
+	}
 }

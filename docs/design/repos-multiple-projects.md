@@ -33,6 +33,16 @@ Only in the repo map. A flag, the environment, a `.kaneo.json` and a profile eac
 
 `.kaneo.json` is unchanged for the same reason it was never the problem: it ties a *directory* to a project, so it switches by where you are rather than covering several at once.
 
+## Finished projects
+
+A project is a plan, not a repository, so a repository accumulates finished ones and the board would fill up with them.
+
+They leave the board by being archived. The server already has `archivedAt` and the two endpoints that set it, so `board` filters on that and `kaneo project archive` reaches it. The mapping and every task stay where they were, and unarchive puts the project back.
+
+Editing a finished project out of `repos` would clear the board as well, but removing is not hiding: it loses the record that the repository ever had that work, and there is nothing to undo it with.
+
+The board listing does not carry the flag, so board reads the project itself first — one extra request per mapped project, against the one it already makes per open task.
+
 ## What a partial failure does
 
 `board` keeps the projects it could read and reports only when it could read none. A project that is unreachable should not cost the others their board, which is how the same command already treats a task whose comments cannot be read.

@@ -56,10 +56,11 @@ func (a *App) Projects() ([]string, error) {
 // Project returns the single project a command should act on.
 //
 // A repository tied to several projects has no single answer, and taking the
-// first would write to a board nobody named. The repo map states no order of
-// precedence among its entries, so there is nothing to read a default out of;
-// the caller has to say which. This is the same reason the owner map supplies
-// a workspace but never a project.
+// first would write to a board nobody named. The entries are ordered, but the
+// order says only how they were written down — no entry is marked as the one
+// to write to — so treating the first as a default would invent a rule nobody
+// stated. The caller has to say which. This is the same reason the owner map
+// supplies a workspace but never a project.
 func (a *App) Project() (string, error) {
 	ids, err := a.Projects()
 	if err != nil {

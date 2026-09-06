@@ -72,9 +72,11 @@ func TestRepoMapListReachesTheResolver(t *testing.T) {
 	}
 }
 
-// A flag names one project, so it has to reduce the list to that one. Without
-// this there would be no way to act on a single project in a repository that
-// is mapped to several.
+// A flag names one project, so whatever the repo map holds, the answer is that
+// one. It wins by precedence rather than by picking out of the list, so it is
+// the answer whether or not it names one of the mapped projects — and either
+// way it is how a single project gets acted on in a repository mapped to
+// several.
 func TestFlagNarrowsAListToOne(t *testing.T) {
 	home := t.TempDir()
 	g := &Global{Repos: map[string]ProjectIDs{"owner/repo": {"proj-one", "proj-two"}}}
@@ -88,10 +90,18 @@ func TestFlagNarrowsAListToOne(t *testing.T) {
 			Flags: Flags{ProjectID: "proj-chosen"}}, SourceFlag},
 		{"env", Inputs{Dir: home, Home: home, Global: g, Repo: "owner/repo",
 			Env: envFrom(map[string]string{"KANEO_PROJECT": "proj-chosen"})}, SourceEnv},
+		// Naming one of the mapped projects is the ordinary case: this is how
+		// a repository mapped to several gets acted on one at a time.
+		{"flag names a mapped project", Inputs{Dir: home, Home: home, Global: g, Repo: "owner/repo",
+			Flags: Flags{ProjectID: "proj-two"}}, SourceFlag},
 	} {
+		want := "proj-chosen"
+		if tc.name == "flag names a mapped project" {
+			want = "proj-two"
+		}
 		r := Resolve(tc.in)
-		if got := strings.Join(r.ProjectIDs, ","); got != "proj-chosen" {
-			t.Errorf("%s: projects = %q, want just proj-chosen", tc.name, got)
+		if got := strings.Join(r.ProjectIDs, ","); got != want {
+			t.Errorf("%s: projects = %q, want just %s", tc.name, got, want)
 		}
 		if r.Origin["project"] != tc.want {
 			t.Errorf("%s: origin = %q, want %q", tc.name, r.Origin["project"], tc.want)
@@ -151,12 +161,15 @@ func TestMalformedRepoMapValueIsAnError(t *testing.T) {
 	}
 }
 
-// Save rewrites the whole file. Widening a lone id to a list would edit
-// mappings this run never touched, and an older build reading the same synced
-// config would then fail on all of them.
-func TestSaveKeepsTheShapeItRead(t *testing.T) {
+// Save rewrites the whole file, and an older build parses every value as a
+// string and fails the whole file on the first one it cannot. So an entry is
+// widened to a list only when it genuinely holds more than one id — including
+// the singleton list and the empty value, which come back as strings even
+// though that is not the shape they were written in.
+func TestSaveWidensOnlyGenuineLists(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	writeFile(t, path, `{"repos":{"one/repo":"proj-one","two/repo":["proj-two","proj-three"]}}`)
+	writeFile(t, path, `{"repos":{"one/repo":"proj-one","two/repo":["proj-two","proj-three"],`+
+		`"lone/repo":["proj-lone"],"blank/repo":"","empty/repo":[]}}`)
 
 	g, err := LoadGlobal(path)
 	if err != nil {
@@ -184,6 +197,24 @@ func TestSaveKeepsTheShapeItRead(t *testing.T) {
 	if err := json.Unmarshal(back.Repos["two/repo"], &two); err != nil ||
 		strings.Join(two, ",") != "proj-two,proj-three" {
 		t.Errorf("two/repo written as %s, want a list of both", back.Repos["two/repo"])
+	}
+
+	// A singleton list is not written back as a list: it holds one id, and an
+	// older build can read a string.
+	var lone string
+	if err := json.Unmarshal(back.Repos["lone/repo"], &lone); err != nil || lone != "proj-lone" {
+		t.Errorf("lone/repo written as %s, want the bare string proj-lone", back.Repos["lone/repo"])
+	}
+
+	// The empty value is the one that bites: "" was readable by a build that
+	// predates this, [] is not, so a config that was fine before Save ran must
+	// not come back broken.
+	for _, key := range []string{"blank/repo", "empty/repo"} {
+		var blank string
+		if err := json.Unmarshal(back.Repos[key], &blank); err != nil || blank != "" {
+			t.Errorf("%s written as %s, want an empty string an older build can read",
+				key, back.Repos[key])
+		}
 	}
 }
 

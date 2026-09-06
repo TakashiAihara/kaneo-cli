@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,13 +17,22 @@ import (
 // boardServer answers the board endpoint for the named projects and returns
 // nothing at all for any other. Comments are always empty, so a board's
 // content is decided by this table alone.
-func boardServer(t *testing.T, names map[string]string, broken map[string]bool, archived ...string) *httptest.Server {
+func boardServer(t *testing.T, names map[string]string, broken map[string]bool, opts ...any) *httptest.Server {
 	t.Helper()
 	isArchived := map[string]bool{}
-	for _, id := range archived {
-		isArchived[id] = true
+	var seen func(string)
+	for _, o := range opts {
+		switch v := o.(type) {
+		case string:
+			isArchived[v] = true
+		case func(string):
+			seen = v
+		}
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if seen != nil {
+			seen(r.URL.Path)
+		}
 		if strings.HasPrefix(r.URL.Path, "/api/comment/") {
 			fmt.Fprint(w, `{"data":[]}`)
 			return
@@ -140,7 +150,14 @@ func TestBoardOnAnUnmappedRepoPrintsNothingAndSucceeds(t *testing.T) {
 // One project that cannot be read should not cost the others their board, for
 // the same reason a task whose comments cannot be read is skipped.
 func TestBoardKeepsTheProjectsItCouldRead(t *testing.T) {
-	srv := boardServer(t, map[string]string{"proj-two": "Two"}, map[string]bool{"proj-one": true})
+	var mu sync.Mutex
+	tried := map[string]bool{}
+	srv := boardServer(t, map[string]string{"proj-two": "Two"}, map[string]bool{"proj-one": true},
+		func(path string) {
+			mu.Lock()
+			defer mu.Unlock()
+			tried[path] = true
+		})
 	app, out, _ := appFor(srv, false, "proj-one", "proj-two")
 
 	if err := run(t, newBoardCommand(app), "--strict"); err != nil {
@@ -148,6 +165,12 @@ func TestBoardKeepsTheProjectsItCouldRead(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "## Two") {
 		t.Errorf("the readable project is missing:\n%s", out.String())
+	}
+	// Without this the test would also pass for a board that never asked about
+	// the first project at all, which is a different bug wearing the same
+	// output.
+	if !tried["/api/project/proj-one"] {
+		t.Error("the failing project was never requested; nothing was recovered from")
 	}
 }
 
@@ -213,9 +236,11 @@ func TestProjectReportsWhenNothingIsConfigured(t *testing.T) {
 	}
 }
 
-// Narrowing has to reach the command, not just the resolver: with --project
-// the board shows that one project alone.
-func TestBoardHonoursAChosenProject(t *testing.T) {
+// board acts on exactly the projects it was given and does not go looking for
+// the rest of the repo map. That is what makes narrowing work end to end: the
+// resolver reduces the list when --project or KANEO_PROJECT names one (pinned
+// in the config package), and board then shows that one alone.
+func TestBoardActsOnlyOnTheProjectsItIsGiven(t *testing.T) {
 	srv := boardServer(t, map[string]string{"proj-one": "One", "proj-two": "Two"}, nil)
 	app, out, _ := appFor(srv, false, "proj-two")
 

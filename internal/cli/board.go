@@ -83,8 +83,11 @@ func newBoardCommand(app *App) *cobra.Command {
 			report, err := buildBoard(ctx, client, project)
 			if err != nil {
 				// One project that cannot be read should not cost the others
-				// their board, for the same reason a task whose comments
-				// cannot be read is skipped rather than failing the report.
+				// their board. It hides more than skipping one task's
+				// comments does, so the reason it is still worth doing is the
+				// caller: board runs from a session-start hook, and a session
+				// that starts with most of its boards beats one that starts
+				// with none.
 				debugf("board for %s: %v", project, err)
 				if firstErr == nil {
 					firstErr = err

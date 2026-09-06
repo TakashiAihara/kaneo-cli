@@ -46,17 +46,23 @@ func (p *ProjectIDs) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON writes a lone id back as a bare string.
+// MarshalJSON writes anything but a genuine list back as a bare string.
 //
-// Save rewrites the whole file, so widening every entry to a list would edit
-// mappings this run never touched, and an older build reading the same synced
-// config would then fail on all of them.
+// Save rewrites the whole file, so an entry is widened to a list only when it
+// holds more than one id. An older build reading the same synced config parses
+// every value as a string and fails the whole file on the first one it cannot,
+// so every entry that can stay a string does.
+//
+// That includes the empty one. An entry of "" carries no project, and so does
+// [], but only the first is readable by a build that predates this — writing
+// [] would make a config that was fine before this ran unreadable afterwards.
 func (p ProjectIDs) MarshalJSON() ([]byte, error) {
-	if len(p) == 1 {
-		return json.Marshal(p[0])
-	}
-	if p == nil {
-		return []byte("[]"), nil
+	if len(p) < 2 {
+		one := ""
+		if len(p) == 1 {
+			one = p[0]
+		}
+		return json.Marshal(one)
 	}
 	return json.Marshal([]string(p))
 }

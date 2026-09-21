@@ -362,7 +362,7 @@ func TestRenameWorkspaceSendsIDAndOnlyTheName(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"ws1","name":"New Name","slug":"old-slug"}`))
 	})
 
-	got, err := c.RenameWorkspace(context.Background(), "ws1", "New Name")
+	got, err := c.RenameWorkspace(context.Background(), "ws1", "  New Name ")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,7 +372,29 @@ func TestRenameWorkspaceSendsIDAndOnlyTheName(t *testing.T) {
 	if gotBody != `{"data":{"name":"New Name"},"organizationId":"ws1"}` {
 		t.Errorf("body = %q", gotBody)
 	}
-	if got.Name != "New Name" || got.Slug != "old-slug" {
+	if got.ID != "ws1" || got.Name != "New Name" {
 		t.Errorf("workspace = %+v", got)
+	}
+}
+
+func TestRenameWorkspaceRejectsABlankNameWithoutCalling(t *testing.T) {
+	called := false
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) { called = true })
+
+	if _, err := c.RenameWorkspace(context.Background(), "ws1", "   "); err == nil {
+		t.Error("a blank name was accepted")
+	}
+	if called {
+		t.Error("the server was called with a blank name")
+	}
+}
+
+// better-auth has no null guard on the updated row, so a 200 can carry null.
+func TestRenameWorkspaceFailsWhenTheReplyDoesNotEchoTheRename(t *testing.T) {
+	for _, reply := range []string{`null`, `{"id":"other","name":"New Name"}`, `{"id":"ws1","name":"Old"}`} {
+		c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(reply)) })
+		if _, err := c.RenameWorkspace(context.Background(), "ws1", "New Name"); err == nil {
+			t.Errorf("reply %s read as success", reply)
+		}
 	}
 }

@@ -19,18 +19,16 @@ on:
         required: true
 
 # Actions are pinned to a commit SHA rather than a tag. A tag can be moved,
-# and this job can publish releases.
+# and this workflow can publish releases.
 permissions:
-  contents: write
-  # A checksum from the same release proves nothing about authenticity. Attach
-  # provenance so which workflow built it, from which commit, can be verified.
-  id-token: write
-  attestations: write
+  contents: read
 
-# One at a time, so two runs cannot read the same highest tag and both claim
-# the next one.
+# Automatic runs are one at a time, so two cannot read the same highest tag and
+# both claim the next one. A newer main push replacing a pending one is fine.
+# A named tag gets its own group: sharing one would let a later main push
+# cancel a pending hand-pushed or dispatched release.
 concurrency:
-  group: release
+  group: release-${{ github.event_name == 'workflow_run' && 'auto' || github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -67,6 +65,12 @@ jobs:
         run: |
           set -eu
           if [ "$EVENT" != workflow_run ]; then
+            # A dispatch input is free text. Anything but a version would be
+            # checked out as a branch and created as a tag of that name.
+            if ! printf '%s\n' "$GIVEN" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$'; then
+              echo "::error::$GIVEN is not a vX.Y.Z or vX.Y.Z-rc.N tag"
+              exit 1
+            fi
             echo "tag=$GIVEN" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -77,13 +81,26 @@ jobs:
             exit 0
           fi
           # A re-run for the same commit reuses its tag rather than cutting another.
-          existing="$(git tag --points-at HEAD --list 'v*' | head -n 1)"
-          echo "tag=${existing:-$(go run ./cmd/next-tag)}" >> "$GITHUB_OUTPUT"
+          # Assigned on its own line: set -e does not see a failure inside a
+          # substitution embedded in echo's argument, which would output an
+          # empty tag, skip the release and still show green.
+          tag="$(git tag --points-at HEAD --list 'v*' | head -n 1)"
+          if [ -z "$tag" ]; then
+            tag="$(go run ./cmd/next-tag)"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   goreleaser:
     needs: tag
     if: needs.tag.outputs.tag != ''
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # A checksum from the same release proves nothing about authenticity.
+      # Attach provenance so which workflow built it, from which commit, can be
+      # verified.
+      id-token: write
+      attestations: write
     steps:
       # On a manual run inputs.tag and the default branch HEAD disagree. Without
       # an explicit ref, binaries whose contents do not match the tag end up in
@@ -124,6 +141,10 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # goreleaser otherwise picks among the tags on HEAD by version sort,
+          # which ranks v0.2.1-rc.3 above v0.2.1: a final tag on a commit that
+          # already has an rc would be released as the rc.
+          GORELEASER_CURRENT_TAG: ${{ needs.tag.outputs.tag }}
 
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:

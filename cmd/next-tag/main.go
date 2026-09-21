@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -46,26 +47,17 @@ func parse(tag string) (version, bool) {
 	return v, true
 }
 
-func less(a, b version) bool {
-	for i := range a {
-		if a[i] != b[i] {
-			return a[i] < b[i]
-		}
-	}
-	return false
-}
-
 func nextTag(tags []string) (string, error) {
-	var top version
-	found := false
+	var versions []version
 	for _, t := range tags {
-		if v, ok := parse(t); ok && (!found || less(top, v)) {
-			top, found = v, true
+		if v, ok := parse(t); ok {
+			versions = append(versions, v)
 		}
 	}
-	if !found {
+	if len(versions) == 0 {
 		return "", errors.New("no vX.Y.Z or vX.Y.Z-rc.N tag to count from")
 	}
+	top := slices.MaxFunc(versions, func(a, b version) int { return slices.Compare(a[:], b[:]) })
 	if top[3] == math.MaxInt {
 		return fmt.Sprintf("v%d.%d.%d-rc.1", top[0], top[1], top[2]+1), nil
 	}

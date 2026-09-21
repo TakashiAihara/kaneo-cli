@@ -349,3 +349,30 @@ func TestIsSecure(t *testing.T) {
 		}
 	}
 }
+
+// better-auth falls back to the session's active organization when
+// organizationId is missing, and an API key has no active organization, so the
+// id must always be sent. Only the name goes in data, so the slug is not reset.
+func TestRenameWorkspaceSendsIDAndOnlyTheName(t *testing.T) {
+	var gotMethod, gotPath, gotBody string
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath = r.Method, r.URL.Path
+		buf, _ := io.ReadAll(r.Body)
+		gotBody = string(buf)
+		_, _ = w.Write([]byte(`{"id":"ws1","name":"New Name","slug":"old-slug"}`))
+	})
+
+	got, err := c.RenameWorkspace(context.Background(), "ws1", "New Name")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/api/auth/organization/update" {
+		t.Errorf("request = %s %s", gotMethod, gotPath)
+	}
+	if gotBody != `{"data":{"name":"New Name"},"organizationId":"ws1"}` {
+		t.Errorf("body = %q", gotBody)
+	}
+	if got.Name != "New Name" || got.Slug != "old-slug" {
+		t.Errorf("workspace = %+v", got)
+	}
+}

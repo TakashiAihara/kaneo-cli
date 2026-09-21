@@ -129,6 +129,7 @@ export KANEO_API_KEY=...   # Settings -> Account -> Developer
 kaneo context                       # what did the settings resolve to, and from where
 kaneo whoami                        # is the key accepted, and what can it reach
 kaneo workspace ls
+kaneo workspace rename <name>       # the workspace from -w / KANEO_WORKSPACE; slug unchanged
 kaneo project ls
 kaneo project get [project-id]
 kaneo task ls [--status ...] [--priority ...] [--all]

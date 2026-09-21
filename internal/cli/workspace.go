@@ -1,6 +1,10 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"strings"
+
+	"github.com/spf13/cobra"
+)
 
 func newWorkspaceCommand(app *App) *cobra.Command {
 	cmd := &cobra.Command{
@@ -29,6 +33,30 @@ func newWorkspaceCommand(app *App) *cobra.Command {
 				app.Out.Human("%s  %s", w.ID, w.Name)
 			}
 			return app.Out.Data(workspaces)
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "rename <name>",
+		Short: "Rename the workspace (-w / KANEO_WORKSPACE); the slug is kept",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			client, err := app.Client()
+			if err != nil {
+				return err
+			}
+			workspace, err := app.Workspace()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := app.Context()
+			defer cancel()
+
+			w, err := client.RenameWorkspace(ctx, workspace, strings.Join(args, " "))
+			if err != nil {
+				return err
+			}
+			app.Out.Human("renamed %s  %s", w.ID, w.Name)
+			return app.Out.Data(w)
 		},
 	})
 	return cmd

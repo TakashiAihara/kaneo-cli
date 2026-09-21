@@ -27,6 +27,21 @@ func (c *Client) VerifyKey(ctx context.Context) error {
 	return err
 }
 
+// RenameWorkspace changes a workspace's display name. The slug is left alone:
+// it is what URLs are built from, and a rename should not break them.
+func (c *Client) RenameWorkspace(ctx context.Context, workspaceID, name string) (*Workspace, error) {
+	op := operation("updateOrganization")
+	body := map[string]any{
+		"organizationId": workspaceID,
+		"data":           map[string]string{"name": name},
+	}
+	var out Workspace
+	if err := c.Do(ctx, op.Method, op.Expand(), nil, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // ListProjects returns the projects in a workspace. workspaceId is a required
 // query parameter; omitting it is a 400, not an unfiltered listing.
 //

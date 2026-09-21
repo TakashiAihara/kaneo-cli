@@ -50,4 +50,7 @@ changelog:
 
 release:
   draft: false
-  prerelease: auto
+  # Release candidates are what main ships, and install.sh asks for
+  # releases/latest, which skips anything marked prerelease. auto would mark
+  # every -rc tag and leave install.sh on the last final version.
+  prerelease: false

@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"sort"
+	"strings"
 )
 
 // ListWorkspaces returns the workspaces the key can see.
@@ -25,6 +27,34 @@ func (c *Client) ListWorkspaces(ctx context.Context) ([]Workspace, error) {
 func (c *Client) VerifyKey(ctx context.Context) error {
 	_, err := c.ListWorkspaces(ctx)
 	return err
+}
+
+// RenameWorkspace changes a workspace's display name. better-auth only touches
+// the slug when data.slug is sent, and Kaneo's own settings page sends the same
+// name-only payload, so a CLI rename matches a UI rename.
+//
+// The server accepts any 1-character name, including a space, so the name is
+// trimmed and checked here. The reply is checked too: a 200 that does not echo
+// the workspace back must not read as success.
+func (c *Client) RenameWorkspace(ctx context.Context, workspaceID, name string) (*Workspace, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("workspace name is empty")
+	}
+
+	op := operation("updateOrganization")
+	body := map[string]any{
+		"organizationId": workspaceID,
+		"data":           map[string]string{"name": name},
+	}
+	var out Workspace
+	if err := c.Do(ctx, op.Method, op.Expand(), nil, body, &out); err != nil {
+		return nil, err
+	}
+	if out.ID != workspaceID || out.Name != name {
+		return nil, fmt.Errorf("%s: server answered with workspace %q named %q", op.Path, out.ID, out.Name)
+	}
+	return &out, nil
 }
 
 // ListProjects returns the projects in a workspace. workspaceId is a required

@@ -43,6 +43,7 @@ func (o Operation) Expand(args ...string) string {
 // Operations is everything this client calls.
 var Operations = []Operation{
 	{ID: "listOrganization", Method: "GET", Path: "/auth/organization/list", Command: "kaneo whoami / workspace ls"},
+	{ID: "updateOrganization", Method: "POST", Path: "/auth/organization/update", Command: "kaneo workspace rename"},
 
 	{ID: "listProjects", Method: "GET", Path: "/project", Command: "kaneo project ls"},
 	{ID: "getProject", Method: "GET", Path: "/project/{id}", Command: "kaneo project get"},

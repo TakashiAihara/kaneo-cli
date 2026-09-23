@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/TakashiAihara/kaneo-cli/internal/api"
@@ -80,7 +81,7 @@ func newProjectCommand(app *App) *cobra.Command {
 		},
 	})
 
-	cmd.AddCommand(newProjectCreateCommand(app))
+	cmd.AddCommand(newProjectCreateCommand(app), newProjectUpdateCommand(app))
 	cmd.AddCommand(newProjectArchiveCommand(app, true), newProjectArchiveCommand(app, false))
 
 	return cmd
@@ -124,6 +125,75 @@ func newProjectCreateCommand(app *App) *cobra.Command {
 	f.StringVar(&icon, "icon", "", "icon name (default Layers)")
 	f.StringVar(&slug, "slug", "", "url slug")
 	f.StringVarP(&description, "description", "d", "", "project description")
+	return cmd
+}
+
+// newProjectUpdateCommand changes a project in place, so a project can be
+// renamed without archive + create, which would lose its tasks and comments.
+//
+// The id is required rather than resolved like `project get`: resolution falls
+// back to .kaneo.json and the repos map, so an update typed inside a checkout
+// would quietly hit whichever project that repo maps to.
+func newProjectUpdateCommand(app *App) *cobra.Command {
+	var name, slug, description, icon string
+
+	cmd := &cobra.Command{
+		Use:   "update <project-id>",
+		Short: "Change a project's name, slug, description or icon; the rest is kept",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			// Built per run: a ProjectChanges held by the command would keep a
+			// field set on one run into the next.
+			var ch api.ProjectChanges
+			f := c.Flags()
+			if f.Changed("name") {
+				ch.Name = &name
+			}
+			if f.Changed("slug") {
+				ch.Slug = &slug
+			}
+			if f.Changed("description") {
+				ch.Description = &description
+			}
+			if f.Changed("icon") {
+				ch.Icon = &icon
+			}
+			if ch == (api.ProjectChanges{}) {
+				return fmt.Errorf("nothing to change: pass --name, --slug, --description or --icon")
+			}
+
+			client, err := app.Client()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := app.Context()
+			defer cancel()
+
+			before, p, err := client.UpdateProject(ctx, args[0], ch)
+			if err != nil {
+				return err
+			}
+			app.Out.Human("updated %s", p.ID)
+			for _, f := range [][3]string{
+				{"name", before.Name, p.Name}, {"slug", before.Slug, p.Slug},
+				{"description", before.Description, p.Description}, {"icon", before.Icon, p.Icon},
+			} {
+				if f[1] != f[2] {
+					app.Out.Human("  %s  %q -> %q", f[0], f[1], f[2])
+				}
+			}
+			if before.Slug != p.Slug {
+				app.Out.Human("  task identifiers now start with %s", p.Slug)
+			}
+			return app.Out.Data(map[string]any{"from": before, "to": p})
+		},
+	}
+
+	f := cmd.Flags()
+	f.StringVar(&name, "name", "", "new name")
+	f.StringVar(&slug, "slug", "", "new url slug (the prefix of task identifiers)")
+	f.StringVarP(&description, "description", "d", "", "new description; empty clears it")
+	f.StringVar(&icon, "icon", "", "new icon name")
 	return cmd
 }
 

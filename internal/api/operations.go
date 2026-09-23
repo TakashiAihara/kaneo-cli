@@ -265,6 +265,93 @@ func (c *Client) CreateProject(ctx context.Context, in NewProject) (*Project, er
 	return &out, nil
 }
 
+// ProjectChanges names the fields to change. A nil field is left as it is.
+type ProjectChanges struct {
+	Name        *string
+	Slug        *string
+	Description *string
+	Icon        *string
+}
+
+// UpdateProject changes only the fields set in ch.
+//
+// The server's update is a full replace: name, icon, slug, description and
+// isPublic are all required, and whatever is sent is written. So the project is
+// read first and every field that was not asked for, visibility included, is
+// sent back as it was when read; a change made elsewhere between the read and
+// the write is overwritten. Sending isPublic unchanged also keeps the call clear
+// of the project:share permission, which the server demands only on a change.
+//
+// A NULL description comes back as "" and is written as "": the server's body
+// takes only a string, so NULL cannot be sent back. Both render the same.
+//
+// It returns the project as read and as written, so a caller can show both.
+func (c *Client) UpdateProject(ctx context.Context, projectID string, ch ProjectChanges) (before, after *Project, err error) {
+	// The server accepts any string, but a blank name, slug or icon leaves a
+	// project that cannot be read or linked to, so those are refused here.
+	for _, f := range []struct {
+		name string
+		v    **string
+	}{{"name", &ch.Name}, {"slug", &ch.Slug}, {"icon", &ch.Icon}} {
+		if *f.v == nil {
+			continue
+		}
+		s := strings.TrimSpace(**f.v)
+		if s == "" {
+			return nil, nil, fmt.Errorf("project %s is empty", f.name)
+		}
+		*f.v = &s
+	}
+
+	if before, err = c.GetProject(ctx, projectID); err != nil {
+		return nil, nil, err
+	}
+	// Every field of this read is written back, so a read that decoded to an
+	// empty project (a null reply, a different shape) would blank the project.
+	if before.ID != projectID || before.Name == "" || before.Slug == "" {
+		return nil, nil, fmt.Errorf("reading project %s before the update got id %q, name %q, slug %q; not writing", projectID, before.ID, before.Name, before.Slug)
+	}
+	want := *before
+	for _, f := range []struct {
+		to   *string
+		from *string
+	}{{&want.Name, ch.Name}, {&want.Slug, ch.Slug}, {&want.Description, ch.Description}, {&want.Icon, ch.Icon}} {
+		if f.from != nil {
+			*f.to = *f.from
+		}
+	}
+
+	op := operation("updateProject")
+	body := map[string]any{
+		"name":        want.Name,
+		"icon":        want.Icon,
+		"slug":        want.Slug,
+		"description": want.Description,
+		"isPublic":    want.IsPublic,
+	}
+	var out Project
+	if err := c.Do(ctx, op.Method, op.Expand(projectID), nil, body, &out); err != nil {
+		return nil, nil, err
+	}
+	var off []string
+	for _, f := range []struct {
+		name      string
+		got, want any
+	}{
+		{"id", out.ID, projectID}, {"name", out.Name, want.Name}, {"slug", out.Slug, want.Slug},
+		{"description", out.Description, want.Description}, {"icon", out.Icon, want.Icon},
+		{"isPublic", out.IsPublic, want.IsPublic},
+	} {
+		if f.got != f.want {
+			off = append(off, fmt.Sprintf("%s %q, want %q", f.name, fmt.Sprint(f.got), fmt.Sprint(f.want)))
+		}
+	}
+	if len(off) > 0 {
+		return nil, nil, fmt.Errorf("%s: server did not echo the update: %s", op.Path, strings.Join(off, "; "))
+	}
+	return before, &out, nil
+}
+
 // RelationTypes are the links the server accepts between two tasks.
 var RelationTypes = []string{"subtask", "blocks", "related"}
 

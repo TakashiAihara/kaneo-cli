@@ -200,3 +200,40 @@ func TestLoadFallsBackToLegacyWhenNothingIsRecorded(t *testing.T) {
 		t.Errorf("Load = %+v, %v; want the legacy record", got, ok)
 	}
 }
+
+// Files written before the project fields existed must still load, and a
+// record without a project must serialise exactly as it did before: readers
+// of the old fields keep working, and "no project" stays absent rather than "".
+func TestStoreProjectFieldsAreAdditive(t *testing.T) {
+	dir := t.TempDir()
+	store := &Store{Dir: dir}
+	old := `{"taskId":"t","number":1,"title":"x"}`
+
+	if err := os.WriteFile(filepath.Join(dir, "old.json"), []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := store.Load("old")
+	if !ok || got != (Attachment{TaskID: "t", TaskNumber: 1, Title: "x"}) {
+		t.Errorf("old format: Load = %+v, %v", got, ok)
+	}
+
+	if err := store.Save("bare", Attachment{TaskID: "t", TaskNumber: 1, Title: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "bare.json"))
+	if string(b) != old {
+		t.Errorf("no project: wrote %s, want %s", b, old)
+	}
+
+	full := Attachment{TaskID: "t", TaskNumber: 1, Title: "x", ProjectID: "p", ProjectName: "P", WorkspaceID: "w", WorkspaceName: "W"}
+	if err := store.Save("new", full); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(filepath.Join(dir, "new.json"))
+	if !strings.HasPrefix(string(b), `{"taskId":"t","number":1,"title":"x",`) {
+		t.Errorf("existing fields changed: %s", b)
+	}
+	if got, ok := store.Load("new"); !ok || got != full {
+		t.Errorf("new format: Load = %+v, %v", got, ok)
+	}
+}

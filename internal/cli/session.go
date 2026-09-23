@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/TakashiAihara/kaneo-cli/internal/api"
 	"github.com/TakashiAihara/kaneo-cli/internal/session"
@@ -67,14 +68,17 @@ func newSessionAttachCommand(app *App) *cobra.Command {
 			return err
 		}
 
+		// Looked up before the marker is posted, so the lookups do not widen
+		// the window where the server has a marker and this host has no record.
+		attachment := session.Attachment{TaskID: task.ID, TaskNumber: task.Number, Title: task.Title}
+		describeBoard(ctx, client, task, &attachment)
+
 		marker := session.Describe(os.Getenv, cwd(), session.StateRunning)
 		marker.NextStep = strings.Join(args[1:], " ")
 		if _, err := client.AddComment(ctx, task.ID, marker.Format()); err != nil {
 			return err
 		}
-		if err := sessionStore().Save(sessionID, session.Attachment{
-			TaskID: task.ID, TaskNumber: task.Number, Title: task.Title,
-		}); err != nil {
+		if err := sessionStore().Save(sessionID, attachment); err != nil {
 			// The marker is already on the server. Reporting success here
 			// would leave `session next` believing nothing is attached, and a
 			// retry would post a second marker.
@@ -82,7 +86,7 @@ func newSessionAttachCommand(app *App) *cobra.Command {
 		}
 
 		app.Out.Human("attached: #%d %s", task.Number, task.Title)
-		return app.Out.Data(map[string]any{"taskId": task.ID, "number": task.Number, "title": task.Title})
+		return app.Out.Data(attachment)
 	})
 
 	addStrictFlag(cmd, &strict)
@@ -135,6 +139,49 @@ func newSessionNextCommand(app *App) *cobra.Command {
 	cmd.Flags().StringVar(&taskRef, "task", "", "task to record against, by number or id; defaults to the attached one")
 	addStrictFlag(cmd, &strict)
 	return cmd
+}
+
+// describeBoard fills in which project and workspace the task is on.
+//
+// Best effort: failing the attach over a name a statusline wants would leave
+// the session unattached. A lookup that fails leaves its fields empty, which a
+// reader treats as absent.
+func describeBoard(ctx context.Context, client *api.Client, task *api.Task, a *session.Attachment) {
+	// The marker post that follows shares this deadline. Slow lookups may
+	// spend only half of what is left, so they cannot starve it.
+	if deadline, ok := ctx.Deadline(); ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Until(deadline)/2)
+		defer cancel()
+	}
+
+	// Never filled from the cwd's project: that is the wrong answer this
+	// field exists to avoid, so an unknown project stays unknown.
+	a.ProjectID = task.ProjectID
+	if a.ProjectID == "" {
+		debugf("attach: task %s carries no projectId; board not recorded", task.ID)
+		return
+	}
+	p, err := client.GetProject(ctx, a.ProjectID)
+	if err != nil {
+		debugf("attach: project %s lookup failed: %v", a.ProjectID, err)
+		return
+	}
+	a.ProjectName, a.WorkspaceID = p.Name, p.WorkspaceID
+	if a.WorkspaceID == "" {
+		return
+	}
+	workspaces, err := client.ListWorkspaces(ctx)
+	if err != nil {
+		debugf("attach: workspace lookup failed: %v", err)
+		return
+	}
+	for _, w := range workspaces {
+		if w.ID == p.WorkspaceID {
+			a.WorkspaceName = w.Name
+			break
+		}
+	}
 }
 
 // targetTask picks the task a command acts on: the one named explicitly,

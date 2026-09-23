@@ -17,6 +17,20 @@ type Attachment struct {
 	TaskID     string `json:"taskId"`
 	TaskNumber int    `json:"number"`
 	Title      string `json:"title"`
+
+	// The board the task is on, so a reader (a statusline redrawn on every
+	// prompt) can name it without an API call. Taken from the task,
+	// not the cwd: a session working in another repo would otherwise be
+	// shown a confident, wrong project.
+	//
+	// Each is omitted when unknown, as in an attachment written before these
+	// existed: absent, never "". A failed lookup leaves out only what it
+	// would have filled. All four are a snapshot at attach time: names go
+	// stale on rename, and the ids on moving the task to another project.
+	ProjectID     string `json:"projectId,omitempty"`
+	ProjectName   string `json:"projectName,omitempty"`
+	WorkspaceID   string `json:"workspaceId,omitempty"`
+	WorkspaceName string `json:"workspaceName,omitempty"`
 }
 
 // Store persists attachments per session id.
@@ -92,7 +106,21 @@ func (s *Store) Save(sessionID string, a Attachment) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.path(s.Dir, sessionID), b, 0o600)
+	// Written aside and renamed into place: a statusline reads this file on
+	// every redraw, and a plain WriteFile can be caught half-written.
+	tmp, err := os.CreateTemp(s.Dir, sessionID+".*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(b); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), s.path(s.Dir, sessionID))
 }
 
 // Load returns the attachment for a session, looking in the legacy locations

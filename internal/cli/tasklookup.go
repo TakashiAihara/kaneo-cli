@@ -31,6 +31,11 @@ func resolveTask(ctx context.Context, client *api.Client, projectID, ref string)
 		for _, t := range board.Tasks() {
 			if t.Number == number {
 				task := t
+				// The board listing does not always carry projectId on each
+				// task, but a task found here is on this project by definition.
+				if task.ProjectID == "" {
+					task.ProjectID = projectID
+				}
 				return &task, nil
 			}
 		}

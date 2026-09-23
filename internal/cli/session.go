@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/TakashiAihara/kaneo-cli/internal/api"
 	"github.com/TakashiAihara/kaneo-cli/internal/session"
@@ -142,10 +143,18 @@ func newSessionNextCommand(app *App) *cobra.Command {
 
 // describeBoard fills in which project and workspace the task is on.
 //
-// Best effort: the marker is already posted, and failing the attach over a
-// name a statusline wants would leave the session unattached. A lookup that
-// fails leaves its fields empty, which a reader treats as absent.
+// Best effort: failing the attach over a name a statusline wants would leave
+// the session unattached. A lookup that fails leaves its fields empty, which a
+// reader treats as absent.
 func describeBoard(ctx context.Context, client *api.Client, task *api.Task, a *session.Attachment) {
+	// The marker post that follows shares this deadline. Slow lookups may
+	// spend only half of what is left, so they cannot starve it.
+	if deadline, ok := ctx.Deadline(); ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Until(deadline)/2)
+		defer cancel()
+	}
+
 	// Never filled from the cwd's project: that is the wrong answer this
 	// field exists to avoid, so an unknown project stays unknown.
 	a.ProjectID = task.ProjectID

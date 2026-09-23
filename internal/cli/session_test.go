@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // The project must come from the task. The cwd resolves to proj1 here while
@@ -153,6 +154,36 @@ func TestSessionAttachNeverFallsBackToTheCwdsProject(t *testing.T) {
 	}
 	b, _ := os.ReadFile(filepath.Join(config, "kaneo", "sessions", "s1.json"))
 	if want := `{"taskId":"task-2","number":3,"title":"three"}`; string(b) != want {
+		t.Errorf("file = %s, want %s", b, want)
+	}
+}
+
+// The lookups share a deadline with the marker post that follows. A lookup
+// that hangs must give up in time for the marker to still be posted.
+func TestSessionAttachLeavesTimeForTheMarker(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("KANEO_SESSION_ID", "s1")
+
+	app := newTestApp(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/task/task-2":
+			w.Write([]byte(`{"id":"task-2","number":3,"title":"three","projectId":"proj2"}`))
+		case "GET /api/project/proj2":
+			<-r.Context().Done()
+		case "POST /api/comment/task-2":
+			w.Write([]byte(`{"id":"c1"}`))
+		default:
+			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	app.Timeout = time.Second
+	if err := run(t, newSessionAttachCommand(app), "task-2", "--strict"); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(config, "kaneo", "sessions", "s1.json"))
+	if want := `{"taskId":"task-2","number":3,"title":"three","projectId":"proj2"}`; string(b) != want {
 		t.Errorf("file = %s, want %s", b, want)
 	}
 }

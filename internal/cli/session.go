@@ -72,9 +72,9 @@ func newSessionAttachCommand(app *App) *cobra.Command {
 		if _, err := client.AddComment(ctx, task.ID, marker.Format()); err != nil {
 			return err
 		}
-		if err := sessionStore().Save(sessionID, session.Attachment{
-			TaskID: task.ID, TaskNumber: task.Number, Title: task.Title,
-		}); err != nil {
+		attachment := session.Attachment{TaskID: task.ID, TaskNumber: task.Number, Title: task.Title}
+		describeBoard(ctx, client, task, project, &attachment)
+		if err := sessionStore().Save(sessionID, attachment); err != nil {
 			// The marker is already on the server. Reporting success here
 			// would leave `session next` believing nothing is attached, and a
 			// retry would post a second marker.
@@ -82,7 +82,7 @@ func newSessionAttachCommand(app *App) *cobra.Command {
 		}
 
 		app.Out.Human("attached: #%d %s", task.Number, task.Title)
-		return app.Out.Data(map[string]any{"taskId": task.ID, "number": task.Number, "title": task.Title})
+		return app.Out.Data(map[string]any{"taskId": task.ID, "number": task.Number, "title": task.Title, "projectId": attachment.ProjectID})
 	})
 
 	addStrictFlag(cmd, &strict)
@@ -135,6 +135,37 @@ func newSessionNextCommand(app *App) *cobra.Command {
 	cmd.Flags().StringVar(&taskRef, "task", "", "task to record against, by number or id; defaults to the attached one")
 	addStrictFlag(cmd, &strict)
 	return cmd
+}
+
+// describeBoard fills in which project and workspace the task is on.
+//
+// Best effort: the marker is already posted, and failing the attach over a
+// name a statusline wants would leave the session unattached. A lookup that
+// fails leaves its fields empty, which a reader treats as absent.
+func describeBoard(ctx context.Context, client *api.Client, task *api.Task, boardProject string, a *session.Attachment) {
+	// A task found by number came off the board of boardProject, and the
+	// board listing does not always carry projectId on each task.
+	a.ProjectID = task.ProjectID
+	if a.ProjectID == "" {
+		a.ProjectID = boardProject
+	}
+	if a.ProjectID == "" {
+		return
+	}
+	p, err := client.GetProject(ctx, a.ProjectID)
+	if err != nil {
+		return
+	}
+	a.ProjectName, a.WorkspaceID = p.Name, p.WorkspaceID
+	workspaces, err := client.ListWorkspaces(ctx)
+	if err != nil {
+		return
+	}
+	for _, w := range workspaces {
+		if w.ID == p.WorkspaceID {
+			a.WorkspaceName = w.Name
+		}
+	}
 }
 
 // targetTask picks the task a command acts on: the one named explicitly,

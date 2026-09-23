@@ -17,6 +17,19 @@ type Attachment struct {
 	TaskID     string `json:"taskId"`
 	TaskNumber int    `json:"number"`
 	Title      string `json:"title"`
+
+	// The board the task is on, so a reader (a statusline redrawing every
+	// few hundred ms) can name it without an API call. Taken from the task,
+	// not the cwd: a session working in another repo would otherwise be
+	// shown a confident, wrong project.
+	//
+	// Omitted when unknown so an attachment written before these existed and
+	// one whose lookup failed look the same: absent, never "". Names are a
+	// snapshot at attach time and go stale on rename; the ids do not.
+	ProjectID     string `json:"projectId,omitempty"`
+	ProjectName   string `json:"projectName,omitempty"`
+	WorkspaceID   string `json:"workspaceId,omitempty"`
+	WorkspaceName string `json:"workspaceName,omitempty"`
 }
 
 // Store persists attachments per session id.

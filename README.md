@@ -155,7 +155,7 @@ kaneo board                     # open tasks, and which sessions hold them
 
 The session is identified by `KANEO_SESSION_ID`, falling back to `CLAUDE_CODE_SESSION_ID`.
 
-`board` and the `session` commands are **fail-open**: an unreachable server, a missing key or an unconfigured project makes them print nothing and exit 0, so a session-start hook is not broken by any of them. `--strict` turns that off and `KANEO_DEBUG=1` prints the reason that was swallowed.
+The `session` commands are **fail-open**: an unreachable server, a missing key or an unconfigured project makes them print nothing and exit 0, so a session-start hook is not broken by any of them. `--strict` turns that off and `KANEO_DEBUG=1` prints the reason that was swallowed. `board` is not: it fails like any other command, so an empty board and one that could not be read look different.
 
 A failure that already changed something elsewhere is reported regardless — `session attach` that wrote the comment but could not record it locally, for instance. Staying quiet there would leave `session next` believing nothing is attached.
 

@@ -24,10 +24,10 @@ func hard(format string, args ...any) error {
 
 // failOpen wraps a command so that a failure produces no output and exit 0.
 //
-// board and the session commands run from a session-start hook, where a
-// missing board is a smaller harm than a broken session. Every other command
-// reports failures normally: hiding an error from someone typing at a prompt
-// would be the larger harm.
+// The session commands run from a session-start hook, where a missing board
+// is a smaller harm than a broken session. Every other command, board
+// included, reports failures normally: hiding an error from someone typing at
+// a prompt would be the larger harm.
 //
 // --strict turns this off, and KANEO_DEBUG=1 prints the swallowed reason.
 func failOpen(app *App, strict *bool, run func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {

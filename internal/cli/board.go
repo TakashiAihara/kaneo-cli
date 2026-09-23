@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/TakashiAihara/kaneo-cli/internal/api"
@@ -28,8 +29,10 @@ type boardReport struct {
 
 // newBoardCommand prints the open tasks and which sessions hold them.
 //
-// It is meant to be called from a session-start hook, so it is fail-open and
-// prints nothing at all when no project is configured for this repository.
+// It fails like every other command when nothing can be read. It used to be
+// fail-open for a session-start hook, but no hook called it and the one caller
+// that did (a script asking "is this session attached anywhere") could not
+// tell an unconfigured directory or a missing key from an empty board (#16).
 //
 // A repository mapped to several projects gets one section per project. board
 // is the only command that takes more than one: it reads, so there is no
@@ -39,7 +42,6 @@ type boardReport struct {
 // accumulates finished ones, and the alternative — dropping them from the repo
 // map — would lose the record that the repository ever had that work.
 func newBoardCommand(app *App) *cobra.Command {
-	var strict bool
 	var includeArchived bool
 
 	cmd := &cobra.Command{
@@ -47,7 +49,7 @@ func newBoardCommand(app *App) *cobra.Command {
 		Short: "Show open tasks and the sessions working on them",
 		Args:  cobra.NoArgs,
 	}
-	cmd.RunE = failOpen(app, &strict, func(c *cobra.Command, args []string) error {
+	cmd.RunE = func(c *cobra.Command, args []string) error {
 		client, err := app.Client()
 		if err != nil {
 			return err
@@ -60,7 +62,6 @@ func newBoardCommand(app *App) *cobra.Command {
 		defer cancel()
 
 		reports := make([]boardReport, 0, len(projects))
-		var firstErr error
 		for _, project := range projects {
 			// The board listing does not carry the archived flag, so the
 			// project itself is read first. An archived project is not a
@@ -69,11 +70,7 @@ func newBoardCommand(app *App) *cobra.Command {
 			if !includeArchived {
 				p, err := client.GetProject(ctx, project)
 				if err != nil {
-					debugf("project %s: %v", project, err)
-					if firstErr == nil {
-						firstErr = err
-					}
-					continue
+					return fmt.Errorf("project %s: %w", project, err)
 				}
 				if p.Archived() {
 					continue
@@ -82,22 +79,11 @@ func newBoardCommand(app *App) *cobra.Command {
 
 			report, err := buildBoard(ctx, client, project)
 			if err != nil {
-				// One project that cannot be read should not cost the others
-				// their board. It hides more than skipping one task's
-				// comments does, so the reason it is still worth doing is the
-				// caller: board runs from a session-start hook, and a session
-				// that starts with most of its boards beats one that starts
-				// with none.
-				debugf("board for %s: %v", project, err)
-				if firstErr == nil {
-					firstErr = err
-				}
-				continue
+				// A board with one project missing reads, to a caller, as that
+				// project having nothing on it (#16).
+				return fmt.Errorf("project %s: %w", project, err)
 			}
 			reports = append(reports, report)
-		}
-		if len(reports) == 0 && firstErr != nil {
-			return firstErr
 		}
 
 		printed := 0
@@ -115,11 +101,10 @@ func newBoardCommand(app *App) *cobra.Command {
 		}
 
 		return app.Out.Data(reports)
-	})
+	}
 
 	cmd.Flags().BoolVar(&includeArchived, "archived", false,
 		"include archived projects, which are left out by default")
-	addStrictFlag(cmd, &strict)
 	return cmd
 }
 
@@ -142,12 +127,13 @@ func buildBoard(ctx context.Context, client *api.Client, project string) (boardR
 	}
 
 	// An empty board still owes a script its document, so it becomes a report
-	// with nothing in it rather than no report at all. Producing nothing is
-	// reserved for "no project is configured here", which is decided before
-	// any of this runs.
+	// with nothing in it rather than no report at all.
 	sessions := []boardSession{}
 	if len(open) > 0 {
-		sessions = collectSessions(ctx, client, open)
+		sessions, err = collectSessions(ctx, client, open)
+		if err != nil {
+			return boardReport{}, err
+		}
 	}
 
 	return boardReport{
@@ -176,15 +162,14 @@ func printBoard(app *App, report boardReport) {
 }
 
 // collectSessions reads each open task's comments for session markers. A task
-// whose comments cannot be read is skipped rather than failing the board: a
-// partial board is more useful than none.
-func collectSessions(ctx context.Context, client *api.Client, tasks []api.Task) []boardSession {
-	var out []boardSession
+// whose comments cannot be read fails the board: skipping it would report the
+// session holding that task as not attached anywhere.
+func collectSessions(ctx context.Context, client *api.Client, tasks []api.Task) ([]boardSession, error) {
+	out := []boardSession{}
 	for _, t := range tasks {
 		comments, err := client.ListComments(ctx, t.ID)
 		if err != nil {
-			debugf("comments for #%d: %v", t.Number, err)
-			continue
+			return nil, fmt.Errorf("comments for #%d: %w", t.Number, err)
 		}
 		var markers []session.Marker
 		for _, c := range comments {
@@ -200,7 +185,7 @@ func collectSessions(ctx context.Context, client *api.Client, tasks []api.Task) 
 			})
 		}
 	}
-	return out
+	return out, nil
 }
 
 func short(id string) string {

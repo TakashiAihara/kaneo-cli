@@ -45,6 +45,6 @@ The board listing does not carry the flag, so board reads the project itself fir
 
 ## What a partial failure does
 
-`board` keeps the projects it could read and reports only when it could read none. A project that is unreachable should not cost the others their board, which is how the same command already treats a task whose comments cannot be read.
+`board` fails if any mapped project, board listing or task's comments cannot be read, and names what failed. It used to keep what it could read, for a session-start hook that no longer exists; a caller reading a partial board took the missing project for one with nothing on it, and a task whose comments were skipped for one no session held (#16).
 
-An unmapped repository is not a failure at all: it produces nothing and exits 0, unchanged, because that is what tells a session-start hook to stay quiet.
+An unmapped repository is a failure (`no project`), like in every other command. It used to produce nothing and exit 0 for a session-start hook, but no such hook exists and a caller could not tell that silence from an empty board (#16).

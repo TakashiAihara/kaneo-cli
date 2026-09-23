@@ -13,29 +13,44 @@ import (
 
 	"github.com/TakashiAihara/kaneo-cli/internal/config"
 	"github.com/TakashiAihara/kaneo-cli/internal/output"
+	"github.com/TakashiAihara/kaneo-cli/internal/session"
 )
 
 // boardServer answers the board endpoint for the named projects and returns
-// nothing at all for any other. Comments are always empty, so a board's
-// content is decided by this table alone.
+// nothing at all for any other. Every task's comments carry one running
+// session marker (sess-1) unless commentsBroken is passed, which makes them
+// fail.
+type commentsBroken struct{}
+
 func boardServer(t *testing.T, names map[string]string, broken map[string]bool, opts ...any) *httptest.Server {
 	t.Helper()
 	isArchived := map[string]bool{}
 	var seen func(string)
+	noComments := false
 	for _, o := range opts {
 		switch v := o.(type) {
 		case string:
 			isArchived[v] = true
 		case func(string):
 			seen = v
+		case commentsBroken:
+			noComments = true
 		}
 	}
+	marker, _ := json.Marshal([]map[string]string{{
+		"id": "c1", "createdAt": "2026-01-01T00:00:00Z",
+		"content": session.Marker{SessionID: "sess-1", Host: "h", Cwd: "/w", Branch: "main", State: session.StateRunning}.Format(),
+	}})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if seen != nil {
 			seen(r.URL.Path)
 		}
 		if strings.HasPrefix(r.URL.Path, "/api/comment/") {
-			fmt.Fprint(w, `{"data":[]}`)
+			if noComments {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Write(marker)
 			return
 		}
 		if id := strings.TrimPrefix(r.URL.Path, "/api/project/"); id != r.URL.Path {
@@ -130,13 +145,16 @@ func TestBoardJSONIsAListEvenForOneProject(t *testing.T) {
 		t.Fatalf("board JSON is not a list: %v\n%s", err, out.String())
 	}
 	if len(reports) != 1 {
-		t.Errorf("reports = %+v, want exactly one", reports)
+		t.Fatalf("reports = %+v, want exactly one", reports)
+	}
+	if s := reports[0].Sessions; len(s) != 1 || s[0].SessionID != "sess-1" {
+		t.Errorf("sessions = %+v, want the one marker the comments carry", s)
 	}
 }
 
-// One project that cannot be read should not cost the others their board, for
-// the same reason a task whose comments cannot be read is skipped.
-func TestBoardKeepsTheProjectsItCouldRead(t *testing.T) {
+// A board with one project missing reads, to a caller, as that project having
+// nothing on it (#16), so any project that cannot be read fails the board.
+func TestBoardFailsWhenOneProjectCannotBeRead(t *testing.T) {
 	var mu sync.Mutex
 	tried := map[string]bool{}
 	srv := boardServer(t, map[string]string{"proj-two": "Two"}, map[string]bool{"proj-one": true},
@@ -145,35 +163,38 @@ func TestBoardKeepsTheProjectsItCouldRead(t *testing.T) {
 			defer mu.Unlock()
 			tried[path] = true
 		})
-	app, out, errOut := appFor(srv, true, "proj-one", "proj-two")
+	app, _, _ := appFor(srv, true, "proj-one", "proj-two")
 
-	if err := run(t, newBoardCommand(app)); err != nil {
-		t.Fatalf("err = %v; a partial board is better than none", err)
-	}
-	// JSON mode on purpose: a script is the reader that would take the missing
-	// board for "no tasks there", and it only sees stderr.
-	if !strings.Contains(errOut.String(), "proj-one") {
-		t.Errorf("stderr = %q, want it to name the skipped project", errOut.String())
-	}
-	if !strings.Contains(out.String(), `"project": "Two"`) {
-		t.Errorf("the readable project is missing:\n%s", out.String())
+	err := run(t, newBoardCommand(app))
+	if err == nil || !strings.Contains(err.Error(), "proj-one") {
+		t.Errorf("err = %v, want a failure naming proj-one", err)
 	}
 	// Without this the test would also pass for a board that never asked about
-	// the first project at all, which is a different bug wearing the same
-	// output.
+	// the first project at all.
 	if !tried["/api/project/proj-one"] {
-		t.Error("the failing project was never requested; nothing was recovered from")
+		t.Error("the failing project was never requested")
 	}
 }
 
-// When nothing could be read there is no partial board to keep, so the failure
-// is real and board has to report it.
-func TestBoardReportsWhenNoProjectCouldBeRead(t *testing.T) {
-	srv := boardServer(t, nil, map[string]bool{"proj-one": true, "proj-two": true})
-	app, _, _ := appFor(srv, false, "proj-one", "proj-two")
+// --archived skips the project lookup, so this is the path where the board
+// listing itself is what fails.
+func TestBoardFailsWhenABoardListingCannotBeRead(t *testing.T) {
+	srv := boardServer(t, map[string]string{"proj-two": "Two"}, map[string]bool{"proj-one": true})
+	app, _, _ := appFor(srv, true, "proj-one", "proj-two")
+
+	if err := run(t, newBoardCommand(app), "--archived"); err == nil || !strings.Contains(err.Error(), "proj-one") {
+		t.Errorf("err = %v, want a failure naming proj-one", err)
+	}
+}
+
+// Skipping a task whose comments failed would report the session holding it
+// as attached nowhere.
+func TestBoardFailsWhenCommentsCannotBeRead(t *testing.T) {
+	srv := boardServer(t, map[string]string{"proj-one": "One"}, nil, commentsBroken{})
+	app, _, _ := appFor(srv, true, "proj-one")
 
 	if err := run(t, newBoardCommand(app)); err == nil {
-		t.Error("every project failed and board still reported success")
+		t.Error("comments failed and board still reported success")
 	}
 }
 
@@ -291,7 +312,7 @@ func TestBoardShowsArchivedProjectsWhenAsked(t *testing.T) {
 }
 
 // Every mapped project being archived is not a failure: the repository has no
-// live work, which is the same silence as a repository nobody mapped.
+// live work, so it is an empty board rather than an error.
 func TestBoardIsSilentWhenEveryProjectIsArchived(t *testing.T) {
 	srv := boardServer(t, map[string]string{"proj-one": "One"}, nil, "proj-one")
 	app, out, errOut := appFor(srv, false, "proj-one")

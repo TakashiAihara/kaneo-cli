@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/TakashiAihara/kaneo-cli/internal/api"
-	"github.com/TakashiAihara/kaneo-cli/internal/output"
 	"github.com/TakashiAihara/kaneo-cli/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -63,7 +62,6 @@ func newBoardCommand(app *App) *cobra.Command {
 		defer cancel()
 
 		reports := make([]boardReport, 0, len(projects))
-		var firstErr error
 		for _, project := range projects {
 			// The board listing does not carry the archived flag, so the
 			// project itself is read first. An archived project is not a
@@ -72,11 +70,7 @@ func newBoardCommand(app *App) *cobra.Command {
 			if !includeArchived {
 				p, err := client.GetProject(ctx, project)
 				if err != nil {
-					warnSkipped(app, project, err)
-					if firstErr == nil {
-						firstErr = err
-					}
-					continue
+					return fmt.Errorf("project %s: %w", project, err)
 				}
 				if p.Archived() {
 					continue
@@ -85,20 +79,11 @@ func newBoardCommand(app *App) *cobra.Command {
 
 			report, err := buildBoard(ctx, client, project)
 			if err != nil {
-				// One project that cannot be read should not cost the others
-				// their board, but it is said on stderr every time: a caller
-				// reading only the boards that came back would take a task on
-				// the missing one for "not there" (#16).
-				warnSkipped(app, project, err)
-				if firstErr == nil {
-					firstErr = err
-				}
-				continue
+				// A board with one project missing reads, to a caller, as that
+				// project having nothing on it (#16).
+				return fmt.Errorf("project %s: %w", project, err)
 			}
 			reports = append(reports, report)
-		}
-		if len(reports) == 0 && firstErr != nil {
-			return firstErr
 		}
 
 		printed := 0
@@ -145,18 +130,15 @@ func buildBoard(ctx context.Context, client *api.Client, project string) (boardR
 	// with nothing in it rather than no report at all.
 	sessions := []boardSession{}
 	if len(open) > 0 {
-		sessions = collectSessions(ctx, client, open)
+		sessions, err = collectSessions(ctx, client, open)
+		if err != nil {
+			return boardReport{}, err
+		}
 	}
 
 	return boardReport{
 		Project: board.ProjectName, Open: open, DoneCount: done, Sessions: sessions,
 	}, nil
-}
-
-// warnSkipped says which project a partial board is missing. It goes to stderr
-// even in JSON mode, so stdout stays a parseable document.
-func warnSkipped(app *App, project string, err error) {
-	fmt.Fprintf(app.Out.Err, "kaneo: skipped project %s: %s\n", project, output.SanitizeControl(err.Error()))
 }
 
 // empty reports a board with no tasks at all, open or done.
@@ -180,15 +162,14 @@ func printBoard(app *App, report boardReport) {
 }
 
 // collectSessions reads each open task's comments for session markers. A task
-// whose comments cannot be read is skipped rather than failing the board: a
-// partial board is more useful than none.
-func collectSessions(ctx context.Context, client *api.Client, tasks []api.Task) []boardSession {
-	var out []boardSession
+// whose comments cannot be read fails the board: skipping it would report the
+// session holding that task as not attached anywhere.
+func collectSessions(ctx context.Context, client *api.Client, tasks []api.Task) ([]boardSession, error) {
+	out := []boardSession{}
 	for _, t := range tasks {
 		comments, err := client.ListComments(ctx, t.ID)
 		if err != nil {
-			debugf("comments for #%d: %v", t.Number, err)
-			continue
+			return nil, fmt.Errorf("comments for #%d: %w", t.Number, err)
 		}
 		var markers []session.Marker
 		for _, c := range comments {
@@ -204,7 +185,7 @@ func collectSessions(ctx context.Context, client *api.Client, tasks []api.Task) 
 			})
 		}
 	}
-	return out
+	return out, nil
 }
 
 func short(id string) string {

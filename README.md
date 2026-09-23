@@ -132,7 +132,7 @@ kaneo workspace ls
 kaneo workspace rename <workspace-id> <name>   # name only; slug and description unchanged
 kaneo project ls
 kaneo project get [project-id]
-kaneo project update <project-id> [--name] [--slug] [-d] [--icon]   # only what is passed changes
+kaneo project update <project-id> [--name NAME] [--slug SLUG] [-d TEXT] [--icon ICON]   # only what is passed changes
 kaneo task ls [--status ...] [--priority ...] [--all]
 kaneo task get <task-id>
 kaneo task status <task-id> <status>

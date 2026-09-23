@@ -144,16 +144,17 @@ func newProjectUpdateCommand(app *App) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			f := c.Flags()
-			for flag, v := range map[string]struct {
-				dst **string
-				src *string
-			}{
-				"name": {&ch.Name, &name}, "slug": {&ch.Slug, &slug},
-				"description": {&ch.Description, &description}, "icon": {&ch.Icon, &icon},
-			} {
-				if f.Changed(flag) {
-					*v.dst = v.src
-				}
+			if f.Changed("name") {
+				ch.Name = &name
+			}
+			if f.Changed("slug") {
+				ch.Slug = &slug
+			}
+			if f.Changed("description") {
+				ch.Description = &description
+			}
+			if f.Changed("icon") {
+				ch.Icon = &icon
 			}
 			if ch == (api.ProjectChanges{}) {
 				return fmt.Errorf("nothing to change: pass --name, --slug, --description or --icon")
@@ -166,12 +167,23 @@ func newProjectUpdateCommand(app *App) *cobra.Command {
 			ctx, cancel := app.Context()
 			defer cancel()
 
-			p, err := client.UpdateProject(ctx, args[0], ch)
+			before, p, err := client.UpdateProject(ctx, args[0], ch)
 			if err != nil {
 				return err
 			}
-			app.Out.Human("updated %s  %s (%s)", p.ID, p.Name, p.Slug)
-			return app.Out.Data(p)
+			app.Out.Human("updated %s", p.ID)
+			for _, f := range [][3]string{
+				{"name", before.Name, p.Name}, {"slug", before.Slug, p.Slug},
+				{"description", before.Description, p.Description}, {"icon", before.Icon, p.Icon},
+			} {
+				if f[1] != f[2] {
+					app.Out.Human("  %s  %q -> %q", f[0], f[1], f[2])
+				}
+			}
+			if before.Slug != p.Slug {
+				app.Out.Human("  task identifiers now start with %s", p.Slug)
+			}
+			return app.Out.Data(map[string]any{"from": before, "to": p})
 		},
 	}
 

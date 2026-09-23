@@ -421,8 +421,8 @@ func TestUpdateProjectSendsBackEveryFieldItWasNotAskedToChange(t *testing.T) {
 		_, _ = w.Write([]byte(`,"id":"p1"}`))
 	})
 
-	name, slug := "  New ", "new"
-	got, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Name: &name, Slug: &slug})
+	name, slug := "  New ", " new "
+	before, got, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Name: &name, Slug: &slug})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -432,6 +432,30 @@ func TestUpdateProjectSendsBackEveryFieldItWasNotAskedToChange(t *testing.T) {
 	if got.Name != "New" || got.Slug != "new" || got.Description != "keep me" {
 		t.Errorf("project = %+v", got)
 	}
+	if before.Name != "Old" || before.Slug != "old" {
+		t.Errorf("before = %+v", before)
+	}
+}
+
+// -d "" is how a description is cleared, so an empty one is sent, not dropped.
+func TestUpdateProjectSendsAnEmptyDescription(t *testing.T) {
+	var putBody string
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`{"id":"p1","name":"N","slug":"s","icon":"Box","description":"old"}`))
+			return
+		}
+		buf, _ := io.ReadAll(r.Body)
+		putBody = string(buf)
+		_, _ = w.Write([]byte(`{"id":"p1","name":"N","slug":"s","icon":"Box","description":""}`))
+	})
+	empty := ""
+	if _, _, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Description: &empty}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(putBody, `"description":""`) {
+		t.Errorf("body = %s", putBody)
+	}
 }
 
 func TestUpdateProjectRejectsABlankNameOrSlugWithoutCalling(t *testing.T) {
@@ -439,8 +463,8 @@ func TestUpdateProjectRejectsABlankNameOrSlugWithoutCalling(t *testing.T) {
 	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) { called = true })
 
 	blank := "  "
-	for _, ch := range []ProjectChanges{{Name: &blank}, {Slug: &blank}} {
-		if _, err := c.UpdateProject(context.Background(), "p1", ch); err == nil {
+	for _, ch := range []ProjectChanges{{Name: &blank}, {Slug: &blank}, {Icon: &blank}} {
+		if _, _, err := c.UpdateProject(context.Background(), "p1", ch); err == nil {
 			t.Errorf("%+v was accepted", ch)
 		}
 	}
@@ -450,16 +474,24 @@ func TestUpdateProjectRejectsABlankNameOrSlugWithoutCalling(t *testing.T) {
 }
 
 func TestUpdateProjectFailsWhenTheReplyDoesNotEchoTheUpdate(t *testing.T) {
-	for _, reply := range []string{`null`, `{"id":"other","name":"New","slug":"s","icon":"Box"}`, `{"id":"p1","name":"Old","slug":"s","icon":"Box"}`} {
+	for _, reply := range []string{
+		`null`,
+		`{"id":"other","name":"New","slug":"s","icon":"Box","description":"d"}`,
+		`{"id":"p1","name":"Old","slug":"s","icon":"Box","description":"d"}`,
+		`{"id":"p1","name":"New","slug":"x","icon":"Box","description":"d"}`,
+		`{"id":"p1","name":"New","slug":"s","icon":"Layers","description":"d"}`,
+		`{"id":"p1","name":"New","slug":"s","icon":"Box","description":""}`,
+		`{"id":"p1","name":"New","slug":"s","icon":"Box","description":"d","isPublic":true}`,
+	} {
 		c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
-				_, _ = w.Write([]byte(`{"id":"p1","name":"Old","slug":"s","icon":"Box"}`))
+				_, _ = w.Write([]byte(`{"id":"p1","name":"Old","slug":"s","icon":"Box","description":"d"}`))
 				return
 			}
 			_, _ = w.Write([]byte(reply))
 		})
 		name := "New"
-		if _, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Name: &name}); err == nil {
+		if _, _, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Name: &name}); err == nil {
 			t.Errorf("reply %s read as success", reply)
 		}
 	}

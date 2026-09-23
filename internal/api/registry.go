@@ -48,6 +48,7 @@ var Operations = []Operation{
 	{ID: "listProjects", Method: "GET", Path: "/project", Command: "kaneo project ls"},
 	{ID: "getProject", Method: "GET", Path: "/project/{id}", Command: "kaneo project get"},
 	{ID: "createProject", Method: "POST", Path: "/project", Command: "kaneo project create"},
+	{ID: "updateProject", Method: "PUT", Path: "/project/{id}", Command: "kaneo project update"},
 	{ID: "archiveProject", Method: "PUT", Path: "/project/{id}/archive", Command: "kaneo project archive"},
 	{ID: "unarchiveProject", Method: "PUT", Path: "/project/{id}/unarchive", Command: "kaneo project unarchive"},
 

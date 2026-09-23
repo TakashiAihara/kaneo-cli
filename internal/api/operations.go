@@ -265,6 +265,66 @@ func (c *Client) CreateProject(ctx context.Context, in NewProject) (*Project, er
 	return &out, nil
 }
 
+// ProjectChanges names the fields to change. A nil field is left as it is.
+type ProjectChanges struct {
+	Name        *string
+	Slug        *string
+	Description *string
+	Icon        *string
+}
+
+// UpdateProject changes only the fields set in ch.
+//
+// The server's update is a full replace: name, icon, slug, description and
+// isPublic are all required, and whatever is sent is written. So the project is
+// read first and every field that was not asked for, visibility included, is
+// sent back as it was. Sending isPublic unchanged also keeps the call clear of
+// the project:share permission, which the server demands only on a change.
+func (c *Client) UpdateProject(ctx context.Context, projectID string, ch ProjectChanges) (*Project, error) {
+	if ch.Name != nil {
+		name := strings.TrimSpace(*ch.Name)
+		if name == "" {
+			return nil, fmt.Errorf("project name is empty")
+		}
+		ch.Name = &name
+	}
+	if ch.Slug != nil && strings.TrimSpace(*ch.Slug) == "" {
+		return nil, fmt.Errorf("project slug is empty")
+	}
+
+	before, err := c.GetProject(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	want := *before
+	for _, f := range []struct {
+		to   *string
+		from *string
+	}{{&want.Name, ch.Name}, {&want.Slug, ch.Slug}, {&want.Description, ch.Description}, {&want.Icon, ch.Icon}} {
+		if f.from != nil {
+			*f.to = *f.from
+		}
+	}
+
+	op := operation("updateProject")
+	body := map[string]any{
+		"name":        want.Name,
+		"icon":        want.Icon,
+		"slug":        want.Slug,
+		"description": want.Description,
+		"isPublic":    want.IsPublic,
+	}
+	var out Project
+	if err := c.Do(ctx, op.Method, op.Expand(projectID), nil, body, &out); err != nil {
+		return nil, err
+	}
+	if out.ID != projectID || out.Name != want.Name || out.Slug != want.Slug ||
+		out.Description != want.Description || out.Icon != want.Icon {
+		return nil, fmt.Errorf("%s: server answered with project %q (%q, slug %q), not the update", op.Path, out.ID, out.Name, out.Slug)
+	}
+	return &out, nil
+}
+
 // RelationTypes are the links the server accepts between two tasks.
 var RelationTypes = []string{"subtask", "blocks", "related"}
 

@@ -398,3 +398,69 @@ func TestRenameWorkspaceFailsWhenTheReplyDoesNotEchoTheRename(t *testing.T) {
 		}
 	}
 }
+
+// The server replaces every field it is sent, so an update that sends only the
+// changed ones would blank the rest. Unchanged fields, isPublic included, go
+// back exactly as read.
+func TestUpdateProjectSendsBackEveryFieldItWasNotAskedToChange(t *testing.T) {
+	var putBody string
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/project/p1" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`{"id":"p1","name":"Old","slug":"old","icon":"Box","description":"keep me","isPublic":true}`))
+			return
+		}
+		if r.Method != http.MethodPut {
+			t.Errorf("method = %s", r.Method)
+		}
+		buf, _ := io.ReadAll(r.Body)
+		putBody = string(buf)
+		_, _ = w.Write(buf[:len(buf)-1])
+		_, _ = w.Write([]byte(`,"id":"p1"}`))
+	})
+
+	name, slug := "  New ", "new"
+	got, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Name: &name, Slug: &slug})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if putBody != `{"description":"keep me","icon":"Box","isPublic":true,"name":"New","slug":"new"}` {
+		t.Errorf("body = %s", putBody)
+	}
+	if got.Name != "New" || got.Slug != "new" || got.Description != "keep me" {
+		t.Errorf("project = %+v", got)
+	}
+}
+
+func TestUpdateProjectRejectsABlankNameOrSlugWithoutCalling(t *testing.T) {
+	called := false
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) { called = true })
+
+	blank := "  "
+	for _, ch := range []ProjectChanges{{Name: &blank}, {Slug: &blank}} {
+		if _, err := c.UpdateProject(context.Background(), "p1", ch); err == nil {
+			t.Errorf("%+v was accepted", ch)
+		}
+	}
+	if called {
+		t.Error("the server was called")
+	}
+}
+
+func TestUpdateProjectFailsWhenTheReplyDoesNotEchoTheUpdate(t *testing.T) {
+	for _, reply := range []string{`null`, `{"id":"other","name":"New","slug":"s","icon":"Box"}`, `{"id":"p1","name":"Old","slug":"s","icon":"Box"}`} {
+		c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				_, _ = w.Write([]byte(`{"id":"p1","name":"Old","slug":"s","icon":"Box"}`))
+				return
+			}
+			_, _ = w.Write([]byte(reply))
+		})
+		name := "New"
+		if _, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Name: &name}); err == nil {
+			t.Errorf("reply %s read as success", reply)
+		}
+	}
+}

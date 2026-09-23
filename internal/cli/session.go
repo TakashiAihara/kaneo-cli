@@ -67,13 +67,16 @@ func newSessionAttachCommand(app *App) *cobra.Command {
 			return err
 		}
 
+		// Looked up before the marker is posted, so the lookups do not widen
+		// the window where the server has a marker and this host has no record.
+		attachment := session.Attachment{TaskID: task.ID, TaskNumber: task.Number, Title: task.Title}
+		describeBoard(ctx, client, task, &attachment)
+
 		marker := session.Describe(os.Getenv, cwd(), session.StateRunning)
 		marker.NextStep = strings.Join(args[1:], " ")
 		if _, err := client.AddComment(ctx, task.ID, marker.Format()); err != nil {
 			return err
 		}
-		attachment := session.Attachment{TaskID: task.ID, TaskNumber: task.Number, Title: task.Title}
-		describeBoard(ctx, client, task, project, &attachment)
 		if err := sessionStore().Save(sessionID, attachment); err != nil {
 			// The marker is already on the server. Reporting success here
 			// would leave `session next` believing nothing is attached, and a
@@ -82,7 +85,7 @@ func newSessionAttachCommand(app *App) *cobra.Command {
 		}
 
 		app.Out.Human("attached: #%d %s", task.Number, task.Title)
-		return app.Out.Data(map[string]any{"taskId": task.ID, "number": task.Number, "title": task.Title, "projectId": attachment.ProjectID})
+		return app.Out.Data(attachment)
 	})
 
 	addStrictFlag(cmd, &strict)
@@ -142,28 +145,32 @@ func newSessionNextCommand(app *App) *cobra.Command {
 // Best effort: the marker is already posted, and failing the attach over a
 // name a statusline wants would leave the session unattached. A lookup that
 // fails leaves its fields empty, which a reader treats as absent.
-func describeBoard(ctx context.Context, client *api.Client, task *api.Task, boardProject string, a *session.Attachment) {
-	// A task found by number came off the board of boardProject, and the
-	// board listing does not always carry projectId on each task.
+func describeBoard(ctx context.Context, client *api.Client, task *api.Task, a *session.Attachment) {
+	// Never filled from the cwd's project: that is the wrong answer this
+	// field exists to avoid, so an unknown project stays unknown.
 	a.ProjectID = task.ProjectID
 	if a.ProjectID == "" {
-		a.ProjectID = boardProject
-	}
-	if a.ProjectID == "" {
+		debugf("attach: task %s carries no projectId; board not recorded", task.ID)
 		return
 	}
 	p, err := client.GetProject(ctx, a.ProjectID)
 	if err != nil {
+		debugf("attach: project %s lookup failed: %v", a.ProjectID, err)
 		return
 	}
 	a.ProjectName, a.WorkspaceID = p.Name, p.WorkspaceID
+	if a.WorkspaceID == "" {
+		return
+	}
 	workspaces, err := client.ListWorkspaces(ctx)
 	if err != nil {
+		debugf("attach: workspace lookup failed: %v", err)
 		return
 	}
 	for _, w := range workspaces {
 		if w.ID == p.WorkspaceID {
 			a.WorkspaceName = w.Name
+			break
 		}
 	}
 }

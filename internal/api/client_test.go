@@ -399,9 +399,8 @@ func TestRenameWorkspaceFailsWhenTheReplyDoesNotEchoTheRename(t *testing.T) {
 	}
 }
 
-// The server replaces every field it is sent, so an update that sends only the
-// changed ones would blank the rest. Unchanged fields, isPublic included, go
-// back exactly as read.
+// The server requires all five fields and writes whatever it is sent, so the
+// unchanged ones, isPublic included, have to go back exactly as read.
 func TestUpdateProjectSendsBackEveryFieldItWasNotAskedToChange(t *testing.T) {
 	var putBody string
 	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -429,7 +428,7 @@ func TestUpdateProjectSendsBackEveryFieldItWasNotAskedToChange(t *testing.T) {
 	if putBody != `{"description":"keep me","icon":"Box","isPublic":true,"name":"New","slug":"new"}` {
 		t.Errorf("body = %s", putBody)
 	}
-	if got.Name != "New" || got.Slug != "new" || got.Description != "keep me" {
+	if *got != (Project{ID: "p1", Name: "New", Slug: "new", Icon: "Box", Description: "keep me", IsPublic: true}) {
 		t.Errorf("project = %+v", got)
 	}
 	if before.Name != "Old" || before.Slug != "old" {
@@ -453,8 +452,30 @@ func TestUpdateProjectSendsAnEmptyDescription(t *testing.T) {
 	if _, _, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Description: &empty}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(putBody, `"description":""`) {
+	if putBody != `{"description":"","icon":"Box","isPublic":false,"name":"N","slug":"s"}` {
 		t.Errorf("body = %s", putBody)
+	}
+}
+
+// A read that decoded to an empty project must not be written back over the
+// real one.
+func TestUpdateProjectDoesNotWriteWhenTheReadIsEmpty(t *testing.T) {
+	for _, reply := range []string{`null`, `{}`, `{"id":"p1"}`, `{"id":"other","name":"N","slug":"s"}`} {
+		wrote := false
+		c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				_, _ = w.Write([]byte(reply))
+				return
+			}
+			wrote = true
+		})
+		name := "New"
+		if _, _, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Name: &name}); err == nil {
+			t.Errorf("read %s was accepted", reply)
+		}
+		if wrote {
+			t.Errorf("read %s was written back", reply)
+		}
 	}
 }
 
@@ -483,16 +504,22 @@ func TestUpdateProjectFailsWhenTheReplyDoesNotEchoTheUpdate(t *testing.T) {
 		`{"id":"p1","name":"New","slug":"s","icon":"Box","description":""}`,
 		`{"id":"p1","name":"New","slug":"s","icon":"Box","description":"d","isPublic":true}`,
 	} {
+		put := false
 		c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
 				_, _ = w.Write([]byte(`{"id":"p1","name":"Old","slug":"s","icon":"Box","description":"d"}`))
 				return
 			}
+			put = true
 			_, _ = w.Write([]byte(reply))
 		})
 		name := "New"
-		if _, _, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Name: &name}); err == nil {
-			t.Errorf("reply %s read as success", reply)
+		_, _, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Name: &name})
+		if err == nil || !strings.Contains(err.Error(), "did not echo") {
+			t.Errorf("reply %s: err = %v", reply, err)
+		}
+		if !put {
+			t.Errorf("reply %s: no PUT was sent", reply)
 		}
 	}
 }

@@ -306,6 +306,11 @@ func (c *Client) UpdateProject(ctx context.Context, projectID string, ch Project
 	if before, err = c.GetProject(ctx, projectID); err != nil {
 		return nil, nil, err
 	}
+	// Every field of this read is written back, so a read that decoded to an
+	// empty project (a null reply, a different shape) would blank the project.
+	if before.ID != projectID || before.Name == "" || before.Slug == "" {
+		return nil, nil, fmt.Errorf("reading project %s before the update got id %q, name %q, slug %q; not writing", projectID, before.ID, before.Name, before.Slug)
+	}
 	want := *before
 	for _, f := range []struct {
 		to   *string

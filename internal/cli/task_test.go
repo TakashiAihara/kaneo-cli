@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -162,5 +163,40 @@ func TestUnknownTaskNumberIsReportedClearly(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "404") {
 		t.Errorf("error %q does not name the task that was asked for", err)
+	}
+}
+
+// -d "" clears a description, so a passed-but-empty flag must reach the server,
+// and a second run of the same command must not carry the first run's flags.
+func TestProjectUpdateSendsOnlyThePassedFlagsEachRun(t *testing.T) {
+	var bodies []string
+	app := newTestApp(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`{"id":"p1","name":"N","slug":"s","icon":"Box","description":"d"}`))
+			return
+		}
+		buf := new(strings.Builder)
+		_, _ = io.Copy(buf, r.Body)
+		bodies = append(bodies, buf.String())
+		_, _ = w.Write([]byte(strings.TrimSuffix(buf.String(), "}") + `,"id":"p1"}`))
+	})
+	cmd := newProjectUpdateCommand(app)
+
+	if err := run(t, cmd, "p1", "-d", ""); err != nil {
+		t.Fatal(err)
+	}
+	cmd.Flags().Lookup("description").Changed = false
+	if err := run(t, cmd, "p1", "--icon", "Star"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		`{"description":"","icon":"Box","isPublic":false,"name":"N","slug":"s"}`,
+		`{"description":"d","icon":"Star","isPublic":false,"name":"N","slug":"s"}`,
+	}
+	if strings.Join(bodies, "\n") != strings.Join(want, "\n") {
+		t.Errorf("bodies =\n%s", strings.Join(bodies, "\n"))
+	}
+	if err := run(t, newProjectUpdateCommand(app), "p1"); err == nil {
+		t.Error("an update with no flags was accepted")
 	}
 }

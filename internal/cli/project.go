@@ -135,7 +135,6 @@ func newProjectCreateCommand(app *App) *cobra.Command {
 // back to .kaneo.json and the repos map, so an update typed inside a checkout
 // would quietly hit whichever project that repo maps to.
 func newProjectUpdateCommand(app *App) *cobra.Command {
-	var ch api.ProjectChanges
 	var name, slug, description, icon string
 
 	cmd := &cobra.Command{
@@ -143,6 +142,9 @@ func newProjectUpdateCommand(app *App) *cobra.Command {
 		Short: "Change a project's name, slug, description or icon; the rest is kept",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
+			// Built per run: a ProjectChanges held by the command would keep a
+			// field set on one run into the next.
+			var ch api.ProjectChanges
 			f := c.Flags()
 			if f.Changed("name") {
 				ch.Name = &name

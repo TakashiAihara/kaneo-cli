@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -144,12 +145,17 @@ func TestBoardKeepsTheProjectsItCouldRead(t *testing.T) {
 			defer mu.Unlock()
 			tried[path] = true
 		})
-	app, out, _ := appFor(srv, false, "proj-one", "proj-two")
+	app, out, errOut := appFor(srv, true, "proj-one", "proj-two")
 
 	if err := run(t, newBoardCommand(app)); err != nil {
 		t.Fatalf("err = %v; a partial board is better than none", err)
 	}
-	if !strings.Contains(out.String(), "## Two") {
+	// JSON mode on purpose: a script is the reader that would take the missing
+	// board for "no tasks there", and it only sees stderr.
+	if !strings.Contains(errOut.String(), "proj-one") {
+		t.Errorf("stderr = %q, want it to name the skipped project", errOut.String())
+	}
+	if !strings.Contains(out.String(), `"project": "Two"`) {
 		t.Errorf("the readable project is missing:\n%s", out.String())
 	}
 	// Without this the test would also pass for a board that never asked about
@@ -175,14 +181,23 @@ func TestBoardReportsWhenNoProjectCouldBeRead(t *testing.T) {
 // caller reading nothing back cannot tell it from "no tasks" (#16).
 func TestBoardReportsAnUnconfiguredProject(t *testing.T) {
 	srv := boardServer(t, nil, nil)
-	app, out, _ := appFor(srv, false)
+	app, _, _ := appFor(srv, false)
 
 	err := run(t, newBoardCommand(app))
 	if err == nil || !strings.Contains(err.Error(), "no project") {
 		t.Errorf("err = %v, want a 'no project' error", err)
 	}
-	if out.String() != "" {
-		t.Errorf("wrote %q to stdout, want nothing", out.String())
+}
+
+// A missing key has to surface as well: an empty answer from it looked the
+// same as an empty board.
+func TestBoardReportsAMissingAPIKey(t *testing.T) {
+	srv := boardServer(t, map[string]string{"proj-one": "One"}, nil)
+	app, _, _ := appFor(srv, false, "proj-one")
+	app.Cfg.APIKey = ""
+
+	if err := run(t, newBoardCommand(app)); !errors.Is(err, ErrNoAPIKey) {
+		t.Errorf("err = %v, want ErrNoAPIKey", err)
 	}
 }
 

@@ -2,9 +2,11 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/TakashiAihara/kaneo-cli/internal/api"
+	"github.com/TakashiAihara/kaneo-cli/internal/output"
 	"github.com/TakashiAihara/kaneo-cli/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -70,7 +72,7 @@ func newBoardCommand(app *App) *cobra.Command {
 			if !includeArchived {
 				p, err := client.GetProject(ctx, project)
 				if err != nil {
-					debugf("project %s: %v", project, err)
+					warnSkipped(app, project, err)
 					if firstErr == nil {
 						firstErr = err
 					}
@@ -84,12 +86,10 @@ func newBoardCommand(app *App) *cobra.Command {
 			report, err := buildBoard(ctx, client, project)
 			if err != nil {
 				// One project that cannot be read should not cost the others
-				// their board. It hides more than skipping one task's
-				// comments does, so the reason it is still worth doing is the
-				// caller: board runs from a session-start hook, and a session
-				// that starts with most of its boards beats one that starts
-				// with none.
-				debugf("board for %s: %v", project, err)
+				// their board, but it is said on stderr every time: a caller
+				// reading only the boards that came back would take a task on
+				// the missing one for "not there" (#16).
+				warnSkipped(app, project, err)
 				if firstErr == nil {
 					firstErr = err
 				}
@@ -151,6 +151,12 @@ func buildBoard(ctx context.Context, client *api.Client, project string) (boardR
 	return boardReport{
 		Project: board.ProjectName, Open: open, DoneCount: done, Sessions: sessions,
 	}, nil
+}
+
+// warnSkipped says which project a partial board is missing. It goes to stderr
+// even in JSON mode, so stdout stays a parseable document.
+func warnSkipped(app *App, project string, err error) {
+	fmt.Fprintf(app.Out.Err, "kaneo: skipped project %s: %s\n", project, output.SanitizeControl(err.Error()))
 }
 
 // empty reports a board with no tasks at all, open or done.

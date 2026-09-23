@@ -28,8 +28,10 @@ type boardReport struct {
 
 // newBoardCommand prints the open tasks and which sessions hold them.
 //
-// It is meant to be called from a session-start hook, so it is fail-open and
-// prints nothing at all when no project is configured for this repository.
+// It fails like every other command when nothing can be read. It used to be
+// fail-open for a session-start hook, but no hook called it and the one caller
+// that did (a script asking "is this session attached anywhere") could not
+// tell an unconfigured directory or a missing key from an empty board (#16).
 //
 // A repository mapped to several projects gets one section per project. board
 // is the only command that takes more than one: it reads, so there is no
@@ -39,7 +41,6 @@ type boardReport struct {
 // accumulates finished ones, and the alternative — dropping them from the repo
 // map — would lose the record that the repository ever had that work.
 func newBoardCommand(app *App) *cobra.Command {
-	var strict bool
 	var includeArchived bool
 
 	cmd := &cobra.Command{
@@ -47,7 +48,7 @@ func newBoardCommand(app *App) *cobra.Command {
 		Short: "Show open tasks and the sessions working on them",
 		Args:  cobra.NoArgs,
 	}
-	cmd.RunE = failOpen(app, &strict, func(c *cobra.Command, args []string) error {
+	cmd.RunE = func(c *cobra.Command, args []string) error {
 		client, err := app.Client()
 		if err != nil {
 			return err
@@ -115,11 +116,10 @@ func newBoardCommand(app *App) *cobra.Command {
 		}
 
 		return app.Out.Data(reports)
-	})
+	}
 
 	cmd.Flags().BoolVar(&includeArchived, "archived", false,
 		"include archived projects, which are left out by default")
-	addStrictFlag(cmd, &strict)
 	return cmd
 }
 
@@ -142,9 +142,7 @@ func buildBoard(ctx context.Context, client *api.Client, project string) (boardR
 	}
 
 	// An empty board still owes a script its document, so it becomes a report
-	// with nothing in it rather than no report at all. Producing nothing is
-	// reserved for "no project is configured here", which is decided before
-	// any of this runs.
+	// with nothing in it rather than no report at all.
 	sessions := []boardSession{}
 	if len(open) > 0 {
 		sessions = collectSessions(ctx, client, open)

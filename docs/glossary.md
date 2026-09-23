@@ -100,7 +100,7 @@ Values are percent-encoded where they contain whitespace. Fields are separated b
 
 ### fail-open
 
-Producing no output and exiting 0 on failure. `board` and the `session` commands do this because they run from a session-start hook, where a missing board is a smaller harm than a broken session. Every other command reports failures normally.
+Producing no output and exiting 0 on failure. The `session` commands do this because they run from a session-start hook, where a missing board is a smaller harm than a broken session. Every other command reports failures normally, `board` included: its callers read the board to decide something, and an empty answer from a failure read as "no tasks" (#16).
 
 It covers failures that changed nothing: an unreachable server, a missing key, no project configured for this repository. A failure that already changed something elsewhere is *not* swallowed — `session attach` that wrote its comment to the server but could not record the attachment locally reports the failure, because staying quiet would leave `session next` believing nothing is attached and a retry would post a second marker.
 

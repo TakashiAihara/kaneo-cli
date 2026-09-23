@@ -87,7 +87,7 @@ func TestBoardCoversEveryMappedProject(t *testing.T) {
 	srv := boardServer(t, map[string]string{"proj-one": "One", "proj-two": "Two"}, nil)
 	app, out, _ := appFor(srv, false, "proj-one", "proj-two")
 
-	if err := run(t, newBoardCommand(app), "--strict"); err != nil {
+	if err := run(t, newBoardCommand(app)); err != nil {
 		t.Fatal(err)
 	}
 	text := out.String()
@@ -103,7 +103,7 @@ func TestBoardJSONCarriesEveryProject(t *testing.T) {
 	srv := boardServer(t, map[string]string{"proj-one": "One", "proj-two": "Two"}, nil)
 	app, out, _ := appFor(srv, true, "proj-one", "proj-two")
 
-	if err := run(t, newBoardCommand(app), "--strict"); err != nil {
+	if err := run(t, newBoardCommand(app)); err != nil {
 		t.Fatal(err)
 	}
 	var reports []boardReport
@@ -121,7 +121,7 @@ func TestBoardJSONIsAListEvenForOneProject(t *testing.T) {
 	srv := boardServer(t, map[string]string{"proj-one": "One"}, nil)
 	app, out, _ := appFor(srv, true, "proj-one")
 
-	if err := run(t, newBoardCommand(app), "--strict"); err != nil {
+	if err := run(t, newBoardCommand(app)); err != nil {
 		t.Fatal(err)
 	}
 	var reports []boardReport
@@ -130,20 +130,6 @@ func TestBoardJSONIsAListEvenForOneProject(t *testing.T) {
 	}
 	if len(reports) != 1 {
 		t.Errorf("reports = %+v, want exactly one", reports)
-	}
-}
-
-// board runs from a session-start hook. A repository nobody mapped has always
-// produced nothing at all, and that is what tells the hook to stay quiet.
-func TestBoardOnAnUnmappedRepoPrintsNothingAndSucceeds(t *testing.T) {
-	srv := boardServer(t, map[string]string{"proj-one": "One"}, nil)
-	app, out, errOut := appFor(srv, false)
-
-	if err := run(t, newBoardCommand(app)); err != nil {
-		t.Fatalf("err = %v, want nil; an unmapped repo is the ordinary case", err)
-	}
-	if out.String() != "" || errOut.String() != "" {
-		t.Errorf("wrote %q / %q, want nothing at all", out.String(), errOut.String())
 	}
 }
 
@@ -160,7 +146,7 @@ func TestBoardKeepsTheProjectsItCouldRead(t *testing.T) {
 		})
 	app, out, _ := appFor(srv, false, "proj-one", "proj-two")
 
-	if err := run(t, newBoardCommand(app), "--strict"); err != nil {
+	if err := run(t, newBoardCommand(app)); err != nil {
 		t.Fatalf("err = %v; a partial board is better than none", err)
 	}
 	if !strings.Contains(out.String(), "## Two") {
@@ -175,26 +161,28 @@ func TestBoardKeepsTheProjectsItCouldRead(t *testing.T) {
 }
 
 // When nothing could be read there is no partial board to keep, so the failure
-// is real and --strict has to show it.
+// is real and board has to report it.
 func TestBoardReportsWhenNoProjectCouldBeRead(t *testing.T) {
 	srv := boardServer(t, nil, map[string]bool{"proj-one": true, "proj-two": true})
 	app, _, _ := appFor(srv, false, "proj-one", "proj-two")
 
-	if err := run(t, newBoardCommand(app), "--strict"); err == nil {
+	if err := run(t, newBoardCommand(app)); err == nil {
 		t.Error("every project failed and board still reported success")
 	}
 }
 
-// Fail-open is unchanged: without --strict the same total failure is silent.
-func TestBoardStaysSilentWhenEveryProjectFails(t *testing.T) {
-	srv := boardServer(t, nil, map[string]bool{"proj-one": true})
-	app, out, errOut := appFor(srv, false, "proj-one")
+// A directory with no project configured is an error, not an empty board: a
+// caller reading nothing back cannot tell it from "no tasks" (#16).
+func TestBoardReportsAnUnconfiguredProject(t *testing.T) {
+	srv := boardServer(t, nil, nil)
+	app, out, _ := appFor(srv, false)
 
-	if err := run(t, newBoardCommand(app)); err != nil {
-		t.Fatalf("err = %v, want nil", err)
+	err := run(t, newBoardCommand(app))
+	if err == nil || !strings.Contains(err.Error(), "no project") {
+		t.Errorf("err = %v, want a 'no project' error", err)
 	}
-	if out.String() != "" || errOut.String() != "" {
-		t.Errorf("wrote %q / %q, want nothing", out.String(), errOut.String())
+	if out.String() != "" {
+		t.Errorf("wrote %q to stdout, want nothing", out.String())
 	}
 }
 
@@ -244,7 +232,7 @@ func TestBoardActsOnlyOnTheProjectsItIsGiven(t *testing.T) {
 	srv := boardServer(t, map[string]string{"proj-one": "One", "proj-two": "Two"}, nil)
 	app, out, _ := appFor(srv, false, "proj-two")
 
-	if err := run(t, newBoardCommand(app), "--strict"); err != nil {
+	if err := run(t, newBoardCommand(app)); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(out.String(), "## One") {
@@ -262,7 +250,7 @@ func TestBoardLeavesOutArchivedProjects(t *testing.T) {
 	srv := boardServer(t, map[string]string{"proj-one": "One", "proj-two": "Two"}, nil, "proj-one")
 	app, out, _ := appFor(srv, false, "proj-one", "proj-two")
 
-	if err := run(t, newBoardCommand(app), "--strict"); err != nil {
+	if err := run(t, newBoardCommand(app)); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(out.String(), "## One") {
@@ -279,7 +267,7 @@ func TestBoardShowsArchivedProjectsWhenAsked(t *testing.T) {
 	srv := boardServer(t, map[string]string{"proj-one": "One"}, nil, "proj-one")
 	app, out, _ := appFor(srv, false, "proj-one")
 
-	if err := run(t, newBoardCommand(app), "--strict", "--archived"); err != nil {
+	if err := run(t, newBoardCommand(app), "--archived"); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "## One") {

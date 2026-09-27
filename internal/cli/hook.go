@@ -46,7 +46,13 @@ func runHook(app *App, event string, env map[string]string) {
 	ctx, killHook := context.WithCancel(ctx)
 	defer killHook()
 	caught, got := make(chan os.Signal, 1), make(chan os.Signal, 1)
-	signal.Notify(caught, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	// A signal kaneo was started with ignored (nohup) stays ignored:
+	// catching it would kill the hook, and re-raising it would do nothing.
+	for _, s := range []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGHUP} {
+		if !signal.Ignored(s) {
+			signal.Notify(caught, s)
+		}
+	}
 	done, watching := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(watching)

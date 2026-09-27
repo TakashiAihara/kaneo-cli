@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -242,5 +243,21 @@ func TestHookIsKilledWhenKaneoIsSignalled(t *testing.T) {
 	}
 	if len(reraised) != 1 || reraised[0] != syscall.SIGTERM {
 		t.Errorf("reraised %v, want [terminated]", reraised)
+	}
+}
+
+// The real reraise ends the process with the signal. Checked in a child,
+// since it would end the test binary too.
+func TestReraiseEndsTheProcess(t *testing.T) {
+	if os.Getenv("KANEO_TEST_RERAISE") == "1" {
+		reraise(syscall.SIGTERM)
+		os.Exit(0)
+	}
+	cmd := exec.Command(os.Args[0], "-test.run=^TestReraiseEndsTheProcess$")
+	cmd.Env = append(os.Environ(), "KANEO_TEST_RERAISE=1")
+	err := cmd.Run()
+	ws, ok := cmd.ProcessState.Sys().(syscall.WaitStatus)
+	if !ok || !ws.Signaled() || ws.Signal() != syscall.SIGTERM {
+		t.Errorf("child ended with %v, want killed by SIGTERM", err)
 	}
 }

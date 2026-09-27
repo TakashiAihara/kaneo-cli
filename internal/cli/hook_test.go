@@ -256,6 +256,9 @@ func TestReraiseEndsTheProcess(t *testing.T) {
 	cmd := exec.Command(os.Args[0], "-test.run=^TestReraiseEndsTheProcess$")
 	cmd.Env = append(os.Environ(), "KANEO_TEST_RERAISE=1")
 	err := cmd.Run()
+	if cmd.ProcessState == nil {
+		t.Fatal(err)
+	}
 	ws, ok := cmd.ProcessState.Sys().(syscall.WaitStatus)
 	if !ok || !ws.Signaled() || ws.Signal() != syscall.SIGTERM {
 		t.Errorf("child ended with %v, want killed by SIGTERM", err)

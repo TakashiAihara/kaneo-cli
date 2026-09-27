@@ -75,6 +75,15 @@ func TestSessionHooksReceiveTheTask(t *testing.T) {
 	})
 	stdout := &strings.Builder{}
 	app.Out = &output.Writer{Mode: output.Mode{JSON: true}, Out: stdout, Err: &strings.Builder{}}
+	// The hook's "echo junk" must not reach the process's own stdout either,
+	// which is where a real --json reader looks.
+	realStdout := os.Stdout
+	procOut, err := os.CreateTemp(t.TempDir(), "stdout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = procOut
+	defer func() { os.Stdout = realStdout }()
 
 	if err := run(t, newSessionAttachCommand(app), "task-2", "--strict"); err != nil {
 		t.Fatal(err)
@@ -87,6 +96,9 @@ func TestSessionHooksReceiveTheTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if b, _ := os.ReadFile(procOut.Name()); len(b) != 0 {
+		t.Errorf("hook wrote to the process's stdout: %q", b)
+	}
 	b, err := os.ReadFile(got)
 	if err != nil {
 		t.Fatal(err)
@@ -157,17 +169,23 @@ func TestHookTimeoutKillsTheWholeHook(t *testing.T) {
 	}
 }
 
-// A hook that leaves a background process behind still succeeded.
+// A hook that leaves a background process behind still succeeded, and the
+// process is left to finish.
 func TestHookLeavingABackgroundProcessIsNotAFailure(t *testing.T) {
 	config := hookEnvForTest(t)
+	done := filepath.Join(t.TempDir(), "done")
 
-	app := hookTestApp(t, map[string]string{"attach": "sleep 2 &"}, http.StatusOK, nil)
+	app := hookTestApp(t, map[string]string{"attach": "(sleep 1.2; touch " + done + ") &"}, http.StatusOK, nil)
 	start := time.Now()
 	if err := run(t, newSessionAttachCommand(app), "task-2", "--strict"); err != nil {
 		t.Fatal(err)
 	}
 	if d := time.Since(start); d > time.Second {
 		t.Errorf("attach waited %s for the background process", d)
+	}
+	time.Sleep(1500 * time.Millisecond)
+	if _, err := os.Stat(done); err != nil {
+		t.Error("the background process did not get to finish")
 	}
 	if log := readHookLog(t, config); log != "" {
 		t.Errorf("hooks.log = %q, want nothing", log)

@@ -42,6 +42,9 @@ func runHook(app *App, event string, env map[string]string) {
 	// the --json output of the command that ran it. A file and not a pipe: a
 	// background process the hook leaves behind would hold a pipe open, and
 	// Wait would report a hook that exited 0 as failed.
+	// ponytail: the file is unbounded; a hook spewing for its whole timeout,
+	// or leaving a spewing process behind, fills the temp dir. Cap it with a
+	// pipe that discards past the limit if a real hook ever does that.
 	out, err := os.CreateTemp("", "kaneo-hook-*.log")
 	if err != nil {
 		reportHookFailure(event, env, fmt.Errorf("capture output: %w", err), "")
@@ -57,7 +60,8 @@ func runHook(app *App, event string, env map[string]string) {
 	}
 	cmd.Stdout, cmd.Stderr = out, out
 	// Killing sh alone leaves its children running, and a timed-out attach
-	// hook could then finish after the close hook and undo it.
+	// hook could then finish after the close hook and undo it. A child that
+	// leaves the process group (setsid) is out of reach.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
 

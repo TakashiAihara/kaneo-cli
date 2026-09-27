@@ -159,6 +159,21 @@ The `session` commands are **fail-open**: an unreachable server, a missing key o
 
 A failure that already changed something elsewhere is reported regardless — `session attach` that wrote the comment but could not record it locally, for instance. Staying quiet there would leave `session next` believing nothing is attached.
 
+#### Hooks
+
+`hooks` in the global config runs a shell command after `session attach` or `session close` succeeds, so another tool can follow the session without either knowing about the other:
+
+```json
+{
+  "hooks": {
+    "attach": "ccx session task \"$KANEO_TASK_REF\" \"$KANEO_SESSION_ID\"",
+    "close": "ccx session task \"\" \"$KANEO_SESSION_ID\""
+  }
+}
+```
+
+The command runs under `sh -c` with `KANEO_HOOK_EVENT`, `KANEO_SESSION_ID`, `KANEO_TASK_ID`, `KANEO_TASK_NUMBER` and `KANEO_TASK_REF` (`kaneo <project slug>#<number>`, set on attach only, empty when the slug could not be looked up). A hook that fails does not fail the command: the reason goes to stderr and is appended to `hooks.log` next to the config (`$XDG_CONFIG_HOME/kaneo/`, by default `~/.config/kaneo/`). A hook still running after 10 seconds is killed along with its process group, and that counts as a failure.
+
 ## Output
 
 Human-readable on a terminal, JSON through a pipe:

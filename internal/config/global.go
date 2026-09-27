@@ -95,6 +95,11 @@ type Global struct {
 	// the project still comes from .kaneo.json or Repos.
 	Owners map[string]string `json:"owners,omitempty"`
 
+	// Hooks are shell commands run after a session attaches to or closes a
+	// task, keyed by "attach" and "close". They let another tool follow the
+	// session without either tool knowing about the other.
+	Hooks map[string]string `json:"hooks,omitempty"`
+
 	path string
 }
 

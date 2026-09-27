@@ -1,19 +1,24 @@
 package cli
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
 // hookTimeout bounds a hook. attach and close run from session hooks, so a
-// hook that hangs would hang the session start with them.
-const hookTimeout = 10 * time.Second
+// hook that hangs would hang the session start with them. A variable only so
+// a test need not wait ten seconds.
+var hookTimeout = 10 * time.Second
+
+// hookOutputLimit caps how much of a failed hook's output is reported.
+const hookOutputLimit = 4096
 
 // runHook runs the command configured for event, if any.
 //
@@ -33,25 +38,43 @@ func runHook(app *App, event string, env map[string]string) {
 	ctx, cancel := context.WithTimeout(context.Background(), hookTimeout)
 	defer cancel()
 
+	// Captured rather than inherited: a hook printing to stdout would corrupt
+	// the --json output of the command that ran it. A file and not a pipe: a
+	// background process the hook leaves behind would hold a pipe open, and
+	// Wait would report a hook that exited 0 as failed.
+	out, err := os.CreateTemp("", "kaneo-hook-*.log")
+	if err != nil {
+		reportHookFailure(event, env, fmt.Errorf("capture output: %w", err), "")
+		return
+	}
+	defer os.Remove(out.Name())
+	defer out.Close()
+
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	cmd.Env = os.Environ()
 	for k, v := range env {
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}
-	// Captured rather than inherited: a hook printing to stdout would corrupt
-	// the --json output of the command that ran it.
-	var out bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &out
-	cmd.WaitDelay = 500 * time.Millisecond
+	cmd.Stdout, cmd.Stderr = out, out
+	// Killing sh alone leaves its children running, and a timed-out attach
+	// hook could then finish after the close hook and undo it.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
 
-	err := cmd.Run()
+	err = cmd.Run()
 	if err == nil {
 		return
 	}
 	if ctx.Err() != nil {
-		err = fmt.Errorf("timed out after %s", hookTimeout)
+		err = fmt.Errorf("killed after %s", hookTimeout)
 	}
-	msg := fmt.Sprintf("%s hook failed: %v: %s", event, err, strings.TrimSpace(out.String()))
+	head := make([]byte, hookOutputLimit)
+	n, _ := io.ReadFull(io.NewSectionReader(out, 0, hookOutputLimit), head)
+	reportHookFailure(event, env, err, string(head[:n]))
+}
+
+func reportHookFailure(event string, env map[string]string, err error, output string) {
+	msg := fmt.Sprintf("%s hook failed: %v: %s", event, err, strings.TrimSpace(output))
 	fmt.Fprintln(os.Stderr, "kaneo: "+msg)
 	logHookFailure(env["KANEO_SESSION_ID"], msg)
 }

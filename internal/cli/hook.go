@@ -61,7 +61,8 @@ func runHook(app *App, event string, env map[string]string) {
 	cmd.Stdout, cmd.Stderr = out, out
 	// Killing sh alone leaves its children running, and a timed-out attach
 	// hook could then finish after the close hook and undo it. A child that
-	// leaves the process group (setsid) is out of reach.
+	// leaves the process group (setsid) is out of reach, and so is the hook
+	// from whoever signals kaneo's own group; the timeout covers that case.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
 
@@ -72,9 +73,15 @@ func runHook(app *App, event string, env map[string]string) {
 	if ctx.Err() != nil {
 		err = fmt.Errorf("killed after %s", hookTimeout)
 	}
-	head := make([]byte, hookOutputLimit)
-	n, _ := io.ReadFull(io.NewSectionReader(out, 0, hookOutputLimit), head)
-	reportHookFailure(event, env, err, string(head[:n]))
+	// The end, not the start: the reason a command failed is usually the
+	// last thing it printed.
+	var from int64
+	if fi, statErr := out.Stat(); statErr == nil && fi.Size() > hookOutputLimit {
+		from = fi.Size() - hookOutputLimit
+	}
+	tail := make([]byte, hookOutputLimit)
+	n, _ := io.ReadFull(io.NewSectionReader(out, from, hookOutputLimit), tail)
+	reportHookFailure(event, env, err, string(tail[:n]))
 }
 
 func reportHookFailure(event string, env map[string]string, err error, output string) {

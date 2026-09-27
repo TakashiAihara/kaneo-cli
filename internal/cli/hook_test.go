@@ -191,3 +191,21 @@ func TestHookLeavingABackgroundProcessIsNotAFailure(t *testing.T) {
 		t.Errorf("hooks.log = %q, want nothing", log)
 	}
 }
+
+// A noisy failing hook is reported by the end of its output, where the
+// reason usually is, and not in full.
+func TestHookFailureReportsTheEndOfItsOutput(t *testing.T) {
+	config := hookEnvForTest(t)
+
+	app := hookTestApp(t, map[string]string{"attach": "head -c 10000 /dev/zero | tr '\\0' x; echo; echo the-reason; exit 1"}, http.StatusOK, nil)
+	if err := run(t, newSessionAttachCommand(app), "task-2", "--strict"); err != nil {
+		t.Fatal(err)
+	}
+	log := readHookLog(t, config)
+	if !strings.Contains(log, "the-reason") {
+		t.Errorf("the reason at the end was dropped")
+	}
+	if len(log) > hookOutputLimit+200 {
+		t.Errorf("hooks.log line is %d bytes", len(log))
+	}
+}

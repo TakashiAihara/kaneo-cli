@@ -205,7 +205,8 @@ func TestHookFailureReportsTheEndOfItsOutput(t *testing.T) {
 	if !strings.Contains(log, "the-reason") {
 		t.Errorf("the reason at the end was dropped")
 	}
-	if len(log) > hookOutputLimit+200 {
+	// A literal, not hookOutputLimit, so raising the limit is noticed.
+	if len(log) > 4096+200 {
 		t.Errorf("hooks.log line is %d bytes", len(log))
 	}
 }

@@ -71,7 +71,7 @@ func newSessionAttachCommand(app *App) *cobra.Command {
 		// Looked up before the marker is posted, so the lookups do not widen
 		// the window where the server has a marker and this host has no record.
 		attachment := session.Attachment{TaskID: task.ID, TaskNumber: task.Number, Title: task.Title}
-		describeBoard(ctx, client, task, &attachment)
+		slug := describeBoard(ctx, client, task, &attachment)
 
 		marker := session.Describe(os.Getenv, cwd(), session.StateRunning)
 		marker.NextStep = strings.Join(args[1:], " ")
@@ -84,6 +84,8 @@ func newSessionAttachCommand(app *App) *cobra.Command {
 			// retry would post a second marker.
 			return hard("attached #%d on the server, but could not record it locally: %w", task.Number, err)
 		}
+
+		runHook(app, "attach", hookEnv("attach", sessionID, task.ID, task.Number, slug))
 
 		app.Out.Human("attached: #%d %s", task.Number, task.Title)
 		return app.Out.Data(attachment)
@@ -145,8 +147,9 @@ func newSessionNextCommand(app *App) *cobra.Command {
 //
 // Best effort: failing the attach over a name a statusline wants would leave
 // the session unattached. A lookup that fails leaves its fields empty, which a
-// reader treats as absent.
-func describeBoard(ctx context.Context, client *api.Client, task *api.Task, a *session.Attachment) {
+// reader treats as absent. It returns the project's slug, which the attach
+// hook needs but the attachment does not keep.
+func describeBoard(ctx context.Context, client *api.Client, task *api.Task, a *session.Attachment) string {
 	// The marker post that follows shares this deadline. Slow lookups may
 	// spend only half of what is left, so they cannot starve it.
 	if deadline, ok := ctx.Deadline(); ok {
@@ -160,21 +163,21 @@ func describeBoard(ctx context.Context, client *api.Client, task *api.Task, a *s
 	a.ProjectID = task.ProjectID
 	if a.ProjectID == "" {
 		debugf("attach: task %s carries no projectId; board not recorded", task.ID)
-		return
+		return ""
 	}
 	p, err := client.GetProject(ctx, a.ProjectID)
 	if err != nil {
 		debugf("attach: project %s lookup failed: %v", a.ProjectID, err)
-		return
+		return ""
 	}
 	a.ProjectName, a.WorkspaceID = p.Name, p.WorkspaceID
 	if a.WorkspaceID == "" {
-		return
+		return p.Slug
 	}
 	workspaces, err := client.ListWorkspaces(ctx)
 	if err != nil {
 		debugf("attach: workspace lookup failed: %v", err)
-		return
+		return p.Slug
 	}
 	for _, w := range workspaces {
 		if w.ID == p.WorkspaceID {
@@ -182,6 +185,7 @@ func describeBoard(ctx context.Context, client *api.Client, task *api.Task, a *s
 			break
 		}
 	}
+	return p.Slug
 }
 
 // targetTask picks the task a command acts on: the one named explicitly,
@@ -235,6 +239,7 @@ func newSessionCloseCommand(app *App) *cobra.Command {
 			return err
 		}
 		sessionStore().Clear(sessionID)
+		runHook(app, "close", hookEnv("close", sessionID, attached.TaskID, attached.TaskNumber, ""))
 
 		app.Out.Human("closed: #%d %s", attached.TaskNumber, attached.Title)
 		return app.Out.Data(map[string]any{"taskId": attached.TaskID, "number": attached.TaskNumber})

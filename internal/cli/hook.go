@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -37,14 +38,20 @@ func runHook(app *App, event string, env map[string]string) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), hookTimeout)
 	defer cancel()
+	// The hook is in its own process group, so a signal meant for kaneo's
+	// group does not reach it. Catching the signal kills the hook group
+	// before kaneo exits, instead of leaving it running with no timeout.
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	defer stop()
 
 	// Captured rather than inherited: a hook printing to stdout would corrupt
 	// the --json output of the command that ran it. A file and not a pipe: a
 	// background process the hook leaves behind would hold a pipe open, and
 	// Wait would report a hook that exited 0 as failed.
 	// ponytail: the file is unbounded; a hook spewing for its whole timeout,
-	// or leaving a spewing process behind, fills the temp dir. Cap it with a
-	// pipe that discards past the limit if a real hook ever does that.
+	// or leaving a spewing process behind, fills the temp dir. Not a pipe if
+	// a real hook ever does that: a pipe brings back the false failure above.
+	// `ulimit -f` in front of the command is the likely cap.
 	out, err := os.CreateTemp("", "kaneo-hook-*.log")
 	if err != nil {
 		reportHookFailure(event, env, fmt.Errorf("capture output: %w", err), "")
@@ -61,8 +68,8 @@ func runHook(app *App, event string, env map[string]string) {
 	cmd.Stdout, cmd.Stderr = out, out
 	// Killing sh alone leaves its children running, and a timed-out attach
 	// hook could then finish after the close hook and undo it. A child that
-	// leaves the process group (setsid) is out of reach, and so is the hook
-	// from whoever signals kaneo's own group; the timeout covers that case.
+	// leaves the process group (setsid) is out of reach, and so is everything
+	// if kaneo is killed with SIGKILL; both are accepted.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
 

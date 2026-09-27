@@ -183,9 +183,13 @@ func TestHookLeavingABackgroundProcessIsNotAFailure(t *testing.T) {
 	if d := time.Since(start); d > time.Second {
 		t.Errorf("attach waited %s for the background process", d)
 	}
-	time.Sleep(1500 * time.Millisecond)
-	if _, err := os.Stat(done); err != nil {
-		t.Error("the background process did not get to finish")
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(100 * time.Millisecond) {
+		if _, err := os.Stat(done); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the background process did not get to finish")
+		}
 	}
 	if log := readHookLog(t, config); log != "" {
 		t.Errorf("hooks.log = %q, want nothing", log)
@@ -197,16 +201,38 @@ func TestHookLeavingABackgroundProcessIsNotAFailure(t *testing.T) {
 func TestHookFailureReportsTheEndOfItsOutput(t *testing.T) {
 	config := hookEnvForTest(t)
 
-	app := hookTestApp(t, map[string]string{"attach": "head -c 10000 /dev/zero | tr '\\0' x; echo; echo the-reason; exit 1"}, http.StatusOK, nil)
+	// 6000 a's then exactly 4096 b's: the report must be the b's and nothing
+	// before them. Literals, not hookOutputLimit, so changing it is noticed.
+	app := hookTestApp(t, map[string]string{"attach": "head -c 6000 /dev/zero | tr '\\0' a; head -c 4096 /dev/zero | tr '\\0' b; exit 1"}, http.StatusOK, nil)
 	if err := run(t, newSessionAttachCommand(app), "task-2", "--strict"); err != nil {
 		t.Fatal(err)
 	}
 	log := readHookLog(t, config)
-	if !strings.Contains(log, "the-reason") {
-		t.Errorf("the reason at the end was dropped")
+	if want := "exit status 1: " + strings.Repeat("b", 4096) + "\n"; !strings.HasSuffix(log, want) {
+		t.Errorf("hooks.log does not end with exactly the last 4096 bytes: %d bytes, %d b's", len(log), strings.Count(log, "b"))
 	}
-	// A literal, not hookOutputLimit, so raising the limit is noticed.
-	if len(log) > 4096+200 {
-		t.Errorf("hooks.log line is %d bytes", len(log))
+}
+
+// kaneo stopped by a signal takes the hook down with it; the hook is in its
+// own process group, so nothing else would, and no timeout is left to.
+func TestHookIsKilledWhenKaneoIsSignalled(t *testing.T) {
+	config := hookEnvForTest(t)
+	late := filepath.Join(t.TempDir(), "late")
+
+	// $PPID is the test process, standing in for kaneo.
+	app := hookTestApp(t, map[string]string{"attach": "kill -TERM $PPID; (sleep 1; touch " + late + "); true"}, http.StatusOK, nil)
+	start := time.Now()
+	if err := run(t, newSessionAttachCommand(app), "task-2", "--strict"); err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(start); d > 900*time.Millisecond {
+		t.Errorf("attach took %s", d)
+	}
+	time.Sleep(1500 * time.Millisecond)
+	if _, err := os.Stat(late); err == nil {
+		t.Error("the hook outlived the signal")
+	}
+	if log := readHookLog(t, config); !strings.Contains(log, "attach hook failed") {
+		t.Errorf("hooks.log = %q", log)
 	}
 }

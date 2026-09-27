@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -218,9 +219,13 @@ func TestHookFailureReportsTheEndOfItsOutput(t *testing.T) {
 func TestHookIsKilledWhenKaneoIsSignalled(t *testing.T) {
 	config := hookEnvForTest(t)
 	late := filepath.Join(t.TempDir(), "late")
+	var reraised []os.Signal
+	defer func(f func(os.Signal)) { reraise = f }(reraise)
+	reraise = func(s os.Signal) { reraised = append(reraised, s) }
 
-	// $PPID is the test process, standing in for kaneo.
-	app := hookTestApp(t, map[string]string{"attach": "kill -TERM $PPID; (sleep 1; touch " + late + "); true"}, http.StatusOK, nil)
+	// The child is started before the signal, so killing sh alone would
+	// leave it running. $PPID is the test process, standing in for kaneo.
+	app := hookTestApp(t, map[string]string{"attach": "(sleep 1; touch " + late + ") & sleep 0.2; kill -TERM $PPID; wait"}, http.StatusOK, nil)
 	start := time.Now()
 	if err := run(t, newSessionAttachCommand(app), "task-2", "--strict"); err != nil {
 		t.Fatal(err)
@@ -234,5 +239,8 @@ func TestHookIsKilledWhenKaneoIsSignalled(t *testing.T) {
 	}
 	if log := readHookLog(t, config); !strings.Contains(log, "attach hook failed: killed: kaneo received a signal") {
 		t.Errorf("hooks.log = %q", log)
+	}
+	if len(reraised) != 1 || reraised[0] != syscall.SIGTERM {
+		t.Errorf("reraised %v, want [terminated]", reraised)
 	}
 }

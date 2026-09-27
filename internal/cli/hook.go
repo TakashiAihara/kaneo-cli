@@ -40,11 +40,35 @@ func runHook(app *App, event string, env map[string]string) {
 	ctx, cancel := context.WithTimeout(context.Background(), hookTimeout)
 	defer cancel()
 	// The hook is in its own process group, so a signal meant for kaneo's
-	// group does not reach it. Catching the signal kills the hook group
-	// instead of leaving it running with no timeout. kaneo then finishes and
-	// exits 0: the attach or close it was asked for has already happened.
-	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-	defer stop()
+	// group does not reach it. The signal is caught to kill the hook group,
+	// instead of leaving it running with no timeout, and then sent again so
+	// kaneo still dies of it and `kaneo session attach && next` stops.
+	ctx, killHook := context.WithCancel(ctx)
+	defer killHook()
+	caught, got := make(chan os.Signal, 1), make(chan os.Signal, 1)
+	signal.Notify(caught, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	done, watching := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(watching)
+		select {
+		case s := <-caught:
+			got <- s
+			killHook()
+		case <-done:
+		}
+	}()
+	defer func() {
+		signal.Stop(caught)
+		close(done)
+		<-watching
+		select {
+		case s := <-got:
+			reraise(s)
+		case s := <-caught:
+			reraise(s)
+		default:
+		}
+	}()
 
 	// Captured rather than inherited: a hook printing to stdout would corrupt
 	// the --json output of the command that ran it. A file and not a pipe: a
@@ -94,6 +118,16 @@ func runHook(app *App, event string, env map[string]string) {
 	tail := make([]byte, hookOutputLimit)
 	n, _ := io.ReadFull(io.NewSectionReader(out, from, hookOutputLimit), tail)
 	reportHookFailure(event, env, err, string(tail[:n]))
+}
+
+// reraise delivers a caught signal again with its default action, which ends
+// the process. A variable so a test can survive the signal it sends itself.
+var reraise = func(s os.Signal) {
+	signal.Reset(s)
+	_ = syscall.Kill(os.Getpid(), s.(syscall.Signal))
+	// Delivery is asynchronous; without the wait, kaneo could print its
+	// success line before it dies.
+	time.Sleep(time.Second)
 }
 
 func reportHookFailure(event string, env map[string]string, err error, output string) {

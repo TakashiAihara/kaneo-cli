@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -40,7 +41,8 @@ func runHook(app *App, event string, env map[string]string) {
 	defer cancel()
 	// The hook is in its own process group, so a signal meant for kaneo's
 	// group does not reach it. Catching the signal kills the hook group
-	// before kaneo exits, instead of leaving it running with no timeout.
+	// instead of leaving it running with no timeout. kaneo then finishes and
+	// exits 0: the attach or close it was asked for has already happened.
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 
@@ -77,8 +79,11 @@ func runHook(app *App, event string, env map[string]string) {
 	if err == nil {
 		return
 	}
-	if ctx.Err() != nil {
+	switch {
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
 		err = fmt.Errorf("killed after %s", hookTimeout)
+	case ctx.Err() != nil:
+		err = errors.New("killed: kaneo received a signal")
 	}
 	// The end, not the start: the reason a command failed is usually the
 	// last thing it printed.

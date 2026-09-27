@@ -232,7 +232,7 @@ func TestHookIsKilledWhenKaneoIsSignalled(t *testing.T) {
 	if _, err := os.Stat(late); err == nil {
 		t.Error("the hook outlived the signal")
 	}
-	if log := readHookLog(t, config); !strings.Contains(log, "attach hook failed") {
+	if log := readHookLog(t, config); !strings.Contains(log, "attach hook failed: killed: kaneo received a signal") {
 		t.Errorf("hooks.log = %q", log)
 	}
 }

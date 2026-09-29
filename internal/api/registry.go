@@ -1,16 +1,11 @@
 package api
 
-import (
-	"net/url"
-	"strings"
-)
-
-// Operation is one server operation this client knows how to call.
+// Operation is one server operation this client calls.
 //
-// The registry is the single source of truth: every request is built from an
-// entry here, and api-check compares the same entries against the server's
-// OpenAPI document. An operation cannot therefore be used without being
-// declared, which is what keeps the check honest.
+// Requests are built by the generated client (package gen), which is
+// generated for exactly the operation ids listed here: gen/cfg.yaml names the
+// same ids, and TestRegistryMatchesTheGeneratedClient fails when the two
+// drift. api-check compares these entries against a live server's document.
 type Operation struct {
 	// ID is the server's operationId, the key api-check matches on.
 	ID string
@@ -21,23 +16,6 @@ type Operation struct {
 	// Command names the CLI surface that needs it, so a missing operation
 	// says what will stop working.
 	Command string
-}
-
-// Expand fills the template's placeholders in order and escapes each value.
-func (o Operation) Expand(args ...string) string {
-	out := o.Path
-	for _, arg := range args {
-		open := strings.Index(out, "{")
-		if open < 0 {
-			break
-		}
-		close := strings.Index(out[open:], "}")
-		if close < 0 {
-			break
-		}
-		out = out[:open] + url.PathEscape(arg) + out[open+close+1:]
-	}
-	return out
 }
 
 // Operations is everything this client calls.
@@ -67,16 +45,4 @@ var Operations = []Operation{
 
 	{ID: "getTaskComments", Method: "GET", Path: "/comment/{taskId}", Command: "kaneo comment ls / board"},
 	{ID: "createTaskComment", Method: "POST", Path: "/comment/{taskId}", Command: "kaneo comment add / session"},
-}
-
-// operation looks an entry up by id. It panics on an unknown id because the
-// argument is always a literal in this package: a miss is a build-time
-// mistake, not a runtime condition.
-func operation(id string) Operation {
-	for _, op := range Operations {
-		if op.ID == id {
-			return op
-		}
-	}
-	panic("api: undeclared operation " + id)
 }

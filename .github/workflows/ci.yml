@@ -31,6 +31,14 @@ jobs:
             exit 1
           fi
 
+      # The client is generated from the pinned OpenAPI document. A hand edit
+      # to the generated file, or a document or overlay change committed
+      # without regenerating, fails here.
+      - name: generated client matches the pinned spec
+        run: |
+          go generate ./internal/api/gen/
+          git diff --exit-code -- internal/api/gen/
+
       - run: go vet ./...
 
       - run: go test ./... -race

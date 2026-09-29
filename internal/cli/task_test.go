@@ -190,8 +190,8 @@ func TestProjectUpdateSendsOnlyThePassedFlagsEachRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		`{"description":"","icon":"Box","isPublic":false,"name":"N","slug":"s"}`,
-		`{"description":"d","icon":"Star","isPublic":false,"name":"N","slug":"s"}`,
+		`{"name":"N","icon":"Box","slug":"s","description":"","isPublic":false}`,
+		`{"name":"N","icon":"Star","slug":"s","description":"d","isPublic":false}`,
 	}
 	if strings.Join(bodies, "\n") != strings.Join(want, "\n") {
 		t.Errorf("bodies =\n%s", strings.Join(bodies, "\n"))

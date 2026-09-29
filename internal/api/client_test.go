@@ -425,7 +425,7 @@ func TestUpdateProjectSendsBackEveryFieldItWasNotAskedToChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if putBody != `{"description":"keep me","icon":"Box","isPublic":true,"name":"New","slug":"new"}` {
+	if putBody != `{"name":"New","icon":"Box","slug":"new","description":"keep me","isPublic":true}` {
 		t.Errorf("body = %s", putBody)
 	}
 	if *got != (Project{ID: "p1", Name: "New", Slug: "new", Icon: "Box", Description: "keep me", IsPublic: true}) {
@@ -452,7 +452,7 @@ func TestUpdateProjectSendsAnEmptyDescription(t *testing.T) {
 	if _, _, err := c.UpdateProject(context.Background(), "p1", ProjectChanges{Description: &empty}); err != nil {
 		t.Fatal(err)
 	}
-	if putBody != `{"description":"","icon":"Box","isPublic":false,"name":"N","slug":"s"}` {
+	if putBody != `{"name":"N","icon":"Box","slug":"s","description":"","isPublic":false}` {
 		t.Errorf("body = %s", putBody)
 	}
 }

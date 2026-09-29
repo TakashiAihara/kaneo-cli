@@ -2310,7 +2310,7 @@ type BoardColumn struct {
 type BoardTask struct {
 	ID          string   `json:"id"`
 	Title       string   `json:"title"`
-	Number      *float32 `json:"number,omitempty"`
+	Number      *float64 `json:"number,omitempty"`
 	Description *string  `json:"description,omitempty"`
 
 	// DescriptionDeferred True when the list omits a large description; load the task detail or description pages to read it. Do not replace stored text with this null summary.
@@ -2321,7 +2321,7 @@ type BoardTask struct {
 	Priority      string     `json:"priority"`
 	StartDate     *time.Time `json:"startDate,omitempty"`
 	DueDate       *time.Time `json:"dueDate,omitempty"`
-	Position      *float32   `json:"position,omitempty"`
+	Position      *float64   `json:"position,omitempty"`
 	CreatedAt     time.Time  `json:"createdAt"`
 	UserID        *string    `json:"userId,omitempty"`
 	AssigneeName  *string    `json:"assigneeName,omitempty"`
@@ -2470,10 +2470,10 @@ type Task struct {
 	ProjectID string `json:"projectId"`
 
 	// Position Order within its column, ascending.
-	Position *float32 `json:"position,omitempty"`
+	Position *float64 `json:"position,omitempty"`
 
 	// Number Per-project counter shown as {projectSlug}-{number}.
-	Number *float32 `json:"number,omitempty"`
+	Number *float64 `json:"number,omitempty"`
 
 	// UserID The assignee, if any.
 	UserID      *string `json:"userId,omitempty"`
@@ -2506,10 +2506,10 @@ type TaskWithAssignee struct {
 	ProjectID string `json:"projectId"`
 
 	// Position Order within its column, ascending.
-	Position *float32 `json:"position,omitempty"`
+	Position *float64 `json:"position,omitempty"`
 
 	// Number Per-project counter shown as {projectSlug}-{number}.
-	Number *float32 `json:"number,omitempty"`
+	Number *float64 `json:"number,omitempty"`
 
 	// UserID The assignee, if any.
 	UserID      *string `json:"userId,omitempty"`

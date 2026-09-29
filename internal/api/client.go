@@ -83,6 +83,11 @@ func (d doer) Do(_ context.Context, req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, &sendError{err}
 	}
+	// The generated parsers accept only the 200 the document declares, and
+	// send has already judged the call a success. A 201 or 204 would otherwise
+	// report a write that happened as a failure, inviting a retry that
+	// duplicates it.
+	resp.StatusCode = http.StatusOK
 	resp.Body = io.NopCloser(bytes.NewReader(raw))
 	return resp, nil
 }

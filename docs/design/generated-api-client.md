@@ -31,15 +31,22 @@ For v2.29.2 the file at the tag and the document a v2.29.2 server serves are ide
 `gen/overlay.json` holds the corrections, each with the condition for removing it. They fall into two groups:
 
 - the document is wrong: better-auth's organization routes are described with empty schemas, so the workspace listing and rename decode to nothing without one
-- the generator is wrong: an empty schema becomes `struct{}`, which rejects a string (external-link metadata, activity event data), and a required nullable field gets `omitempty`, which drops the `null` that clears an assignee
+- the generator is wrong: an empty schema becomes `struct{}`, which rejects any value that is not an object (an external link's metadata values, activity event data); a required nullable field gets `omitempty`, which drops the `null` that clears an assignee; and a `number` becomes `float32`, which rounds task numbers past 16,777,216
 
 The overlay is JSON because oapi-codegen-dd v3.75.20 fails to apply a YAML overlay to a JSON document.
 
 ## Paging the board
 
-v2.29.2 pages the task listing: 50 tasks by default, 100 at most. Older releases returned every task in one page. Read as one call, a board past 50 tasks would lose the rest without an error, so `GetBoard` asks for 100 per page and reads until `totalPages`, merging columns that recur across pages.
+v2.29.2 pages the task listing twice over, which is confirmed in its `get-tasks.ts`:
 
-A page's labels, links and columns are paged again (`relatedPage`). Reading that level is not implemented; a board that needs it fails instead of coming back with labels missing.
+- task pages (`page`): 50 tasks by default, 100 at most, ordered with the task id as the tiebreaker
+- related pages (`relatedPage`): within one task page, the same tasks again with the next 100 labels, links and columns
+
+Read as one call, a board past 50 tasks would lose the rest without an error. `GetBoard` reads every task page and every related page, keys tasks by id so a task repeated on a related page only gains labels, and merges columns by id.
+
+The first request names no page. Releases between 2026-03-22 and v2.29.2 paginate only when `page` or `limit` is given, and then sort on position alone, which ties within a column and so pages unstably; left without them they return the whole board at once, which is what the old client relied on. Later pages are only requested when the server reports more than one, which such a release never does for a plain request.
+
+Not done here: `task list --status` still filters after reading the whole board, and one CLI timeout covers every page of a board. Both are unchanged in kind from before, where the one request carried the whole board.
 
 ## Compatibility with older servers
 
@@ -47,6 +54,6 @@ Requests are the same shape on older releases for these 21 operations, and respo
 
 ## Cost
 
-- Go 1.27 (the generated runtime needs at least 1.25.7; the latest release was taken)
+- `go 1.25.7` in go.mod, the runtime's floor, so building from source does not need a newer Go than the dependency does; the repo's own toolchain (`.mise.toml`) is 1.27
 - the runtime pulls in `go-playground/validator`; the stripped binary grows from 7,680,263 to 8,327,431 bytes
 - the generator is a `go tool` dependency, so the generator and the runtime are the same version by construction

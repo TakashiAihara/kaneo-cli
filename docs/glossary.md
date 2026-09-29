@@ -50,7 +50,9 @@ A link between two tasks: `subtask`, `blocks` or `related`. For a subtask link t
 
 One server endpoint this client knows how to call, declared in the registry in `internal/api/registry.go` as an `operationId`, method, path template and the command that needs it.
 
-Requests are made by the generated client (`internal/api/gen`), which is generated for exactly the operations in the registry: `gen/cfg.yaml` lists the same ids, and a test fails when the registry, that list and the pinned OpenAPI document disagree. `kaneo api-check` compares the registry against a live server's document, so the check cannot drift from what the client actually calls.
+Requests are made by the generated client (`internal/api/gen`), which is generated for exactly the operations in the registry: `gen/cfg.yaml` lists the same ids, and a test fails when the registry, that list and the pinned OpenAPI document disagree on an operation's id, method or path. Request bodies and parameters are typed by the generated code, not by the registry.
+
+`kaneo api-check` compares the registry's operation ids against a live server's document. It says whether the server still offers each operation; it does not compare request bodies, so it would not catch a field the server renamed.
 
 ### pinned spec
 

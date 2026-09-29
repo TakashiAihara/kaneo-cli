@@ -40,6 +40,8 @@ snapshot:
 
 spec:
 	curl -fsSL https://raw.githubusercontent.com/usekaneo/kaneo/v$(KANEO_VERSION)/apps/docs/openapi.json -o internal/api/gen/openapi.json
+	go generate ./internal/api/gen/
+	git diff --stat -- internal/api/gen/
 
 generate:
 	go generate ./internal/api/gen/

@@ -13,7 +13,7 @@ generate:
     skip: true
 filter:
   include:
-    # Keep in step with api.Operations; TestGeneratedOperationsMatchRegistry
+    # Keep in step with api.Operations; TestRegistryMatchesTheGeneratedClient
     # fails when the two lists differ.
     operation-ids:
       - listOrganization

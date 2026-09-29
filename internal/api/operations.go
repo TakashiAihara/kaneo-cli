@@ -139,58 +139,91 @@ func (b Board) Tasks() []Task {
 	return out
 }
 
-// boardPageSize is the most tasks the server returns in one page.
-const boardPageSize = 100
-
 // GetBoard fetches a project's columns and tasks, every page of them.
 //
-// The listing is paginated (50 tasks by default, 100 at most), and a page
-// carries only the columns its own tasks need, so columns are merged across
-// pages by id in the order they first appear. Labels, links and columns are
-// paginated again within a task page; a board that needs that second level is
-// refused rather than returned with labels silently missing.
+// Two levels of paging, as v2.29.2 serves the listing:
+//   - task pages (page): 50 tasks each, in a stable order
+//   - within a task page, related pages (relatedPage): the same tasks again,
+//     with the next 100 labels, links and columns
+//
+// Tasks are keyed by id, so a task seen again on a related page only gains the
+// labels that page carries, and columns are merged by id in the order they
+// first appear.
+//
+// The first request sends neither page nor limit. A release from before
+// v2.29.2 paginates only when one of them is present, and there it sorts on
+// position alone, which ties within a column and so pages unstably; left
+// without them it returns the whole board at once, as it always did.
 func (c *Client) GetBoard(ctx context.Context, projectID string) (*Board, error) {
 	var b *Board
-	index := map[string]int{}
-	limit := boardPageSize
-	for page, pages := 1, 1; page <= pages; page++ {
-		p := page
-		resp, err := c.gen.ListTasks(ctx, &gen.ListTasksRequestOptions{
-			PathParams: &gen.ListTasksPath{ProjectID: esc(projectID)},
-			Query:      &gen.ListTasksQuery{Page: &p, Limit: &limit},
-		})
-		if err != nil {
-			return nil, unwrap(err)
-		}
-		if resp.Pagination.RelatedTotalPages > 1 {
-			return nil, fmt.Errorf("board %s has more labels, links or columns than one page carries (%d pages); this client does not read them yet",
-				projectID, int(resp.Pagination.RelatedTotalPages))
-		}
-		pages = int(resp.Pagination.TotalPages)
+	columns := map[string]int{}
+	type at struct{ col, task int }
+	tasks := map[string]at{}
 
-		if b == nil {
-			b = &Board{ProjectID: resp.Data.ID, ProjectName: resp.Data.Name}
-		}
-		for _, col := range resp.Data.Columns {
-			i, ok := index[col.ID]
-			if !ok {
-				i = len(b.Columns)
-				index[col.ID] = i
-				b.Columns = append(b.Columns, Column{ID: col.ID, Name: col.Name})
+	for page, pages := 1, 1; page <= pages; page++ {
+		for related, relatedPages := 1, 1; related <= relatedPages; related++ {
+			q := &gen.ListTasksQuery{}
+			if page > 1 {
+				p := page
+				q.Page = &p
 			}
-			for _, t := range col.Tasks {
-				b.Columns[i].Tasks = append(b.Columns[i].Tasks, boardTask(t))
+			if related > 1 {
+				r := related
+				q.RelatedPage = &r
+				if page == 1 {
+					one := 1
+					q.Page = &one
+				}
+			}
+			resp, err := c.gen.ListTasks(ctx, &gen.ListTasksRequestOptions{
+				PathParams: &gen.ListTasksPath{ProjectID: esc(projectID)},
+				Query:      q,
+			})
+			if err != nil {
+				return nil, unwrap(err)
+			}
+			pages = int(resp.Pagination.TotalPages)
+			relatedPages = int(resp.Pagination.RelatedTotalPages)
+
+			if b == nil {
+				b = &Board{ProjectID: resp.Data.ID, ProjectName: resp.Data.Name}
+			}
+			for _, col := range resp.Data.Columns {
+				ci, ok := columns[col.ID]
+				if !ok {
+					ci = len(b.Columns)
+					columns[col.ID] = ci
+					b.Columns = append(b.Columns, Column{ID: col.ID, Name: col.Name})
+				}
+				for _, t := range col.Tasks {
+					if seen, ok := tasks[t.ID]; ok {
+						// A repeat on a related page brings more labels; a
+						// repeat on a later task page is the same task twice.
+						if related > 1 {
+							dst := &b.Columns[seen.col].Tasks[seen.task]
+							dst.Labels = append(dst.Labels, labelsFrom(t.Labels)...)
+						}
+						continue
+					}
+					tasks[t.ID] = at{ci, len(b.Columns[ci].Tasks)}
+					b.Columns[ci].Tasks = append(b.Columns[ci].Tasks, boardTask(t))
+				}
 			}
 		}
 	}
 	return b, nil
 }
 
-func boardTask(t gen.BoardTask) Task {
-	labels := make([]Label, 0, len(t.Labels))
-	for _, l := range t.Labels {
-		labels = append(labels, Label{ID: l.ID, Name: l.Name, Color: l.Color})
+func labelsFrom(in []gen.TaskLabel) []Label {
+	out := make([]Label, 0, len(in))
+	for _, l := range in {
+		out = append(out, Label{ID: l.ID, Name: l.Name, Color: l.Color})
 	}
+	return out
+}
+
+func boardTask(t gen.BoardTask) Task {
+	labels := labelsFrom(t.Labels)
 	return Task{
 		ID: t.ID, Number: toInt(t.Number), Title: t.Title, Description: deref(t.Description),
 		Status: t.Status, Priority: t.Priority, Position: toInt(t.Position), ProjectID: t.ProjectID,
@@ -483,8 +516,10 @@ func (c *Client) UnlinkTasks(ctx context.Context, relationID string) error {
 	return unwrap(err)
 }
 
-// isoLayout is how the server writes timestamps (JavaScript's toISOString), so
-// a time read and printed again comes out as the server sent it.
+// isoLayout is how the server writes timestamps (JavaScript's toISOString:
+// UTC, milliseconds), so a time read and printed again comes out as the server
+// sent it. A timestamp written any other way, with an offset or finer than
+// milliseconds, is printed as the same instant in this form.
 const isoLayout = "2006-01-02T15:04:05.000Z07:00"
 
 func isoTime(t time.Time) string { return t.UTC().Format(isoLayout) }
@@ -513,9 +548,10 @@ func nonEmpty(s string) *string {
 	return &s
 }
 
-// toInt reads a task number or position. The document types them as number,
-// but the server only issues integers.
-func toInt(f *float32) int {
+// toInt reads a task number or position. The document types them as number
+// (read as float64, exact for any integer the server issues); the server only
+// issues integers.
+func toInt(f *float64) int {
 	if f == nil {
 		return 0
 	}

@@ -1,6 +1,6 @@
 module github.com/TakashiAihara/kaneo-cli
 
-go 1.27.1
+go 1.25.7
 
 require (
 	github.com/doordash-oss/oapi-codegen-dd/v3 v3.75.20

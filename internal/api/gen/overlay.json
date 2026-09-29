@@ -1,0 +1,47 @@
+{
+  "overlay": "1.0.0",
+  "info": {
+    "title": "kaneo-cli corrections to the Kaneo OpenAPI document",
+    "version": "1.0.0",
+    "description": "Written in JSON because oapi-codegen-dd v3.75.20 fails to apply a YAML overlay to a JSON document ('invalid character' while re-reading the result)."
+  },
+  "actions": [
+    {
+      "description": "better-auth's organization routes are documented with empty schemas, which generate as struct{} and decode to nothing. The server answers with the organization object. REMOVE WHEN the upstream document gives these responses a schema.",
+      "target": "$.components.schemas",
+      "update": {
+        "Organization": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string"},
+            "name": {"type": "string"},
+            "slug": {"type": "string"}
+          },
+          "required": ["id", "name", "slug"]
+        }
+      }
+    },
+    {
+      "target": "$.paths['/auth/organization/list'].get.responses['200'].content['application/json'].schema.items",
+      "update": {"$ref": "#/components/schemas/Organization"}
+    },
+    {
+      "target": "$.paths['/auth/organization/update'].post.responses['200'].content['application/json'].schema",
+      "update": {"$ref": "#/components/schemas/Organization"}
+    },
+    {
+      "description": "The generator turns an empty schema into struct{}, which rejects any JSON value that is not an object, so one external link whose metadata holds a string would fail the whole board. REMOVE WHEN oapi-codegen-dd maps an empty schema to any.",
+      "target": "$.components.schemas.TaskExternalLink.properties.metadata",
+      "update": {"x-go-type": "map[string]any"}
+    },
+    {
+      "target": "$.components.schemas.Activity.properties.eventData",
+      "update": {"x-go-type": "any"}
+    },
+    {
+      "description": "userId is required and null means unassign, but the generator tags a nullable field omitempty, so an unassign would send {} and be rejected. REMOVE WHEN oapi-codegen-dd leaves omitempty off required fields.",
+      "target": "$.paths['/task/assignee/{id}'].put.requestBody.content['application/json'].schema.properties.userId",
+      "update": {"x-omitempty": false}
+    }
+  ]
+}

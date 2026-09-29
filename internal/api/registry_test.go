@@ -7,26 +7,6 @@ import (
 	"testing"
 )
 
-func TestExpandFillsPlaceholdersInOrder(t *testing.T) {
-	op := Operation{Path: "/task/status/{id}"}
-	if got := op.Expand("abc"); got != "/task/status/abc" {
-		t.Errorf("Expand = %q", got)
-	}
-
-	noParams := Operation{Path: "/project"}
-	if got := noParams.Expand(); got != "/project" {
-		t.Errorf("Expand = %q, want /project", got)
-	}
-}
-
-func TestExpandEscapesValues(t *testing.T) {
-	op := Operation{Path: "/task/{id}"}
-	got := op.Expand("a/b?c")
-	if strings.Contains(got, "?") || strings.Count(got, "/") != 2 {
-		t.Errorf("Expand = %q; a value escaped into the path structure", got)
-	}
-}
-
 // Every operation must be declared before it can be used, so the registry has
 // to be internally consistent: no duplicate ids, and every field populated.
 func TestRegistryIsWellFormed(t *testing.T) {

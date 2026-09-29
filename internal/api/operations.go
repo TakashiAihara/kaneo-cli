@@ -3,9 +3,11 @@ package api
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/TakashiAihara/kaneo-cli/internal/api/gen"
 )
 
 // ListWorkspaces returns the workspaces the key can see.
@@ -15,10 +17,13 @@ import (
 // and no key at all, so it has no discriminating power and must not be used to
 // check credentials.
 func (c *Client) ListWorkspaces(ctx context.Context) ([]Workspace, error) {
-	op := operation("listOrganization")
-	var out []Workspace
-	if err := c.Do(ctx, op.Method, op.Expand(), nil, nil, &out); err != nil {
-		return nil, err
+	resp, err := c.gen.ListOrganization(ctx)
+	if err != nil {
+		return nil, unwrap(err)
+	}
+	out := make([]Workspace, 0, len(*resp))
+	for _, o := range *resp {
+		out = append(out, Workspace{ID: o.ID, Name: o.Name, Slug: o.Slug})
 	}
 	return out, nil
 }
@@ -42,19 +47,17 @@ func (c *Client) RenameWorkspace(ctx context.Context, workspaceID, name string) 
 		return nil, fmt.Errorf("workspace name is empty")
 	}
 
-	op := operation("updateOrganization")
-	body := map[string]any{
-		"organizationId": workspaceID,
-		"data":           map[string]string{"name": name},
+	resp, err := c.gen.UpdateOrganization(ctx, &gen.UpdateOrganizationRequestOptions{Body: &gen.UpdateOrganizationBody{
+		OrganizationID: &workspaceID,
+		Data:           gen.UpdateOrganizationBody_Data{Name: &name},
+	}})
+	if err != nil {
+		return nil, unwrap(err)
 	}
-	var out Workspace
-	if err := c.Do(ctx, op.Method, op.Expand(), nil, body, &out); err != nil {
-		return nil, err
+	if resp.ID != workspaceID || resp.Name != name {
+		return nil, fmt.Errorf("/auth/organization/update: server answered with workspace %q named %q", resp.ID, resp.Name)
 	}
-	if out.ID != workspaceID || out.Name != name {
-		return nil, fmt.Errorf("%s: server answered with workspace %q named %q", op.Path, out.ID, out.Name)
-	}
-	return &out, nil
+	return &Workspace{ID: resp.ID, Name: resp.Name, Slug: resp.Slug}, nil
 }
 
 // ListProjects returns the projects in a workspace. workspaceId is a required
@@ -63,16 +66,30 @@ func (c *Client) RenameWorkspace(ctx context.Context, workspaceID, name string) 
 // Archived projects are left out unless asked for, which is the same view the
 // board takes.
 func (c *Client) ListProjects(ctx context.Context, workspaceID string, includeArchived bool) ([]Project, error) {
-	op := operation("listProjects")
-	var out []Project
-	q := url.Values{"workspaceId": {workspaceID}}
+	q := &gen.ListProjectsQuery{WorkspaceID: workspaceID}
 	if includeArchived {
-		q.Set("includeArchived", "true")
+		yes := "true"
+		q.IncludeArchived = &yes
 	}
-	if err := c.Do(ctx, op.Method, op.Expand(), q, nil, &out); err != nil {
-		return nil, err
+	resp, err := c.gen.ListProjects(ctx, &gen.ListProjectsRequestOptions{Query: q})
+	if err != nil {
+		return nil, unwrap(err)
+	}
+	out := make([]Project, 0, len(*resp))
+	for _, p := range *resp {
+		out = append(out, Project{
+			ID: p.ID, Name: p.Name, Slug: p.Slug, Icon: deref(p.Icon), Description: deref(p.Description),
+			WorkspaceID: p.WorkspaceID, IsPublic: derefBool(p.IsPublic), ArchivedAt: isoTimePtr(p.ArchivedAt),
+		})
 	}
 	return out, nil
+}
+
+func projectFrom(p *gen.Project) *Project {
+	return &Project{
+		ID: p.ID, Name: p.Name, Slug: p.Slug, Icon: deref(p.Icon), Description: deref(p.Description),
+		WorkspaceID: p.WorkspaceID, IsPublic: derefBool(p.IsPublic), ArchivedAt: isoTimePtr(p.ArchivedAt),
+	}
 }
 
 // SetProjectArchived puts a project away, or brings it back.
@@ -81,32 +98,22 @@ func (c *Client) ListProjects(ctx context.Context, workspaceID string, includeAr
 // mapping and every task on it stay where they are, and only the board stops
 // showing it. Nothing is deleted, so the change is reversible.
 func (c *Client) SetProjectArchived(ctx context.Context, projectID string, archived bool) error {
-	id := "unarchiveProject"
+	var err error
 	if archived {
-		id = "archiveProject"
+		_, err = c.gen.ArchiveProject(ctx, &gen.ArchiveProjectRequestOptions{PathParams: &gen.ArchiveProjectPath{ID: esc(projectID)}})
+	} else {
+		_, err = c.gen.UnarchiveProject(ctx, &gen.UnarchiveProjectRequestOptions{PathParams: &gen.UnarchiveProjectPath{ID: esc(projectID)}})
 	}
-	op := operation(id)
-	return c.Do(ctx, op.Method, op.Expand(projectID), nil, nil, nil)
+	return unwrap(err)
 }
 
 // GetProject fetches one project by id.
 func (c *Client) GetProject(ctx context.Context, projectID string) (*Project, error) {
-	op := operation("getProject")
-	var out Project
-	if err := c.Do(ctx, op.Method, op.Expand(projectID), nil, nil, &out); err != nil {
-		return nil, err
+	resp, err := c.gen.GetProject(ctx, &gen.GetProjectRequestOptions{PathParams: &gen.GetProjectPath{ID: esc(projectID)}})
+	if err != nil {
+		return nil, unwrap(err)
 	}
-	return &out, nil
-}
-
-// board is the shape returned by the task listing: a project carrying its
-// columns, each of which carries its tasks.
-type board struct {
-	Data struct {
-		ID      string   `json:"id"`
-		Name    string   `json:"name"`
-		Columns []Column `json:"columns"`
-	} `json:"data"`
+	return projectFrom(resp), nil
 }
 
 // Board is a project together with its columns and tasks.
@@ -132,28 +139,90 @@ func (b Board) Tasks() []Task {
 	return out
 }
 
-// GetBoard fetches a project's columns and tasks.
+// boardPageSize is the most tasks the server returns in one page.
+const boardPageSize = 100
+
+// GetBoard fetches a project's columns and tasks, every page of them.
+//
+// The listing is paginated (50 tasks by default, 100 at most), and a page
+// carries only the columns its own tasks need, so columns are merged across
+// pages by id in the order they first appear. Labels, links and columns are
+// paginated again within a task page; a board that needs that second level is
+// refused rather than returned with labels silently missing.
 func (c *Client) GetBoard(ctx context.Context, projectID string) (*Board, error) {
-	op := operation("listTasks")
-	var raw board
-	if err := c.Do(ctx, op.Method, op.Expand(projectID), nil, nil, &raw); err != nil {
-		return nil, err
+	var b *Board
+	index := map[string]int{}
+	limit := boardPageSize
+	for page, pages := 1, 1; page <= pages; page++ {
+		p := page
+		resp, err := c.gen.ListTasks(ctx, &gen.ListTasksRequestOptions{
+			PathParams: &gen.ListTasksPath{ProjectID: esc(projectID)},
+			Query:      &gen.ListTasksQuery{Page: &p, Limit: &limit},
+		})
+		if err != nil {
+			return nil, unwrap(err)
+		}
+		if resp.Pagination.RelatedTotalPages > 1 {
+			return nil, fmt.Errorf("board %s has more labels, links or columns than one page carries (%d pages); this client does not read them yet",
+				projectID, int(resp.Pagination.RelatedTotalPages))
+		}
+		pages = int(resp.Pagination.TotalPages)
+
+		if b == nil {
+			b = &Board{ProjectID: resp.Data.ID, ProjectName: resp.Data.Name}
+		}
+		for _, col := range resp.Data.Columns {
+			i, ok := index[col.ID]
+			if !ok {
+				i = len(b.Columns)
+				index[col.ID] = i
+				b.Columns = append(b.Columns, Column{ID: col.ID, Name: col.Name})
+			}
+			for _, t := range col.Tasks {
+				b.Columns[i].Tasks = append(b.Columns[i].Tasks, boardTask(t))
+			}
+		}
 	}
-	return &Board{
-		ProjectID:   raw.Data.ID,
-		ProjectName: raw.Data.Name,
-		Columns:     raw.Data.Columns,
-	}, nil
+	return b, nil
+}
+
+func boardTask(t gen.BoardTask) Task {
+	labels := make([]Label, 0, len(t.Labels))
+	for _, l := range t.Labels {
+		labels = append(labels, Label{ID: l.ID, Name: l.Name, Color: l.Color})
+	}
+	return Task{
+		ID: t.ID, Number: toInt(t.Number), Title: t.Title, Description: deref(t.Description),
+		Status: t.Status, Priority: t.Priority, Position: toInt(t.Position), ProjectID: t.ProjectID,
+		AssigneeID: t.AssigneeID, AssigneeName: t.AssigneeName,
+		StartDate: isoTimePtr(t.StartDate), DueDate: isoTimePtr(t.DueDate), CreatedAt: isoTime(t.CreatedAt),
+		Labels: labels,
+	}
+}
+
+// taskFrom maps a task as the write routes return it. Those carry the assignee
+// as userId and no name.
+func taskFrom(t *gen.Task) *Task {
+	return &Task{
+		ID: t.ID, Number: toInt(t.Number), Title: t.Title, Description: deref(t.Description),
+		Status: t.Status, Priority: t.Priority, Position: toInt(t.Position), ProjectID: t.ProjectID,
+		AssigneeID: t.UserID,
+		StartDate:  isoTimePtr(t.StartDate), DueDate: isoTimePtr(t.DueDate), CreatedAt: isoTime(t.CreatedAt),
+	}
 }
 
 // GetTask fetches one task by id.
 func (c *Client) GetTask(ctx context.Context, taskID string) (*Task, error) {
-	op := operation("getTask")
-	var out Task
-	if err := c.Do(ctx, op.Method, op.Expand(taskID), nil, nil, &out); err != nil {
-		return nil, err
+	t, err := c.gen.GetTask(ctx, &gen.GetTaskRequestOptions{PathParams: &gen.GetTaskPath{ID: esc(taskID)}})
+	if err != nil {
+		return nil, unwrap(err)
 	}
-	return &out, nil
+	return &Task{
+		ID: t.ID, Number: toInt(t.Number), Title: t.Title, Description: deref(t.Description),
+		Status: t.Status, Priority: t.Priority, Position: toInt(t.Position), ProjectID: t.ProjectID,
+		AssigneeID: t.AssigneeID, AssigneeName: t.AssigneeName,
+		StartDate: isoTimePtr(t.StartDate), DueDate: isoTimePtr(t.DueDate), CreatedAt: isoTime(t.CreatedAt),
+	}, nil
 }
 
 // SetTaskStatus moves a task to another column.
@@ -161,34 +230,46 @@ func (c *Client) GetTask(ctx context.Context, taskID string) (*Task, error) {
 // The dedicated endpoint is used rather than PUT /task/{id}, which requires
 // every field and answers 400 when used for a partial update.
 func (c *Client) SetTaskStatus(ctx context.Context, taskID, status string) error {
-	op := operation("updateTaskStatus")
-	return c.Do(ctx, op.Method, op.Expand(taskID), nil, map[string]string{"status": status}, nil)
+	_, err := c.gen.UpdateTaskStatus(ctx, &gen.UpdateTaskStatusRequestOptions{
+		PathParams: &gen.UpdateTaskStatusPath{ID: esc(taskID)},
+		Body:       &gen.UpdateTaskStatusBody{Status: status},
+	})
+	return unwrap(err)
 }
 
 // SetTaskPriority changes a task's priority.
 func (c *Client) SetTaskPriority(ctx context.Context, taskID, priority string) error {
-	op := operation("updateTaskPriority")
-	return c.Do(ctx, op.Method, op.Expand(taskID), nil, map[string]string{"priority": priority}, nil)
+	_, err := c.gen.UpdateTaskPriority(ctx, &gen.UpdateTaskPriorityRequestOptions{
+		PathParams: &gen.UpdateTaskPriorityPath{ID: esc(taskID)},
+		Body:       &gen.UpdateTaskPriorityBody{Priority: gen.UpdateTaskPriorityBodyPriority(priority)},
+	})
+	return unwrap(err)
 }
 
 // ListComments returns a task's comments oldest-first.
 func (c *Client) ListComments(ctx context.Context, taskID string) ([]Comment, error) {
-	op := operation("getTaskComments")
-	var out []Comment
-	if err := c.Do(ctx, op.Method, op.Expand(taskID), nil, nil, &out); err != nil {
-		return nil, err
+	resp, err := c.gen.GetTaskComments(ctx, &gen.GetTaskCommentsRequestOptions{PathParams: &gen.GetTaskCommentsPath{TaskID: esc(taskID)}})
+	if err != nil {
+		return nil, unwrap(err)
+	}
+	out := make([]Comment, 0, len(*resp))
+	for _, cm := range *resp {
+		out = append(out, Comment{ID: cm.ID, Content: cm.Content, UserID: cm.UserID, UserName: cm.User.Name, CreatedAt: isoTime(cm.CreatedAt)})
 	}
 	return out, nil
 }
 
-// AddComment posts a comment on a task.
+// AddComment posts a comment on a task. The server answers with the stored
+// activity row, which names no author.
 func (c *Client) AddComment(ctx context.Context, taskID, content string) (*Comment, error) {
-	op := operation("createTaskComment")
-	var out Comment
-	if err := c.Do(ctx, op.Method, op.Expand(taskID), nil, map[string]string{"content": content}, &out); err != nil {
-		return nil, err
+	a, err := c.gen.CreateTaskComment(ctx, &gen.CreateTaskCommentRequestOptions{
+		PathParams: &gen.CreateTaskCommentPath{TaskID: esc(taskID)},
+		Body:       &gen.CreateTaskCommentBody{Content: content},
+	})
+	if err != nil {
+		return nil, unwrap(err)
 	}
-	return &out, nil
+	return &Comment{ID: a.ID, Content: deref(a.Content), UserID: deref(a.UserID), CreatedAt: isoTime(a.CreatedAt)}, nil
 }
 
 // CreateTask adds a task to a project. The server requires description,
@@ -201,55 +282,64 @@ func (c *Client) CreateTask(ctx context.Context, projectID string, in NewTask) (
 	if in.Status == "" {
 		in.Status = "to-do"
 	}
-	op := operation("createTask")
-	var out Task
-	if err := c.Do(ctx, op.Method, op.Expand(projectID), nil, in, &out); err != nil {
-		return nil, err
+	body := &gen.CreateTaskBody{
+		Title: in.Title, Description: in.Description,
+		Priority: gen.CreateTaskBodyPriority(in.Priority), Status: in.Status,
+		DueDate: nonEmpty(in.DueDate), UserID: nonEmpty(in.AssigneeID),
 	}
-	return &out, nil
+	t, err := c.gen.CreateTask(ctx, &gen.CreateTaskRequestOptions{PathParams: &gen.CreateTaskPath{ProjectID: esc(projectID)}, Body: body})
+	if err != nil {
+		return nil, unwrap(err)
+	}
+	return taskFrom(t), nil
 }
 
 // NewTask is the payload for creating a task.
 type NewTask struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Priority    string `json:"priority"`
-	Status      string `json:"status"`
-	DueDate     string `json:"dueDate,omitempty"`
-	AssigneeID  string `json:"assigneeId,omitempty"`
+	Title       string
+	Description string
+	Priority    string
+	Status      string
+	DueDate     string
+	AssigneeID  string
 }
 
 // DeleteTask removes a task.
 func (c *Client) DeleteTask(ctx context.Context, taskID string) error {
-	op := operation("deleteTask")
-	return c.Do(ctx, op.Method, op.Expand(taskID), nil, nil, nil)
+	_, err := c.gen.DeleteTask(ctx, &gen.DeleteTaskRequestOptions{PathParams: &gen.DeleteTaskPath{ID: esc(taskID)}})
+	return unwrap(err)
 }
 
 // SetTaskAssignee assigns a task to a user, or clears the assignee when
 // userID is empty.
 func (c *Client) SetTaskAssignee(ctx context.Context, taskID, userID string) error {
-	op := operation("updateTaskAssignee")
-	body := map[string]any{"assigneeId": any(userID)}
-	if userID == "" {
-		body["assigneeId"] = nil
-	}
-	return c.Do(ctx, op.Method, op.Expand(taskID), nil, body, nil)
+	_, err := c.gen.UpdateTaskAssignee(ctx, &gen.UpdateTaskAssigneeRequestOptions{
+		PathParams: &gen.UpdateTaskAssigneePath{ID: esc(taskID)},
+		Body:       &gen.UpdateTaskAssigneeBody{UserID: nonEmpty(userID)},
+	})
+	return unwrap(err)
 }
 
 // MoveTask moves a task to another project.
 func (c *Client) MoveTask(ctx context.Context, taskID, projectID string) error {
-	op := operation("moveTask")
-	return c.Do(ctx, op.Method, op.Expand(taskID), nil, map[string]string{"projectId": projectID}, nil)
+	_, err := c.gen.MoveTask(ctx, &gen.MoveTaskRequestOptions{
+		PathParams: &gen.MoveTaskPath{ID: esc(taskID)},
+		Body:       &gen.MoveTaskBody{DestinationProjectID: projectID},
+	})
+	return unwrap(err)
 }
 
 // NewProject is the payload for creating a project. The server requires an
 // icon, so CreateProject supplies one when the caller does not.
+//
+// The server's create route takes no description, so Description is not sent;
+// it is kept so a caller can set it with UpdateProject afterwards.
 type NewProject struct {
-	Name        string `json:"name"`
-	WorkspaceID string `json:"workspaceId"`
-	Icon        string `json:"icon"`
-	Slug        string `json:"slug,omitempty"`
-	Description string `json:"description,omitempty"`
+	Name        string
+	WorkspaceID string
+	Icon        string
+	Slug        string
+	Description string
 }
 
 // CreateProject adds a project to a workspace.
@@ -257,12 +347,13 @@ func (c *Client) CreateProject(ctx context.Context, in NewProject) (*Project, er
 	if in.Icon == "" {
 		in.Icon = "Layers"
 	}
-	op := operation("createProject")
-	var out Project
-	if err := c.Do(ctx, op.Method, op.Expand(), nil, in, &out); err != nil {
-		return nil, err
+	p, err := c.gen.CreateProject(ctx, &gen.CreateProjectRequestOptions{Body: &gen.CreateProjectBody{
+		Name: in.Name, WorkspaceID: in.WorkspaceID, Icon: in.Icon, Slug: in.Slug,
+	}})
+	if err != nil {
+		return nil, unwrap(err)
 	}
-	return &out, nil
+	return projectFrom(p), nil
 }
 
 // ProjectChanges names the fields to change. A nil field is left as it is.
@@ -321,18 +412,16 @@ func (c *Client) UpdateProject(ctx context.Context, projectID string, ch Project
 		}
 	}
 
-	op := operation("updateProject")
-	body := map[string]any{
-		"name":        want.Name,
-		"icon":        want.Icon,
-		"slug":        want.Slug,
-		"description": want.Description,
-		"isPublic":    want.IsPublic,
+	resp, err := c.gen.UpdateProject(ctx, &gen.UpdateProjectRequestOptions{
+		PathParams: &gen.UpdateProjectPath{ID: esc(projectID)},
+		Body: &gen.UpdateProjectBody{
+			Name: want.Name, Icon: want.Icon, Slug: want.Slug, Description: want.Description, IsPublic: want.IsPublic,
+		},
+	})
+	if err != nil {
+		return nil, nil, unwrap(err)
 	}
-	var out Project
-	if err := c.Do(ctx, op.Method, op.Expand(projectID), nil, body, &out); err != nil {
-		return nil, nil, err
-	}
+	out := projectFrom(resp)
 	var off []string
 	for _, f := range []struct {
 		name      string
@@ -347,9 +436,9 @@ func (c *Client) UpdateProject(ctx context.Context, projectID string, ch Project
 		}
 	}
 	if len(off) > 0 {
-		return nil, nil, fmt.Errorf("%s: server did not echo the update: %s", op.Path, strings.Join(off, "; "))
+		return nil, nil, fmt.Errorf("/project/%s: server did not echo the update: %s", projectID, strings.Join(off, "; "))
 	}
-	return before, &out, nil
+	return before, out, nil
 }
 
 // RelationTypes are the links the server accepts between two tasks.
@@ -365,31 +454,70 @@ type Relation struct {
 
 // LinkTasks relates two tasks. For a subtask link, source is the parent.
 func (c *Client) LinkTasks(ctx context.Context, sourceTaskID, targetTaskID, relationType string) (*Relation, error) {
-	op := operation("createTaskRelation")
-	var out Relation
-	body := map[string]string{
-		"sourceTaskId": sourceTaskID,
-		"targetTaskId": targetTaskID,
-		"relationType": relationType,
+	r, err := c.gen.CreateTaskRelation(ctx, &gen.CreateTaskRelationRequestOptions{Body: &gen.CreateTaskRelationBody{
+		SourceTaskID: sourceTaskID, TargetTaskID: targetTaskID,
+		RelationType: gen.CreateTaskRelationBodyRelationType(relationType),
+	}})
+	if err != nil {
+		return nil, unwrap(err)
 	}
-	if err := c.Do(ctx, op.Method, op.Expand(), nil, body, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
+	return &Relation{ID: r.ID, SourceTaskID: r.SourceTaskID, TargetTaskID: r.TargetTaskID, RelationType: r.RelationType}, nil
 }
 
 // ListRelations returns a task's links.
 func (c *Client) ListRelations(ctx context.Context, taskID string) ([]Relation, error) {
-	op := operation("getTaskRelations")
-	var out []Relation
-	if err := c.Do(ctx, op.Method, op.Expand(taskID), nil, nil, &out); err != nil {
-		return nil, err
+	resp, err := c.gen.GetTaskRelations(ctx, &gen.GetTaskRelationsRequestOptions{PathParams: &gen.GetTaskRelationsPath{TaskID: esc(taskID)}})
+	if err != nil {
+		return nil, unwrap(err)
+	}
+	out := make([]Relation, 0, len(*resp))
+	for _, r := range *resp {
+		out = append(out, Relation{ID: r.ID, SourceTaskID: r.SourceTaskID, TargetTaskID: r.TargetTaskID, RelationType: r.RelationType})
 	}
 	return out, nil
 }
 
 // UnlinkTasks removes a relation by its own id.
 func (c *Client) UnlinkTasks(ctx context.Context, relationID string) error {
-	op := operation("deleteTaskRelation")
-	return c.Do(ctx, op.Method, op.Expand(relationID), nil, nil, nil)
+	_, err := c.gen.DeleteTaskRelation(ctx, &gen.DeleteTaskRelationRequestOptions{PathParams: &gen.DeleteTaskRelationPath{ID: esc(relationID)}})
+	return unwrap(err)
+}
+
+// isoLayout is how the server writes timestamps (JavaScript's toISOString), so
+// a time read and printed again comes out as the server sent it.
+const isoLayout = "2006-01-02T15:04:05.000Z07:00"
+
+func isoTime(t time.Time) string { return t.UTC().Format(isoLayout) }
+
+func isoTimePtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := isoTime(*t)
+	return &s
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func derefBool(b *bool) bool { return b != nil && *b }
+
+func nonEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// toInt reads a task number or position. The document types them as number,
+// but the server only issues integers.
+func toInt(f *float32) int {
+	if f == nil {
+		return 0
+	}
+	return int(*f)
 }

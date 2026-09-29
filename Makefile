@@ -3,7 +3,10 @@ PKG    := ./cmd/kaneo
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: build test vet fmt check clean cross snapshot
+# The Kaneo release whose OpenAPI document the API client is generated from.
+KANEO_VERSION := 2.29.2
+
+.PHONY: build test vet fmt check clean cross snapshot spec generate
 
 build:
 	go build -ldflags '$(LDFLAGS)' -o $(BINARY) $(PKG)
@@ -34,6 +37,12 @@ cross:
 # Build every release archive locally, exactly as the release job would.
 snapshot:
 	goreleaser release --snapshot --clean --skip=publish
+
+spec:
+	curl -fsSL https://raw.githubusercontent.com/usekaneo/kaneo/v$(KANEO_VERSION)/apps/docs/openapi.json -o internal/api/gen/openapi.json
+
+generate:
+	go generate ./internal/api/gen/
 
 clean:
 	rm -rf dist $(BINARY)

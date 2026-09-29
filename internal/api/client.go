@@ -1,9 +1,11 @@
 // Package api talks to a Kaneo server.
 //
-// The client is hand-written rather than generated because the server's
-// responses are not uniformly shaped: some operations return a bare array,
-// others wrap the payload in a "data" key, and the task listing nests tasks
-// inside columns. Absorbing that in generated code costs more than it saves.
+// Requests and response types come from the client generated out of the
+// server's OpenAPI document (package gen), so a request that drifts from what
+// the server expects fails to compile instead of failing at the server. This
+// package keeps what the document cannot say: where the key may be sent, how a
+// failure is reported, and the CLI's own view of workspaces, projects and
+// tasks.
 package api
 
 import (
@@ -18,6 +20,9 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/TakashiAihara/kaneo-cli/internal/api/gen"
+	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 )
 
 // DefaultTimeout bounds a single request.
@@ -28,6 +33,8 @@ type Client struct {
 	BaseURL string // always ends in /api
 	APIKey  string
 	HTTP    *http.Client
+
+	gen *gen.Client
 }
 
 // NormalizeBaseURL turns whatever the user configured into an API root.
@@ -51,7 +58,7 @@ func New(baseURL, apiKey string, timeout time.Duration) *Client {
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
-	return &Client{
+	c := &Client{
 		BaseURL: NormalizeBaseURL(baseURL),
 		APIKey:  apiKey,
 		HTTP: &http.Client{
@@ -59,7 +66,47 @@ func New(baseURL, apiKey string, timeout time.Duration) *Client {
 			CheckRedirect: dropCredentialOnDowngrade,
 		},
 	}
+	// NewAPIClient only fails on an option error, and the one option passed
+	// here cannot fail.
+	apiClient, _ := runtime.NewAPIClient(c.BaseURL, runtime.WithHTTPClient(doer{c}))
+	c.gen = gen.NewClient(apiClient)
+	return c
 }
+
+// doer is the transport under the generated client. Every generated call goes
+// through send, so the key is checked, attached and reported on the same way
+// as a hand-built request.
+type doer struct{ c *Client }
+
+func (d doer) Do(_ context.Context, req *http.Request) (*http.Response, error) {
+	resp, raw, err := d.c.send(req)
+	if err != nil {
+		return nil, &sendError{err}
+	}
+	resp.Body = io.NopCloser(bytes.NewReader(raw))
+	return resp, nil
+}
+
+// sendError marks an error that send produced, so unwrap can hand it back
+// without the generated client's "error executing request:" prefixes.
+type sendError struct{ err error }
+
+func (e *sendError) Error() string { return e.err.Error() }
+func (e *sendError) Unwrap() error { return e.err }
+
+// unwrap returns the error send reported, if that is what failed, so callers
+// see *Error and ErrInsecureCredential exactly as a direct call returns them.
+func unwrap(err error) error {
+	var se *sendError
+	if errors.As(err, &se) {
+		return se.err
+	}
+	return err
+}
+
+// esc escapes a path parameter. The generated client substitutes values into
+// the path as they are, so an id holding "/" or "?" would change the route.
+func esc(s string) string { return url.PathEscape(s) }
 
 // dropCredentialOnDowngrade removes the API key from a redirected request that
 // is no longer protected by TLS.
@@ -176,7 +223,9 @@ func (e errorEnvelope) messages() []string {
 	return nil
 }
 
-// Do issues a request and decodes the body into out, which may be nil.
+// Do issues a request the generated client does not cover and decodes the body
+// into out, which may be nil. Only the OpenAPI document itself is fetched this
+// way.
 func (c *Client) Do(ctx context.Context, method, path string, query url.Values, body, out any) error {
 	if c.BaseURL == "" {
 		return fmt.Errorf("no API URL configured")
@@ -185,16 +234,6 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 	endpoint := c.BaseURL + path
 	if len(query) > 0 {
 		endpoint += "?" + query.Encode()
-	}
-
-	if c.APIKey != "" {
-		parsed, err := url.Parse(endpoint)
-		if err != nil {
-			return fmt.Errorf("%s %s: %w", method, path, err)
-		}
-		if !isSecure(parsed) {
-			return fmt.Errorf("%s: %w", parsed.Scheme+"://"+parsed.Host, ErrInsecureCredential)
-		}
 	}
 
 	var reader io.Reader
@@ -210,35 +249,14 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 	if err != nil {
 		return err
 	}
-	if c.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.APIKey)
-	}
-	req.Header.Set("Accept", "application/json")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	resp, err := c.HTTP.Do(req)
+	_, raw, err := c.send(req)
 	if err != nil {
-		return fmt.Errorf("%s %s: %w", method, path, err)
+		return err
 	}
-	defer resp.Body.Close()
-
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("%s %s: read body: %w", method, path, err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return newAPIError(method, path, resp.StatusCode, raw)
-	}
-
-	// A 2xx carrying success:false is still a failure. The server reports
-	// validation problems this way, so status alone is not enough.
-	if env, ok := decodeErrorEnvelope(raw); ok {
-		return newAPIErrorFromEnvelope(method, path, resp.StatusCode, raw, env)
-	}
-
 	if out == nil {
 		return nil
 	}
@@ -249,6 +267,44 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 		return fmt.Errorf("%s %s: decode response: %w", method, path, err)
 	}
 	return nil
+}
+
+// send attaches the key, performs req and returns the body. A non-2xx status
+// and a 2xx carrying success:false both come back as *Error; the server
+// reports validation problems the second way, so status alone is not enough.
+// The response's body is consumed; the bytes are returned instead.
+//
+// Errors name the request by its full path, /api included, so the path in a
+// message can be pasted into curl as it is.
+func (c *Client) send(req *http.Request) (*http.Response, []byte, error) {
+	method, path := req.Method, req.URL.Path
+
+	if c.APIKey != "" {
+		if !isSecure(req.URL) {
+			return nil, nil, fmt.Errorf("%s: %w", req.URL.Scheme+"://"+req.URL.Host, ErrInsecureCredential)
+		}
+		req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s %s: %w", method, path, err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s %s: read body: %w", method, path, err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, nil, newAPIError(method, path, resp.StatusCode, raw)
+	}
+	if env, ok := decodeErrorEnvelope(raw); ok {
+		return nil, nil, newAPIErrorFromEnvelope(method, path, resp.StatusCode, raw, env)
+	}
+	return resp, raw, nil
 }
 
 func decodeErrorEnvelope(raw []byte) (errorEnvelope, bool) {

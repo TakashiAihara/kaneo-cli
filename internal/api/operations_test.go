@@ -143,10 +143,13 @@ func TestGetBoardReadsEveryPage(t *testing.T) {
 		switch page, related := q.Get("page"), q.Get("relatedPage"); {
 		case page == "" && related == "":
 			_, _ = w.Write([]byte(boardPage(1, 2, 1, 2, columns(boardTaskJSON("t1", 1, label("a"))+`,`+boardTaskJSON("t2", 2, "")))))
-		case page == "1" && related == "2":
-			_, _ = w.Write([]byte(boardPage(1, 2, 2, 2, columns(boardTaskJSON("t1", 1, label("b"))+`,`+boardTaskJSON("t2", 2, "")))))
+		case page == "" && related == "2":
+			// "a" again, as a board changed mid-read would send it.
+			_, _ = w.Write([]byte(boardPage(1, 2, 2, 2, columns(boardTaskJSON("t1", 1, label("b")+`,`+label("a"))+`,`+boardTaskJSON("t2", 2, "")))))
 		case page == "2" && related == "":
-			_, _ = w.Write([]byte(boardPage(2, 2, 1, 1, columns(boardTaskJSON("t2", 2, "")+`,`+boardTaskJSON("t3", 3, "")))))
+			// t2 again, as a page boundary that moved would repeat it. Its
+			// label here must not be added: this is not a related page.
+			_, _ = w.Write([]byte(boardPage(2, 2, 1, 1, columns(boardTaskJSON("t2", 2, label("z"))+`,`+boardTaskJSON("t3", 3, "")))))
 		default:
 			t.Errorf("unexpected query %q", r.URL.RawQuery)
 		}
@@ -156,9 +159,9 @@ func TestGetBoardReadsEveryPage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The first request asks for no page: a pre-v2.29.2 server starts paging,
+	// The first request asks for no page: a pre-v2.26.0 server starts paging,
 	// unstably, as soon as one is named.
-	if strings.Join(queries, "|") != "|page=1&relatedPage=2|page=2" {
+	if strings.Join(queries, "|") != "|relatedPage=2|page=2" {
 		t.Errorf("requests = %q", queries)
 	}
 	if len(b.Columns) != 2 || b.Columns[0].ID != "to-do" || b.Columns[1].ID != "done" {
@@ -175,9 +178,12 @@ func TestGetBoardReadsEveryPage(t *testing.T) {
 	if strings.Join(names, ",") != "a,b" {
 		t.Errorf("t1 labels = %v, want a,b", names)
 	}
+	if len(todo[1].Labels) != 0 {
+		t.Errorf("t2 labels = %+v; a repeat on a later task page added labels", todo[1].Labels)
+	}
 }
 
-// A server before v2.29.2 answers the plain request with the whole board.
+// A server before v2.26.0 answers the plain request with the whole board.
 func TestGetBoardMakesOneRequestWhenThereIsOnePage(t *testing.T) {
 	calls := 0
 	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -274,8 +280,11 @@ func TestAnyTwoHundredIsASuccess(t *testing.T) {
 			}
 		})
 		if status == http.StatusCreated {
-			if _, err := c.CreateTask(context.Background(), "p1", NewTask{Title: "x"}); err != nil {
+			got, err := c.CreateTask(context.Background(), "p1", NewTask{Title: "x"})
+			if err != nil {
 				t.Errorf("201: %v", err)
+			} else if got.ID != "t1" || got.ProjectID != "p1" || got.Title != "x" {
+				t.Errorf("201: task = %+v; the body was lost", got)
 			}
 			continue
 		}
@@ -285,36 +294,48 @@ func TestAnyTwoHundredIsASuccess(t *testing.T) {
 	}
 }
 
-// Every call that takes an id escapes it.
-func TestEveryPathValueIsEscaped(t *testing.T) {
+// Every call reaches its own route, with the id escaped. The method and the
+// whole path are compared, so a wrapper calling a sibling operation fails.
+func TestEveryCallHitsItsRouteWithTheIDEscaped(t *testing.T) {
 	const id = "a/b"
 	ctx := context.Background()
-	calls := map[string]func(c *Client) error{
-		"GetProject":         func(c *Client) error { _, err := c.GetProject(ctx, id); return err },
-		"SetProjectArchived": func(c *Client) error { return c.SetProjectArchived(ctx, id, true) },
-		"Unarchive":          func(c *Client) error { return c.SetProjectArchived(ctx, id, false) },
-		"GetBoard":           func(c *Client) error { _, err := c.GetBoard(ctx, id); return err },
-		"GetTask":            func(c *Client) error { _, err := c.GetTask(ctx, id); return err },
-		"SetTaskStatus":      func(c *Client) error { return c.SetTaskStatus(ctx, id, "x") },
-		"SetTaskPriority":    func(c *Client) error { return c.SetTaskPriority(ctx, id, "low") },
-		"SetTaskAssignee":    func(c *Client) error { return c.SetTaskAssignee(ctx, id, "") },
-		"MoveTask":           func(c *Client) error { return c.MoveTask(ctx, id, "p") },
-		"DeleteTask":         func(c *Client) error { return c.DeleteTask(ctx, id) },
-		"CreateTask":         func(c *Client) error { _, err := c.CreateTask(ctx, id, NewTask{}); return err },
-		"ListComments":       func(c *Client) error { _, err := c.ListComments(ctx, id); return err },
-		"AddComment":         func(c *Client) error { _, err := c.AddComment(ctx, id, "x"); return err },
-		"ListRelations":      func(c *Client) error { _, err := c.ListRelations(ctx, id); return err },
-		"UnlinkTasks":        func(c *Client) error { return c.UnlinkTasks(ctx, id) },
+	calls := []struct {
+		name, method, path string
+		call               func(c *Client) error
+	}{
+		{"GetProject", "GET", "/api/project/a%2Fb", func(c *Client) error { _, err := c.GetProject(ctx, id); return err }},
+		{"Archive", "PUT", "/api/project/a%2Fb/archive", func(c *Client) error { return c.SetProjectArchived(ctx, id, true) }},
+		{"Unarchive", "PUT", "/api/project/a%2Fb/unarchive", func(c *Client) error { return c.SetProjectArchived(ctx, id, false) }},
+		{"GetBoard", "GET", "/api/task/tasks/a%2Fb", func(c *Client) error { _, err := c.GetBoard(ctx, id); return err }},
+		{"GetTask", "GET", "/api/task/a%2Fb", func(c *Client) error { _, err := c.GetTask(ctx, id); return err }},
+		{"SetTaskStatus", "PUT", "/api/task/status/a%2Fb", func(c *Client) error { return c.SetTaskStatus(ctx, id, "x") }},
+		{"SetTaskPriority", "PUT", "/api/task/priority/a%2Fb", func(c *Client) error { return c.SetTaskPriority(ctx, id, "low") }},
+		{"SetTaskAssignee", "PUT", "/api/task/assignee/a%2Fb", func(c *Client) error { return c.SetTaskAssignee(ctx, id, "") }},
+		{"MoveTask", "PUT", "/api/task/move/a%2Fb", func(c *Client) error { return c.MoveTask(ctx, id, "p") }},
+		{"DeleteTask", "DELETE", "/api/task/a%2Fb", func(c *Client) error { return c.DeleteTask(ctx, id) }},
+		{"CreateTask", "POST", "/api/task/a%2Fb", func(c *Client) error { _, err := c.CreateTask(ctx, id, NewTask{}); return err }},
+		{"ListComments", "GET", "/api/comment/a%2Fb", func(c *Client) error { _, err := c.ListComments(ctx, id); return err }},
+		{"AddComment", "POST", "/api/comment/a%2Fb", func(c *Client) error { _, err := c.AddComment(ctx, id, "x"); return err }},
+		{"ListRelations", "GET", "/api/task-relation/a%2Fb", func(c *Client) error { _, err := c.ListRelations(ctx, id); return err }},
+		{"UnlinkTasks", "DELETE", "/api/task-relation/a%2Fb", func(c *Client) error { return c.UnlinkTasks(ctx, id) }},
+		{"LinkTasks", "POST", "/api/task-relation", func(c *Client) error { _, err := c.LinkTasks(ctx, "s", "d", "blocks"); return err }},
+		{"CreateProject", "POST", "/api/project", func(c *Client) error { _, err := c.CreateProject(ctx, NewProject{Name: "n"}); return err }},
+		{"ListProjects", "GET", "/api/project", func(c *Client) error { _, err := c.ListProjects(ctx, "w", false); return err }},
+		{"ListWorkspaces", "GET", "/api/auth/organization/list", func(c *Client) error { _, err := c.ListWorkspaces(ctx); return err }},
 	}
-	for name, call := range calls {
-		var got string
+	for _, tc := range calls {
+		var method, path string
 		c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
-			got = r.URL.EscapedPath()
+			method, path = r.Method, r.URL.EscapedPath()
 			w.WriteHeader(http.StatusNoContent)
 		})
-		_ = call(c)
-		if !strings.Contains(got, "a%2Fb") {
-			t.Errorf("%s: path %q does not carry the id escaped", name, got)
+		// An empty reply is an error for the board, which must name a project,
+		// and a success for everything else.
+		if err := tc.call(c); (err != nil) != (tc.name == "GetBoard") {
+			t.Errorf("%s: err = %v", tc.name, err)
+		}
+		if method != tc.method || path != tc.path {
+			t.Errorf("%s: %s %s, want %s %s", tc.name, method, path, tc.method, tc.path)
 		}
 	}
 }
@@ -423,4 +444,36 @@ func TestWritesSendEveryField(t *testing.T) {
 			t.Errorf("body = %s, relation = %+v", *body, got)
 		}
 	})
+}
+
+// A write's reply is mapped in full, and a number past float32's exact range
+// comes through unchanged.
+func TestWriteReplyMapsEveryField(t *testing.T) {
+	c, _, _ := recorder(t, `{"id":"t1","projectId":"p1","number":16777217,"position":16777219,"title":"x","description":"d","status":"s","priority":"low",`+
+		`"userId":"u1","startDate":"2026-09-01T00:00:00.000Z","dueDate":"2026-10-01T00:00:00.000Z","createdAt":"2026-09-30T00:00:00.123Z"}`)
+	got, err := c.CreateTask(context.Background(), "p1", NewTask{Title: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "t1" || got.ProjectID != "p1" || got.Number != 16777217 || got.Position != 16777219 || got.Title != "x" ||
+		got.Description != "d" || got.Status != "s" || got.Priority != "low" || *got.AssigneeID != "u1" ||
+		*got.StartDate != "2026-09-01T00:00:00.000Z" || *got.DueDate != "2026-10-01T00:00:00.000Z" || got.CreatedAt != "2026-09-30T00:00:00.123Z" {
+		t.Errorf("task = %+v", got)
+	}
+}
+
+// UpdateProject reads and writes the same escaped route.
+func TestUpdateProjectEscapesTheID(t *testing.T) {
+	var paths []string
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.Method+" "+r.URL.EscapedPath())
+		_, _ = w.Write([]byte(`{"id":"a/b","name":"New","slug":"s","icon":"Box","description":"d","createdAt":"2026-09-30T00:00:00.000Z","position":1,"lastTaskNumber":0}`))
+	})
+	name := "New"
+	if _, _, err := c.UpdateProject(context.Background(), "a/b", ProjectChanges{Name: &name}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(paths, ", ") != "GET /api/project/a%2Fb, PUT /api/project/a%2Fb" {
+		t.Errorf("requests = %v", paths)
+	}
 }

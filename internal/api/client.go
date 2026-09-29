@@ -87,7 +87,7 @@ func (d doer) Do(_ context.Context, req *http.Request) (*http.Response, error) {
 	// send has already judged the call a success. A 201 or 204 would otherwise
 	// report a write that happened as a failure, inviting a retry that
 	// duplicates it.
-	resp.StatusCode = http.StatusOK
+	resp.StatusCode, resp.Status = http.StatusOK, "200 OK"
 	resp.Body = io.NopCloser(bytes.NewReader(raw))
 	return resp, nil
 }

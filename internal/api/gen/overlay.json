@@ -60,7 +60,7 @@
       "description": "Same generator fault as the metadata entry: eventData holds whatever the activity type carries. REMOVE WHEN oapi-codegen-dd maps an empty schema to any."
     },
     {
-      "description": "number and position are typed number, which generates float32 and rounds past 16,777,216. REMOVE WHEN the upstream document types them integer.",
+      "description": "userId is required and null means unassign, but the generator tags a nullable field omitempty, so an unassign would send {} and be rejected. REMOVE WHEN oapi-codegen-dd leaves omitempty off required fields.",
       "target": "$.paths['/task/assignee/{id}'].put.requestBody.content['application/json'].schema.properties.userId",
       "update": {
         "x-omitempty": false
@@ -70,13 +70,15 @@
       "target": "$.components.schemas.Task.properties['number','position']",
       "update": {
         "x-go-type": "float64"
-      }
+      },
+      "description": "number and position are typed number, which generates float32 and rounds past 16,777,216. REMOVE WHEN the upstream document types them integer."
     },
     {
       "target": "$.components.schemas.BoardTask.properties['number','position']",
       "update": {
         "x-go-type": "float64"
-      }
+      },
+      "description": "number and position are typed number, which generates float32 and rounds past 16,777,216. REMOVE WHEN the upstream document types them integer."
     }
   ]
 }

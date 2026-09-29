@@ -44,7 +44,7 @@ v2.29.2 pages the task listing twice over, which is confirmed in its `get-tasks.
 
 Read as one call, a board past 50 tasks would lose the rest without an error. `GetBoard` reads every task page and every related page, keys tasks by id so a task repeated on a related page only gains labels, and merges columns by id.
 
-The first request names no page. Releases between 2026-03-22 and v2.29.2 paginate only when `page` or `limit` is given, and then sort on position alone, which ties within a column and so pages unstably; left without them they return the whole board at once, which is what the old client relied on. Later pages are only requested when the server reports more than one, which such a release never does for a plain request.
+The first request names no page. Releases from 2026-03-22 until v2.26.0 paginate only when `page` or `limit` is given, and then sort on position alone, which ties within a column and so pages unstably; left without them they return the whole board at once, which is what the old client relied on. Later pages are only requested when the server reports more than one, which such a release never does for a plain request.
 
 Not done here: `task list --status` still filters after reading the whole board, and one CLI timeout covers every page of a board. Both are unchanged in kind from before, where the one request carried the whole board.
 

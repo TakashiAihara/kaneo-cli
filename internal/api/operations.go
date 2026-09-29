@@ -151,7 +151,7 @@ func (b Board) Tasks() []Task {
 // first appear.
 //
 // The first request sends neither page nor limit. A release from before
-// v2.29.2 paginates only when one of them is present, and there it sorts on
+// v2.26.0 paginates only when one of them is present, and there it sorts on
 // position alone, which ties within a column and so pages unstably; left
 // without them it returns the whole board at once, as it always did.
 func (c *Client) GetBoard(ctx context.Context, projectID string) (*Board, error) {
@@ -170,10 +170,6 @@ func (c *Client) GetBoard(ctx context.Context, projectID string) (*Board, error)
 			if related > 1 {
 				r := related
 				q.RelatedPage = &r
-				if page == 1 {
-					one := 1
-					q.Page = &one
-				}
 			}
 			resp, err := c.gen.ListTasks(ctx, &gen.ListTasksRequestOptions{
 				PathParams: &gen.ListTasksPath{ProjectID: esc(projectID)},
@@ -201,7 +197,7 @@ func (c *Client) GetBoard(ctx context.Context, projectID string) (*Board, error)
 						// repeat on a later task page is the same task twice.
 						if related > 1 {
 							dst := &b.Columns[seen.col].Tasks[seen.task]
-							dst.Labels = append(dst.Labels, labelsFrom(t.Labels)...)
+							dst.Labels = appendNewLabels(dst.Labels, labelsFrom(t.Labels))
 						}
 						continue
 					}
@@ -211,7 +207,27 @@ func (c *Client) GetBoard(ctx context.Context, projectID string) (*Board, error)
 			}
 		}
 	}
+	if b == nil || b.ProjectID == "" {
+		return nil, fmt.Errorf("board %s: the server answered without a project", projectID)
+	}
 	return b, nil
+}
+
+// appendNewLabels adds the labels not already present. Pages are read one
+// request at a time without a snapshot, so a label can come back twice when the
+// board changes mid-read.
+func appendNewLabels(have, more []Label) []Label {
+	seen := make(map[string]bool, len(have))
+	for _, l := range have {
+		seen[l.ID] = true
+	}
+	for _, l := range more {
+		if !seen[l.ID] {
+			seen[l.ID] = true
+			have = append(have, l)
+		}
+	}
+	return have
 }
 
 func labelsFrom(in []gen.TaskLabel) []Label {

@@ -96,11 +96,18 @@ const decoded = (path: string): string => {
 // The server writes timestamps the way JavaScript's toISOString does — UTC,
 // milliseconds — so a time read and printed again comes out as the server sent
 // it. A timestamp written any other way is shown as the same instant in that
-// form.
+// form, and one the reply left out is the Go build's zero time rather than an
+// empty string, because that is what its zero time.Time formatted as and a task
+// with no createdAt is a fact the report has to be able to show.
 const isoTime = (value: string | null | undefined): string => {
   const at = Date.parse(value ?? "");
-  return Number.isNaN(at) ? (value ?? "") : new Date(at).toISOString();
+  if (!Number.isNaN(at)) return new Date(at).toISOString();
+  return value === null || value === undefined || value === "" ? ZERO_TIME : value;
 };
+
+// The instant Go's zero time.Time holds, which is what a reply that carried no
+// timestamp decoded to.
+const ZERO_TIME = "0001-01-01T00:00:00.000Z";
 
 // The same, for a field that is a timestamp or nothing at all. An absent one
 // stays absent rather than becoming an empty string, because a task with no due

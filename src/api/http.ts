@@ -1,4 +1,5 @@
 import type { ZodError, ZodType } from "zod";
+import { OPERATIONS, type Operation } from "./registry";
 
 // The transport under the generated client. Every generated call goes through
 // kaneoFetch, so the key is checked, attached and reported on the same way for
@@ -194,28 +195,52 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     target = next;
   }
 
-  let raw: string;
+  let bytes: ArrayBuffer;
   try {
-    raw = await response.text();
+    // Read as bytes, because both decisions made from the body are the Go
+    // build's: it judged an empty reply by its length in bytes and reported the
+    // length in bytes when a reply failed to decode, neither of which is what a
+    // string of the same reply would measure.
+    bytes = await response.arrayBuffer();
   } catch (e) {
     throw new Error(`${method} ${path}: read body: ${reason(e)}`, { cause: e });
   }
-  const text = raw.trim();
+  const text = new TextDecoder().decode(bytes);
+  // Trimmed, because that is what the Go build's Error.Body holds and a server
+  // may write its envelope with either of the request's line endings around it.
+  const trimmed = text.trim();
 
   // A non-2xx status and a 2xx carrying success:false are both failures: the
   // server reports validation problems the second way, so the status alone is
   // not enough to judge the call.
-  const reported = failure(method, path, response.status, text);
+  const reported = failure(method, path, response.status, trimmed);
   if (reported) throw reported;
+
+  // Which of the Go build's two request paths this is, which its two parsers
+  // were told apart by as well: a reply the generated client read is decoded and
+  // named after the operation it was read into, and the one request this CLI
+  // issues without the generated client (the server's own document, for
+  // api-check) is trimmed first and reported the way Client.Do reported it.
+  const operation = operationAt(method, path);
+
   // A write that reports 204 has nothing to decode, and the generated types
-  // say so by having nothing to return.
-  if (text === "") return undefined as T;
+  // say so by having nothing to return. What counts as empty is the Go build's
+  // answer: a body of no bytes at all, so a 2xx carrying only whitespace is not
+  // a reply to return zero values for but one that failed to decode, which is
+  // what stopped the command there.
+  if (operation === undefined ? trimmed === "" : bytes.byteLength === 0) return undefined as T;
 
   let decoded: unknown;
   try {
     decoded = JSON.parse(text);
   } catch (e) {
-    throw new Error(`${method} ${path}: decode response: ${reason(e)}`, { cause: e });
+    const why = goDecodeReason(reason(e));
+    throw new Error(
+      operation === undefined
+        ? `${method} ${path}: decode response: ${why}`
+        : decodeFailure(response, bytes.byteLength, operation, why),
+      { cause: e },
+    );
   }
   if (schema) {
     const checked = schema.safeParse(decoded);
@@ -235,6 +260,55 @@ const reason = (e: unknown): string => (e instanceof Error ? e.message : String(
 
 const isSignal = (signal: AbortSignal | null | undefined): signal is AbortSignal =>
   signal !== undefined && signal !== null;
+
+// The operation a request was made for, as the registry of them sees it.
+//
+// The generated client is built for exactly the operations in the registry, and
+// the one request this CLI makes without it is the server's own document, which
+// the registry does not list. So a request that matches an entry came in through
+// the generated client, and one that matches none is the hand-issued call the Go
+// build's Client.Do issued — the two the Go build read an empty reply differently.
+const operationAt = (method: string, path: string): Operation | undefined => {
+  const route = (path.split("?")[0] ?? "").split("/");
+  return OPERATIONS.find((o) => o.method === method && routeMatches(o.path.split("/"), route));
+};
+
+// A path template names a parameter in braces, and a parameter is any one
+// segment: every id is escaped before it is written into a path, so a segment
+// never carries a separator of its own to split on.
+const routeMatches = (template: string[], route: string[]): boolean =>
+  template.length === route.length && template.every((part, i) => part.startsWith("{") || part === route[i]);
+
+// How the runtime the Go build's generated client decodes through reported a
+// reply it could not read: the status and content type as they arrived, the
+// length of the body in bytes, the type it was reading that body into, and the
+// parse error underneath. The body itself is left out of it on purpose, so a
+// reply carrying something private does not end up wherever the message is
+// quoted.
+//
+// The status is the one the reply carried, where the Go build's names 200 for
+// all of them: its transport rewrote every status before the generated parser
+// saw a reply, because those parsers accepted only the 200 the document
+// declares. That rewrite is not reproduced, as nothing here needs it.
+const decodeFailure = (response: Response, length: number, operation: Operation, why: string): string =>
+  `error decoding response: status=${response.status}, content-type=${response.headers.get("content-type") ?? ""}, ` +
+  `content-length=${length}, target-type=${responseTypeOf(operation)}: ${why}`;
+
+// The name Go's generated client gave the type it read a reply into: the
+// operation's id as Go spells a name and "Response" after it.
+const responseTypeOf = (operation: Operation): string =>
+  `${operation.id[0]!.toUpperCase()}${operation.id.slice(1)}Response`;
+
+// What Go's encoding/json says, given what JSON.parse says. A document that runs
+// out before it holds a value is the one both parsers call the end of the input,
+// and it is what a server answering with nothing but whitespace produces, so
+// that case is translated. The rest is passed on as it comes: Go names the
+// character it tripped over and the value it wanted there ("invalid character
+// '<' looking for beginning of value"), which is a report of its own scanner to
+// reproduce, and saying a differently worded reason is better than saying a
+// wrong one.
+const goDecodeReason = (why: string): string =>
+  why.includes("Unexpected EOF") ? "unexpected end of JSON input" : why;
 
 // The path a request was made on, as the server saw it: /api included, percent-
 // escapes read back and the query left out. A call that never got an answer is
@@ -309,9 +383,11 @@ const redirectTarget = (response: Response, from: URL): URL | undefined => {
 //
 // The host is the recipient: the key was given to one server, and a hop that
 // names another server is giving it to somebody who never asked for it. Only the
-// host name is compared, because a redirect that moves the port is the same
-// server reached another way, and whether the connection still protects what is
-// sent over it is keepsCredential's question to answer.
+// host name is compared, and that is a trust assumption rather than a check:
+// the Go build's rule is net/http's, which compares host names and leaves the
+// port out of it, so a hop that changes the port is taken to be the same server
+// reached another way. Whether the connection still protects what is sent over
+// it is keepsCredential's question to answer.
 export const forwardsCredential = (from: URL, to: URL): boolean =>
   hostName(from) === hostName(to) && keepsCredential(to.href);
 

@@ -21,7 +21,7 @@ const HOOK_TIMEOUT_MS = 10_000;
 // Caps how much of a failed hook's output is reported.
 const HOOK_OUTPUT_LIMIT = 4096;
 
-// The signals caught while a hook runs, so the hook can be killed before kaneo
+// The signals caught around a hook, so the hook can be killed before kaneo
 // dies of one. A signal kaneo was started with ignored (nohup) was meant to stay
 // ignored, and Bun offers no way to read an inherited disposition, so the
 // handler is installed either way and that case is accepted rather than guessed
@@ -38,39 +38,108 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
   const command = (app.global.hooks?.[event] ?? "").trim();
   if (command === "") return;
 
-  // Captured rather than inherited: a hook printing to stdout would corrupt the
-  // --json output of the command that ran it. A file and not a pipe: a
-  // background process the hook leaves behind would hold a pipe open, and
-  // waiting for it would report a hook that exited 0 as failed.
-  // NOTE: the file is unbounded; a hook spewing for its whole timeout, or
-  // leaving a spewing process behind, fills the temp dir. `ulimit -f` in front
-  // of the command is the likely cap.
-  let captured: string;
+  // The signals are caught from before the hook exists, as the Go build calls
+  // signal.Notify before cmd.Run: the hook is what sends them, so a handler that
+  // is not yet there when one arrives lets kaneo die of it outright and takes the
+  // hook's group with it, leaving that group to run on with no timeout and
+  // nothing cleaning up after it.
+  //
+  // They come down only at the very end, so a signal arriving while the failure
+  // is being reported, or the capture is being given back, still finds one.
+  let caught: string | undefined;
+  let killed: "timeout" | "signalled" | undefined;
+  // The hook's process group, once it has one. Signalling -pid is what reaches
+  // the whole group, which is what has to die: killing sh alone leaves its
+  // children running, and a timed-out attach hook could then finish after the
+  // close hook and undo it. A child that leaves the group is out of reach, and
+  // so is everything if kaneo is killed with SIGKILL; both are accepted.
+  let group: number | undefined;
+  // The group is only this process's to kill while the hook is in it: afterwards
+  // the number has been given back and may already name somebody else's, and a
+  // hook that ended cleanly is a hook that did its work whatever arrived while it
+  // was running.
+  let running = true;
+  // Set once the capture has been given back, which is the point from which a
+  // caught signal has nothing left to act on but this process.
+  let over = false;
+  let captured: string | undefined;
+  let output: number | undefined;
+
+  const killGroup = (why: "timeout" | "signalled") => {
+    if (!running) return;
+    killed ??= why;
+    // The hook has not been started yet, so there is no group to signal: the
+    // kill waits for one and is applied the moment there is.
+    if (group === undefined) return;
+    try {
+      process.kill(-group, "SIGKILL");
+    } catch {
+      // Already gone, or never started: the exit status says so anyway.
+    }
+  };
+
+  const listeners = SIGNALS.map((signal) => {
+    const handler = () => {
+      caught ??= signal;
+      // Nothing is left to read what the handler recorded, so the process ends
+      // here. Ending it from inside the handler is what keeps a signal from ever
+      // arriving with nobody to act on it: this is the last thing one can arrive
+      // at, and taking the handlers down here is what gives it the default action
+      // that ends this process.
+      if (over) raise(caught);
+      else killGroup("signalled");
+    };
+    process.on(signal, handler);
+    return { signal, handler };
+  });
+
+  const stopListening = (): void => {
+    for (const { signal, handler } of listeners) process.off(signal, handler);
+  };
+
+  // Delivers a caught signal again with its default action, so kaneo still dies
+  // of it and `kaneo session attach && next` stops. Removing the last listener
+  // for a signal restores that default action, which is why this is where the
+  // handlers go; the removal and the delivery are one turn of the loop with
+  // nothing awaited between them, and what is delivered is the signal a handler
+  // recorded rather than whatever has arrived since.
+  const raise = (signal: string | undefined): void => {
+    stopListening();
+    if (signal !== undefined) process.kill(process.pid, signal);
+  };
+
   try {
-    captured = mkdtempSync(join(tmpdir(), "kaneo-hook-"));
-  } catch (e) {
-    // A hook that cannot even be started is a hook that failed, and is reported
-    // like one: the attach it was following has already happened, and a temp
-    // directory nobody can create is not a reason to fail that.
-    reportHookFailure(event, env, `capture output: ${(e as Error).message}`, "");
-    return;
-  }
-  const log = join(captured, "out.log");
-  // One descriptor for both streams, which is the single file Go handed the child.
-  // Two Bun.file targets on one path are two opens of it, and each truncates what
-  // the other wrote, so the report keeps one stream's worth of the hook's output
-  // and loses the rest. Opened here rather than left to Bun, and given back in
-  // the finally below, so this process is not left holding it either.
-  let output: number;
-  try {
-    output = openSync(log, "w", 0o600);
-  } catch (e) {
-    // A file nobody can create is the same failure as a directory nobody can,
-    // and is reported the way the Go build reported its CreateTemp.
-    reportHookFailure(event, env, `capture output: ${(e as Error).message}`, "");
-    return;
-  }
-  try {
+    // Captured rather than inherited: a hook printing to stdout would corrupt the
+    // --json output of the command that ran it. A file and not a pipe: a
+    // background process the hook leaves behind would hold a pipe open, and
+    // waiting for it would report a hook that exited 0 as failed.
+    // NOTE: the file is unbounded; a hook spewing for its whole timeout, or
+    // leaving a spewing process behind, fills the temp dir. `ulimit -f` in front
+    // of the command is the likely cap.
+    try {
+      captured = mkdtempSync(join(tmpdir(), "kaneo-hook-"));
+    } catch (e) {
+      // A hook that cannot even be started is a hook that failed, and is reported
+      // like one: the attach it was following has already happened, and a temp
+      // directory nobody can create is not a reason to fail that.
+      reportHookFailure(event, env, `capture output: ${(e as Error).message}`, "");
+      return;
+    }
+    const log = join(captured, "out.log");
+    // One descriptor for both streams, which is the single file Go handed the child.
+    // Two Bun.file targets on one path are two opens of it, and each truncates what
+    // the other wrote, so the report keeps one stream's worth of the hook's output
+    // and loses the rest. Opened here rather than left to Bun, and given back in
+    // the finally below, so this process is not left holding it either.
+    try {
+      output = openSync(log, "w", 0o600);
+    } catch (e) {
+      // A file nobody can create is the same failure as a directory nobody can,
+      // and is reported the way the Go build reported its CreateTemp.
+      reportHookFailure(event, env, `capture output: ${(e as Error).message}`, "");
+      return;
+    }
+
     let hook: Bun.Subprocess;
     try {
       hook = Bun.spawn(["sh", "-c", command], {
@@ -87,35 +156,13 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
       reportHookFailure(event, env, `fork/exec sh: ${(e as Error).message}`, "");
       return;
     }
+    group = hook.pid;
+    // A kill recorded while the hook did not exist yet is applied here, so that a
+    // report cannot claim a kill that never happened and the hook does not get to
+    // run before being killed.
+    if (killed !== undefined) killGroup(killed);
 
-    // Killing sh alone leaves its children running, and a timed-out attach hook
-    // could then finish after the close hook and undo it. A child that leaves
-    // the group is out of reach, and so is everything if kaneo is killed with
-    // SIGKILL; both are accepted.
-    let caught: string | undefined;
-    let killed: "timeout" | "signalled" | undefined;
-    // The group is only worth signalling while the hook is in it: afterwards the
-    // number has been given back and may already name somebody else's.
-    let running = true;
-    const killGroup = (why: "timeout" | "signalled") => {
-      killed ??= why;
-      if (!running) return;
-      try {
-        process.kill(-hook.pid, "SIGKILL");
-      } catch {
-        // Already gone, or never started: the exit status says so anyway.
-      }
-    };
     const deadline = setTimeout(() => killGroup("timeout"), HOOK_TIMEOUT_MS);
-
-    const listeners = SIGNALS.map((signal) => {
-      const handler = () => {
-        caught ??= signal;
-        killGroup("signalled");
-      };
-      process.on(signal, handler);
-      return { signal, handler };
-    });
 
     await hook.exited;
     running = false;
@@ -129,41 +176,43 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
     // clean, and nothing is re-raised at all.
     await nextTurn();
 
-    // Decided here, with the handlers still installed. Taking them down is what
-    // makes this answer final: a signal arriving from here on has to find the
-    // default action rather than a handler whose record of it nothing reads.
+    // Decided with the handlers still installed, which is what a signal arriving
+    // during the report below finds.
     const failure = failureOf(hook, killed);
     if (failure !== undefined) reportHookFailure(event, env, failure, tailOf(log));
-    // Taken away before the re-raise below, which ends this process without
-    // running the finally. force makes the second removal a no-op.
-    rmSync(captured, { recursive: true, force: true });
-
-    // Removing the last listener for a signal restores the default action, which is
-    // what the signal below is delivered to. The removal and the re-raise are one
-    // turn of the loop with nothing awaited between them, and what is re-raised is
-    // the signal a handler recorded rather than whatever has arrived since.
-    for (const { signal, handler } of listeners) process.off(signal, handler);
-    // Delivered again with its default action, so kaneo still dies of it and
-    // `kaneo session attach && next` stops. The wait is because delivery is
-    // asynchronous, and without it kaneo could print its success line first.
-    if (caught !== undefined) {
-      process.kill(process.pid, caught);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
   } finally {
     // Given back here rather than left to the operating system, which only takes
-    // it when the re-raise above ends this process without running the finally.
-    closeSync(output);
-    rmSync(captured, { recursive: true, force: true });
+    // it when the re-raise below ends this process without running the finally.
+    // Closed before the directory holding it goes, in the order the Go build's
+    // deferred calls ran.
+    if (output !== undefined) closeSync(output);
+    if (captured !== undefined) rmSync(captured, { recursive: true, force: true });
+    over = true;
+
+    // The last wait, and the one the report makes necessary: hooks.log is appended
+    // to, and a FIFO in its place holds that append open for as long as nobody is
+    // reading it, so a signal can arrive while the failure is being written and
+    // find no turn to be handled on until this one. The handler ends the process
+    // from there.
+    await nextTurn();
+
+    raise(caught);
+    // Delivery is asynchronous, and without the wait kaneo could print its
+    // success line before it dies.
+    if (caught !== undefined) await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 };
 
-// The next turn of the loop, which is when a signal it has been given reaches its
-// handler: the signal is queued when it arrives, and the handler runs on the turn
-// after that. One is the whole of it after a hook has ended, because everything
-// the hook sent was queued before the hook's exit was and so is already ahead of
-// this. What was sent after it exited is not waited for, since there is no
-// telling how long that could be, and it reaches the default action anyway.
+// The next turn of the loop, which is where a signal kaneo has been given is
+// handled: the signal is queued when it arrives, and its handler runs on a turn
+// after that. Bun documents none of that ordering, so it is measured: a queued
+// signal's handler runs before the next immediate, and every signal queued
+// before the loop turned is handled on that one turn.
+//
+// One is the whole of it once a hook has ended, because everything the hook sent
+// was queued before its exit was and so is already ahead of this. What was sent
+// after it exited is not waited for, since there is no telling how long that
+// could be, and it reaches the default action anyway.
 const nextTurn = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 // How a hook ended badly, in the Go build's words, because that is what

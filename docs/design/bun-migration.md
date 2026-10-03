@@ -11,7 +11,7 @@
 ## Why
 
 - the choice between the two follows whether the process stays resident: for a resident process Go's memory and size win; for a command that starts, makes a few requests and exits, ease of change, maintenance and the TypeScript ecosystem weigh more
-- a single binary without a runtime was the reason Go was chosen; `bun build --compile` cross-compiles to linux and darwin on amd64 and arm64 just as well
+- a single binary without a runtime was the reason Go was chosen; `bun build --compile` also cross-compiles one per target for linux and darwin on amd64 and arm64, with the two differences below (glibc on Linux, and darwin binaries built but not yet run)
 - what it costs, measured on 2026-10-03 with `kaneo --version` on linux/amd64 (median of 20 runs): startup 51 ms against 8 ms, peak RSS 40 MB against 9 MB, binary 83 MB against 12 MB unstripped (8 MB as released). The 43 ms is startup alone, and every invocation pays it: `session attach`, `next` and `close` from session hooks, `board` from a session start. A command's requests take tens of milliseconds each on top, the same for both builds
 - the Linux binaries link against glibc, so a musl distribution (Alpine) cannot run them; the Go ones were static. amd64 is built for the baseline target, so AVX2 is not required
 - the Go client generator needed an overlay for three faults of Go's type mapping (an empty schema becomes `struct{}`, a nullable field is tagged `omitempty`, `number` becomes `float32`). None of them exist in TypeScript; only the document's own fault (organization routes with empty schemas) still needs a correction

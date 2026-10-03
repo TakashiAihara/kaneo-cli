@@ -1,4 +1,5 @@
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { SPEC_VERSION, SPEC_PATH } from "../openapi/spec";
 
 // Re-pins the OpenAPI document to another Kaneo release: downloads the
@@ -20,7 +21,9 @@ const body = await res.text();
 JSON.parse(body);
 
 const specTs = new URL("../openapi/spec.ts", import.meta.url).pathname;
-writeFileSync(SPEC_PATH.replace(SPEC_VERSION, next), body);
+// Only the file name carries the version; the directories above it may hold
+// the same digits.
+writeFileSync(join(dirname(SPEC_PATH), basename(SPEC_PATH).replace(SPEC_VERSION, next)), body);
 writeFileSync(specTs, readFileSync(specTs, "utf8").replace(`"${SPEC_VERSION}"`, `"${next}"`));
 if (next !== SPEC_VERSION) rmSync(SPEC_PATH);
 console.log(`pinned ${next}; now run: bun run generate`);

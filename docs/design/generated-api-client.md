@@ -1,5 +1,8 @@
 # Generating the API client from the OpenAPI document
 
+> Superseded by `docs/design/bun-migration.md`: kept as the record of how the earlier build worked.
+
+
 ## The problem
 
 The client was hand-written: every request body and path was typed out from reading the server, and nothing checked them against what the server declares. Three of the 21 operations had drifted, and each failed only when run (all three reproduced with v0.2.1-rc.5 against a v2.29.2 server):

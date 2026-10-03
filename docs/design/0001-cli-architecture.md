@@ -1,5 +1,8 @@
 # Design 0001: CLI architecture
 
+> Superseded by `docs/design/bun-migration.md`: kept as the record of how the earlier build worked.
+
+
 Status: accepted (2026-08-28)
 
 ## Goal

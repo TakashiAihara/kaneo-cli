@@ -11,8 +11,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "build": "bun scripts/build.ts",
-    "parity:record": "bun scripts/record-golden.ts",
-    "install-bin": "bun run scripts/install-bin.ts"
+    "parity:record": "bun scripts/record-golden.ts"
   },
   "repository": {
     "type": "git",

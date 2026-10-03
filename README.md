@@ -142,6 +142,14 @@ A status is a column id. The defaults are `to-do`, `in-progress`, `in-review` an
 
 Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing.
 
+### Shell completion
+
+```bash
+kaneo completion zsh > "${fpath[1]}/_kaneo"    # or bash, fish, powershell
+```
+
+Each sub-command writes the script for its shell and says where to put it. `--no-descriptions` leaves the descriptions out, which is what a shell that shows only the candidates wants.
+
 ### Agent sessions
 
 Tasks carry no custom fields, so the link between a session and a task is written into a task comment:

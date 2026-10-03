@@ -1,4 +1,4 @@
-import { apiKey, debug, taskProject, type App } from "./app";
+import { apiKey, debug, halfLeft, taskProject, type App } from "./app";
 import { addComment, getProject, listWorkspaces, type Task } from "../api/kaneo";
 import { minimumArgs, noArgs, type RunContext } from "./args";
 import { failOpen, hard, strictFlag } from "./failopen";
@@ -46,13 +46,12 @@ export const sessionCommand = {
         apiKey(app);
         // From here on the lookups and the marker post share one budget, the way
         // they shared one context.
-        const started = Date.now();
         const task = await resolveTask(taskProject(app), args[0]!);
 
         // Looked up before the marker is posted, so the lookups do not widen the
         // window where the server has a marker and this host has no record.
         const attachment: Attachment = { taskId: task.id, number: task.number, title: task.title };
-        const slug = await describeBoard(app, task, attachment, started);
+        const slug = await describeBoard(app, task, attachment);
 
         const marker = store.describe(env, cwd(), RUNNING);
         marker.nextStep = args.slice(1).join(" ");
@@ -137,15 +136,10 @@ export const sessionCommand = {
 // Best effort: failing the attach over a name a statusline wants would leave the
 // session unattached. A lookup that fails leaves its fields unset, which a reader
 // treats as absent.
-const describeBoard = async (
-  app: App,
-  task: Task,
-  attachment: Attachment,
-  started: number,
-): Promise<string> => {
+const describeBoard = async (app: App, task: Task, attachment: Attachment): Promise<string> => {
   // The marker post that follows shares this budget. Slow lookups may spend only
   // half of what is left, so they cannot starve it.
-  const signal = AbortSignal.timeout(Math.max(0, (app.timeoutMs - (Date.now() - started)) / 2));
+  const signal = halfLeft(app);
 
   // Never filled from the cwd's project: that is the wrong answer this field
   // exists to avoid, so an unknown project stays unknown.

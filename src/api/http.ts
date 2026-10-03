@@ -10,13 +10,17 @@ type ClientConfig = {
   baseUrl: string;
   apiKey?: string;
   timeoutMs?: number;
+  // The budget every request of the running command shares. Applied to each of
+  // them rather than to one, which is the difference between a command that
+  // times out once and a command whose four lookups each get the full timeout.
+  deadline?: AbortSignal;
   // KANEO_DEBUG is the switch the documentation names; taking it here as well
   // means the transport reports what it saw without every caller having to
   // remember to pass the flag on.
   debug?: boolean;
 };
 
-type Settings = Required<ClientConfig>;
+type Settings = Required<Omit<ClientConfig, "deadline">> & { deadline: AbortSignal | undefined };
 
 // Bounds a single request, as the Go build's DefaultTimeout did.
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -26,7 +30,7 @@ const REDIRECT_STATUSES = [301, 302, 303, 307, 308];
 // the whole of it for whoever wants to look closer.
 const BODY_LIMIT = 200;
 
-let settings: Settings = { baseUrl: "", apiKey: "", timeoutMs: DEFAULT_TIMEOUT_MS, debug: false };
+let settings: Settings = { baseUrl: "", apiKey: "", timeoutMs: DEFAULT_TIMEOUT_MS, deadline: undefined, debug: false };
 
 // Called once per process, before the first generated call. The transport is a
 // module the generated client imports, so there is no other way to hand it the
@@ -36,6 +40,7 @@ export const configureClient = (config: ClientConfig): void => {
     baseUrl: normalizeBaseUrl(config.baseUrl),
     apiKey: config.apiKey ?? "",
     timeoutMs: config.timeoutMs && config.timeoutMs > 0 ? config.timeoutMs : DEFAULT_TIMEOUT_MS,
+    deadline: config.deadline,
     debug: config.debug ?? Boolean(process.env.KANEO_DEBUG),
   };
 };
@@ -79,9 +84,10 @@ const hostName = (url: URL): string => url.hostname.toLowerCase().replace(/^\[/,
 
 const isLoopback = (hostname: string): boolean => {
   if (hostname === "localhost") return true;
-  if (hostname === "::1" || hostname === "0:0:0:0:0:0:0:1") return true;
-  // The whole of 127.0.0.0/8, which is what net.IP.IsLoopback counts.
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
+  // The whole of 127.0.0.0/8, which is what net.IP.IsLoopback counts. An IPv6
+  // address is written in its compressed form by the URL parser, so ::1 needs no
+  // spelling of its own here.
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) || hostname === "::1";
 };
 
 // Raised instead of sending the key where TLS is not protecting it. The check
@@ -135,8 +141,9 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   if (settings.baseUrl === "") throw new Error("no API URL configured");
 
   const { schema, ...request } = init;
-  // The path is kept as the caller wrote it, query included: a message quoting
-  // it reads as the call that was made.
+  // The endpoint as the generated client wrote it, query included. A failure
+  // with a status quotes this, because that is the call that was made; one
+  // without a status quotes the path it was served on, which is servedPath's.
   const path = url;
 
   let method = (request.method ?? "GET").toUpperCase();
@@ -151,10 +158,13 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     headers.set("Authorization", `Bearer ${settings.apiKey}`);
   }
 
-  // One deadline covers the whole chain, so a server that keeps redirecting
-  // cannot hold the process open.
-  const timeout = AbortSignal.timeout(settings.timeoutMs);
-  const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
+  // Three things can cut a request short: the budget its command shares with
+  // everything else it does, a signal the caller passed to bound this one
+  // further, and the cap on any single request. The same deadline covers the
+  // redirect chain, so a server that keeps redirecting cannot hold the process
+  // open either.
+  const cap = AbortSignal.timeout(settings.timeoutMs);
+  const signal = AbortSignal.any([settings.deadline, request.signal, cap].filter(isSignal));
 
   let response: Response;
   for (let hop = 0; ; hop++) {
@@ -164,7 +174,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       // still carry the key, and fetch decides that on its own.
       response = await fetch(target, { method, headers, body, signal, redirect: "manual" });
     } catch (e) {
-      throw new Error(`${method} ${path}: ${reason(e)}`, { cause: e });
+      throw new Error(`${method} ${servedPath(target)}: ${urlError(method, target, e)}`, { cause: e });
     }
     const next = redirectTarget(response, target);
     if (!next) break;
@@ -176,8 +186,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     // does, or the write would be replayed against a route that does not take
     // it. 307 and 308 keep the method and body, which is why the body has to
     // be replayable: the generated client always sends a serialized string.
-    const downgrade = downgradeToGet(response.status, method);
-    if (downgrade) {
+    if (downgradeToGet(response.status, method)) {
       method = "GET";
       body = null;
       headers.delete("content-type");
@@ -224,6 +233,57 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
 
 const reason = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
+const isSignal = (signal: AbortSignal | null | undefined): signal is AbortSignal =>
+  signal !== undefined && signal !== null;
+
+// The path a request was made on, as the server saw it: /api included, percent-
+// escapes read back and the query left out. A call that never got an answer is
+// reported this way because there is no status to report instead, and the
+// address is what can be put into curl to try it by hand.
+const servedPath = (target: URL): string => {
+  try {
+    return decodeURIComponent(target.pathname);
+  } catch {
+    // A path that is not valid encoding is the caller's, not something to try to
+    // decode into a different route.
+    return target.pathname;
+  }
+};
+
+// Go's net/http reports a request that never got an answer as
+// `Get "URL": reason`: the method in title case, the whole URL it dialled, and
+// the failure underneath.
+//
+// Bun's own wording names none of that ("Unable to connect. Is the computer able
+// to access the url?"), which leaves nothing to act on and nothing to search
+// for, so both the shape and the reasons are rebuilt here from the error code.
+const urlError = (method: string, target: URL, e: unknown): string => {
+  const code = (e as { code?: unknown } | null)?.code;
+  const op = method === "" ? "Get" : method.slice(0, 1) + method.slice(1).toLowerCase();
+  return `${op} ${JSON.stringify(target.href)}: ${dialReason(target, code, e)}`;
+};
+
+// What went wrong below the request, in the words a Go user would recognise.
+// Anything unrecognised is passed on as it is, since inventing a reason would be
+// worse than a vague one.
+const dialReason = (target: URL, code: unknown, e: unknown): string => {
+  switch (code) {
+    case "ConnectionRefused":
+      // Go names the address it dialled. The host as written is that address
+      // for a loopback port, which is where a refused connection is met.
+      return `dial tcp ${target.host}: connect: connection refused`;
+    case "ENOTFOUND":
+      return `dial tcp: lookup ${target.hostname}: no such host`;
+    // Both aborts are a deadline: the only signal this CLI ever passes in is
+    // the command's timeout, and Go reports that as a deadline exceeded.
+    case 23:
+    case 20:
+      return "context deadline exceeded";
+    default:
+      return reason(e);
+  }
+};
+
 const reportMismatch = <T>(method: string, path: string, error: ZodError<T>): void => {
   const fields = error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
   console.error(
@@ -260,9 +320,15 @@ const withoutCredential = (headers: Headers, from: URL, to: URL): Headers => {
   return kept;
 };
 
+// Whether a 3xx turns the request into a read.
+//
+// Every client follows net/http here: 301, 302 and 303 answer a write with a
+// GET and no body, because the redirect target is a route that answers GET and
+// replaying the write against it would either fail or do the wrong thing. 307
+// and 308 keep both, which is why the body has to be replayable: the generated
+// client always sends a serialized string.
 const downgradeToGet = (status: number, method: string): boolean =>
-  (status === 303 && method !== "GET" && method !== "HEAD") ||
-  ((status === 301 || status === 302) && method === "POST");
+  (status === 301 || status === 302 || status === 303) && method !== "GET" && method !== "HEAD";
 
 // Builds the failure a body reports, or undefined when it reports none. An
 // error status always fails, even without the envelope, because the status is

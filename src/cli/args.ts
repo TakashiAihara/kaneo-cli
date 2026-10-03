@@ -37,6 +37,16 @@ export type Command<A> = {
   args?: (args: string[]) => void;
   run?: (ctx: RunContext<A>) => void | Promise<void>;
   children?: Command<A>[];
+  // Kept out of the listings a person reads, as cobra keeps a hidden command:
+  // the shell calls it, so it exists, but nobody has to be shown it.
+  hidden?: boolean;
+  // Printed without the [flags] the other use lines end in, for a command
+  // whose flags are the caller's business rather than part of what is typed.
+  noFlagsInUse?: boolean;
+  // Handed the words after its own name without a flag being read out of them,
+  // which is what lets the completion command be asked about a command line
+  // that has flags in it.
+  rawArgs?: boolean;
 };
 
 // Everything a command's body is handed: what was typed, and what was resolved.
@@ -107,7 +117,14 @@ const parseBool = (text: string): boolean => {
 // `--help` for a flag waiting for a value.
 export const declaredFlags = <A>(chain: Command<A>[]): Flag[] => {
   const command = chain[chain.length - 1]!;
-  return [...chain.slice(0, -1).flatMap((ancestor) => ancestor.persistent ?? []), ...(command.flags ?? [])];
+  return [
+    ...chain.slice(0, -1).flatMap((ancestor) => ancestor.persistent ?? []),
+    // The root's persistent flags are its own: nothing above it to hand them
+    // down from, so a lookup that left them out would treat `kaneo --json
+    // whoami` as a word that names no command.
+    ...(command.persistent ?? []),
+    ...(command.flags ?? []),
+  ];
 };
 
 // The same, with the two flags the command carries for itself: every command can
@@ -119,9 +136,18 @@ export const parsingFlags = <A>(chain: Command<A>[]): Flag[] => {
 
 // What the help of this command shows as its own flags, and what it shows as the
 // ones it inherited.
+//
+// cobra counts a command's persistent flags as its own: nothing above the root
+// exists to hand them down from, so they are part of the root's own flags rather
+// than an inherited section it cannot have.
 const localFlags = <A>(chain: Command<A>[]): Flag[] => {
   const command = chain[chain.length - 1]!;
-  return [...(command.flags ?? []), helpFlag(command), ...(chain.length === 1 ? [VERSION_FLAG] : [])];
+  return [
+    ...(command.persistent ?? []),
+    ...(command.flags ?? []),
+    helpFlag(command),
+    ...(chain.length === 1 ? [VERSION_FLAG] : []),
+  ];
 };
 const inheritedFlags = <A>(chain: Command<A>[]): Flag[] =>
   chain.slice(0, -1).flatMap((ancestor) => ancestor.persistent ?? []);
@@ -143,6 +169,16 @@ const VERSION_FLAG: Flag = {
 };
 
 export type ParsedFlags = { flags: FlagValues; args: string[]; changed: ReadonlySet<string> };
+
+// Reads the words after a command's name.
+//
+// A command that asked for them raw is handed them as they are: the completion
+// command is asked about a command line, and reading a flag out of that line as
+// one of its own would throw away the question being asked.
+export const readFlags = <A>(flags: Flag[], args: string[], command: Command<A>): ParsedFlags => {
+  if (command.rawArgs === true) return { flags: {}, args, changed: new Set() };
+  return parseFlags(flags, args);
+};
 
 export const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
   const byName = new Map(flags.map((flag) => [flag.name, flag]));
@@ -205,7 +241,7 @@ export const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
     while (shorthands !== "") {
       const letter = shorthands[0]!;
       const flag = byShorthand.get(letter);
-      if (flag === undefined) throw new Error(`unknown shorthand flag: ${quote(letter)} in -${shorthands}`);
+      if (flag === undefined) throw new Error(`unknown shorthand flag: ${quoteRune(letter)} in -${shorthands}`);
       const rest = shorthands.slice(1);
       if (rest.length > 1 && rest[0] === "=") {
         given(flag, rest.slice(1));
@@ -219,7 +255,7 @@ export const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
         shorthands = "";
       } else {
         const value = take();
-        if (value === undefined) throw new Error(`flag needs an argument: ${quote(letter)} in -${shorthands}`);
+        if (value === undefined) throw new Error(`flag needs an argument: ${quoteRune(letter)} in -${shorthands}`);
         given(flag, value);
         // The rest of the word held no further shorthand; only a value flag can
         // leave it empty, so nothing is left to read.
@@ -332,7 +368,7 @@ export const rangeArgs =
 
 const available = <A>(command: Command<A>): Command<A>[] =>
   (command.children ?? [])
-    .filter((child) => child.run !== undefined || (child.children?.length ?? 0) > 0)
+    .filter((child) => child.hidden !== true && (child.run !== undefined || (child.children?.length ?? 0) > 0))
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
 export const unknownCommand = <A>(command: Command<A>, path: string, word: string): Error => {
@@ -377,6 +413,13 @@ const isZero = (flag: Flag): boolean => {
   }
 };
 
+// How a flag's default is written in its usage line.
+//
+// pflag quotes a string's default and prints anything else as it stands: a
+// duration's default is already the text it is shown as, and quoting "10s" would
+// read as a duration being a string.
+const printed = (flag: Flag): string => (flag.type === "string" ? quote(flag.defaultValue) : flag.defaultValue);
+
 // The flag block, aligned on the usage text: the widest flag decides where
 // every description starts, and every line ends in the same column.
 const flagUsages = (flags: Flag[]): string => {
@@ -384,7 +427,7 @@ const flagUsages = (flags: Flag[]): string => {
   const described = sorted.map((flag) => {
     const head = flag.shorthand ? `  -${flag.shorthand}, --${flag.name}` : `      --${flag.name}`;
     const type = flag.type === "bool" ? "" : ` ${flag.type}`;
-    const tail = isZero(flag) ? flag.usage : `${flag.usage} (default ${quote(flag.defaultValue)})`;
+    const tail = isZero(flag) ? flag.usage : `${flag.usage} (default ${printed(flag)})`;
     return `${head}${type}\x00${tail}`;
   });
   const width = Math.max(...described.map((line) => line.indexOf("\x00") + 1));
@@ -400,12 +443,14 @@ const trimEnd = (text: string): string => text.replace(/\s+$/, "");
 
 // The command's own path with its arguments: "kaneo workspace rename
 // <workspace-id> <name> [flags]". The [flags] is there because every command
-// carries at least a help flag.
+// carries at least a help flag, except the few that say their flags are the
+// caller's business.
 const useLine = <A>(chain: Command<A>[]): string => {
   const command = chain[chain.length - 1]!;
   const use = command.use ?? command.name;
   const line = `${chain.slice(0, -1).map((c) => c.name).join(" ")}${chain.length === 1 ? "" : " "}${use}`;
-  return line.includes("[flags]") ? line : `${line} [flags]`;
+  if (command.noFlagsInUse === true || line.includes("[flags]")) return line;
+  return `${line} [flags]`;
 };
 
 export const usageText = <A>(chain: Command<A>[]): string => {
@@ -437,15 +482,4 @@ export const usageText = <A>(chain: Command<A>[]): string => {
 export const helpText = <A>(chain: Command<A>[]): string => {
   const command = chain[chain.length - 1]!;
   return `${trimEnd(command.long ?? command.short)}\n\n${usageText(chain)}`;
-};
-
-// The topic `kaneo help <words>` looked for, resolved against the tree.
-export const pathOf = <A>(root: Command<A>, words: string[]): Command<A>[] => {
-  const chain: Command<A>[] = [root];
-  for (const word of words) {
-    const child = chain[chain.length - 1]!.children?.find((c) => c.name === word || c.aliases?.includes(word));
-    if (child === undefined) break;
-    chain.push(child);
-  }
-  return chain;
 };

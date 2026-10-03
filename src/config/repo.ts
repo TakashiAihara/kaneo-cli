@@ -29,14 +29,24 @@ const REMOTE_TIMEOUT_MS = 2000;
 // It comes from the remote rather than the working copy's path, because a
 // checkout lives at a different absolute path on every machine while the remote
 // is the same everywhere. git's own complaint goes nowhere: a directory that is
-// not a repository is an ordinary answer here, not a failure.
+// not a repository is an ordinary answer here, not a failure, and a machine
+// with no git at all is the same answer.
 export const currentRepo = (dir: string): string => {
-  const git = Bun.spawnSync(["git", "remote", "get-url", "origin"], {
-    cwd: dir,
-    timeout: REMOTE_TIMEOUT_MS,
-    stdout: "pipe",
-    stderr: "ignore",
-  });
-  if (!git.success) return "";
-  return parseRemote(git.stdout.toString());
+  let remote: string;
+  try {
+    const git = Bun.spawnSync(["git", "remote", "get-url", "origin"], {
+      cwd: dir,
+      timeout: REMOTE_TIMEOUT_MS,
+      stdout: "pipe",
+      stderr: "ignore",
+    });
+    if (!git.success) return "";
+    remote = git.stdout.toString();
+  } catch {
+    // Spawning is what fails when there is no git on PATH, and the repository
+    // map is a convenience layer: without git to read a remote, the layers above
+    // it are still an answer and the command is still worth running.
+    return "";
+  }
+  return parseRemote(remote);
 };

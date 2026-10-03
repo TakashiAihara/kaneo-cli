@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { decode, parse, STRING, stringMap, type GoType } from "./json";
 
 // The user-level config at ~/.config/kaneo/config.json.
 
@@ -43,6 +44,41 @@ type File = {
   hooks?: Record<string, string>;
 };
 
+// The Go types the file is decoded into. Their names are the ones a decode
+// error quotes, so they are the Go spelling rather than this file's.
+const PROFILE: GoType = {
+  at: "struct",
+  name: "Profile",
+  fields: [
+    { name: "api_url", type: STRING },
+    { name: "api_key", type: STRING },
+    { name: "workspace_id", type: STRING },
+    { name: "project_id", type: STRING },
+  ],
+};
+
+// A repo map entry holds either a project id or a list of them, because every
+// config written before the list existed holds a bare string. Go tries both
+// shapes and says so when neither fits.
+const PROJECT_IDS: GoType = {
+  at: "either",
+  name: "ProjectIDs",
+  of: [STRING, { at: "slice", value: STRING }],
+  complaint: "repo map value must be a project id or a list of project ids",
+};
+
+const GLOBAL: GoType = {
+  at: "struct",
+  name: "Global",
+  fields: [
+    { name: "default_profile", type: STRING },
+    { name: "profiles", type: stringMap(PROFILE) },
+    { name: "repos", type: stringMap(PROJECT_IDS) },
+    { name: "owners", type: stringMap(STRING) },
+    { name: "hooks", type: stringMap(STRING) },
+  ],
+};
+
 export const globalPath = (home: string, env: (name: string) => string): string => {
   const xdg = env("XDG_CONFIG_HOME");
   return xdg === "" ? join(home, ".config", "kaneo", "config.json") : join(xdg, "kaneo", "config.json");
@@ -57,37 +93,41 @@ const projectIds = (value: string | string[] | undefined): string[] => {
 
 // A missing file is not an error: it is an empty config, so a fresh install
 // works from flags and environment alone. A malformed one is, because silently
-// reading it as empty is how a key stops working without anyone noticing.
+// reading it as empty is how a key stops working without anyone noticing, and
+// the Go build stopped with the decoder's own words for both reasons.
 export const loadGlobal = (path: string): GlobalConfig => {
-  const empty: GlobalConfig = { path };
-  if (!existsSync(path)) return empty;
-  let parsed: unknown;
+  if (!existsSync(path)) return { path };
+
+  let text: string;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
+    text = readFileSync(path, "utf8");
+  } catch (e) {
+    throw new Error(`read ${path}: ${(e as Error).message}`);
+  }
+  let file: File;
+  try {
+    file = decode(parse(text), GLOBAL) as File;
   } catch (e) {
     throw new Error(`parse ${path}: ${(e as Error).message}`);
   }
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`parse ${path}: not an object`);
-  }
-  const file = parsed as File;
+
   return {
     path,
-    defaultProfile: file.default_profile,
+    defaultProfile: file.default_profile ?? undefined,
     profiles: Object.fromEntries(
       Object.entries(file.profiles ?? {}).map(([name, p]) => [
         name,
         {
-          apiUrl: p.api_url,
-          apiKey: p.api_key,
-          workspaceId: p.workspace_id,
-          projectId: p.project_id,
+          apiUrl: p.api_url ?? undefined,
+          apiKey: p.api_key ?? undefined,
+          workspaceId: p.workspace_id ?? undefined,
+          projectId: p.project_id ?? undefined,
         },
       ]),
     ),
-    repos: file.repos,
-    owners: file.owners,
-    hooks: file.hooks,
+    repos: file.repos ?? undefined,
+    owners: file.owners ?? undefined,
+    hooks: file.hooks ?? undefined,
   };
 };
 

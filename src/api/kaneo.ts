@@ -58,16 +58,20 @@ const call = async <T>(pending: Promise<T>): Promise<T> => {
   } catch (e) {
     if (e instanceof KaneoApiError) {
       const [route] = e.path.split("?");
-      throw new KaneoApiError(
-        e.method,
-        e.path.startsWith("/api") ? decoded(route!) : `/api${decoded(route!)}`,
-        e.statusCode,
-        e.messages,
-        e.body,
-      );
+      throw new KaneoApiError(e.method, served(route!), e.statusCode, e.messages, e.body);
     }
     throw e;
   }
+};
+
+// The route a request was made on, with /api in front of it and without the
+// encoding the endpoint was written with.
+//
+// The check is on the whole segment rather than on the spelling: /apix is a
+// path of its own, and prefixing it with /api would name a route nobody called.
+const served = (path: string): string => {
+  const route = decoded(path);
+  return route === "/api" || route.startsWith("/api/") ? route : `/api${route}`;
 };
 
 // A percent-encoded path as the server saw it, read back as the route it names.
@@ -211,9 +215,10 @@ const project = (item: ProjectFields): Project => ({
 
 // Fetches one project by id.
 //
-// A signal bounds the call when the caller shares a deadline with other work;
-// the transport applies the process-wide timeout as well, and a signal here
-// only ever cuts the request short.
+// A signal bounds the call when the caller shares its budget with other work,
+// which is how the attach lookups leave room for the marker post. The transport
+// applies the command's own deadline as well, and a signal here only ever cuts
+// this one request short.
 export const getProject = async (projectId: string, signal?: AbortSignal): Promise<Project> =>
   project(await call(readProject(pathParam(projectId), { ...(signal === undefined ? {} : { signal }) })));
 
@@ -365,7 +370,7 @@ export type Board = {
 
 // A project's columns and tasks, every page of them.
 //
-// Two levels of paging, as v2.29.2 serves the listing:
+// The two levels of paging, as v2.29.2 serves the listing:
 //   - task pages (page): 50 tasks each, in a stable order
 //   - within a task page, related pages (relatedPage): the same tasks again,
 //     with the next 100 labels, links and columns
@@ -378,6 +383,12 @@ export type Board = {
 // v2.26.0 paginates only when one of them is present, and there it sorts on
 // position alone, which ties within a column and so pages unstably; left
 // without them it returns the whole board at once, as it always did.
+//
+// A server older than the document this client is generated from sends no
+// pagination block at all, which reads as one page of everything and no related
+// pages: zero is how Go's paging counted a block that was not there, and the
+// loop stops on it after the first request instead of asking for pages that hold
+// nothing.
 export const getBoard = async (projectId: string): Promise<Board> => {
   let board: Board | undefined;
   const columnAt = new Map<string, number>();
@@ -391,8 +402,8 @@ export const getBoard = async (projectId: string): Promise<Board> => {
           ...(related > 1 ? { relatedPage: related } : {}),
         }),
       );
-      pages = response.pagination.totalPages;
-      relatedPages = response.pagination.relatedTotalPages;
+      pages = response.pagination?.totalPages ?? 0;
+      relatedPages = response.pagination?.relatedTotalPages ?? 0;
 
       if (board === undefined) {
         board = { projectId: response.data.id, projectName: response.data.name, columns: [] };
@@ -445,7 +456,10 @@ const appendNewLabels = (have: Label[] | null, more: Label[]): Label[] => {
   return kept;
 };
 
-const labels = (from: TaskLabel[]): Label[] => from.map((l) => ({ id: l.id, name: l.name, color: l.color }));
+const labels = (from: TaskLabel[] | undefined): Label[] =>
+  // A board older than the document sends no labels field at all, which Go read
+  // as the empty list it made of every one it was given.
+  (from ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color }));
 
 // What the three routes that answer with a task agree on, before the CLI's own
 // fields are filled in: the assignee and the labels are the two that differ.
@@ -564,13 +578,15 @@ export type Comment = {
 // A task's comments, oldest first.
 //
 // The author's name arrives as user.name, which only this route carries, so it
-// is read from there and from nowhere else.
+// is read from there and from nowhere else. A server that sends no author, or a
+// null one, has not answered who wrote it rather than answered that nobody did,
+// and the name reads as empty.
 export const listComments = async (taskId: string): Promise<Comment[]> =>
   (await call(getTaskComments(pathParam(taskId)))).map((c) => ({
     id: c.id,
     content: c.content,
     userId: c.userId,
-    userName: c.user.name,
+    userName: c.user?.name ?? "",
     createdAt: isoTime(c.createdAt),
   }));
 

@@ -3,13 +3,13 @@ import {
   find,
   helpText,
   parsingFlags,
-  parseFlags,
+  readFlags,
   unknownCommand,
   usageText,
   type Command,
   type Flag,
 } from "./args";
-import type { App } from "./app";
+import { deadlineFor, type App } from "./app";
 import { resolveFromEnvironment, type Flags as ResolvedFlags } from "../config/resolve";
 import { isTTY, resolveMode, Writer } from "../output/output";
 import { configureClient } from "../api/http";
@@ -22,6 +22,7 @@ import { boardCommand } from "./board";
 import { sessionCommand } from "./session";
 import { commentCommand } from "./comment";
 import { apiCheckCommand } from "./apicheck";
+import { completeCommand, completionCommand } from "./completion";
 
 // The version is stamped in at build time; an unreleased build calls itself dev,
 // which is what makes it obvious that a report about it belongs to no release.
@@ -72,19 +73,23 @@ const rootCommand = (): { root: Command<App> } => {
     use: "kaneo",
     short: "Command-line client for Kaneo",
     persistent: GLOBAL_FLAGS,
-    children: [
-      contextCommand,
-      whoamiCommand,
-      workspaceCommand,
-      projectCommand,
-      taskCommand,
-      boardCommand,
-      sessionCommand,
-      commentCommand,
-      apiCheckCommand,
-      helpCommand,
-    ],
   };
+  root.children = [
+    contextCommand,
+    whoamiCommand,
+    workspaceCommand,
+    projectCommand,
+    taskCommand,
+    boardCommand,
+    sessionCommand,
+    commentCommand,
+    apiCheckCommand,
+    completionCommand,
+    helpCommand,
+    // The command the completion scripts call, built against this tree and kept
+    // out of the listings.
+    completeCommand(root),
+  ];
   return { root };
 };
 
@@ -123,7 +128,7 @@ export const run = async (argv: string[]): Promise<number> => {
       throw unknownCommand(root, chain.map((c) => c.name).join(" "), found.words[0]!);
     }
 
-    const parsed = parseFlags(parsingFlags(chain), rest);
+    const parsed = readFlags(parsingFlags(chain), rest, command);
 
     // Help wins over everything else on the command line, including --version,
     // and neither reaches the settings.
@@ -143,10 +148,10 @@ export const run = async (argv: string[]): Promise<number> => {
     command.args?.(parsed.args);
 
     out = writerFor(parsed.flags.json === true, parsed.flags.human === true);
-    // parseFlags keys a flag by the name it was declared with, so a dashed flag
-    // only answers to that dashed spelling. Asking for it in any other case
-    // misses without complaining and yields "", which reads as "the user did not
-    // pass it" and hands the weaker layer a value the flag was meant to beat.
+    // A flag is keyed by the name it was declared with, so a dashed flag only
+    // answers to that dashed spelling. Asking for it in any other case misses
+    // without complaining and yields "", which reads as "the user did not pass
+    // it" and hands the weaker layer a value the flag was meant to beat.
     const flags: ResolvedFlags = {
       apiUrl: String(parsed.flags["api-url"] ?? ""),
       apiKey: String(parsed.flags["api-key"] ?? ""),
@@ -154,8 +159,14 @@ export const run = async (argv: string[]): Promise<number> => {
       projectId: String(parsed.flags.project ?? ""),
     };
     const { cfg, global } = resolveFromEnvironment(flags);
-    const app: App = { cfg, global, out, timeoutMs: Number(parsed.flags.timeout ?? 0) };
-    configureClient({ baseUrl: cfg.apiUrl, apiKey: cfg.apiKey, timeoutMs: app.timeoutMs });
+    const timeout = Number(parsed.flags.timeout ?? 0);
+    // One deadline for the whole command, as the Go build's app.Context() was one
+    // context: the lookups a command makes before it writes and the write itself
+    // share one budget, so a slow server cannot use up the time each was given
+    // and still have some left for the one that matters.
+    const { deadline, deadlineAt } = deadlineFor(timeout);
+    const app: App = { cfg, global, out, deadline, deadlineAt };
+    configureClient({ baseUrl: cfg.apiUrl, apiKey: cfg.apiKey, timeoutMs: timeout, deadline });
 
     await command.run({ args: parsed.args, flags: parsed.flags, changed: parsed.changed, app });
     return 0;

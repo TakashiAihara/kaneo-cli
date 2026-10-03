@@ -1,9 +1,7 @@
 import {
   appendFileSync,
-  closeSync,
   mkdirSync,
   mkdtempSync,
-  openSync,
   readFileSync,
   rmSync,
   statSync,
@@ -45,18 +43,37 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
   // NOTE: the file is unbounded; a hook spewing for its whole timeout, or
   // leaving a spewing process behind, fills the temp dir. `ulimit -f` in front
   // of the command is the likely cap.
-  const captured = mkdtempSync(join(tmpdir(), "kaneo-hook-"));
-  const log = join(captured, "out.log");
-  const fd = openSync(log, "w");
+  let captured: string;
   try {
-    const hook = Bun.spawn(["sh", "-c", command], {
-      env: { ...process.env, ...env },
-      stdin: "ignore",
-      stdout: fd,
-      stderr: fd,
-      // Its own session, so a signal meant for kaneo's group does not reach it.
-      detached: true,
-    });
+    captured = mkdtempSync(join(tmpdir(), "kaneo-hook-"));
+  } catch (e) {
+    // A hook that cannot even be started is a hook that failed, and is reported
+    // like one: the attach it was following has already happened, and a temp
+    // directory nobody can create is not a reason to fail that.
+    reportHookFailure(event, env, `capture output: ${(e as Error).message}`, "");
+    return;
+  }
+  const log = join(captured, "out.log");
+  try {
+    let hook: Bun.Subprocess;
+    try {
+      hook = Bun.spawn(["sh", "-c", command], {
+        env: { ...process.env, ...env },
+        stdin: "ignore",
+        // A file rather than a descriptor of one opened here: Bun opens it for
+        // the child and closes it again, so nothing is left open in this process
+        // for a hook to be writing into after it has gone.
+        stdout: Bun.file(log),
+        stderr: Bun.file(log),
+        // Its own session, so a signal meant for kaneo's group does not reach it.
+        detached: true,
+      });
+    } catch (e) {
+      // No sh on PATH, or nothing left to run it with. Reported the way the Go
+      // build reported a command it could not start.
+      reportHookFailure(event, env, `fork/exec sh: ${(e as Error).message}`, "");
+      return;
+    }
 
     // Killing sh alone leaves its children running, and a timed-out attach hook
     // could then finish after the close hook and undo it. A child that leaves
@@ -83,11 +100,16 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
     });
 
     await hook.exited;
+    // A signal that arrived while the hook was on its way out is still queued in
+    // the loop, and the loop does not run it until something yields. Deciding
+    // here without that yield is how a hook that signals kaneo on its way out
+    // gets missed: the hook is gone, nothing is left to wait for, and the
+    // command would exit 0 as though nothing had happened.
+    await yieldToTheLoop();
     clearTimeout(deadline);
     // Removing the last listener for a signal restores the default action,
     // which is what the signal below is delivered to.
     for (const { signal, handler } of listeners) process.off(signal, handler);
-    closeSync(fd);
 
     const failure = failureOf(hook, killed);
     if (failure !== undefined) reportHookFailure(event, env, failure, tailOf(log));
@@ -105,6 +127,14 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
   } finally {
     rmSync(captured, { recursive: true, force: true });
   }
+};
+
+// Two turns of the event loop, which is what it takes for a signal handler that
+// is already due to run: one for the task the loop has queued, one for the one
+// that queues behind it.
+const yieldToTheLoop = async (): Promise<void> => {
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 0));
 };
 
 // How a hook ended badly, in the Go build's words, because that is what
@@ -134,10 +164,15 @@ const NAMES: Record<string, string> = {
 const signalName = (code: string): string => NAMES[code] ?? code.slice(3).toLowerCase();
 
 // The end, not the start: the reason a command failed is usually the last thing
-// it printed.
+// it printed. A file that cannot be read at all has nothing to report, and that
+// is not a second failure on top of the first.
 const tailOf = (log: string): string => {
-  const size = statSync(log).size;
-  return readFileSync(log).subarray(size > HOOK_OUTPUT_LIMIT ? size - HOOK_OUTPUT_LIMIT : 0).toString("utf8");
+  try {
+    const size = statSync(log).size;
+    return readFileSync(log).subarray(size > HOOK_OUTPUT_LIMIT ? size - HOOK_OUTPUT_LIMIT : 0).toString("utf8");
+  } catch {
+    return "";
+  }
 };
 
 const reportHookFailure = (event: string, env: Record<string, string>, failure: string, output: string): void => {
@@ -160,8 +195,24 @@ const logHookFailure = (sessionId: string, message: string): void => {
   }
 };
 
-// RFC 3339 to the second, the form the log has always held.
-const rfc3339 = (at: Date): string => at.toISOString().replace(/\.\d+Z$/, "Z");
+// RFC 3339 to the second, in the time of the machine that wrote it.
+//
+// Local rather than UTC: the log says when a hook failed on the host it failed
+// on, and that is the clock whoever reads it will compare against. The zone goes
+// with the time, since a bare wall-clock reading is not an instant, and "Z" is
+// how RFC 3339 spells an offset of zero.
+const rfc3339 = (at: Date): string => {
+  // How far local time is from UTC, in minutes, which is the other way round from
+  // the offset JS reports. The clock is shifted by it and then read back as UTC,
+  // which spells the wall clock without a formatter of its own.
+  const ahead = -at.getTimezoneOffset();
+  const wall = new Date(at.getTime() - at.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
+  if (ahead === 0) return `${wall}Z`;
+  const sign = ahead < 0 ? "-" : "+";
+  return `${wall}${sign}${two(Math.floor(Math.abs(ahead) / 60))}:${two(Math.abs(ahead) % 60)}`;
+};
+
+const two = (part: number): string => String(part).padStart(2, "0");
 
 // Where hook failures are recorded: beside the store, next to the config.
 const hooksLog = (): string => join(dirname(sessionStore().dir), "hooks.log");

@@ -32,8 +32,9 @@
 
 ### The transport (`src/api/http.ts`)
 
-- `kaneoFetch` is the Orval mutator; `configureClient({ baseUrl, apiKey, timeoutMs, debug })` sets it up once per process
-- its contract is `tests/http.test.ts`, ported from the Go client tests: `/api` prefix, bearer key, the key refused over plain HTTP except to loopback, the key dropped on a redirect to an insecure target, at most 10 redirects, `success:false` on a 2xx is a failure, the server's message kept whatever shape it arrives in, a timeout per request
+- `kaneoFetch` is the Orval mutator; `configureClient({ baseUrl, apiKey, timeoutMs, deadline, debug })` sets it up once per process
+- `deadline` is the one budget the running command shares, built from `--timeout` where the Go build built one `context.Context` per command and passed it down. A `--timeout` of zero or less is a deadline that has already passed, as a `context.WithTimeout` of no duration is, rather than the default
+- its contract is `tests/http.test.ts`, ported from the Go client tests: `/api` prefix, bearer key, the key refused over plain HTTP except to loopback, the key dropped on a redirect to an insecure target, at most 10 redirects, a 301, 302 or 303 turning any method but GET and HEAD into a GET, `success:false` on a 2xx is a failure, the server's message kept whatever shape it arrives in, and a request cut short by the deadline with Go's wording for it
 
 ### What is not carried over
 
@@ -43,7 +44,8 @@
 
 - `tests/parity/`: an in-memory Kaneo (`fake.ts`) that validates every request body and response against the generated schemas, and 98 scenarios (`scenarios.ts`): every command in `--json` and human form, help output, the config layers including invalid files, hooks, unreachable servers, timeouts, ids that need escaping, a server older than the document (`legacy`, where responses are not validated), and a host without git
 - what the scenarios do not reach is held by unit tests ported from the Go build (`tests/unit/`: markers and their compatibility fixture, the session store, hooks) and by `tests/http.test.ts` (redirects, the key over plain HTTP)
-- what neither covers: a darwin binary has not been run, only built; shell completion follows the decision recorded for it
+- what neither covers: a darwin binary has not been run, only built
+- shell completion is cobra's, kept as it was: `src/cli/completion-scripts.ts` holds the four generated scripts as templates with the program name, the ActiveHelp variable and the hidden command they call filled in, and the golden for `completion bash|zsh|fish|powershell` compares them byte for byte. `__complete` and `__completeNoDesc` are one command with two names, as in cobra, and nothing here checks what a shell makes of the answer
 - `tests/parity/golden/` was recorded from the last Go build with `bun scripts/record-golden.ts <go binary>`. Running the suite with `KANEO_PARITY_BIN=<go binary>` passes every scenario, three runs in a row, so a failure against this build is a real difference
 - values that differ for reasons outside the CLI (the fake's port, the temporary HOME, the host name, wall-clock times in logs) are replaced with placeholders before comparing
 - manual check against a real Kaneo: `docs/design/bun-migration-manual-test.md`

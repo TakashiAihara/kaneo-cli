@@ -168,7 +168,13 @@ export const run = async (argv: string[]): Promise<number> => {
     const app: App = { cfg, global, out, deadline, deadlineAt };
     configureClient({ baseUrl: cfg.apiUrl, apiKey: cfg.apiKey, timeoutMs: timeout, deadline });
 
-    await command.run({ args: parsed.args, flags: parsed.flags, changed: parsed.changed, app });
+    await command.run({
+      args: parsed.args,
+      flags: parsed.flags,
+      changed: parsed.changed,
+      calledAs: found.calledAs,
+      app,
+    });
     return 0;
   } catch (e) {
     const writer =

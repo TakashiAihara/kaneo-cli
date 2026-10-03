@@ -235,6 +235,11 @@ class Parser {
   // named by the state that follows: a '.' where a digit belongs is a complaint
   // about the number, while a second '.' is a complaint about what came after
   // the value, and Go words those two differently.
+  //
+  // The three parts are RFC 8259's grammar — an optional minus, an integer that
+  // is a lone zero or a digit run, then a fraction and an exponent that each
+  // hold at least one digit — and every part is required to be complete rather
+  // than merely started, so `1.` and `1e` are as much a syntax error as `1.x`.
   private number(): Value {
     const start = this.at;
     if (this.peek() === "-") this.at += 1;
@@ -245,7 +250,7 @@ class Parser {
     else if (this.digits() === 0) return this.bad("in numeric literal");
     if (!this.done && this.peek() === ".") {
       this.at += 1;
-      this.digits();
+      if (this.digits() === 0) return this.bad("in numeric literal");
     }
     if (!this.done && (this.peek() === "e" || this.peek() === "E")) {
       this.at += 1;
@@ -323,9 +328,11 @@ const goName = (type: GoType): string => {
 };
 
 const decodeValue = (value: Value, type: GoType, at: Where): unknown => {
-  // A null leaves the destination as it was, which for a field read into a
-  // struct means the zero value rather than an error.
-  if (value === null) return null;
+  // A null is not a value the destination can hold, so Go writes nothing at all:
+  // a primitive or a struct keeps what it had, and a map or a slice is emptied.
+  // Both leave the field at its zero value, which is what a field the document
+  // does not carry is left at as well.
+  if (value === null) return zeroOf(type);
 
   switch (type.at) {
     case "string":
@@ -376,6 +383,28 @@ const decodeValue = (value: Value, type: GoType, at: Where): unknown => {
       }
       throw new Error(`${type.complaint}: ${first?.message ?? mismatch(value, type, at).message}`);
     }
+  }
+};
+
+// The value a field that carried a null is left holding.
+//
+// A struct is left empty rather than filled in with its own zero fields, since a
+// field the document does not carry reads the same way and there is nothing to
+// tell them apart. A type that decodes more than one shape hands the null to its
+// own unmarshaler, which settles on the first shape it accepts.
+const zeroOf = (type: GoType): unknown => {
+  switch (type.at) {
+    case "string":
+      return "";
+    case "bool":
+      return false;
+    case "slice":
+      return [];
+    case "either":
+      return zeroOf(type.of[0]!);
+    default:
+      // A map or a struct, both of which every reader here treats as empty.
+      return {};
   }
 };
 

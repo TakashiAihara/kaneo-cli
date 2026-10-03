@@ -1,5 +1,5 @@
 import { writeSync } from "node:fs";
-import { find, noArgs, type Command, type Flag, type FlagValues } from "./args";
+import { find, inheritedFlags, localFlags, noArgs, type Command, type Flag, type FlagValues, type RunContext } from "./args";
 import type { App } from "./app";
 import { activeHelpVar, bashScript, fishScript, powershellScript, zshScript, type Program } from "./completion-scripts";
 
@@ -16,11 +16,14 @@ import { activeHelpVar, bashScript, fishScript, powershellScript, zshScript, typ
 const COMPLETE = "__complete";
 const COMPLETE_NO_DESC = "__completeNoDesc";
 
-// What a shell reads off the last line of a candidate list: the bitmask that
-// tells it whether to complete file names too. Every generated script knows
-// these numbers.
-const DIRECTIVE_DEFAULT = 0;
-const DIRECTIVE_NO_FILE_COMPLETION = 4;
+// What a shell reads off the last line of a candidate list, and what that same
+// directive is called on stderr, where a person is the one reading. The number
+// is the bit that tells the shell whether to complete file names too; every
+// generated script knows the numbers.
+const DIRECTIVES = {
+  default: { bit: 0, name: "ShellCompDirectiveDefault" },
+  noFileCompletion: { bit: 4, name: "ShellCompDirectiveNoFileComp" },
+} as const;
 
 const PROGRAM_NAME = "kaneo";
 
@@ -174,22 +177,28 @@ export const completeCommand = (root: Command<App>): Command<App> => ({
   args: (args) => {
     if (args.length === 0) throw new Error("requires at least 1 arg(s), only received 0");
   },
-  run: ({ args, app: _app }) => {
+  run: ({ args, calledAs, app: _app }: RunContext<App>) => {
     // The name it was reached by says whether the descriptions are wanted, so
-    // the difference is read out of the words rather than a flag.
-    const descriptions = !args.includes(COMPLETE_NO_DESC);
+    // the difference is read out of the name rather than out of the arguments,
+    // which hold only the command line being completed.
+    const descriptions = calledAs !== COMPLETE_NO_DESC;
     // The last word is the one being completed: a partial word or an empty one,
     // neither of which names a command yet.
     const typed = args.slice(0, -1);
     const partial = args[args.length - 1] ?? "";
     const { chain } = find(root, typed);
     const command = chain[chain.length - 1]!;
-    const lines = partial.startsWith("-") ? flagLines(command, chain, typed, partial) : commandLines(command, partial);
+    // A flag name is never followed by a file name, so the shell is told to stop
+    // there whether or not anything matched. Otherwise a command that offers
+    // subcommands of its own is finished with those, which is the same answer.
+    const flagWord = partial.startsWith("-");
+    const directive = flagWord || (command.children ?? []).length > 0 ? DIRECTIVES.noFileCompletion : DIRECTIVES.default;
+    const lines = flagWord ? flagLines(chain, typed, partial) : commandLines(command, partial);
     for (const word of lines) writeSync(1, `${descriptions ? word : word.split("\t")[0]!}\n`);
-    // A command that offers subcommands of its own is finished with those, so
-    // the shell is told not to fall back to listing the directory as well.
-    const directive = (command.children ?? []).length > 0 ? DIRECTIVE_NO_FILE_COMPLETION : DIRECTIVE_DEFAULT;
-    writeSync(1, `:${directive}\n`);
+    writeSync(1, `:${directive.bit}\n`);
+    // A shell reads stdout and ignores stderr, so the directive is reported a
+    // second time where whoever ran the command by hand can see which one it was.
+    writeSync(2, `Completion ended with directive: ${directive.name}\n`);
   },
 });
 
@@ -200,41 +209,38 @@ const candidate = (word: string, description: string): string => `${word}\t${des
 // The commands below this one, each with what it is for. Aliases are not offered:
 // a shell that completes a name nobody can type has been told something false, and
 // cobra completes the names alone for the same reason.
-const commandLines = (command: Command<App>, partial: string): string[] => {
-  const found: [string, string][] = [];
-  for (const child of command.children ?? []) {
-    if (child.hidden === true) continue;
-    if (child.name.startsWith(partial)) found.push([child.name, child.short]);
-  }
-  return sorted(found).map(([word, description]) => candidate(word, description));
-};
+//
+// Sorted the way the help lists them, so a shell's menu and `kaneo --help` agree.
+const commandLines = (command: Command<App>, partial: string): string[] =>
+  (command.children ?? [])
+    .filter((child) => child.hidden !== true)
+    .sort(byName)
+    .filter((child) => child.name.startsWith(partial))
+    .map((child) => candidate(child.name, child.short));
 
 // A flag is offered under both its spellings. One already written on the line is
 // not offered again, since repeating it is never what is meant.
-const flagLines = (
-  command: Command<App>,
-  chain: Command<App>[],
-  typed: string[],
-  partial: string,
-): string[] => {
-  const offered = [
-    ...chain.slice(0, -1).flatMap((at) => at.persistent ?? []),
-    ...(command.persistent ?? []),
-    ...(command.flags ?? []),
-    // Every command can be asked for help, so that is a completion as well.
-    { name: "help", shorthand: "h", type: "bool" as const, usage: `help for ${command.name}`, defaultValue: "false" },
-  ];
-  const given = alreadyGiven(typed, offered);
-  const found: [string, string][] = [];
-  for (const flag of offered) {
+//
+// The inherited set comes before the command's own, each sorted by name, which is
+// the order the help prints the two sections in.
+const flagLines = (chain: Command<App>[], typed: string[], partial: string): string[] => {
+  const inherited = inheritedFlags(chain);
+  const own = localFlags(chain);
+  const given = alreadyGiven(typed, [...inherited, ...own]);
+  return [...flagNames(inherited, given, partial), ...flagNames(own, given, partial)];
+};
+
+const flagNames = (flags: Flag[], given: ReadonlySet<string>, partial: string): string[] => {
+  const found: string[] = [];
+  for (const flag of [...flags].sort(byName)) {
     if (given.has(flag.name)) continue;
     const long = `--${flag.name}`;
-    if (long.startsWith(partial)) found.push([long, flag.usage]);
+    if (long.startsWith(partial)) found.push(candidate(long, flag.usage));
     if (flag.shorthand !== undefined && `-${flag.shorthand}`.startsWith(partial)) {
-      found.push([`-${flag.shorthand}`, flag.usage]);
+      found.push(candidate(`-${flag.shorthand}`, flag.usage));
     }
   }
-  return sorted(found).map(([word, description]) => candidate(word, description));
+  return found;
 };
 
 // The flags already written on the line, read off it the way the lookup that
@@ -261,5 +267,5 @@ const alreadyGiven = (typed: string[], offered: Flag[]): Set<string> => {
 };
 
 // Sorted the way the help lists them, so a shell's menu and `kaneo --help` agree.
-const sorted = (pairs: [string, string][]): [string, string][] =>
-  pairs.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+const byName = (a: { name: string }, b: { name: string }): number =>
+  a.name < b.name ? -1 : a.name > b.name ? 1 : 0;

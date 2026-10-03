@@ -54,6 +54,10 @@ export type RunContext<A> = {
   args: string[];
   flags: FlagValues;
   changed: ReadonlySet<string>;
+  // The word that named this command, which is one of its aliases when it was
+  // reached by one. The lookup takes that word out of the arguments, so a
+  // command with two names has nothing else to tell them apart by.
+  calledAs: string;
   app: A;
 };
 
@@ -135,12 +139,13 @@ export const parsingFlags = <A>(chain: Command<A>[]): Flag[] => {
 };
 
 // What the help of this command shows as its own flags, and what it shows as the
-// ones it inherited.
+// ones it inherited. The completion reads the same two sets, in the same order,
+// so a shell's menu and the help agree on which flag is whose.
 //
 // cobra counts a command's persistent flags as its own: nothing above the root
 // exists to hand them down from, so they are part of the root's own flags rather
 // than an inherited section it cannot have.
-const localFlags = <A>(chain: Command<A>[]): Flag[] => {
+export const localFlags = <A>(chain: Command<A>[]): Flag[] => {
   const command = chain[chain.length - 1]!;
   return [
     ...(command.persistent ?? []),
@@ -149,7 +154,7 @@ const localFlags = <A>(chain: Command<A>[]): Flag[] => {
     ...(chain.length === 1 ? [VERSION_FLAG] : []),
   ];
 };
-const inheritedFlags = <A>(chain: Command<A>[]): Flag[] =>
+export const inheritedFlags = <A>(chain: Command<A>[]): Flag[] =>
   chain.slice(0, -1).flatMap((ancestor) => ancestor.persistent ?? []);
 
 const helpFlag = (command: { name: string }): Flag => ({
@@ -314,6 +319,10 @@ const dropFirst = (args: string[], word: string, flags: Flag[]): string[] => {
 export type Found<A> = {
   chain: Command<A>[];
   command: Command<A>;
+  // The word the command was reached by, which is an alias when it was called by
+  // one: the lookup drops that word from the arguments, so a command whose names
+  // answer to different things has only this to tell them apart by.
+  calledAs: string;
   // What is left of argv once the command names are taken out.
   rest: string[];
   // The words that were not flags, for the unknown-command report.
@@ -323,6 +332,7 @@ export type Found<A> = {
 export const find = <A>(root: Command<A>, argv: string[]): Found<A> => {
   const chain: Command<A>[] = [root];
   let rest = argv;
+  let calledAs = root.name;
   for (;;) {
     const words = wordsOf(rest, declaredFlags(chain));
     const next = words[0];
@@ -331,8 +341,9 @@ export const find = <A>(root: Command<A>, argv: string[]): Found<A> => {
     if (child === undefined) break;
     rest = dropFirst(rest, next, declaredFlags(chain));
     chain.push(child);
+    calledAs = next;
   }
-  return { chain, command: chain[chain.length - 1]!, rest, words: wordsOf(rest, declaredFlags(chain)) };
+  return { chain, command: chain[chain.length - 1]!, calledAs, rest, words: wordsOf(rest, declaredFlags(chain)) };
 };
 
 export const noArgs = (path: string): ((args: string[]) => void) => (args) => {

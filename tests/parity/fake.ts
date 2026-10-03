@@ -44,6 +44,9 @@ export type FakeOptions = {
   legacy?: boolean;
   // Holds every response back this long, for timeouts.
   delayMs?: number;
+  // Answers a request whose "METHOD path" matches with a 200 holding only
+  // whitespace, a reply no schema accepts and Go's client rejects.
+  whitespaceOn?: string;
 };
 
 export function startFake(seed: Seed, opts: FakeOptions = {}) {
@@ -308,8 +311,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     return fail(404, `no route: ${req.method} ${path}`);
   };
 
+  const whitespace = opts.whitespaceOn ? new RegExp(opts.whitespaceOn) : undefined;
   const delayed = async (req: Request) => {
     if (opts.delayMs) await Bun.sleep(opts.delayMs);
+    if (whitespace?.test(`${req.method} ${new URL(req.url).pathname.replace(/^\/api/, "")}`)) {
+      requests.push({ method: req.method, path: new URL(req.url).pathname.replace(/^\/api/, ""), query: new URL(req.url).search, body: req.method === "GET" ? undefined : await req.json().catch(() => null) });
+      return new Response("  \n", { status: 200, headers: { "content-type": "application/json" } });
+    }
     return route(req);
   };
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: delayed });

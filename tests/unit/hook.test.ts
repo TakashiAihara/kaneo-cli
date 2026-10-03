@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFake } from "../parity/fake";
@@ -222,4 +222,65 @@ describe("hooks", () => {
     const r = await kaneo("session", "attach", "2", "--strict");
     expect(r.signal, `ended with exit ${r.exit}, want killed by SIGTERM`).toBe("SIGTERM");
   }, 30_000);
+});
+
+// Not ported: found by review of the TS build, measured against the Go build,
+// which got both right by installing its signal handling before starting the
+// hook and keeping it until the very end.
+describe("signals around the hook's lifetime", () => {
+  const kaneoWith = (env: Record<string, string>, ...args: string[]) =>
+    Bun.spawn(["bun", INDEX, ...args], {
+      cwd: home,
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { PATH: process.env.PATH ?? "", HOME: home, XDG_CONFIG_HOME: config, CLAUDE_CODE_SESSION_ID: "s1", NO_COLOR: "1", ...env },
+    });
+
+  // A signal can reach kaneo before it has had a chance to listen for one. If
+  // it then dies of the default action, the hook's group runs on with no
+  // timeout and the capture directory stays. The race was lost about 1 time in
+  // 5, so 20 runs.
+  test("a hook that signals kaneo at once leaves no process and no capture directory", async () => {
+    writeConfig({ attach: "kill -TERM $PPID; sleep 29.3" });
+    const tmp = join(home, "tmp");
+    mkdirSync(tmp);
+    for (let run = 1; run <= 20; run++) {
+      const p = kaneoWith({ TMPDIR: tmp }, "session", "attach", "1", "--strict");
+      await p.exited;
+      await Bun.sleep(150);
+      const sleepers = sleepersLeft().filter((s) => s.arg === "29.3").length;
+      const dirs = readdirSync(tmp).filter((n) => n.startsWith("kaneo-hook-"));
+      killSleepers();
+      expect({ run, signal: p.signalCode, sleepers, dirs }).toEqual({ run, signal: "SIGTERM", sleepers: 0, dirs: [] });
+    }
+  }, 120_000);
+
+  // Reporting a failed hook writes to stderr and appends to hooks.log. A
+  // signal that arrives during that write must still end kaneo; a FIFO in
+  // place of hooks.log holds the append open until the signal has been sent.
+  test("a signal that arrives while the failure is being logged still ends kaneo", async () => {
+    writeConfig({ attach: "exit 3" });
+    const fifo = join(config, "kaneo", "hooks.log");
+    for (let run = 1; run <= 3; run++) {
+      rmSync(fifo, { force: true });
+      expect(Bun.spawnSync(["mkfifo", fifo]).exitCode).toBe(0);
+      const p = kaneoWith({}, "session", "attach", "1", "--strict");
+      // stderr carries the failure before the append blocks on the FIFO.
+      const reader = p.stderr.getReader();
+      let seen = "";
+      while (!seen.includes("hook failed")) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        seen += new TextDecoder().decode(value);
+      }
+      await Bun.sleep(200);
+      p.kill("SIGTERM");
+      await Bun.sleep(200);
+      const drain = Bun.spawn(["timeout", "10", "cat", fifo], { stdout: "ignore", stderr: "ignore" });
+      await Promise.race([p.exited, Bun.sleep(10_000)]);
+      await drain.exited;
+      expect({ run, signal: p.signalCode, exit: p.exitCode }).toEqual({ run, signal: "SIGTERM", exit: null });
+    }
+  }, 60_000);
 });

@@ -48,6 +48,8 @@ export type Scenario = {
   legacy?: boolean;
   // The fake holds every response back this long.
   delayMs?: number;
+  // The fake answers matching "METHOD path" requests with whitespace only.
+  whitespaceOn?: string;
   pageSize?: number;
 };
 
@@ -185,6 +187,10 @@ export const SCENARIOS: Scenario[] = [
   // Each request alone fits in the timeout; the command's requests together do
   // not. One deadline for the whole command fails; one per request would pass.
   { name: "one deadline per command", delayMs: 400, env: { KANEO_SESSION_ID: "sess-budget" }, steps: [["session", "attach", "1", "--strict", "--timeout", "1s"], ["board", "--json", "--timeout", "1s"]] },
+  { name: "whitespace reply to the marker post", whitespaceOn: "^POST /comment/", env: { KANEO_SESSION_ID: "sess-ws" }, config: { hooks: { attach: 'echo ran > "$HOME/hook-ran"' } }, steps: [["session", "attach", "1", "--strict"], ["session", "next", "x", "--strict"]] },
+  { name: "whitespace reply to project get", whitespaceOn: "^GET /project/", steps: [["project", "get", "--json"]] },
+  { name: "whitespace reply to task create", whitespaceOn: "^POST /task/", steps: [["task", "create", "x", "--json"]] },
+  { name: "whitespace reply to the project list", whitespaceOn: "^GET /project$", steps: [["project", "ls", "--json"], ["board", "--json"]] },
   {
     name: "hook failure logged in local time",
     env: { KANEO_SESSION_ID: "sess-tz", TZ: "Asia/Tokyo" },

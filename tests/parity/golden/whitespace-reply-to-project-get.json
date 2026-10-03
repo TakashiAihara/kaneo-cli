@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "get",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"error decoding response: status=200, content-type=application/json, content-length=3, target-type=GetProjectResponse: unexpected end of JSON input\"\n}\n",
+      "stderr": "Error: error decoding response: status=200, content-type=application/json, content-length=3, target-type=GetProjectResponse: unexpected end of JSON input\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

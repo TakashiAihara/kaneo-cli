@@ -1,0 +1,29 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "create",
+        "x",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskResponse: unexpected end of JSON input\"\n}\n",
+      "stderr": "Error: error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskResponse: unexpected end of JSON input\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
+      "query": "",
+      "body": {
+        "title": "x",
+        "description": "",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    }
+  ],
+  "files": {}
+}

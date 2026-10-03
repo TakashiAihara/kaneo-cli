@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
+import { hostname } from "node:os";
 import { runScenario } from "../tests/parity/run";
 import { SCENARIOS } from "../tests/parity/scenarios";
 
@@ -27,7 +28,16 @@ async function record(bin: string | undefined) {
   mkdirSync(dir, { recursive: true });
   for (const s of SCENARIOS) {
     const result = await runScenario([bin], s);
-    writeFileSync(`${dir}${slug(s.name)}.json`, JSON.stringify(result, null, 2) + "\n");
+    const text = JSON.stringify(result, null, 2) + "\n";
+    // The goldens are published with the repository. The recording machine's
+    // name surviving normalisation means a new place prints it; stop rather
+    // than publish it, and extend the normalisation in tests/parity/run.ts.
+    const host = hostname();
+    if (new RegExp(`(^|[^A-Za-z0-9-])${host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Za-z0-9-]|$)`).test(text)) {
+      console.error(`${s.name}: the output still holds this machine's name (${host}); not written`);
+      process.exit(2);
+    }
+    writeFileSync(`${dir}${slug(s.name)}.json`, text);
     console.log(`${result.steps.map((x) => x.exit).join(",").padEnd(12)} ${s.name}`);
   }
 }

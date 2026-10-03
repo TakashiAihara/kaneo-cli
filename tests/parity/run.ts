@@ -57,6 +57,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
         .replaceAll(fake.url, "<URL>")
         .replaceAll(home, "<HOME>")
         .replaceAll(`host=${host} `, "host=<HOST> ")
+        .replaceAll(`@${host} `, "@<HOST> ")
         .replaceAll(`"host": "${host}"`, `"host": "<HOST>"`)
         .replaceAll(`"host":"${host}"`, `"host":"<HOST>"`);
 

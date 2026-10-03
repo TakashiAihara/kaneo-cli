@@ -15,7 +15,11 @@ function parse(tag: string): Version | undefined {
 }
 
 const compare = (a: Version, b: Version) => {
-  for (let i = 0; i < 4; i++) if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+  for (let i = 0; i < 4; i++) {
+    const x = a[i]!;
+    const y = b[i]!;
+    if (x !== y) return x < y ? -1 : 1;
+  }
   return 0;
 };
 

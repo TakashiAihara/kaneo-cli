@@ -20,7 +20,7 @@ describe("parity with the Go build", () => {
       const got = await runScenario(CLI, s);
 
       for (const [i, w] of want.steps.entries()) {
-        const g = got.steps[i];
+        const g = got.steps[i]!;
         const at = `step ${i + 1}: kaneo ${w.args.join(" ")}`;
         expect({ at, exit: g.exit }).toEqual({ at, exit: w.exit });
         expect({ at, stdout: g.stdout }).toEqual({ at, stdout: w.stdout });

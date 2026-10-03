@@ -41,6 +41,7 @@ export function startFake(seed: Seed, opts: { pageSize?: number } = {}) {
   const id = (prefix: string) => `${prefix}${String(++seq).padStart(4, "0")}`;
 
   const columns = seed.columns ?? DEFAULT_COLUMNS;
+  const firstColumn = columns[0]!.slug;
   const users = new Map((seed.users ?? []).map((u) => [u.id, u.name]));
   const workspaces = seed.workspaces.map((w) => ({ ...w }));
   const projects = seed.projects.map((p, i) => ({
@@ -69,7 +70,7 @@ export function startFake(seed: Seed, opts: { pageSize?: number } = {}) {
       userId: t.userId ?? null,
       title: t.title,
       description: t.description ?? null,
-      status: t.status ?? columns[0].slug,
+      status: t.status ?? firstColumn,
       priority: t.priority ?? "no-priority",
       startDate: null,
       dueDate: null,
@@ -158,13 +159,15 @@ export function startFake(seed: Seed, opts: { pageSize?: number } = {}) {
       if (req.method !== method || !re.test(path)) continue;
       const r = schema.safeParse(body);
       if (!r.success) {
-        const i = r.error.issues[0];
+        const i = r.error.issues[0]!;
         return fail(400, `Invalid key: ${i.path.join(".")}: ${i.message}`);
       }
     }
 
-    const m = (re: RegExp) => path.match(re);
-    let p: RegExpMatchArray | null;
+    // Every route's groups are read only where the route guarantees them.
+    type Groups = [string, string, string, string];
+    const m = (re: RegExp) => path.match(re) as Groups | null;
+    let p: Groups | null;
 
     if (req.method === "GET" && path === "/openapi") return new Response(Bun.file(new URL("../../openapi/kaneo-2.29.2.json", import.meta.url)));
     if (req.method === "GET" && path === "/auth/organization/list") return ok(z.array(M.Organization), workspaces);
@@ -246,7 +249,7 @@ export function startFake(seed: Seed, opts: { pageSize?: number } = {}) {
         const dest = projects.find((x) => x.id === b.destinationProjectId);
         if (!dest) return fail(404, "Project not found");
         dest.lastTaskNumber += 1;
-        Object.assign(t, { projectId: dest.id, number: dest.lastTaskNumber, status: b.destinationStatus ?? columns[0].slug });
+        Object.assign(t, { projectId: dest.id, number: dest.lastTaskNumber, status: b.destinationStatus ?? firstColumn });
         return ok(M.MoveTaskResult, { task: t, sourceProjectId: from, destinationProjectId: dest.id });
       }
       return ok(M.Task, t);
@@ -254,7 +257,7 @@ export function startFake(seed: Seed, opts: { pageSize?: number } = {}) {
     if ((p = m(/^\/task\/([^/]+)$/))) {
       const i = tasks.findIndex((x) => x.id === decodeURIComponent(p![1]));
       if (i < 0) return fail(404, "Task not found");
-      const t = tasks[i];
+      const t = tasks[i]!;
       if (req.method === "GET") return ok(M.TaskWithAssignee, { ...t, assigneeId: t.userId, assigneeName: t.userId ? (users.get(t.userId) ?? null) : null });
       if (req.method === "DELETE") {
         tasks.splice(i, 1);
@@ -286,7 +289,7 @@ export function startFake(seed: Seed, opts: { pageSize?: number } = {}) {
       if (req.method === "DELETE") {
         const i = relations.findIndex((r) => r.id === key);
         if (i < 0) return fail(404, "Relation not found");
-        return ok(M.TaskRelation, relations.splice(i, 1)[0]);
+        return ok(M.TaskRelation, relations.splice(i, 1)[0]!);
       }
     }
 

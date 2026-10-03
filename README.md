@@ -216,7 +216,7 @@ bun run parity:record /tmp/kaneo   # rewrites tests/parity/golden/
 git diff --stat tests/parity/golden/
 ```
 
-`parity:record` refuses to write a golden that still holds the recording machine's host name, since the goldens are published.
+`parity:record` refuses to write a golden that still holds the recording machine's host name, since the goldens are published. Request bodies are compared as JSON values, so key order is not part of the contract: re-recording from this build reorders the keys of one body (`workspace rename`) and nothing else.
 
 Every push to `main` that passes CI is released as the next release candidate (`v0.2.0` → `v0.2.1-rc.1` → `v0.2.1-rc.2`), so the latest release and `install.sh` follow the newest commit on `main` that passed CI. A final version is cut by pushing its tag by hand, or by running the release workflow with that tag.
 

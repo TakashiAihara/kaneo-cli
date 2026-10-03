@@ -1,3 +1,6 @@
 node_modules/
-dist/
+/dist/
+/kaneo
 *.log
+*.test
+coverage.out

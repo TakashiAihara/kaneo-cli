@@ -1,39 +1,125 @@
 # Glossary
 
-Terms used across kaneo-cli code, docs, and command output. One term, one meaning. Each definition names where it exists in the Kaneo API so it can be verified, not believed.
+Terms used across this codebase, the CLI's own output, and the Kaneo API. Where a name differs between the two, both are given: the API's vocabulary leaks into any client, and guessing at the mapping is how a client ends up calling the wrong endpoint.
 
-## Conflicting terms (read this first)
+## Kaneo concepts
 
-### workspace / organization
+### workspace
 
-Kaneo is migrating workspaces onto better-auth "organizations". The API exposes both `/workspace/{workspaceId}/members` (legacy) and `/auth/organization/*` (current). In kaneo-cli, the user-facing word is always **workspace**; which endpoint gets called is an implementation detail hidden inside the API layer. Never surface "organization" in command names, flags, or output.
+The top-level container. Owns members, roles and labels; contains projects.
 
-### status / column
+The server models it as a [better-auth](https://better-auth.com) *organization*, which is why it is listed at `/auth/organization/list` rather than under `/workspace`. A single `/workspace/{id}/members` route exists, but everything else about a workspace lives under `/auth/organization/*`.
 
-A task's `status` is **the slug of the column it sits in** (see `POST /task/{projectId}` request schema: `status: "The target column's slug."`). It is not a fixed enum; each project defines its own columns via `/column/{projectId}`. In prose and help text, use **status** for the value on a task and **column** for the board structure it refers to.
+Data does not cross workspaces. A project cannot be moved between them, and a task cannot be related to one in another.
 
-### id / number
+### project
 
-Tasks have both an `id` (opaque unique string, used in API paths) and a `number` (human-facing per-project sequence shown in the UI as `#12`). CLI commands accept ids in API calls; where we accept numbers for convenience, the code must resolve number → id explicitly and say so.
+A board, belonging to exactly one workspace. Holds columns, which hold tasks.
 
-### token / API key
+`GET /project` requires a `workspaceId` query parameter; without it the server answers 400 rather than listing everything.
 
-Both authenticate via the same `Authorization: Bearer` header. A **session token** resolves to a user via `/auth/get-session`; an **API key** does not (get-session returns `200 null` for it — that is not an auth failure). Code and docs say **token** for the credential the CLI carries, and **API key** only when the distinction matters.
+### column
 
-## Plain terms
+A lane on the board. **A column's id is also the `status` value of every task in it** — there is no separate status vocabulary. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define others, so nothing here treats that list as closed.
+
+### task
+
+A work item. Has a `number`, unique within its project and stable, which is what a person reads off the board. Its `id` is an opaque string, which is what the API takes.
+
+Both are accepted wherever this CLI takes a task: a number, with or without a leading `#`, is looked up on the board first.
+
+Tasks carry **no custom fields**. Anything a client wants to attach has to go in a comment.
+
+### comment
+
+A note on a task. Also the only place a client can store structured data of its own, for want of custom fields — see *session marker*.
+
+`GET /task/export/{projectId}` does **not** include comments, so an export-and-reimport loses everything kept there.
+
+### label
+
+A tag, scoped to a workspace rather than a project.
+
+### relation
+
+A link between two tasks: `subtask`, `blocks` or `related`. For a subtask link the source is the parent. Relations cannot cross workspaces.
+
+## This CLI's concepts
+
+### operation
+
+One server endpoint this client knows how to call, declared in the registry in `internal/api/registry.go` as an `operationId`, method, path template and the command that needs it.
+
+Requests are made by the generated client (`internal/api/gen`), which is generated for exactly the operations in the registry: `gen/cfg.yaml` lists the same ids, and a test fails when the registry, that list and the pinned OpenAPI document disagree on an operation's id, method or path. Request bodies and parameters are typed by the generated code, not by the registry.
+
+`kaneo api-check` compares the registry's operation ids against a live server's document. It says whether the server still offers each operation; it does not compare request bodies, so it would not catch a field the server renamed.
+
+### pinned spec
+
+`internal/api/gen/openapi.json`: the OpenAPI document shipped in the Kaneo release named by `KANEO_VERSION` in the Makefile, copied unchanged. The generated client is built from it plus `gen/overlay.json`, which corrects what the document gets wrong for this client. Not to be confused with the document a running server serves at `/api/openapi`, which is what `api-check` reads and which follows whatever version that server runs.
+
+### operationId
+
+The server's own name for an endpoint, taken from its OpenAPI document. The key `api-check` matches on, because it survives a path being restructured.
 
 ### profile
 
-A named `{url, token}` pair in `~/.config/kaneo/config.json`, selected via `--profile` / `KANEO_PROFILE` / `defaultProfile`. Exists only in kaneo-cli, not in the Kaneo API.
+A named set of connection settings — API URL, key, workspace, project — kept in `~/.config/kaneo/config.json` with mode `0600`. Switching profiles is how one machine talks to more than one Kaneo instance, or to more than one workspace.
 
-### instance
+### local config
 
-A deployed Kaneo server, identified by its base URL. The API lives under `<instance>/api`; `normalizeUrl()` in `src/config.ts` enforces this.
+A `.kaneo.json` naming a workspace and a project. Read from the current directory and every parent up to `$HOME`, nearest definition winning per field, so a parent can supply a workspace while a subdirectory overrides the project.
 
-### priority
+It carries **no credentials**: the file is meant to be committed, and a secret in it would leave with the repository.
 
-Fixed enum on tasks: `no-priority | low | medium | high | urgent` (see `POST /task/{projectId}` request schema).
+### repo map
 
-### board
+The `repos` table in the global config, mapping a git remote's `owner/repo` to the projects it is tied to. It exists for repositories that cannot carry a `.kaneo.json` — one owned by someone else, for instance.
 
-The column-grouped task view returned by `GET /task/tasks/{projectId}` (`BoardResponse` schema). "Board" always means this response shape, not a separate resource.
+The value is either one project id or a list of them; both forms mean the same thing, and a lone id is written back as it was read. It is the only layer that can answer with more than one project, and `board` is the only command that takes more than one.
+
+The key is `owner/repo` rather than a path because a working copy sits at a different absolute path on every machine, while the remote is the same everywhere.
+
+### archived project
+
+A project the server has stamped with `archivedAt`. `board` leaves it out, `project ls` leaves it out unless asked, and everything about it stays where it was.
+
+It exists because projects are made per plan rather than per repository, so a repository accumulates finished ones. Dropping a finished project from the repo map would clear the board too, but it would also lose the record that the repository ever had that work. Archiving is reversible; editing the map is not.
+
+### origin
+
+Which layer of the resolution chain supplied a given setting. Reported by `kaneo context` so a surprising value can be traced rather than guessed at.
+
+### session marker
+
+An HTML comment written into a task comment, recording that an agent session holds that task:
+
+```text
+<!-- kn:session id=... host=... cwd=... branch=... state=running -->
+```
+
+The prefix is `kn:` rather than `kaneo:` because that is what is already written on existing boards, by the Python `kn` this CLI replaces. Both read the same board during the changeover, so the format cannot change.
+
+`state` is `running` or `closed`. Each of attach, next and close appends its own comment, so a session leaves a trail; only the newest marker per session id describes the current state.
+
+Values are percent-encoded where they contain whitespace. Fields are separated by spaces, so a raw space inside a value is indistinguishable from the start of the next field — a path like `/work/client foo=bar` would otherwise be read back as `/work/client`. Markers written by the older implementation carry raw values and are still read as-is.
+
+### fail-open
+
+Producing no output and exiting 0 on failure. The `session` commands do this because they run from a session-start hook, where a missing board is a smaller harm than a broken session. Every other command reports failures normally, `board` included: its callers read the board to decide something, and an empty answer from a failure read as "no tasks" (#16).
+
+It covers failures that changed nothing: an unreachable server, a missing key, no project configured for this repository. A failure that already changed something elsewhere is *not* swallowed — `session attach` that wrote its comment to the server but could not record the attachment locally reports the failure, because staying quiet would leave `session next` believing nothing is attached and a retry would post a second marker.
+
+`--strict` reports everything; `KANEO_DEBUG=1` prints the reason that was swallowed.
+
+## Distinctions worth keeping straight
+
+| Not the same | Difference |
+| --- | --- |
+| task `number` and task `id` | The number is per-project and human-facing; the id is opaque and what the API takes. Sending a number as an id makes the server answer `400 Workspace ID could not be determined`, which names neither |
+| workspace and project | A workspace holds projects. `repos` maps a repo to a *project*; the workspace follows from it |
+| reading a board and writing to one | `board` reads, so it can cover several projects at once. Everything else writes, and a write has to name the board it lands on — so a repository mapped to several projects makes those commands ask for `--project` rather than pick |
+| status and column | The same string. A status *is* a column id |
+| site root and API root | The root serves the web app and answers 200 with HTML for any path. Only `/api/...` is the API, which is why the configured URL is normalised to end in `/api` |
+| `/auth/get-session` and `/auth/organization/list` | The first answers 200 with `null` for a valid key, an invalid key and no key, so it cannot check a credential. The second answers 401 on a bad key |
+| a hosted remote and a local one | git accepts a filesystem path as a remote, and its trailing components look exactly like `owner/repo`. `/home/me/acme/thing` must not resolve to the `acme` workspace, so only SSH and URL remotes are parsed |

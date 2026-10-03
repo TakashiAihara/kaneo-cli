@@ -1,0 +1,84 @@
+{
+  "overlay": "1.0.0",
+  "info": {
+    "title": "kaneo-cli corrections to the Kaneo OpenAPI document",
+    "version": "1.0.0",
+    "description": "Written in JSON because oapi-codegen-dd v3.75.20 fails to apply a YAML overlay to a JSON document ('invalid character' while re-reading the result)."
+  },
+  "actions": [
+    {
+      "description": "better-auth's organization routes are documented with empty schemas, which generate as struct{} and decode to nothing. The server answers with the organization object. REMOVE WHEN the upstream document gives these responses a schema.",
+      "target": "$.components.schemas",
+      "update": {
+        "Organization": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "slug": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "slug"
+          ]
+        }
+      }
+    },
+    {
+      "target": "$.paths['/auth/organization/list'].get.responses['200'].content['application/json'].schema.items",
+      "update": {
+        "$ref": "#/components/schemas/Organization"
+      },
+      "description": "Part of the Organization correction above. REMOVE WHEN the upstream document gives the organization list a schema."
+    },
+    {
+      "target": "$.paths['/auth/organization/update'].post.responses['200'].content['application/json'].schema",
+      "update": {
+        "$ref": "#/components/schemas/Organization"
+      },
+      "description": "Part of the Organization correction above. REMOVE WHEN the upstream document gives the organization update a schema."
+    },
+    {
+      "description": "The generator turns an empty schema into struct{}, so a metadata value that is not an object (a string, a number) fails the whole board. REMOVE WHEN oapi-codegen-dd maps an empty schema to any.",
+      "target": "$.components.schemas.TaskExternalLink.properties.metadata",
+      "update": {
+        "x-go-type": "map[string]any"
+      }
+    },
+    {
+      "target": "$.components.schemas.Activity.properties.eventData",
+      "update": {
+        "x-go-type": "any"
+      },
+      "description": "Same generator fault as the metadata entry: eventData holds whatever the activity type carries. REMOVE WHEN oapi-codegen-dd maps an empty schema to any."
+    },
+    {
+      "description": "userId is required and null means unassign, but the generator tags a nullable field omitempty, so an unassign would send {} and be rejected. REMOVE WHEN oapi-codegen-dd leaves omitempty off required fields.",
+      "target": "$.paths['/task/assignee/{id}'].put.requestBody.content['application/json'].schema.properties.userId",
+      "update": {
+        "x-omitempty": false
+      }
+    },
+    {
+      "target": "$.components.schemas.Task.properties['number','position']",
+      "update": {
+        "x-go-type": "float64"
+      },
+      "description": "number and position are typed number, which generates float32 and rounds past 16,777,216. REMOVE WHEN the upstream document types them integer."
+    },
+    {
+      "target": "$.components.schemas.BoardTask.properties['number','position']",
+      "update": {
+        "x-go-type": "float64"
+      },
+      "description": "number and position are typed number, which generates float32 and rounds past 16,777,216. REMOVE WHEN the upstream document types them integer."
+    }
+  ]
+}

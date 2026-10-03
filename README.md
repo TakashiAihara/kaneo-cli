@@ -1,72 +1,212 @@
-# kaneo-cli
+# kaneo
 
-Command-line interface for [Kaneo](https://github.com/usekaneo/kaneo), the open source project management tool.
+Command-line client for [Kaneo](https://github.com/usekaneo/kaneo), the self-hostable project management tool.
 
-Works against any Kaneo instance (self-hosted or cloud) using an API key.
+Single static binary, no runtime to install. Ships for `linux/amd64`, `linux/arm64`, `darwin/arm64` and `darwin/amd64`.
 
 ## Status
 
-Early development. Currently implemented:
-
-- `kaneo whoami` — verify authentication against an instance
-- Global flags: `--url`, `--token`, `--profile`, `--json`
-
-Planned: `task`, `project`, `workspace`, `comment`, `search`, `label`, `time-entry` commands and device-authorization login. See `docs/design/0001-cli-architecture.md`.
-
-## Requirements
-
-- [Bun](https://bun.sh) >= 1.1
+Early. The command surface below is what exists today; the rest of the API is not wired up yet.
 
 ## Install
 
 ```bash
-git clone https://github.com/TakashiAihara/kaneo-cli
-cd kaneo-cli
-bun install
-bun run install-bin   # symlinks ~/.local/bin/kaneo
+curl -fsSL https://raw.githubusercontent.com/TakashiAihara/kaneo-cli/main/install.sh | sh
 ```
 
-## Configuration
+Installs the latest release into `$HOME/.local/bin`, and tells you if that is not on your `PATH`. `wget` works in place of `curl` throughout.
 
-Create an API key in Kaneo: account settings → Account tab → API Keys.
+The script does two things that matter more than they sound:
 
-Three ways to point the CLI at your instance, most specific wins:
+- the archive is checked against the release's `checksums.txt`, and refuses to install if it does not match
+- the new binary is staged, run, and only then moved into place — a bad download fails without costing you the copy you already had
 
-1. Flags: `kaneo --url https://kaneo.example.com --token <key> whoami`
-2. Environment: `KANEO_URL`, `KANEO_TOKEN` (and `KANEO_PROFILE`)
-3. Config file `~/.config/kaneo/config.json`:
+| variable | effect |
+| --- | --- |
+| `KANEO_VERSION` | install a specific tag instead of the latest release |
+| `KANEO_INSTALL_DIR` | install somewhere other than `$HOME/.local/bin` |
+| `KANEO_RELEASE_BASE` | fetch archives from a mirror |
+
+```bash
+# a specific version, somewhere else
+curl -fsSL https://raw.githubusercontent.com/TakashiAihara/kaneo-cli/main/install.sh \
+  | KANEO_VERSION=v0.1.0 KANEO_INSTALL_DIR=/usr/local/bin sh
+```
+
+Piping a script into a shell is worth being uneasy about. To read it first:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/TakashiAihara/kaneo-cli/main/install.sh
+less install.sh && sh install.sh
+```
+
+Or take the archive for your platform straight from the [releases page](https://github.com/TakashiAihara/kaneo-cli/releases) — `linux/amd64`, `linux/arm64`, `darwin/arm64` and `darwin/amd64`, each with a checksum.
+
+Or build from source:
+
+```bash
+make build
+```
+
+## Configure
+
+Settings resolve from strongest to weakest:
+
+1. command-line flags — `--api-url`, `--api-key`, `--workspace`, `--project`
+2. environment — `KANEO_API_URL`, `KANEO_API_KEY`, `KANEO_WORKSPACE`, `KANEO_PROJECT`
+3. `.kaneo.json` in the current directory or any parent, up to `$HOME` — workspace and project only
+4. the active profile in `~/.config/kaneo/config.json`
+5. the `repos` map in that same file, keyed by the git remote's `owner/repo` — project only, and the one layer that can name more than one
+6. the `owners` map in that same file, keyed by the remote's owner — workspace only
+
+Not every layer answers every setting:
+
+| setting | comes from |
+| --- | --- |
+| api url | flag, environment, profile, then the hosted default |
+| api key | flag, environment, profile |
+| workspace | flag, environment, `.kaneo.json`, profile, `owners` |
+| project | flag, environment, `.kaneo.json`, profile, `repos` |
+
+`kaneo context` prints the resolved values and names the layer each one came from.
+
+### `.kaneo.json`
 
 ```json
 {
-  "defaultProfile": "home",
+  "workspace": "your-workspace-id",
+  "project": "your-project-id"
+}
+```
+
+The nearest file wins per field, so a parent can supply a workspace while a subdirectory overrides the project. This file is meant to be committed, so it carries no credentials.
+
+### Global config
+
+```json
+{
+  "default_profile": "self",
   "profiles": {
-    "home": { "url": "https://kaneo.example.com", "token": "your-api-key" },
-    "work": { "url": "https://kaneo.work.example", "token": "another-key" }
+    "self": { "api_url": "https://kaneo.example.com" }
+  },
+  "owners": {
+    "some-org": "workspace-id-for-that-org"
+  },
+  "repos": {
+    "some-org/some-repo": "project-id",
+    "some-org/another-repo": ["project-id", "another-project-id"]
   }
 }
 ```
 
-The URL may be given with or without the `/api` suffix.
+`owners` states a rule once for a whole organisation: every repository under it belongs to that workspace. It supplies a workspace only — a workspace does not imply a project, so `repos` or `.kaneo.json` still names that.
+
+A `repos` entry takes either one project id or a list of them, because a workspace holds any number of projects and one repository can have work on several. `board` then shows a section per project. Everything else acts on one board, so in a repository mapped to several it asks which: `--project` or `KANEO_PROJECT` names it, and either of those also narrows `board` to that one.
+
+A finished project leaves the board by being archived, not by being edited out of `repos`:
+
+```bash
+kaneo project archive <project-id>     # off the board; nothing is deleted
+kaneo project unarchive <project-id>   # back again
+kaneo project ls --archived            # find one to bring back
+kaneo board --archived                 # show them anyway
+```
+
+Written with mode `0600`, since a profile may hold a key.
+
+### Self-hosted instances
+
+`--api-url` takes the site root; `/api` is appended for you.
+
+```bash
+export KANEO_API_URL=https://kaneo.example.com
+export KANEO_API_KEY=...   # Settings -> Account -> Developer
+```
+
+## Use
+
+```bash
+kaneo context                       # what did the settings resolve to, and from where
+kaneo whoami                        # is the key accepted, and what can it reach
+kaneo workspace ls
+kaneo workspace rename <workspace-id> <name>   # name only; slug and description unchanged
+kaneo project ls
+kaneo project get [project-id]
+kaneo project update <project-id> [--name NAME] [--slug SLUG] [-d TEXT] [--icon ICON]   # only what is passed changes
+kaneo task ls [--status ...] [--priority ...] [--all]
+kaneo task get <task-id>
+kaneo task status <task-id> <status>
+```
+
+A status is a column id. The defaults are `to-do`, `in-progress`, `in-review` and `done`.
+
+Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing.
+
+### Agent sessions
+
+Tasks carry no custom fields, so the link between a session and a task is written into a task comment:
+
+```bash
+kaneo session attach 7 "what happens next"
+kaneo session next "what happens after that"
+kaneo session close
+kaneo board                     # open tasks, and which sessions hold them
+```
+
+The session is identified by `KANEO_SESSION_ID`, falling back to `CLAUDE_CODE_SESSION_ID`.
+
+The `session` commands are **fail-open**: an unreachable server, a missing key or an unconfigured project makes them print nothing and exit 0, so a session-start hook is not broken by any of them. `--strict` turns that off and `KANEO_DEBUG=1` prints the reason that was swallowed. `board` is not: it fails like any other command, so an empty board and one that could not be read look different.
+
+A failure that already changed something elsewhere is reported regardless — `session attach` that wrote the comment but could not record it locally, for instance. Staying quiet there would leave `session next` believing nothing is attached.
+
+#### Hooks
+
+`hooks` in the global config runs a shell command after `session attach` or `session close` succeeds, so another tool can follow the session without either knowing about the other:
+
+```json
+{
+  "hooks": {
+    "attach": "ccx session task \"$KANEO_TASK_REF\" \"$KANEO_SESSION_ID\"",
+    "close": "ccx session task \"\" \"$KANEO_SESSION_ID\""
+  }
+}
+```
+
+The command runs under `sh -c` with `KANEO_HOOK_EVENT`, `KANEO_SESSION_ID`, `KANEO_TASK_ID`, `KANEO_TASK_NUMBER` and `KANEO_TASK_REF` (`kaneo <project slug>#<number>`, set on attach only, empty when the slug could not be looked up). A hook that fails does not fail the command: the reason goes to stderr and is appended to `hooks.log` next to the config (`$XDG_CONFIG_HOME/kaneo/`, by default `~/.config/kaneo/`). A hook still running after 10 seconds is killed along with its process group, and that counts as a failure.
 
 ## Output
 
-Human-readable by default. `--json` prints the raw API response to stdout with nothing else mixed in (logs go to stderr), so it composes with `jq`.
-
-Exit codes: `0` success, `1` configuration or API error, `2` usage error.
-
-## Development
+Human-readable on a terminal, JSON through a pipe:
 
 ```bash
-bun test            # test suite (mock server; no network)
-bun run typecheck
-bun run generate    # regenerate src/api/schema.d.ts from openapi.json
+kaneo task ls              # a table
+kaneo task ls | jq '.[0]'  # JSON, no flag needed
+kaneo task ls --json       # JSON on a terminal too
+kaneo task ls --human      # a table through a pipe
 ```
 
-`openapi.json` is a committed snapshot of upstream `apps/docs/openapi.json`. To refresh it:
+Data goes to stdout and progress goes to stderr, so piping into `jq` is always safe.
+
+## Develop
 
 ```bash
-curl -sL https://raw.githubusercontent.com/usekaneo/kaneo/main/apps/docs/openapi.json -o openapi.json
-bun run generate
+make check      # go vet + go test
+make cross      # build every release target into dist/
+make snapshot   # build the release archives exactly as the release job does
+make spec       # re-pin the Kaneo OpenAPI document for KANEO_VERSION
+make generate   # regenerate the API client from the pinned document
 ```
 
-Note: a self-hosted instance can run an older image than the committed spec. A 404 on a documented route usually means the instance lags upstream, not a CLI bug.
+The API client in `internal/api/gen` is generated by [oapi-codegen-dd](https://github.com/doordash-oss/oapi-codegen-dd) from the OpenAPI document shipped in a Kaneo release (`KANEO_VERSION` in the Makefile), restricted to the operations in `internal/api/registry.go`. `gen/overlay.json` corrects the places where that document and the server disagree; each entry says when it can go. CI fails when the generated code does not match the pinned document. To call a new endpoint, add its `operationId` to the registry and to `gen/cfg.yaml`, then `make generate`.
+
+Every push to `main` that passes CI is released as the next release candidate (`v0.2.0` → `v0.2.1-rc.1` → `v0.2.1-rc.2`), so the latest release and `install.sh` follow the newest commit on `main` that passed CI. A final version is cut by pushing its tag by hand, or by running the release workflow with that tag.
+
+`kaneo api-check` compares the operations this client calls against the server's OpenAPI document and exits non-zero if the server is missing one, so it works as a CI gate against a specific deployment.
+
+## Glossary
+
+`docs/glossary.md` covers the vocabulary, including where this CLI's names differ from the API's — task number against id, status against column, and what a session marker is.
+
+## License
+
+MIT

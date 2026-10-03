@@ -1,0 +1,30 @@
+[
+  {
+    "content": "<!-- kn:session id=00000000-0000-4000-8000-000000000001 host=host-a cwd=/home/user/src/github.com/example/repo/0123456789ABCDEFGHJKMNPQRS branch=main state=running -->\n次の一手: 次の作業の説明",
+    "createdAt": "2026-08-24T03:56:25.139Z"
+  },
+  {
+    "content": "<!-- kn:session id=00000000-0000-4000-8000-000000000001 host=host-a cwd=/home/user/src/github.com/example/repo/0123456789ABCDEFGHJKMNPQRS branch=main state=closed -->\nラベル無しの説明行",
+    "createdAt": "2026-08-24T04:16:31.591Z"
+  },
+  {
+    "content": "<!-- kn:session id=00000000-0000-4000-8000-000000000001 host=host-a cwd=/home/user/src/github.com/example/repo/0123456789ABCDEFGHJKMNPQRS branch=main state=running -->\n次の一手: 次の作業の説明",
+    "createdAt": "2026-08-24T04:15:28.881Z"
+  },
+  {
+    "content": "<!-- kn:session id=00000000-0000-4000-8000-000000000001 host=host-a cwd=/home/user/src/github.com/example/repo/0123456789ABCDEFGHJKMNPQRS branch=main state=running -->\n次の一手: 次の作業の説明",
+    "createdAt": "2026-08-24T04:15:29.612Z"
+  },
+  {
+    "content": "<!-- kn:session id=00000000-0000-4000-8000-000000000001 host=host-a cwd=/home/user/src/github.com/example/repo/0123456789ABCDEFGHJKMNPQRS branch=main state=closed -->\nラベル無しの説明行",
+    "createdAt": "2026-08-24T04:15:30.125Z"
+  },
+  {
+    "content": "<!-- kn:session id=remote-test-pi host=host-a cwd=/home/user/src/github.com/example/repo/0123456789ABCDEFGHJKMNPQRS branch=- state=running -->\n次の一手: 次の作業の説明",
+    "createdAt": "2026-08-24T04:31:36.671Z"
+  },
+  {
+    "content": "<!-- kn:session id=remote-test-pi host=host-a cwd=/home/user/src/github.com/example/repo/0123456789ABCDEFGHJKMNPQRS branch=- state=closed -->\nラベル無しの説明行",
+    "createdAt": "2026-08-24T04:32:25.120Z"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "steps": [
+    {
+      "args": [
+        "__completeNoDesc",
+        ""
+      ],
+      "exit": 0,
+      "stdout": "api-check\nboard\ncomment\ncompletion\ncontext\nhelp\nproject\nsession\ntask\nwhoami\nworkspace\n:4\n",
+      "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

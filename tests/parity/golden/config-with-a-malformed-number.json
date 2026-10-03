@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "args": [
+        "context",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"parse <HOME>/.config/kaneo/config.json: invalid character '}' in numeric literal\"\n}\n",
+      "stderr": "Error: parse <HOME>/.config/kaneo/config.json: invalid character '}' in numeric literal\n"
+    }
+  ],
+  "requests": [],
+  "files": {
+    ".config/kaneo/config.json": "{\"unknown\":1.}"
+  }
+}

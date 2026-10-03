@@ -1,0 +1,15 @@
+{
+  "steps": [
+    {
+      "args": [
+        "__complete",
+        "ta"
+      ],
+      "exit": 0,
+      "stdout": "task\tWork with tasks\n:4\n",
+      "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

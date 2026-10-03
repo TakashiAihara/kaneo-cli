@@ -1,0 +1,15 @@
+{
+  "steps": [
+    {
+      "args": [
+        "__complete",
+        ""
+      ],
+      "exit": 0,
+      "stdout": "api-check\tCheck this client's operations against the server's OpenAPI document\nboard\tShow open tasks and the sessions working on them\ncomment\tWork with task comments\ncompletion\tGenerate the autocompletion script for the specified shell\ncontext\tShow the resolved settings and where each value came from\nhelp\tHelp about any command\nproject\tWork with projects\nsession\tTie the current agent session to a task\ntask\tWork with tasks\nwhoami\tVerify the configured API key and show what it can reach\nworkspace\tWork with workspaces\n:4\n",
+      "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

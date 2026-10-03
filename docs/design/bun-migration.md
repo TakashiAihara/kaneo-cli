@@ -3,15 +3,16 @@
 ## What it looks like when done
 
 - `src/` is the whole CLI, run as `bun src/index.ts` in development and shipped as a standalone binary per target (`bun build --compile`)
-- the commands, flags, output (`--json` and human), exit codes, config files and session markers are the ones the Go build had: every scenario in `tests/parity/` produces byte-identical results
-- releases keep their archive names (`kaneo_<os>_<arch>.tar.gz`) and `checksums.txt`, so `install.sh` and existing installs are unaffected
+- the commands, flags, output (`--json` and human), exit codes, config files and session markers are the ones the Go build had: every scenario in `tests/parity/` produces the same bytes as the Go build once the values that differ between machines (port, temporary HOME, host name, wall-clock times) are replaced with placeholders. Inputs outside the scenarios are not compared
+- releases keep their archive names (`kaneo_<os>_<arch>.tar.gz`) and `checksums.txt`, so `install.sh` and existing installs upgrade in place, with one exception: the Linux binaries need glibc, so a host on a musl distribution (Alpine) that ran the static Go binary cannot run the new one
+- releases are cut by `.github/workflows/release.yml` as before (every main push as the next rc, a final tag by hand); it builds with `scripts/build.ts` and publishes with `gh release`, where goreleaser built and published before
 - `cmd/`, `internal/`, `go.mod`, `go.sum`, `Makefile` and `.goreleaser.yaml` are gone
 
 ## Why
 
 - the choice between the two follows whether the process stays resident: for a resident process Go's memory and size win; for a command that starts, makes a few requests and exits, ease of change, maintenance and the TypeScript ecosystem weigh more
 - a single binary without a runtime was the reason Go was chosen; `bun build --compile` cross-compiles to linux and darwin on amd64 and arm64 just as well
-- what it costs, measured on 2026-10-03 with `kaneo --version` on linux/amd64 (median of 20 runs): startup 51 ms against 8 ms, peak RSS 40 MB against 9 MB, binary 83 MB against 12 MB unstripped (8 MB as released). A session hook that runs `kaneo session attach` pays the extra 43 ms once per session, next to requests that take tens of milliseconds each
+- what it costs, measured on 2026-10-03 with `kaneo --version` on linux/amd64 (median of 20 runs): startup 51 ms against 8 ms, peak RSS 40 MB against 9 MB, binary 83 MB against 12 MB unstripped (8 MB as released). The 43 ms is startup alone, and every invocation pays it: `session attach`, `next` and `close` from session hooks, `board` from a session start. A command's requests take tens of milliseconds each on top, the same for both builds
 - the Linux binaries link against glibc, so a musl distribution (Alpine) cannot run them; the Go ones were static. amd64 is built for the baseline target, so AVX2 is not required
 - the Go client generator needed an overlay for three faults of Go's type mapping (an empty schema becomes `struct{}`, a nullable field is tagged `omitempty`, `number` becomes `float32`). None of them exist in TypeScript; only the document's own fault (organization routes with empty schemas) still needs a correction
 - Kaneo itself is TypeScript and zod; the generated zod schemas describe responses in the server's own terms
@@ -57,6 +58,6 @@
 3. `project`
 4. `task`
 5. `comment`, `session` (markers, store, hooks), `board`
-6. delete the Go tree and the unused dependencies (`openapi-fetch`, `openapi-typescript`, `src/api/schema.d.ts`)
+6. delete the Go tree and the unused dependencies (`openapi-fetch`, `openapi-typescript`, `src/api/schema.d.ts`), and replace goreleaser in the release workflow with `scripts/build.ts` and `gh release`, keeping the archive names; `install.sh` was run against a local mirror of the new archives. The first release after the merge is checked by installing it with `install.sh` on linux/amd64 and linux/arm64
 
 Each step is done when its parity scenarios pass and `bun run typecheck` is clean. The Go sources stay in the tree until step 6 as the reference for each step.

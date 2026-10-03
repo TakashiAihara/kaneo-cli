@@ -115,12 +115,28 @@ export const SCENARIOS: Scenario[] = [
   ),
   { name: "unknown flag", steps: [["task", "ls", "--bogus"], ["task", "ls", "-x"], ["--bogus"]] },
   { name: "completion", steps: [["completion", "zsh"], ["completion", "bash"], ["completion", "fish"], ["completion", "powershell"], ["completion"]] },
+  // What a shell asks once the script is installed: cobra's answer carries a
+  // directive line and reports it on stderr, and the NoDesc spelling leaves the
+  // descriptions out.
+  ...[
+    ["__complete", ""],
+    ["__completeNoDesc", ""],
+    ["__complete", "ta"],
+    ["__complete", "task", ""],
+    ["__completeNoDesc", "task", ""],
+    ["__complete", "task", "create", "--"],
+    ["__complete", "--wo"],
+    ["__complete", "completion", ""],
+  ].map((args, i): Scenario => ({ name: `shell asks ${i + 1}: ${args.join(" ")}`, steps: [args] })),
 
   { name: "server unreachable", env: { KANEO_API_URL: "http://127.0.0.1:9" }, steps: [["whoami", "--json"], ["task", "ls"], ["board"]] },
   { name: "request timeout", delayMs: 1500, steps: [["whoami", "--json", "--timeout", "300ms"], ["task", "ls", "--timeout", "300ms"]] },
   { name: "timeout zero or negative", steps: [["whoami", "--json", "--timeout", "0"], ["whoami", "--json", "--timeout", "-1s"], ["whoami", "--timeout", "nonsense"]] },
 
   { name: "config that is not JSON", env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" }, rawConfig: "{not json", steps: [["context", "--json"], ["task", "ls"]] },
+  { name: "config with a null profile", rawConfig: '{"profiles":{"dev":null},"default_profile":"dev"}', steps: [["context", "--json"]] },
+  { name: "config that is null", rawConfig: "null", steps: [["context", "--json"]] },
+  { name: "config with a malformed number", rawConfig: '{"unknown":1.}', steps: [["context", "--json"]] },
   {
     name: "config with a wrong type",
     env: { KANEO_SESSION_ID: "sess-types" },

@@ -1,0 +1,61 @@
+import type { App } from "./app";
+import { checkApi } from "../api/kaneo";
+import type { Operation } from "../api/registry";
+import type { Json } from "../output/json";
+
+// Compares what this client calls against what the server offers.
+//
+// It exits non-zero when an operation this client uses is missing from the
+// server, so it can gate a release. Reporting a mismatch and exiting 0 would
+// make the check unusable in CI, which is the whole reason to have it.
+export const apiCheckCommand = {
+  name: "api-check",
+  short: "Check this client's operations against the server's OpenAPI document",
+  long:
+    "Check this client's operations against the server's OpenAPI document.\n\n" +
+    "Exits non-zero when the server is missing an operation this client calls.\n" +
+    "The document needs no authentication, so this works before a key is set.",
+  args: (args: string[]) => {
+    const first = args[0];
+    if (first !== undefined) {
+      throw new Error(`unknown command ${JSON.stringify(first)} for "kaneo api-check"`);
+    }
+  },
+  run: async ({ app }: { app: App }) => {
+    const result = await checkApi();
+
+    for (const operation of result.covered) app.out.human(`ok      ${pad(operation)} ${operation.command}`);
+    for (const operation of result.missing) app.out.human(`MISSING ${pad(operation)} ${operation.command}`);
+    if (result.newOnServer.length > 0) {
+      app.out.human("");
+      app.out.human(`${result.newOnServer.length} server operations this client does not use yet`);
+    }
+    app.out.human("");
+    app.out.human(
+      `${result.covered.length} of ${result.clientOperations} client operations present; server offers ${result.serverOperations}`,
+    );
+
+    app.out.data({
+      serverOperations: result.serverOperations,
+      clientOperations: result.clientOperations,
+      covered: result.covered.map(asReport),
+      missing: result.missing.map(asReport),
+      newOnServer: result.newOnServer,
+    } as Json);
+
+    if (result.missing.length > 0) {
+      throw new Error(`${result.missing.length} operation(s) this client calls are missing from the server`);
+    }
+  },
+};
+
+const pad = (operation: Operation): string => operation.id.padEnd(22);
+
+// The registry entries carry no json tags, so the report prints their field
+// names as they are declared rather than in lower case.
+const asReport = (operation: Operation): Json => ({
+  ID: operation.id,
+  Method: operation.method,
+  Path: operation.path,
+  Command: operation.command,
+});

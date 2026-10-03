@@ -1,0 +1,409 @@
+// Argument parsing, with the Go build's wording.
+//
+// The build this replaces reported a bad invocation as `Error: unknown flag:
+// --nope` and put the same text in its JSON output, so a script parses the line
+// itself. The messages are therefore part of the contract, and this reproduces
+// them rather than inventing friendlier ones. The shape of the parsing is the
+// same: a command is looked up from the non-flag words first, so an unknown
+// command is reported before any flag is judged, and the found command then
+// parses what is left.
+
+export type FlagType = "string" | "bool" | "duration";
+
+export type Flag = {
+  name: string;
+  shorthand?: string;
+  type: FlagType;
+  usage: string;
+  // The value the flag's variable starts at. It is printed as "(default ...)"
+  // when it is not the type's zero, the way the Go build printed it.
+  defaultValue: string;
+};
+
+export type FlagValues = Record<string, string | boolean | number>;
+
+export type Command<A> = {
+  name: string;
+  aliases?: string[];
+  short: string;
+  long?: string;
+  // The usage line, with its arguments: "rename <workspace-id> <name>".
+  use?: string;
+  // Flags inherited by every command below this one.
+  persistent?: Flag[];
+  // Flags of this command only.
+  flags?: Flag[];
+  // Rejects the positional arguments, in the words the Go build used.
+  args?: (args: string[]) => void;
+  run?: (ctx: { args: string[]; flags: FlagValues; app: A }) => void | Promise<void>;
+  children?: Command<A>[];
+};
+
+// Go's %q, which is close enough to JSON's quoting for anything a user types.
+const quote = (value: string): string => JSON.stringify(value);
+
+// A Go duration, in milliseconds. The error messages are Go's, because they are
+// what a user sees when they mistype the value.
+export const parseDuration = (text: string): number => {
+  const invalid = (): Error => new Error(`time: invalid duration ${quote(text)}`);
+  let rest = text;
+  let negative = false;
+  if (rest.startsWith("-") || rest.startsWith("+")) {
+    negative = rest.startsWith("-");
+    rest = rest.slice(1);
+  }
+  // Go returns zero for a bare "0" without asking for a unit.
+  if (rest === "0") return 0;
+  if (rest === "") throw invalid();
+  const UNITS: Record<string, number> = { ns: 1e-6, us: 1e-3, "µs": 1e-3, "μs": 1e-3, ms: 1, s: 1000, m: 60_000, h: 3_600_000 };
+  let ms = 0;
+  while (rest !== "") {
+    if (!(rest[0] === "." || (rest[0]! >= "0" && rest[0]! <= "9"))) throw invalid();
+    const whole = /^\d*/.exec(rest)![0];
+    let fraction = 0;
+    let scale = 1;
+    rest = rest.slice(whole.length);
+    if (rest.startsWith(".")) {
+      const digits = /^\d*/.exec(rest.slice(1))![0];
+      rest = rest.slice(1 + digits.length);
+      for (const digit of digits) {
+        scale /= 10;
+        fraction += Number(digit) * scale;
+      }
+      if (whole === "" && digits === "") throw invalid();
+    }
+    const unit = /^[a-zA-Zµμ]+/.exec(rest)?.[0] ?? "";
+    if (unit === "") throw new Error(`time: missing unit in duration ${quote(text)}`);
+    const factor = UNITS[unit];
+    if (factor === undefined) throw new Error(`time: unknown unit ${quote(unit)} in duration ${quote(text)}`);
+    rest = rest.slice(unit.length);
+    ms += Number(whole) * factor + fraction * factor;
+    if (!Number.isFinite(ms) || Math.abs(ms) > Number.MAX_SAFE_INTEGER) throw invalid();
+  }
+  return negative ? -ms : ms;
+};
+
+const parseBool = (text: string): boolean => {
+  if (["1", "t", "T", "TRUE", "true", "True"].includes(text)) return true;
+  if (["0", "f", "F", "FALSE", "false", "False"].includes(text)) return false;
+  throw new Error(`strconv.ParseBool: parsing ${quote(text)}: invalid syntax`);
+};
+
+// The flags a command was declared with, plus everything its parents made
+// persistent. The help and version flags are deliberately absent: they are added
+// once a command has been found, so the lookup that found it could not mistake
+// `--help` for a flag waiting for a value.
+export const declaredFlags = <A>(chain: Command<A>[]): Flag[] => {
+  const command = chain[chain.length - 1]!;
+  return [...chain.slice(0, -1).flatMap((ancestor) => ancestor.persistent ?? []), ...(command.flags ?? [])];
+};
+
+// The same, with the two flags the command carries for itself: every command can
+// be asked for help, and the root knows a version.
+export const parsingFlags = <A>(chain: Command<A>[]): Flag[] => {
+  const command = chain[chain.length - 1]!;
+  return [...declaredFlags(chain), helpFlag(command), ...(chain.length === 1 ? [VERSION_FLAG] : [])];
+};
+
+// What the help of this command shows as its own flags, and what it shows as the
+// ones it inherited.
+const localFlags = <A>(chain: Command<A>[]): Flag[] => {
+  const command = chain[chain.length - 1]!;
+  return [...(command.flags ?? []), helpFlag(command), ...(chain.length === 1 ? [VERSION_FLAG] : [])];
+};
+const inheritedFlags = <A>(chain: Command<A>[]): Flag[] =>
+  chain.slice(0, -1).flatMap((ancestor) => ancestor.persistent ?? []);
+
+const helpFlag = (command: { name: string }): Flag => ({
+  name: "help",
+  shorthand: "h",
+  type: "bool",
+  usage: `help for ${command.name}`,
+  defaultValue: "false",
+});
+
+const VERSION_FLAG: Flag = {
+  name: "version",
+  shorthand: "v",
+  type: "bool",
+  usage: "version for kaneo",
+  defaultValue: "false",
+};
+
+export type ParsedFlags = { flags: FlagValues; args: string[] };
+
+export const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
+  const byName = new Map(flags.map((flag) => [flag.name, flag]));
+  const byShorthand = new Map(flags.flatMap((flag) => (flag.shorthand ? [[flag.shorthand, flag] as const] : [])));
+  const values: FlagValues = {};
+  const set = (flag: Flag, raw: string): void => {
+    const name = flag.shorthand ? `-${flag.shorthand}, --${flag.name}` : `--${flag.name}`;
+    try {
+      if (flag.type === "bool") values[flag.name] = parseBool(raw);
+      else if (flag.type === "string") values[flag.name] = raw;
+      else values[flag.name] = parseDuration(raw);
+    } catch (e) {
+      throw new Error(`invalid argument ${quote(raw)} for ${quote(name)} flag: ${(e as Error).message}`);
+    }
+  };
+  for (const flag of flags) set(flag, flag.defaultValue);
+
+  const positional: string[] = [];
+  let at = 0;
+  const take = (): string | undefined => (at < args.length ? args[at++] : undefined);
+  while (at < args.length) {
+    const token = args[at++]!;
+    // A bare "-" and an empty word are arguments, not flags.
+    if (token === "" || !token.startsWith("-") || token.length === 1) {
+      positional.push(token);
+      continue;
+    }
+    if (token.startsWith("--")) {
+      // "--" ends the flags; the rest is arguments, and they stay arguments
+      // even when they look like flags.
+      if (token.length === 2) {
+        positional.push(...args.slice(at));
+        break;
+      }
+      const name = token.slice(2);
+      if (name.startsWith("-") || name.startsWith("=")) throw new Error(`bad flag syntax: ${token}`);
+      const equals = name.indexOf("=");
+      const flag = byName.get(equals === -1 ? name : name.slice(0, equals));
+      if (flag === undefined) throw new Error(`unknown flag: --${equals === -1 ? name : name.slice(0, equals)}`);
+      if (equals !== -1) set(flag, name.slice(equals + 1));
+      else if (flag.type === "bool") set(flag, "true");
+      else {
+        const value = take();
+        if (value === undefined) throw new Error(`flag needs an argument: ${token}`);
+        set(flag, value);
+      }
+      continue;
+    }
+    let shorthands = token.slice(1);
+    while (shorthands !== "") {
+      const letter = shorthands[0]!;
+      const flag = byShorthand.get(letter);
+      if (flag === undefined) throw new Error(`unknown shorthand flag: ${quote(letter)} in -${shorthands}`);
+      const rest = shorthands.slice(1);
+      if (rest.length > 1 && rest[0] === "=") {
+        set(flag, rest.slice(1));
+        shorthands = "";
+      } else if (flag.type === "bool") {
+        set(flag, "true");
+        shorthands = rest;
+      } else if (rest !== "") {
+        // -pvalue and -p=value both carry the value in the same word.
+        set(flag, rest);
+        shorthands = "";
+      } else {
+        const value = take();
+        if (value === undefined) throw new Error(`flag needs an argument: ${quote(letter)} in -${shorthands}`);
+        set(flag, value);
+        // The rest of the word held no further shorthand; only a value flag can
+        // leave it empty, so nothing is left to read.
+        shorthands = "";
+      }
+    }
+  }
+  return { flags: values, args: positional };
+};
+
+const hasNoValue = (flags: Flag[], name: string): boolean =>
+  flags.some((flag) => flag.name === name && flag.type === "bool");
+const hasShorthandNoValue = (flags: Flag[], letter: string): boolean =>
+  flags.some((flag) => flag.shorthand === letter && flag.type === "bool");
+
+// The words that are not flags, or the value of one. A word that names no
+// command is the end of the lookup; a flag whose value is missing ends it too,
+// since there is nothing left to look at.
+const wordsOf = (args: string[], flags: Flag[]): string[] => {
+  const words: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const token = args[i]!;
+    if (token === "--") break;
+    if (token.startsWith("--") && !token.includes("=") && !hasNoValue(flags, token.slice(2))) {
+      if (args.length - i - 1 <= 0) break;
+      i++;
+      continue;
+    }
+    if (token.startsWith("-") && !token.startsWith("--") && token.length === 2 && !hasShorthandNoValue(flags, token[1]!)) {
+      if (args.length - i - 1 <= 0) break;
+      i++;
+      continue;
+    }
+    if (token !== "" && !token.startsWith("-")) words.push(token);
+  }
+  return words;
+};
+
+const dropFirst = (args: string[], word: string, flags: Flag[]): string[] => {
+  for (let i = 0; i < args.length; i++) {
+    const token = args[i]!;
+    if (token === "--") break;
+    if (token.startsWith("--") && !token.includes("=") && !hasNoValue(flags, token.slice(2))) {
+      i++;
+      continue;
+    }
+    if (token.startsWith("-") && !token.startsWith("--") && token.length === 2 && !hasShorthandNoValue(flags, token[1]!)) {
+      i++;
+      continue;
+    }
+    if (!token.startsWith("-") && token === word) return [...args.slice(0, i), ...args.slice(i + 1)];
+  }
+  return args;
+};
+
+export type Found<A> = {
+  chain: Command<A>[];
+  command: Command<A>;
+  // What is left of argv once the command names are taken out.
+  rest: string[];
+  // The words that were not flags, for the unknown-command report.
+  words: string[];
+};
+
+export const find = <A>(root: Command<A>, argv: string[]): Found<A> => {
+  const chain: Command<A>[] = [root];
+  let rest = argv;
+  for (;;) {
+    const words = wordsOf(rest, declaredFlags(chain));
+    const next = words[0];
+    if (next === undefined) break;
+    const child = chain[chain.length - 1]!.children?.find((c) => c.name === next || c.aliases?.includes(next));
+    if (child === undefined) break;
+    rest = dropFirst(rest, next, declaredFlags(chain));
+    chain.push(child);
+  }
+  return { chain, command: chain[chain.length - 1]!, rest, words: wordsOf(rest, declaredFlags(chain)) };
+};
+
+export const noArgs = (path: string): ((args: string[]) => void) => (args) => {
+  const first = args[0];
+  if (first !== undefined) throw new Error(`unknown command ${quote(first)} for ${quote(path)}`);
+};
+
+export const minimumArgs =
+  (count: number): ((args: string[]) => void) =>
+  (args) => {
+    if (args.length < count) throw new Error(`requires at least ${count} arg(s), only received ${args.length}`);
+  };
+
+const available = <A>(command: Command<A>): Command<A>[] =>
+  (command.children ?? [])
+    .filter((child) => child.run !== undefined || (child.children?.length ?? 0) > 0)
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+export const unknownCommand = <A>(command: Command<A>, path: string, word: string): Error => {
+  const suggestions = available(command)
+    .filter((child) => distance(word.toLowerCase(), child.name.toLowerCase()) <= 2 || child.name.toLowerCase().startsWith(word.toLowerCase()))
+    .map((child) => child.name);
+  const hint =
+    suggestions.length === 0
+      ? ""
+      : `\n\nDid you mean this?\n${suggestions.map((s) => `\t${s}\n`).join("")}`;
+  return new Error(`unknown command ${quote(word)} for ${quote(path)}${hint}`);
+};
+
+const distance = (from: string, to: string): number => {
+  let row = Array.from({ length: to.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= from.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= to.length; j++) {
+      next[j] = Math.min(
+        row[j]! + 1,
+        next[j - 1]! + 1,
+        row[j - 1]! + (from[i - 1] === to[j - 1] ? 0 : 1),
+      );
+    }
+    row = next;
+  }
+  return row[to.length]!;
+};
+
+const isZero = (flag: Flag): boolean => {
+  switch (flag.type) {
+    case "bool":
+      return flag.defaultValue === "false";
+    case "duration":
+      try {
+        return parseDuration(flag.defaultValue) === 0;
+      } catch {
+        return false;
+      }
+    default:
+      return flag.defaultValue === "";
+  }
+};
+
+// The flag block, aligned on the usage text: the widest flag decides where
+// every description starts, and every line ends in the same column.
+const flagUsages = (flags: Flag[]): string => {
+  const sorted = [...flags].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  const described = sorted.map((flag) => {
+    const head = flag.shorthand ? `  -${flag.shorthand}, --${flag.name}` : `      --${flag.name}`;
+    const type = flag.type === "bool" ? "" : ` ${flag.type}`;
+    const tail = isZero(flag) ? flag.usage : `${flag.usage} (default ${quote(flag.defaultValue)})`;
+    return `${head}${type}\x00${tail}`;
+  });
+  const width = Math.max(...described.map((line) => line.indexOf("\x00") + 1));
+  return described
+    .map((line) => {
+      const at = line.indexOf("\x00");
+      return `${line.slice(0, at)} ${" ".repeat(width - at)} ${line.slice(at + 1)}`;
+    })
+    .join("\n");
+};
+
+const trimEnd = (text: string): string => text.replace(/\s+$/, "");
+
+// The command's own path with its arguments: "kaneo workspace rename
+// <workspace-id> <name> [flags]". The [flags] is there because every command
+// carries at least a help flag.
+const useLine = <A>(chain: Command<A>[]): string => {
+  const command = chain[chain.length - 1]!;
+  const use = command.use ?? command.name;
+  const line = `${chain.slice(0, -1).map((c) => c.name).join(" ")}${chain.length === 1 ? "" : " "}${use}`;
+  return line.includes("[flags]") ? line : `${line} [flags]`;
+};
+
+export const usageText = <A>(chain: Command<A>[]): string => {
+  const command = chain[chain.length - 1]!;
+  const path = chain.map((c) => c.name).join(" ");
+  const subcommands = available(command);
+  const sections: string[] = [];
+
+  let usage = "Usage:";
+  if (command.run !== undefined) usage += `\n  ${useLine(chain)}`;
+  if (subcommands.length > 0) usage += `\n  ${path} [command]`;
+  sections.push(usage);
+
+  if ((command.aliases?.length ?? 0) > 0) sections.push(`Aliases:\n  ${[command.name, ...command.aliases!].join(", ")}`);
+  if (subcommands.length > 0) {
+    const padding = Math.max(11, ...subcommands.map((c) => c.name.length));
+    const lines = subcommands.map((c) => `  ${c.name.padEnd(padding)} ${c.short}`);
+    sections.push(`Available Commands:\n${lines.join("\n")}`);
+  }
+  const local = localFlags(chain);
+  if (local.length > 0) sections.push(`Flags:\n${flagUsages(local)}`);
+  const inherited = inheritedFlags(chain);
+  if (inherited.length > 0) sections.push(`Global Flags:\n${flagUsages(inherited)}`);
+  if (subcommands.length > 0) sections.push(`Use "${path} [command] --help" for more information about a command.`);
+
+  return `${sections.join("\n\n")}\n`;
+};
+
+export const helpText = <A>(chain: Command<A>[]): string => {
+  const command = chain[chain.length - 1]!;
+  return `${trimEnd(command.long ?? command.short)}\n\n${usageText(chain)}`;
+};
+
+// The topic `kaneo help <words>` looked for, resolved against the tree.
+export const pathOf = <A>(root: Command<A>, words: string[]): Command<A>[] => {
+  const chain: Command<A>[] = [root];
+  for (const word of words) {
+    const child = chain[chain.length - 1]!.children?.find((c) => c.name === word || c.aliases?.includes(word));
+    if (child === undefined) break;
+    chain.push(child);
+  }
+  return chain;
+};

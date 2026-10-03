@@ -152,6 +152,25 @@ describe("redirects", () => {
     expect(auth).toBe("Bearer test-key");
   });
 
+  // A redirect to another host is a different recipient, whatever its scheme:
+  // the Go build's client dropped the key there, and so must this one.
+  test("drop the key when the redirect changes host", async () => {
+    let auth = "unset";
+    const target = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: (req) => {
+        auth = req.headers.get("authorization") ?? "";
+        return Response.json([]);
+      },
+    });
+    servers.push(target);
+    const origin = serve(() => Response.redirect(`http://localhost:${target.port}/api/project`, 307));
+    configureClient({ baseUrl: origin, apiKey: "test-key" });
+    await kaneoFetch("/project", { method: "GET" });
+    expect(auth).toBe("");
+  });
+
   test("stop after 10 hops", async () => {
     let hops = 0;
     const url = serve((req) => {

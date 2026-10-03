@@ -127,6 +127,11 @@ export const SCENARIOS: Scenario[] = [
     steps: [["context", "--json"], ["board", "--json"]],
   },
   {
+    name: "--api-url and --api-key beat the environment",
+    env: { KANEO_API_URL: "http://127.0.0.1:9", KANEO_API_KEY: "wrong-key" },
+    steps: [["whoami", "--json", "--api-url", "<URL>", "--api-key", "test-key"], ["context", "--json", "--api-url", "<URL>"]],
+  },
+  {
     name: "flag beats env beats profile",
     config: { default_profile: "self", profiles: { self: { workspace_id: "ws-other", project_id: P2 } } },
     steps: [["context", "--json"], ["context", "-p", "proj-old", "--json"]],

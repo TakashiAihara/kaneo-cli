@@ -49,7 +49,10 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
 
     const steps: StepResult[] = [];
     for (const args of s.steps) {
-      const p = Bun.spawn([...bin, ...args], { cwd, env, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+      // <URL> in a scenario's arguments stands for the fake's address, which
+      // is only known once it is listening.
+      const argv = args.map((a) => a.replaceAll("<URL>", fake.url));
+      const p = Bun.spawn([...bin, ...argv], { cwd, env, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
       const [stdout, stderr, exit] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
       steps.push({ args, exit, stdout: normalize(stdout), stderr: normalize(stderr) });
     }

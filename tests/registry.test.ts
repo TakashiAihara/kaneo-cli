@@ -1,7 +1,10 @@
 import { expect, test } from "bun:test";
 import * as client from "../src/api/gen/kaneo";
 import { OPERATIONS } from "../src/api/registry";
-import spec from "../openapi/kaneo-2.29.2.json";
+import { readFileSync } from "node:fs";
+import { SPEC_PATH } from "../openapi/spec";
+
+const spec = JSON.parse(readFileSync(SPEC_PATH, "utf8"));
 
 // The registry is the list the client is generated for and the list api-check
 // compares against a server. An id that the pinned document lacks, or whose

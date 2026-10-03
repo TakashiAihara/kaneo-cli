@@ -9,8 +9,10 @@
 
 ## Why
 
-- the CLI is a short-lived process: start, make a few requests, exit. Go's advantages (memory, binary size, startup) matter for a resident process and barely here
-- a single binary without a runtime was the reason Go was chosen; `bun build --compile` cross-compiles to linux and darwin on amd64 and arm64 just as well. The cost is size: about 80 MB per binary against Go's 8 MB
+- the choice between the two follows whether the process stays resident: for a resident process Go's memory and size win; for a command that starts, makes a few requests and exits, ease of change, maintenance and the TypeScript ecosystem weigh more
+- a single binary without a runtime was the reason Go was chosen; `bun build --compile` cross-compiles to linux and darwin on amd64 and arm64 just as well
+- what it costs, measured on 2026-10-03 with `kaneo --version` on linux/amd64 (median of 20 runs): startup 51 ms against 8 ms, peak RSS 40 MB against 9 MB, binary 83 MB against 12 MB unstripped (8 MB as released). A session hook that runs `kaneo session attach` pays the extra 43 ms once per session, next to requests that take tens of milliseconds each
+- the Linux binaries link against glibc, so a musl distribution (Alpine) cannot run them; the Go ones were static. amd64 is built for the baseline target, so AVX2 is not required
 - the Go client generator needed an overlay for three faults of Go's type mapping (an empty schema becomes `struct{}`, a nullable field is tagged `omitempty`, `number` becomes `float32`). None of them exist in TypeScript; only the document's own fault (organization routes with empty schemas) still needs a correction
 - Kaneo itself is TypeScript and zod; the generated zod schemas describe responses in the server's own terms
 
@@ -39,7 +41,9 @@
 
 ## How it is verified
 
-- `tests/parity/`: an in-memory Kaneo (`fake.ts`) that validates every request body and response against the generated schemas, and scenarios (`scenarios.ts`) covering every command, the config layers, hooks and failure paths
+- `tests/parity/`: an in-memory Kaneo (`fake.ts`) that validates every request body and response against the generated schemas, and 98 scenarios (`scenarios.ts`): every command in `--json` and human form, help output, the config layers including invalid files, hooks, unreachable servers, timeouts, ids that need escaping, a server older than the document (`legacy`, where responses are not validated), and a host without git
+- what the scenarios do not reach is held by unit tests ported from the Go build (`tests/unit/`: markers and their compatibility fixture, the session store, hooks) and by `tests/http.test.ts` (redirects, the key over plain HTTP)
+- what neither covers: a darwin binary has not been run, only built; shell completion follows the decision recorded for it
 - `tests/parity/golden/` was recorded from the last Go build with `bun scripts/record-golden.ts <go binary>`. Running the suite with `KANEO_PARITY_BIN=<go binary>` passes every scenario, three runs in a row, so a failure against this build is a real difference
 - values that differ for reasons outside the CLI (the fake's port, the temporary HOME, the host name, wall-clock times in logs) are replaced with placeholders before comparing
 - manual check against a real Kaneo: `docs/design/bun-migration-manual-test.md`

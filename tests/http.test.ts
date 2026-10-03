@@ -171,6 +171,7 @@ describe("redirects", () => {
     expect(auth).toBe("");
   });
 
+  // Go's client refuses the eleventh request, so the server sees ten.
   test("stop after 10 hops", async () => {
     let hops = 0;
     const url = serve((req) => {
@@ -178,8 +179,35 @@ describe("redirects", () => {
       return Response.redirect(new URL(req.url).toString(), 307);
     });
     configureClient({ baseUrl: url, apiKey: "test-key" });
-    await failure(kaneoFetch("/project", { method: "GET" }));
-    expect(hops).toBeLessThanOrEqual(11);
+    const e = (await failure(kaneoFetch("/project", { method: "GET" }))) as Error;
+    expect(hops).toBe(10);
+    expect(e.message).toContain("stopped after 10 redirects");
+  });
+
+  // As Go's client does: 301, 302 and 303 turn any method but GET and HEAD
+  // into a GET without a body; 307 and 308 keep both.
+  test.each([
+    [301, "PUT", "GET", ""],
+    [302, "PUT", "GET", ""],
+    [303, "PUT", "GET", ""],
+    [301, "POST", "GET", ""],
+    [303, "DELETE", "GET", ""],
+    [307, "PUT", "PUT", '{"status":"done"}'],
+    [308, "POST", "POST", '{"status":"done"}'],
+  ])("a %p answered to %p is followed as %p", async (status, method, want, wantBody) => {
+    let got = { method: "", body: "" };
+    const target = serve(async (req) => {
+      got = { method: req.method, body: await req.text() };
+      return Response.json({});
+    });
+    const origin = serve(() => new Response(null, { status, headers: { location: `${target}/api/task/status/t1` } }));
+    configureClient({ baseUrl: origin, apiKey: "test-key" });
+    await kaneoFetch("/task/status/t1", {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "done" }),
+    });
+    expect(got).toEqual({ method: want, body: wantBody });
   });
 });
 

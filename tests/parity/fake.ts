@@ -1,5 +1,6 @@
 import { z } from "zod";
 import * as M from "../../src/api/gen/model";
+import { SPEC_PATH } from "../../openapi/spec";
 
 // An in-memory Kaneo that answers the operations in src/api/registry.ts the
 // way a v2.29.2 server does. Every response is parsed with the generated zod
@@ -180,7 +181,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     const m = (re: RegExp) => path.match(re) as Groups | null;
     let p: Groups | null;
 
-    if (req.method === "GET" && path === "/openapi") return new Response(Bun.file(new URL("../../openapi/kaneo-2.29.2.json", import.meta.url)));
+    if (req.method === "GET" && path === "/openapi") return new Response(Bun.file(SPEC_PATH));
     if (req.method === "GET" && path === "/auth/organization/list") return ok(z.array(M.Organization), workspaces);
     if (req.method === "POST" && path === "/auth/organization/update") {
       const w = workspaces.find((x) => x.id === (body as any)?.organizationId);

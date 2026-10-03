@@ -1,4 +1,5 @@
 import { defineConfig } from "orval";
+import { SPEC_PATH } from "./openapi/spec";
 
 
 export default defineConfig({
@@ -6,8 +7,8 @@ export default defineConfig({
     input: {
       // The document shipped in the Kaneo release, not the one a deployed
       // instance serves: a public client targets a release, and the build
-      // must not depend on the network. Bump with `bun run spec`.
-      target: "./openapi/kaneo-2.29.2.json",
+      // must not depend on the network. Bump with `bun run spec <version>`.
+      target: SPEC_PATH,
       // Drops every operation outside src/api/registry.ts.
       override: { transformer: "./openapi/transformer.ts" },
     },

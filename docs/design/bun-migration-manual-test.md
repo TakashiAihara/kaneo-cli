@@ -27,6 +27,8 @@ The last line prints every place the server's response differs from the document
 
 ## Writes, in a project made for the check
 
+`session attach` and `session close` run the hooks in your `~/.config/kaneo/config.json`. Point `XDG_CONFIG_HOME` at an empty directory for these steps if those hooks write somewhere you do not want a test session to appear.
+
 ```bash
 P=$($K project create "cli check $(date +%Y%m%d%H%M)" --slug CHK --json | jq -r .id)
 export KANEO_PROJECT=$P

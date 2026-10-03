@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "--version"
+      ],
+      "exit": 0,
+      "stdout": "kaneo version dev\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "-v"
+      ],
+      "exit": 0,
+      "stdout": "kaneo version dev\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

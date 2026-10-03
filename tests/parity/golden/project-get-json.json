@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "get",
+        "proj-alpha",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"proj-alpha\",\n  \"name\": \"Alpha\",\n  \"slug\": \"ALP\",\n  \"icon\": \"Layout\",\n  \"description\": \"\",\n  \"workspaceId\": \"ws-main\",\n  \"isPublic\": false,\n  \"archivedAt\": null\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

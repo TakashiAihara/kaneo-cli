@@ -1,0 +1,50 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "create",
+        "Mine",
+        "--assignee",
+        "user-1",
+        "--status",
+        "in-progress",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created #4 Mine\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "4",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task0002\",\n  \"number\": 4,\n  \"title\": \"Mine\",\n  \"description\": \"\",\n  \"status\": \"in-progress\",\n  \"priority\": \"medium\",\n  \"position\": 3,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": \"user-1\",\n  \"assigneeName\": \"Ada\",\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n  \"labels\": []\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
+      "query": "",
+      "body": {
+        "title": "Mine",
+        "description": "",
+        "priority": "medium",
+        "status": "in-progress",
+        "userId": "user-1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,32 @@
+{
+  "steps": [
+    {
+      "args": [
+        "board",
+        "--archived",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Alpha (open 2 / done 1)\n- [high] #1 Write the parser (to-do)\n- [no-priority] #2 Ship it (in-progress)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

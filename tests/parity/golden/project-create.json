@@ -1,0 +1,48 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "create",
+        "Gamma",
+        "--slug",
+        "GAM",
+        "-d",
+        "third",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"proj0002\",\n  \"name\": \"Gamma\",\n  \"slug\": \"GAM\",\n  \"icon\": \"Layers\",\n  \"description\": \"\",\n  \"workspaceId\": \"ws-main\",\n  \"isPublic\": false,\n  \"archivedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha\nproj-beta  Beta\nproj0002  Gamma\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Gamma",
+        "workspaceId": "ws-main",
+        "icon": "Layers",
+        "slug": "GAM"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

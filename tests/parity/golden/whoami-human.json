@@ -1,0 +1,21 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "api url    <URL>/api\napi key    accepted\nworkspaces 2\n  ws-main  Main\n  ws-other  Other\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "ls",
+        "--archived",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha\nproj-beta  Beta\nproj-old  Old  (archived)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

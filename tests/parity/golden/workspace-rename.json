@@ -1,0 +1,50 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workspace",
+        "rename",
+        "ws-main",
+        "Renamed",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"from\": \"Main\",\n  \"id\": \"ws-main\",\n  \"slug\": \"main\",\n  \"to\": \"Renamed\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workspace",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ws-main  Renamed\nws-other  Other\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/auth/organization/update",
+      "query": "",
+      "body": {
+        "data": {
+          "name": "Renamed"
+        },
+        "organizationId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1  Write the parser\nstatus    to-do\npriority  high\n\nmulti\nline\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

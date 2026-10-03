@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no project: pass --project, set KANEO_PROJECT, or add one to .kaneo.json\"\n}\n",
+      "stderr": "Error: no project: pass --project, set KANEO_PROJECT, or add one to .kaneo.json\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

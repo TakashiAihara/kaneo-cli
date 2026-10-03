@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no destination: pass --to \\u003cproject-id\\u003e\"\n}\n",
+      "stderr": "Error: no destination: pass --to <project-id>\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

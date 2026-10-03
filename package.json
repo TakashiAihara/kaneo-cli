@@ -7,9 +7,11 @@
     "kaneo": "src/index.ts"
   },
   "scripts": {
-    "generate": "openapi-typescript openapi.json -o src/api/schema.d.ts",
+    "generate": "orval --config orval.config.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "build": "bun scripts/build.ts",
+    "parity:record": "bun scripts/record-golden.ts",
     "install-bin": "bun run scripts/install-bin.ts"
   },
   "repository": {
@@ -22,12 +24,14 @@
   },
   "dependencies": {
     "commander": "^15.0.0",
-    "openapi-fetch": "^0.17.0"
+    "openapi-fetch": "^0.17.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",
     "@types/node": "^26.4.0",
     "openapi-typescript": "^7.13.0",
+    "orval": "8.39.0",
     "typescript": "^5.9.0"
   }
 }

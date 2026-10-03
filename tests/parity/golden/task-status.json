@@ -1,0 +1,48 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "status",
+        "1",
+        "done",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"status\": \"done\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1  Write the parser\nstatus    done\npriority  high\n\nmulti\nline\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/status/task-a1",
+      "query": "",
+      "body": {
+        "status": "done"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

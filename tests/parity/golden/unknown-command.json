@@ -1,0 +1,14 @@
+{
+  "steps": [
+    {
+      "args": [
+        "frobnicate"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown command \\\"frobnicate\\\" for \\\"kaneo\\\"\"\n}\n",
+      "stderr": "Error: unknown command \"frobnicate\" for \"kaneo\"\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

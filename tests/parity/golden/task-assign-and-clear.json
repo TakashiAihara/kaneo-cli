@@ -1,0 +1,72 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "assign",
+        "1",
+        "user-1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"assigneeId\": \"user-1\",\n  \"id\": \"task-a1\",\n  \"number\": 1\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "assign",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1 unassigned\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"description\": \"multi\\nline\",\n  \"status\": \"to-do\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n  \"labels\": []\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/assignee/task-a1",
+      "query": "",
+      "body": {
+        "userId": "user-1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/assignee/task-a1",
+      "query": "",
+      "body": {
+        "userId": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,33 @@
+{
+  "steps": [
+    {
+      "args": [
+        "context",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-beta\"\n  ],\n  \"profile\": \"self\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"profile\",\n    \"workspace\": \"profile\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"task-b1\",\n    \"number\": 1,\n    \"title\": \"Beta first\",\n    \"description\": \"\",\n    \"status\": \"to-do\",\n    \"priority\": \"urgent\",\n    \"position\": 0,\n    \"projectId\": \"proj-beta\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:07.000Z\",\n    \"labels\": []\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    }
+  ],
+  "files": {
+    ".config/kaneo/config.json": "{\"default_profile\":\"self\",\"profiles\":{\"self\":{\"workspace_id\":\"ws-main\",\"project_id\":\"proj-beta\"}}}"
+  }
+}

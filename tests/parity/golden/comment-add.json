@@ -1,0 +1,54 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "add",
+        "1",
+        "hello",
+        "world",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"cmt0002\",\n  \"content\": \"hello world\",\n  \"userId\": \"user-self\",\n  \"userName\": \"\",\n  \"createdAt\": \"2026-01-01T00:00:09.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
+        "ls",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "2026-01-01T00:00:08.000Z  first comment\n2026-01-01T00:00:09.000Z  hello world\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "hello world"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

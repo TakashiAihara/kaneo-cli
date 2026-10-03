@@ -114,6 +114,8 @@ export const SCENARIOS: Scenario[] = [
     (args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] }),
   ),
   { name: "unknown flag", steps: [["task", "ls", "--bogus"], ["task", "ls", "-x"], ["--bogus"]] },
+  { name: "control characters in an unknown command", steps: [["\u0001"], ["a\u007fb"], ["tab\there"]] },
+  { name: "completion help", steps: [["completion", "zsh", "--help"], ["completion", "fish", "--help"], ["completion", "powershell", "--help"], ["completion", "bash", "--help"]] },
   { name: "completion", steps: [["completion", "zsh"], ["completion", "bash"], ["completion", "fish"], ["completion", "powershell"], ["completion"]] },
   // What a shell asks once the script is installed: cobra's answer carries a
   // directive line and reports it on stderr, and the NoDesc spelling leaves the
@@ -127,6 +129,15 @@ export const SCENARIOS: Scenario[] = [
     ["__complete", "task", "create", "--"],
     ["__complete", "--wo"],
     ["__complete", "completion", ""],
+    ["__complete", "help", ""],
+    ["__complete", "frobnicate", ""],
+    ["__complete", "task", "status", ""],
+    ["__complete", "task", "ls", "--status", ""],
+    ["__complete", "--timeout", ""],
+    ["__complete", "-w", ""],
+    ["__complete", "--version"],
+    ["__complete", "task", "create", "--priority", ""],
+    ["__complete", "session", "attach", ""],
   ].map((args, i): Scenario => ({ name: `shell asks ${i + 1}: ${args.join(" ")}`, steps: [args] })),
 
   { name: "server unreachable", env: { KANEO_API_URL: "http://127.0.0.1:9" }, steps: [["whoami", "--json"], ["task", "ls"], ["board"]] },
@@ -159,6 +170,21 @@ export const SCENARIOS: Scenario[] = [
   { name: "no git on PATH", env: { PATH: "/nonexistent" }, steps: [["task", "ls", "--json"], ["context", "--json"]] },
   { name: "no git on PATH, session", env: { PATH: "/nonexistent", KANEO_SESSION_ID: "sess-nogit" }, steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"]] },
 
+  {
+    name: "a failing hook's output keeps both streams",
+    env: { KANEO_SESSION_ID: "sess-streams" },
+    config: { hooks: { attach: "echo out; echo err >&2; echo out2; exit 4" } },
+    steps: [["session", "attach", "1", "--strict"]],
+  },
+  {
+    name: "a hook killed by a signal",
+    env: { KANEO_SESSION_ID: "sess-signal" },
+    config: { hooks: { attach: "kill -USR1 $$", close: "kill -SEGV $$" } },
+    steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"]],
+  },
+  // Each request alone fits in the timeout; the command's requests together do
+  // not. One deadline for the whole command fails; one per request would pass.
+  { name: "one deadline per command", delayMs: 400, env: { KANEO_SESSION_ID: "sess-budget" }, steps: [["session", "attach", "1", "--strict", "--timeout", "1s"], ["board", "--json", "--timeout", "1s"]] },
   {
     name: "hook failure logged in local time",
     env: { KANEO_SESSION_ID: "sess-tz", TZ: "Asia/Tokyo" },

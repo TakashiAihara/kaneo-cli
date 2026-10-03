@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "args": [
+        "__complete",
+        "-w",
+        ""
+      ],
+      "exit": 0,
+      "stdout": ":0\n",
+      "stderr": "Completion ended with directive: ShellCompDirectiveDefault\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

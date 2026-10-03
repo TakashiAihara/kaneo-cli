@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "args": [
+        "__complete",
+        "frobnicate",
+        ""
+      ],
+      "exit": 0,
+      "stdout": ":0\n",
+      "stderr": "[Debug] [Error] unable to find a command for arguments: [frobnicate]\nCompletion ended with directive: ShellCompDirectiveDefault\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

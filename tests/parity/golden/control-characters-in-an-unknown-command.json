@@ -1,0 +1,30 @@
+{
+  "steps": [
+    {
+      "args": [
+        "\u0001"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown command \\\"\\\\x01\\\" for \\\"kaneo\\\"\"\n}\n",
+      "stderr": "Error: unknown command \"\\x01\" for \"kaneo\"\n"
+    },
+    {
+      "args": [
+        "ab"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown command \\\"a\\\\x7fb\\\" for \\\"kaneo\\\"\"\n}\n",
+      "stderr": "Error: unknown command \"a\\x7fb\" for \"kaneo\"\n"
+    },
+    {
+      "args": [
+        "tab\there"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown command \\\"tab\\\\there\\\" for \\\"kaneo\\\"\"\n}\n",
+      "stderr": "Error: unknown command \"tab\\there\" for \"kaneo\"\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

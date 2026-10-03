@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { z } from "zod";
 import {
   configureClient,
+  forwardsCredential,
   InsecureCredentialError,
   kaneoFetch,
   KaneoApiError,
@@ -150,6 +151,21 @@ describe("redirects", () => {
     configureClient({ baseUrl: origin, apiKey: "test-key" });
     await kaneoFetch("/project", { method: "GET" });
     expect(auth).toBe("Bearer test-key");
+  });
+
+  // The whole rule in one place, so each half of it is pinned: the host must
+  // stay the same, and the hop must still be protected.
+  test.each([
+    ["https://kaneo.example/api", "https://kaneo.example/api/x", true],
+    ["https://kaneo.example/api", "https://kaneo.example:8443/api/x", true],
+    ["https://kaneo.example/api", "http://kaneo.example/api/x", false],
+    ["https://kaneo.example/api", "https://other.example/api/x", false],
+    ["https://kaneo.example/api", "https://KANEO.example/api/x", true],
+    ["http://127.0.0.1:5173/api", "http://127.0.0.1:5174/api/x", true],
+    ["http://127.0.0.1:5173/api", "http://localhost:5173/api/x", false],
+    ["http://[::1]:5173/api", "http://[::1]:5174/api/x", true],
+  ])("forwardsCredential(%p, %p) is %p", (from, to, want) => {
+    expect(forwardsCredential(new URL(from), new URL(to))).toBe(want);
   });
 
   // A redirect to another host is a different recipient, whatever its scheme:

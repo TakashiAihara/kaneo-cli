@@ -35,12 +35,16 @@ export type Command<A> = {
   flags?: Flag[];
   // Rejects the positional arguments, in the words the Go build used.
   args?: (args: string[]) => void;
-  run?: (ctx: { args: string[]; flags: FlagValues; app: A }) => void | Promise<void>;
+  run?: (ctx: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: A }) => void | Promise<void>;
   children?: Command<A>[];
 };
 
 // Go's %q, which is close enough to JSON's quoting for anything a user types.
 const quote = (value: string): string => JSON.stringify(value);
+
+// The same for a single shorthand letter. pflag quotes it as the rune it is, so
+// the single quotes are part of the wording a user sees.
+const quoteRune = (letter: string): string => `'${letter}'`;
 
 // A Go duration, in milliseconds. The error messages are Go's, because they are
 // what a user sees when they mistype the value.
@@ -130,12 +134,18 @@ const VERSION_FLAG: Flag = {
   defaultValue: "false",
 };
 
-export type ParsedFlags = { flags: FlagValues; args: string[] };
+export type ParsedFlags = { flags: FlagValues; args: string[]; changed: ReadonlySet<string> };
 
 export const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
   const byName = new Map(flags.map((flag) => [flag.name, flag]));
   const byShorthand = new Map(flags.flatMap((flag) => (flag.shorthand ? [[flag.shorthand, flag] as const] : [])));
   const values: FlagValues = {};
+  // The names of the flags the command line gave a value to. A string flag that
+  // was not passed holds its default, which is "" for every flag here, so a
+  // passed-but-empty `--description ""` is otherwise indistinguishable from
+  // saying nothing at all — and the difference between clearing a description
+  // and keeping it is the whole point of that flag.
+  const changed = new Set<string>();
   const set = (flag: Flag, raw: string): void => {
     const name = flag.shorthand ? `-${flag.shorthand}, --${flag.name}` : `--${flag.name}`;
     try {
@@ -145,6 +155,10 @@ export const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
     } catch (e) {
       throw new Error(`invalid argument ${quote(raw)} for ${quote(name)} flag: ${(e as Error).message}`);
     }
+  };
+  const given = (flag: Flag, raw: string): void => {
+    changed.add(flag.name);
+    set(flag, raw);
   };
   for (const flag of flags) set(flag, flag.defaultValue);
 
@@ -170,12 +184,12 @@ export const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
       const equals = name.indexOf("=");
       const flag = byName.get(equals === -1 ? name : name.slice(0, equals));
       if (flag === undefined) throw new Error(`unknown flag: --${equals === -1 ? name : name.slice(0, equals)}`);
-      if (equals !== -1) set(flag, name.slice(equals + 1));
-      else if (flag.type === "bool") set(flag, "true");
+      if (equals !== -1) given(flag, name.slice(equals + 1));
+      else if (flag.type === "bool") given(flag, "true");
       else {
         const value = take();
         if (value === undefined) throw new Error(`flag needs an argument: ${token}`);
-        set(flag, value);
+        given(flag, value);
       }
       continue;
     }
@@ -186,26 +200,26 @@ export const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
       if (flag === undefined) throw new Error(`unknown shorthand flag: ${quote(letter)} in -${shorthands}`);
       const rest = shorthands.slice(1);
       if (rest.length > 1 && rest[0] === "=") {
-        set(flag, rest.slice(1));
+        given(flag, rest.slice(1));
         shorthands = "";
       } else if (flag.type === "bool") {
-        set(flag, "true");
+        given(flag, "true");
         shorthands = rest;
       } else if (rest !== "") {
         // -pvalue and -p=value both carry the value in the same word.
-        set(flag, rest);
+        given(flag, rest);
         shorthands = "";
       } else {
         const value = take();
         if (value === undefined) throw new Error(`flag needs an argument: ${quote(letter)} in -${shorthands}`);
-        set(flag, value);
+        given(flag, value);
         // The rest of the word held no further shorthand; only a value flag can
         // leave it empty, so nothing is left to read.
         shorthands = "";
       }
     }
   }
-  return { flags: values, args: positional };
+  return { flags: values, args: positional, changed };
 };
 
 const hasNoValue = (flags: Flag[], name: string): boolean =>
@@ -286,6 +300,26 @@ export const minimumArgs =
   (count: number): ((args: string[]) => void) =>
   (args) => {
     if (args.length < count) throw new Error(`requires at least ${count} arg(s), only received ${args.length}`);
+  };
+
+export const maximumArgs =
+  (count: number): ((args: string[]) => void) =>
+  (args) => {
+    if (args.length > count) throw new Error(`accepts at most ${count} arg(s), received ${args.length}`);
+  };
+
+export const exactArgs =
+  (count: number): ((args: string[]) => void) =>
+  (args) => {
+    if (args.length !== count) throw new Error(`accepts ${count} arg(s), received ${args.length}`);
+  };
+
+export const rangeArgs =
+  (min: number, max: number): ((args: string[]) => void) =>
+  (args) => {
+    if (args.length < min || args.length > max) {
+      throw new Error(`accepts between ${min} and ${max} arg(s), received ${args.length}`);
+    }
   };
 
 const available = <A>(command: Command<A>): Command<A>[] =>

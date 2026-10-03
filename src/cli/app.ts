@@ -59,3 +59,15 @@ export const project = (app: App): string => {
   }
   return ids[0]!;
 };
+
+// The project a command reads a task out of, or "" when the settings name none
+// or several.
+//
+// The Go build dropped the error from project() and passed the empty string on,
+// because a task reference can be an id as well as a number, and only a number
+// needs a project to look through. The leniency is kept, and the lookup is what
+// reports the missing project, naming the number it could not resolve.
+export const taskProject = (app: App): string => {
+  const ids = app.cfg.projectIds ?? [];
+  return ids.length === 1 ? ids[0]! : "";
+};

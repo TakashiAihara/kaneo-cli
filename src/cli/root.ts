@@ -139,7 +139,7 @@ export const run = async (argv: string[]): Promise<number> => {
     const app: App = { cfg, global, out, timeoutMs: Number(parsed.flags.timeout ?? 0) };
     configureClient({ baseUrl: cfg.apiUrl, apiKey: cfg.apiKey, timeoutMs: app.timeoutMs });
 
-    await command.run({ args: parsed.args, flags: parsed.flags, app });
+    await command.run({ args: parsed.args, flags: parsed.flags, changed: parsed.changed, app });
     return 0;
   } catch (e) {
     const writer =

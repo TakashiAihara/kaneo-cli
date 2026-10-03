@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "1",
+        "--strict"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"parse <HOME>/.config/kaneo/config.json: json: cannot unmarshal number into Go struct field Global.hooks.attach of type string\"\n}\n",
+      "stderr": "Error: parse <HOME>/.config/kaneo/config.json: json: cannot unmarshal number into Go struct field Global.hooks.attach of type string\n"
+    },
+    {
+      "args": [
+        "context",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"parse <HOME>/.config/kaneo/config.json: json: cannot unmarshal number into Go struct field Global.hooks.attach of type string\"\n}\n",
+      "stderr": "Error: parse <HOME>/.config/kaneo/config.json: json: cannot unmarshal number into Go struct field Global.hooks.attach of type string\n"
+    }
+  ],
+  "requests": [],
+  "files": {
+    ".config/kaneo/config.json": "{\"hooks\":{\"attach\":5}}"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"ALP\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  {\n    \"id\": \"proj-beta\",\n    \"name\": \"Beta\",\n    \"slug\": \"BET\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

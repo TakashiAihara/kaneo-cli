@@ -11,7 +11,7 @@ import { SCENARIOS } from "./scenarios";
 // reference to show the goldens are deterministic before trusting a failure.
 const CLI = process.env.KANEO_PARITY_BIN
   ? [process.env.KANEO_PARITY_BIN]
-  : ["bun", new URL("../../src/index.ts", import.meta.url).pathname];
+  : [process.execPath, new URL("../../src/index.ts", import.meta.url).pathname];
 
 describe("parity with the Go build", () => {
   for (const s of SCENARIOS) {
@@ -19,6 +19,9 @@ describe("parity with the Go build", () => {
       const want: ScenarioResult = JSON.parse(readFileSync(new URL(`golden/${slug(s.name)}.json`, import.meta.url), "utf8"));
       const got = await runScenario(CLI, s);
 
+      // The golden's own shape first: a scenario edited after recording would
+      // otherwise compare only the steps both sides happen to share.
+      expect(got.steps.map((s) => s.args)).toEqual(want.steps.map((s) => s.args));
       for (const [i, w] of want.steps.entries()) {
         const g = got.steps[i]!;
         const at = `step ${i + 1}: kaneo ${w.args.join(" ")}`;

@@ -1,0 +1,32 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/auth/organization/list: Get \\\"http://127.0.0.1:9/api/auth/organization/list\\\": dial tcp 127.0.0.1:9: connect: connection refused\"\n}\n",
+      "stderr": "Error: GET /api/auth/organization/list: Get \"http://127.0.0.1:9/api/auth/organization/list\": dial tcp 127.0.0.1:9: connect: connection refused\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/task/tasks/proj-alpha: Get \\\"http://127.0.0.1:9/api/task/tasks/proj-alpha\\\": dial tcp 127.0.0.1:9: connect: connection refused\"\n}\n",
+      "stderr": "Error: GET /api/task/tasks/proj-alpha: Get \"http://127.0.0.1:9/api/task/tasks/proj-alpha\": dial tcp 127.0.0.1:9: connect: connection refused\n"
+    },
+    {
+      "args": [
+        "board"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"project proj-alpha: GET /api/project/proj-alpha: Get \\\"http://127.0.0.1:9/api/project/proj-alpha\\\": dial tcp 127.0.0.1:9: connect: connection refused\"\n}\n",
+      "stderr": "Error: project proj-alpha: GET /api/project/proj-alpha: Get \"http://127.0.0.1:9/api/project/proj-alpha\": dial tcp 127.0.0.1:9: connect: connection refused\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

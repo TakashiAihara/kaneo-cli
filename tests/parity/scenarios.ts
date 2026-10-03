@@ -42,6 +42,12 @@ export type Scenario = {
   local?: unknown;
   // Makes the cwd a git repository whose origin is github.com/<repo>.
   repo?: string;
+  // Writes this text as config.json, for a file that is not valid JSON.
+  rawConfig?: string;
+  // The fake answers like a server older than the pinned document.
+  legacy?: boolean;
+  // The fake holds every response back this long.
+  delayMs?: number;
   pageSize?: number;
 };
 
@@ -104,6 +110,46 @@ export const SCENARIOS: Scenario[] = [
   { name: "no workspace", env: { KANEO_WORKSPACE: "" }, steps: [["project", "ls", "--json"]] },
   { name: "no project", env: { KANEO_PROJECT: "" }, steps: [["task", "ls", "--json"]] },
   { name: "unknown command", steps: [["frobnicate"]] },
+  ...[["--help"], ["help"], ["help", "project"], ["task", "--help"], ["task", "create", "--help"], ["project", "get", "--help"], ["session"], ["session", "next", "--help"]].map(
+    (args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] }),
+  ),
+  { name: "unknown flag", steps: [["task", "ls", "--bogus"], ["task", "ls", "-x"], ["--bogus"]] },
+  { name: "completion", steps: [["completion", "zsh"], ["completion", "bash"], ["completion", "fish"], ["completion", "powershell"], ["completion"]] },
+
+  { name: "server unreachable", env: { KANEO_API_URL: "http://127.0.0.1:9" }, steps: [["whoami", "--json"], ["task", "ls"], ["board"]] },
+  { name: "request timeout", delayMs: 1500, steps: [["whoami", "--json", "--timeout", "300ms"], ["task", "ls", "--timeout", "300ms"]] },
+  { name: "timeout zero or negative", steps: [["whoami", "--json", "--timeout", "0"], ["whoami", "--json", "--timeout", "-1s"], ["whoami", "--timeout", "nonsense"]] },
+
+  { name: "config that is not JSON", env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" }, rawConfig: "{not json", steps: [["context", "--json"], ["task", "ls"]] },
+  {
+    name: "config with a wrong type",
+    env: { KANEO_SESSION_ID: "sess-types" },
+    config: { hooks: { attach: 5 } },
+    steps: [["session", "attach", "1", "--strict"], ["context", "--json"]],
+  },
+  {
+    name: "config keys in another case",
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
+    config: { Default_Profile: "self", Profiles: { self: { Workspace_ID: WS, project_id: P2 } } },
+    steps: [["context", "--json"]],
+  },
+
+  { name: "ids that need escaping", steps: [["task", "get", "a b/c?#%é", "--json"], ["comment", "ls", "x/y", "--json"], ["project", "get", "p/q", "--json"]] },
+
+  ...[["project", "ls", "--json"], ["project", "get", "--json"], ["task", "ls", "--json"], ["task", "ls", "--human"], ["board", "--json"], ["board", "--human"], ["comment", "ls", "1", "--json"], ["comment", "ls", "1", "--human"], ["task", "links", "1", "--json"]].map(
+    (args): Scenario => ({ name: `older server: ${args.join(" ")}`, legacy: true, steps: [args] }),
+  ),
+
+  { name: "no git on PATH", env: { PATH: "/nonexistent" }, steps: [["task", "ls", "--json"], ["context", "--json"]] },
+  { name: "no git on PATH, session", env: { PATH: "/nonexistent", KANEO_SESSION_ID: "sess-nogit" }, steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"]] },
+
+  {
+    name: "hook failure logged in local time",
+    env: { KANEO_SESSION_ID: "sess-tz", TZ: "Asia/Tokyo" },
+    config: { hooks: { attach: "exit 2" } },
+    steps: [["session", "attach", "1", "--strict"]],
+  },
+
   // An unreleased build reports itself as dev; scripts/build.ts stamps the tag.
   { name: "version", steps: [["--version"], ["-v"]] },
 

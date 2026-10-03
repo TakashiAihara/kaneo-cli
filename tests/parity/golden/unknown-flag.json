@@ -1,0 +1,34 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "--bogus"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown flag: --bogus\"\n}\n",
+      "stderr": "Error: unknown flag: --bogus\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "-x"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown shorthand flag: 'x' in -x\"\n}\n",
+      "stderr": "Error: unknown shorthand flag: 'x' in -x\n"
+    },
+    {
+      "args": [
+        "--bogus"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown flag: --bogus\"\n}\n",
+      "stderr": "Error: unknown flag: --bogus\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

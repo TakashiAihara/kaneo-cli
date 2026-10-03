@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "--json",
+        "--timeout",
+        "300ms"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/auth/organization/list: Get \\\"<URL>/api/auth/organization/list\\\": context deadline exceeded\"\n}\n",
+      "stderr": "Error: GET /api/auth/organization/list: Get \"<URL>/api/auth/organization/list\": context deadline exceeded\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--timeout",
+        "300ms"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/task/tasks/proj-alpha: Get \\\"<URL>/api/task/tasks/proj-alpha\\\": context deadline exceeded\"\n}\n",
+      "stderr": "Error: GET /api/task/tasks/proj-alpha: Get \"<URL>/api/task/tasks/proj-alpha\": context deadline exceeded\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

@@ -34,7 +34,18 @@ const DEFAULT_COLUMNS = [
   { slug: "done", name: "Done", isFinal: true },
 ];
 
-export function startFake(seed: Seed, opts: { pageSize?: number } = {}) {
+export type FakeOptions = {
+  pageSize?: number;
+  // Answers the way a server older than the pinned document does: fields the
+  // document has since added are missing, and a comment's author can be null.
+  // Responses are then not checked against the schema, since departing from
+  // it is the point.
+  legacy?: boolean;
+  // Holds every response back this long, for timeouts.
+  delayMs?: number;
+};
+
+export function startFake(seed: Seed, opts: FakeOptions = {}) {
   let clock = 0;
   const now = () => new Date(T0 + 1000 * clock++).toISOString();
   let seq = 0;
@@ -94,7 +105,7 @@ export function startFake(seed: Seed, opts: { pageSize?: number } = {}) {
   const requests: Recorded[] = [];
 
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
-    Response.json(schema.parse(body), { status });
+    Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
 
   const boardTask = (t: (typeof tasks)[number]) => ({
@@ -296,10 +307,27 @@ export function startFake(seed: Seed, opts: { pageSize?: number } = {}) {
     return fail(404, `no route: ${req.method} ${path}`);
   };
 
-  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: route });
+  const delayed = async (req: Request) => {
+    if (opts.delayMs) await Bun.sleep(opts.delayMs);
+    return route(req);
+  };
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: delayed });
   return {
     url: `http://127.0.0.1:${server.port}`,
     requests,
     stop: () => server.stop(true),
   };
+}
+
+// What a server older than the document leaves out, applied to any response.
+const LEGACY_DROPPED = new Set(["backgroundVersion", "pagination", "labels", "externalLinks", "subtaskCounts", "assigneeImage", "lastTaskNumber"]);
+function legacy(body: unknown): unknown {
+  if (Array.isArray(body)) return body.map(legacy);
+  if (!body || typeof body !== "object") return body;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(body)) {
+    if (LEGACY_DROPPED.has(k)) continue;
+    out[k] = k === "user" ? null : legacy(v);
+  }
+  return out;
 }

@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "args": [
+        "context",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-beta\"\n  ],\n  \"profile\": \"self\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"profile\",\n    \"workspace\": \"profile\"\n  }\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [],
+  "files": {
+    ".config/kaneo/config.json": "{\"Default_Profile\":\"self\",\"Profiles\":{\"self\":{\"Workspace_ID\":\"ws-main\",\"project_id\":\"proj-beta\"}}}"
+  }
+}

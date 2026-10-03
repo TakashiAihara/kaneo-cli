@@ -14,7 +14,7 @@ export type ScenarioResult = { steps: StepResult[]; requests: Recorded[]; files:
 // fake's port, the temp HOME, the machine's host name) are replaced with
 // placeholders.
 export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioResult> {
-  const fake = startFake(SEED, { pageSize: s.pageSize });
+  const fake = startFake(SEED, { pageSize: s.pageSize, legacy: s.legacy, delayMs: s.delayMs });
   const home = mkdtempSync(join(tmpdir(), "kaneo-parity-"));
   try {
     const cwd = join(home, "work");
@@ -25,6 +25,10 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
         const g = Bun.spawnSync(["git", ...args], { cwd, env: { PATH: process.env.PATH ?? "", HOME: home } });
         if (g.exitCode !== 0) throw new Error(`git ${args.join(" ")} failed: ${g.stderr}`);
       }
+    }
+    if (s.rawConfig !== undefined) {
+      mkdirSync(join(home, ".config", "kaneo"), { recursive: true });
+      writeFileSync(join(home, ".config", "kaneo", "config.json"), s.rawConfig);
     }
     if (s.config !== undefined) {
       mkdirSync(join(home, ".config", "kaneo"), { recursive: true });
@@ -44,8 +48,17 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     };
     for (const [k, v] of Object.entries(env)) if (v === "") delete env[k];
 
+    // The host name is replaced only where the CLI writes it, a marker's host=
+    // field and a stored attachment's "host", so a short name such as "ci"
+    // cannot rewrite the same letters inside an id or a title.
+    const host = hostname();
     const normalize = (text: string) =>
-      text.replaceAll(fake.url, "<URL>").replaceAll(home, "<HOME>").replaceAll(hostname(), "<HOST>");
+      text
+        .replaceAll(fake.url, "<URL>")
+        .replaceAll(home, "<HOME>")
+        .replaceAll(`host=${host} `, "host=<HOST> ")
+        .replaceAll(`"host": "${host}"`, `"host": "<HOST>"`)
+        .replaceAll(`"host":"${host}"`, `"host":"<HOST>"`);
 
     const steps: StepResult[] = [];
     for (const args of s.steps) {
@@ -67,7 +80,9 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
         else
           files[relative(home, full)] = normalize(readFileSync(full, "utf8")).replace(
             /\b(?!2026-01-01T)\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d:\d\d)/g,
-            "<TIME>",
+            // The zone is kept: whether a log is written in UTC or local time
+            // is behaviour, and only the moment itself varies between runs.
+            "<TIME>$2",
           );
       }
     };

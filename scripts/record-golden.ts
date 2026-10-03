@@ -15,6 +15,14 @@ async function record(bin: string | undefined) {
     console.error("usage: bun scripts/record-golden.ts <go-kaneo-binary>");
     process.exit(2);
   }
+  // Two names that slug alike would share one golden, the later overwriting
+  // the earlier without a word.
+  const slugs = SCENARIOS.map((s) => slug(s.name));
+  const clash = slugs.filter((s, i) => slugs.indexOf(s) !== i);
+  if (clash.length > 0) {
+    console.error(`scenario names collide as golden files: ${[...new Set(clash)].join(", ")}`);
+    process.exit(2);
+  }
   const dir = new URL("../tests/parity/golden/", import.meta.url).pathname;
   mkdirSync(dir, { recursive: true });
   for (const s of SCENARIOS) {

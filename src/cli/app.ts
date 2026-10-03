@@ -1,3 +1,4 @@
+import { writeSync } from "node:fs";
 import type { GlobalConfig } from "../config/global";
 import type { Resolved } from "../config/resolve";
 import type { Writer } from "../output/output";
@@ -70,4 +71,12 @@ export const project = (app: App): string => {
 export const taskProject = (app: App): string => {
   const ids = app.cfg.projectIds ?? [];
   return ids.length === 1 ? ids[0]! : "";
+};
+
+// Writes to stderr only when KANEO_DEBUG is set. It exists so the fail-open
+// commands can explain themselves without breaking their contract of producing
+// no output.
+export const debug = (message: string): void => {
+  if ((process.env.KANEO_DEBUG ?? "") === "") return;
+  writeSync(2, `kaneo: ${message}\n`);
 };

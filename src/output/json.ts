@@ -61,3 +61,21 @@ export const encode = (value: Json, depth = 0): string => {
 
 // One line terminator, as Go's json.Encoder adds after every value it writes.
 export const line = (value: Json): string => `${encode(value)}\n`;
+
+// The same encoder without the whitespace or the trailing newline, which is
+// what Go's json.Marshal writes. A file another program reads is written this
+// way: the indentation above is for a person, and this is for the next read.
+export const compact = (value: Json): string => {
+  if (value === null) return "null";
+  switch (typeof value) {
+    case "boolean":
+      return value ? "true" : "false";
+    case "number":
+      return number(value);
+    case "string":
+      return string(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(compact).join(",")}]`;
+  const members = Object.entries(value).filter((entry): entry is [string, Json] => entry[1] !== undefined);
+  return `{${members.map(([key, item]) => `${string(key)}:${compact(item)}`).join(",")}}`;
+};

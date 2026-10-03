@@ -260,7 +260,7 @@ export const taskCommand = {
 //
 // An empty project is not refused here: a reference may be an id, which needs no
 // board, so only a number asks for one.
-const resolveTask = async (projectId: string, ref: string): Promise<Task> => {
+export const resolveTask = async (projectId: string, ref: string): Promise<Task> => {
   const wanted = ref.trim();
   if (wanted === "") throw new Error("no task given");
 

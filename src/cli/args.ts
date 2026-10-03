@@ -35,8 +35,16 @@ export type Command<A> = {
   flags?: Flag[];
   // Rejects the positional arguments, in the words the Go build used.
   args?: (args: string[]) => void;
-  run?: (ctx: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: A }) => void | Promise<void>;
+  run?: (ctx: RunContext<A>) => void | Promise<void>;
   children?: Command<A>[];
+};
+
+// Everything a command's body is handed: what was typed, and what was resolved.
+export type RunContext<A> = {
+  args: string[];
+  flags: FlagValues;
+  changed: ReadonlySet<string>;
+  app: A;
 };
 
 // Go's %q, which is close enough to JSON's quoting for anything a user types.

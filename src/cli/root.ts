@@ -18,6 +18,9 @@ import { whoamiCommand } from "./whoami";
 import { workspaceCommand } from "./workspace";
 import { projectCommand } from "./project";
 import { taskCommand } from "./task";
+import { boardCommand } from "./board";
+import { sessionCommand } from "./session";
+import { commentCommand } from "./comment";
 import { apiCheckCommand } from "./apicheck";
 
 // The version is stamped in at build time; an unreleased build calls itself dev,
@@ -69,7 +72,18 @@ const rootCommand = (): { root: Command<App> } => {
     use: "kaneo",
     short: "Command-line client for Kaneo",
     persistent: GLOBAL_FLAGS,
-    children: [contextCommand, whoamiCommand, workspaceCommand, projectCommand, taskCommand, apiCheckCommand, helpCommand],
+    children: [
+      contextCommand,
+      whoamiCommand,
+      workspaceCommand,
+      projectCommand,
+      taskCommand,
+      boardCommand,
+      sessionCommand,
+      commentCommand,
+      apiCheckCommand,
+      helpCommand,
+    ],
   };
   return { root };
 };

@@ -4,10 +4,12 @@ import {
   archiveProject,
   createProject as postProject,
   createTask as postTask,
+  createTaskComment,
   createTaskRelation,
   deleteTask as removeTask,
   getProject as readProject,
   getTask as readTask,
+  getTaskComments,
   getTaskRelations,
   listOrganization,
   listProjects,
@@ -133,8 +135,8 @@ export type Workspace = { id: string; name: string; slug: string };
 // one. /auth/get-session answers 200 with null for a valid key, an invalid key
 // and no key at all, so it has no discriminating power and must not be used to
 // check credentials.
-export const listWorkspaces = async (): Promise<Workspace[]> =>
-  (await call(listOrganization())).map((org) => workspace(org));
+export const listWorkspaces = async (signal?: AbortSignal): Promise<Workspace[]> =>
+  (await call(listOrganization({ ...(signal === undefined ? {} : { signal }) }))).map((org) => workspace(org));
 
 const workspace = (org: Organization): Workspace => ({ id: org.id, name: org.name, slug: org.slug });
 
@@ -208,8 +210,12 @@ const project = (item: ProjectFields): Project => ({
 });
 
 // Fetches one project by id.
-export const getProject = async (projectId: string): Promise<Project> =>
-  project(await call(readProject(pathParam(projectId)))); 
+//
+// A signal bounds the call when the caller shares a deadline with other work;
+// the transport applies the process-wide timeout as well, and a signal here
+// only ever cuts the request short.
+export const getProject = async (projectId: string, signal?: AbortSignal): Promise<Project> =>
+  project(await call(readProject(pathParam(projectId), { ...(signal === undefined ? {} : { signal }) })));
 
 // The payload for creating a project. description is not sent: the server's
 // create route takes no description, so it is only here to be set by an update
@@ -543,6 +549,45 @@ export const moveTask = async (taskId: string, projectId: string): Promise<void>
 
 export const deleteTask = async (taskId: string): Promise<void> => {
   await call(removeTask(pathParam(taskId)));
+};
+
+// A comment on a task. It is also where the session's metadata lives, since a
+// task has no custom fields.
+export type Comment = {
+  id: string;
+  content: string;
+  userId: string;
+  userName: string;
+  createdAt: string;
+};
+
+// A task's comments, oldest first.
+//
+// The author's name arrives as user.name, which only this route carries, so it
+// is read from there and from nowhere else.
+export const listComments = async (taskId: string): Promise<Comment[]> =>
+  (await call(getTaskComments(pathParam(taskId)))).map((c) => ({
+    id: c.id,
+    content: c.content,
+    userId: c.userId,
+    userName: c.user.name,
+    createdAt: isoTime(c.createdAt),
+  }));
+
+// Posts a comment on a task. The server answers with the stored activity row,
+// which carries no author, so the reply's name is empty and a caller that needs
+// one reads the listing back.
+export const addComment = async (taskId: string, content: string, signal?: AbortSignal): Promise<Comment> => {
+  const a = await call(
+    createTaskComment(pathParam(taskId), { content }, { ...(signal === undefined ? {} : { signal }) }),
+  );
+  return {
+    id: a.id,
+    content: a.content ?? "",
+    userId: a.userId ?? "",
+    userName: "",
+    createdAt: isoTime(a.createdAt),
+  };
 };
 
 // The links the server accepts between two tasks.

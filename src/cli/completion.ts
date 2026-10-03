@@ -1,5 +1,5 @@
 import { writeSync } from "node:fs";
-import { find, inheritedFlags, localFlags, noArgs, type Command, type Flag, type FlagValues, type RunContext } from "./args";
+import { declaredFlags, find, inheritedFlags, localFlags, noArgs, type Command, type Flag, type FlagValues, type RunContext } from "./args";
 import type { App } from "./app";
 import { activeHelpVar, bashScript, fishScript, powershellScript, zshScript, type Program } from "./completion-scripts";
 
@@ -24,6 +24,8 @@ const DIRECTIVES = {
   default: { bit: 0, name: "ShellCompDirectiveDefault" },
   noFileCompletion: { bit: 4, name: "ShellCompDirectiveNoFileComp" },
 } as const;
+
+type Directive = (typeof DIRECTIVES)[keyof typeof DIRECTIVES];
 
 const PROGRAM_NAME = "kaneo";
 
@@ -132,10 +134,10 @@ const shellCommand = (shell: Shell, long: string): Command<App> => ({
   name: shell,
   short: `Generate the autocompletion script for ${shell}`,
   long: long.trim(),
-  // cobra prints these use lines without the [flags] every other command ends
-  // in: --no-descriptions is there for whoever generates the script, not for
-  // whoever types this one.
-  noFlagsInUse: true,
+  // Only bash. cobra's completion tree sets this on that one command and leaves
+  // the other three alone, so their use lines end in [flags] and its does not.
+  // The help is the Go build's word for word, that difference included.
+  noFlagsInUse: shell === "bash",
   args: noArgs(`kaneo completion ${shell}`),
   flags: [noDescriptionsFlag],
   run: ({ flags }: { flags: FlagValues }) => {
@@ -186,14 +188,45 @@ export const completeCommand = (root: Command<App>): Command<App> => ({
     // neither of which names a command yet.
     const typed = args.slice(0, -1);
     const partial = args[args.length - 1] ?? "";
-    const { chain } = find(root, typed);
+    const { chain, rest, words } = find(root, typed);
     const command = chain[chain.length - 1]!;
-    // A flag name is never followed by a file name, so the shell is told to stop
-    // there whether or not anything matched. Otherwise a command that offers
-    // subcommands of its own is finished with those, which is the same answer.
-    const flagWord = partial.startsWith("-");
-    const directive = flagWord || (command.children ?? []).length > 0 ? DIRECTIVES.noFileCompletion : DIRECTIVES.default;
-    const lines = flagWord ? flagLines(chain, typed, partial) : commandLines(command, partial);
+
+    let lines: string[] = [];
+    // The shell is told to fall back on its own idea of what to do unless the
+    // answer rules that out: only a name the program knows, or a flag name, is
+    // something a file can never be.
+    let directive: Directive = DIRECTIVES.default;
+
+    if (chain.length === 1 && words.length > 0) {
+      // A word that names no command ends the lookup, and cobra says so where
+      // whoever ran the line by hand can read it. The shell ignores stderr and
+      // is told only that nothing is on offer.
+      writeSync(2, `[Debug] [Error] unable to find a command for arguments: [${typed.join(" ")}]\n`);
+    } else if (expectsValue(chain, rest)) {
+      // The word being completed is the value of the flag before it. Nothing is
+      // on offer for one, and the shell is left to fall back: a flag's value is
+      // whatever the flag says it takes, which only the program can answer, and
+      // a file name is the one answer that is always wrong.
+    } else if (command.completesNamedCommands === true) {
+      // The command whose name is being completed is the one the words after
+      // its own name lead to, not one of its own subcommands, so the lookup is
+      // done against the tree as though this command were not there. A name
+      // nobody has leaves nothing to complete.
+      const named = find(root, rest);
+      if (named.chain.length > 1 || rest.length === 0) lines = commandLines(named.command, partial);
+      directive = DIRECTIVES.noFileCompletion;
+    } else if (partial.startsWith("-")) {
+      // A flag name is never followed by a file name, so the shell is told to
+      // stop there whether or not anything matched.
+      lines = flagLines(chain, typed, partial);
+      directive = DIRECTIVES.noFileCompletion;
+    } else {
+      // A command that offers subcommands of its own is finished with those,
+      // which is the same answer as for a flag name.
+      lines = commandLines(command, partial);
+      if ((command.children ?? []).length > 0) directive = DIRECTIVES.noFileCompletion;
+    }
+
     for (const word of lines) writeSync(1, `${descriptions ? word : word.split("\t")[0]!}\n`);
     writeSync(1, `:${directive.bit}\n`);
     // A shell reads stdout and ignores stderr, so the directive is reported a
@@ -201,6 +234,26 @@ export const completeCommand = (root: Command<App>): Command<App> => ({
     writeSync(2, `Completion ended with directive: ${directive.name}\n`);
   },
 });
+
+// Whether the word being completed is a flag's value, which the word before it
+// gives away: a flag that takes one leaves nothing to offer, and a flag that
+// takes none is a flag name again rather than a value.
+const expectsValue = (chain: Command<App>[], rest: string[]): boolean => {
+  const previous = rest[rest.length - 1];
+  if (previous === undefined || previous.includes("=")) return false;
+  const name = flagNamed(previous);
+  if (name === undefined) return false;
+  return declaredFlags(chain).some((flag) => (flag.name === name || flag.shorthand === name) && flag.type !== "bool");
+};
+
+// The flag a word names, or undefined when the word is not one. A long spelling
+// carries the name itself and a short one only its last letter, which is the one
+// a cluster of shorthands has reached.
+const flagNamed = (word: string): string | undefined => {
+  if (word.startsWith("--")) return word.length > 2 ? word.slice(2) : undefined;
+  if (word.startsWith("-") && word.length > 1 && word[1] !== "-") return word[word.length - 1];
+  return undefined;
+};
 
 // One candidate per line: the word, then a tab and what it means, which is the
 // shape the generated scripts split the answer on.

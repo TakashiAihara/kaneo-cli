@@ -1,7 +1,9 @@
 import {
   appendFileSync,
+  closeSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   rmSync,
   statSync,
@@ -54,17 +56,28 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
     return;
   }
   const log = join(captured, "out.log");
+  // One descriptor for both streams, which is the single file Go handed the child.
+  // Two Bun.file targets on one path are two opens of it, and each truncates what
+  // the other wrote, so the report keeps one stream's worth of the hook's output
+  // and loses the rest. Opened here rather than left to Bun, and given back in
+  // the finally below, so this process is not left holding it either.
+  let output: number;
+  try {
+    output = openSync(log, "w", 0o600);
+  } catch (e) {
+    // A file nobody can create is the same failure as a directory nobody can,
+    // and is reported the way the Go build reported its CreateTemp.
+    reportHookFailure(event, env, `capture output: ${(e as Error).message}`, "");
+    return;
+  }
   try {
     let hook: Bun.Subprocess;
     try {
       hook = Bun.spawn(["sh", "-c", command], {
         env: { ...process.env, ...env },
         stdin: "ignore",
-        // A file rather than a descriptor of one opened here: Bun opens it for
-        // the child and closes it again, so nothing is left open in this process
-        // for a hook to be writing into after it has gone.
-        stdout: Bun.file(log),
-        stderr: Bun.file(log),
+        stdout: output,
+        stderr: output,
         // Its own session, so a signal meant for kaneo's group does not reach it.
         detached: true,
       });
@@ -81,8 +94,12 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
     // SIGKILL; both are accepted.
     let caught: string | undefined;
     let killed: "timeout" | "signalled" | undefined;
+    // The group is only worth signalling while the hook is in it: afterwards the
+    // number has been given back and may already name somebody else's.
+    let running = true;
     const killGroup = (why: "timeout" | "signalled") => {
       killed ??= why;
+      if (!running) return;
       try {
         process.kill(-hook.pid, "SIGKILL");
       } catch {
@@ -90,6 +107,7 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
       }
     };
     const deadline = setTimeout(() => killGroup("timeout"), HOOK_TIMEOUT_MS);
+
     const listeners = SIGNALS.map((signal) => {
       const handler = () => {
         caught ??= signal;
@@ -100,23 +118,31 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
     });
 
     await hook.exited;
-    // A signal that arrived while the hook was on its way out is still queued in
-    // the loop, and the loop does not run it until something yields. Deciding
-    // here without that yield is how a hook that signals kaneo on its way out
-    // gets missed: the hook is gone, nothing is left to wait for, and the
-    // command would exit 0 as though nothing had happened.
-    await yieldToTheLoop();
+    running = false;
     clearTimeout(deadline);
-    // Removing the last listener for a signal restores the default action,
-    // which is what the signal below is delivered to.
-    for (const { signal, handler } of listeners) process.off(signal, handler);
 
+    // A signal is queued when it arrives and its handler runs on the next turn of
+    // the loop, and the turn that brings the hook's exit is not always that one —
+    // measured at about one time in eight. So this wait is part of the decision
+    // rather than a margin on it: without it a hook that signals kaneo on its way
+    // out is reported as a hook killed for some other reason, or as one that ran
+    // clean, and nothing is re-raised at all.
+    await nextTurn();
+
+    // Decided here, with the handlers still installed. Taking them down is what
+    // makes this answer final: a signal arriving from here on has to find the
+    // default action rather than a handler whose record of it nothing reads.
     const failure = failureOf(hook, killed);
     if (failure !== undefined) reportHookFailure(event, env, failure, tailOf(log));
     // Taken away before the re-raise below, which ends this process without
     // running the finally. force makes the second removal a no-op.
     rmSync(captured, { recursive: true, force: true });
 
+    // Removing the last listener for a signal restores the default action, which is
+    // what the signal below is delivered to. The removal and the re-raise are one
+    // turn of the loop with nothing awaited between them, and what is re-raised is
+    // the signal a handler recorded rather than whatever has arrived since.
+    for (const { signal, handler } of listeners) process.off(signal, handler);
     // Delivered again with its default action, so kaneo still dies of it and
     // `kaneo session attach && next` stops. The wait is because delivery is
     // asynchronous, and without it kaneo could print its success line first.
@@ -125,17 +151,20 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   } finally {
+    // Given back here rather than left to the operating system, which only takes
+    // it when the re-raise above ends this process without running the finally.
+    closeSync(output);
     rmSync(captured, { recursive: true, force: true });
   }
 };
 
-// Two turns of the event loop, which is what it takes for a signal handler that
-// is already due to run: one for the task the loop has queued, one for the one
-// that queues behind it.
-const yieldToTheLoop = async (): Promise<void> => {
-  await new Promise((resolve) => setImmediate(resolve));
-  await new Promise((resolve) => setTimeout(resolve, 0));
-};
+// The next turn of the loop, which is when a signal it has been given reaches its
+// handler: the signal is queued when it arrives, and the handler runs on the turn
+// after that. One is the whole of it after a hook has ended, because everything
+// the hook sent was queued before the hook's exit was and so is already ahead of
+// this. What was sent after it exited is not waited for, since there is no
+// telling how long that could be, and it reaches the default action anyway.
+const nextTurn = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 // How a hook ended badly, in the Go build's words, because that is what
 // hooks.log has always held.
@@ -151,17 +180,47 @@ const failureOf = (hook: Bun.Subprocess, killed: "timeout" | "signalled" | undef
   return `exit status ${hook.exitCode}`;
 };
 
-// Go names a signal after what it does; anything it does not name is spelled as
-// the platform spells it.
-const NAMES: Record<string, string> = {
+// Go names every signal after what it does rather than after its number, and
+// that wording is what hooks.log has always held: a hook that kills itself with
+// SIGUSR1 is reported as "user defined signal 1", which says what happened, where
+// the abbreviation says only which constant was used. Anything this table does
+// not hold is spelled the way the platform spells it, as Go falls back on the
+// name for a number its table does not carry.
+const SIGNAL_NAMES: Record<string, string> = {
+  SIGHUP: "hangup",
   SIGINT: "interrupt",
   SIGQUIT: "quit",
+  SIGILL: "illegal instruction",
+  SIGTRAP: "trace/breakpoint trap",
+  SIGABRT: "aborted",
+  SIGBUS: "bus error",
+  SIGFPE: "floating point exception",
   SIGKILL: "killed",
+  SIGUSR1: "user defined signal 1",
+  SIGSEGV: "segmentation fault",
+  SIGUSR2: "user defined signal 2",
+  SIGPIPE: "broken pipe",
+  SIGALRM: "alarm clock",
   SIGTERM: "terminated",
-  SIGHUP: "hangup",
+  SIGSTKFLT: "stack fault",
+  SIGCHLD: "child exited",
+  SIGCONT: "continued",
+  SIGSTOP: "stopped (signal)",
+  SIGTSTP: "stopped",
+  SIGTTIN: "stopped (tty input)",
+  SIGTTOU: "stopped (tty output)",
+  SIGURG: "urgent I/O condition",
+  SIGXCPU: "CPU time limit exceeded",
+  SIGXFSZ: "file size limit exceeded",
+  SIGVTALRM: "virtual timer expired",
+  SIGPROF: "profiling timer expired",
+  SIGWINCH: "window changed",
+  SIGIO: "I/O possible",
+  SIGPWR: "power failure",
+  SIGSYS: "bad system call",
 };
 
-const signalName = (code: string): string => NAMES[code] ?? code.slice(3).toLowerCase();
+const signalName = (code: string): string => SIGNAL_NAMES[code] ?? code.slice(3).toLowerCase();
 
 // The end, not the start: the reason a command failed is usually the last thing
 // it printed. A file that cannot be read at all has nothing to report, and that

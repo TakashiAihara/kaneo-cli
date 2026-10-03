@@ -53,6 +53,9 @@ const helpCommand: Command<App> = {
   name: "help",
   short: "Help about any command",
   use: "help [command]",
+  // A shell completing `kaneo help <TAB>` is asking which command can be asked
+  // for help about, which is the whole tree rather than anything below help.
+  completesNamedCommands: true,
   run: ({ args, app: _app }) => {
     const { root } = rootCommand();
     const chain = find(root, args).chain;

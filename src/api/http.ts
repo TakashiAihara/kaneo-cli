@@ -305,16 +305,18 @@ const redirectTarget = (response: Response, from: URL): URL | undefined => {
   }
 };
 
-// Whether the redirect is still talking to the host the key was handed to, and
-// still over a connection that protects it.
+// Whether the key goes with a hop from one URL to another.
 //
 // The host is the recipient: the key was given to one server, and a hop that
 // names another server is giving it to somebody who never asked for it. Only the
-// host name is compared, because a redirect that moves the port, or the scheme,
-// is the same server reached another way, and whether the transport is still
-// safe is keepsCredential's question to answer.
+// host name is compared, because a redirect that moves the port is the same
+// server reached another way, and whether the connection still protects what is
+// sent over it is keepsCredential's question to answer.
+export const forwardsCredential = (from: URL, to: URL): boolean =>
+  hostName(from) === hostName(to) && keepsCredential(to.href);
+
 const withoutCredential = (headers: Headers, from: URL, to: URL): Headers => {
-  if (hostName(from) === hostName(to) && keepsCredential(to.href)) return headers;
+  if (forwardsCredential(from, to)) return headers;
   const kept = new Headers(headers);
   kept.delete("Authorization");
   return kept;

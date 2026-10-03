@@ -47,6 +47,12 @@ export type Command<A> = {
   // which is what lets the completion command be asked about a command line
   // that has flags in it.
   rawArgs?: boolean;
+  // Answers with the commands the words after its own name lead to, rather than
+  // with its own subcommands: what it completes is named by the line being
+  // completed, not by the command doing the completing. The help command is the
+  // one that has this, since what it is asked for is the command somebody wants
+  // help about.
+  completesNamedCommands?: boolean;
 };
 
 // Everything a command's body is handed: what was typed, and what was resolved.
@@ -61,8 +67,53 @@ export type RunContext<A> = {
   app: A;
 };
 
-// Go's %q, which is close enough to JSON's quoting for anything a user types.
-const quote = (value: string): string => JSON.stringify(value);
+const LOWER_HEX = "0123456789abcdef";
+
+// What Go's unicode.IsPrint calls printable: the letter, mark, number,
+// punctuation and symbol categories. A rune outside them has no glyph to show,
+// so Go spells it out and so must this — a command name read off the terminal is
+// only useful if it says which bytes it was made of.
+const PRINTABLE = /^[\p{L}\p{M}\p{N}\p{P}\p{S}]$/u;
+
+// One rune as Go quotes it, given the rune that ends the string.
+const escaped = (char: string, delimiter: string): string => {
+  if (char === delimiter || char === "\\") return `\\${char}`;
+  const code = char.codePointAt(0)!;
+  // The printable ASCII range needs no spelling of its own, and the space is in
+  // it, which is why it is here rather than in the table above.
+  if ((code >= 0x20 && code <= 0x7e) || PRINTABLE.test(char)) return char;
+  switch (char) {
+    case "\a":
+      return "\\a";
+    case "\b":
+      return "\\b";
+    case "\f":
+      return "\\f";
+    case "\n":
+      return "\\n";
+    case "\r":
+      return "\\r";
+    case "\t":
+      return "\\t";
+    case "\v":
+      return "\\v";
+  }
+  // Two hex digits for a byte Go cannot show, four for a code point and eight
+  // for one outside the basic plane, which is how it names each of them.
+  const digits = code < 0x20 || code === 0x7f ? 2 : code < 0x10000 ? 4 : 8;
+  const lead = digits === 2 ? "\\x" : digits === 4 ? "\\u" : "\\U";
+  let hex = "";
+  for (let shift = (digits - 1) * 4; shift >= 0; shift -= 4) hex += LOWER_HEX[(code >>> shift) & 0xf];
+  return `${lead}${hex}`;
+};
+
+// Go's %q.
+//
+// Not JSON.stringify, which agrees on every printable character and spells the
+// rest differently: a command typed with a control character in it has to be
+// reported as the byte it is, and \u0001 reads as a different keyboard than \x01
+// does.
+const quote = (value: string): string => `"${[...value].map((char) => escaped(char, '"')).join("")}"`;
 
 // The same for a single shorthand letter. pflag quotes it as the rune it is, so
 // the single quotes are part of the wording a user sees.

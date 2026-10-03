@@ -64,6 +64,14 @@ const call = async <T>(pending: Promise<T>): Promise<T> => {
   }
 };
 
+// A 2xx reply with no body is the zero value of the type the document declares,
+// which is what Go's generated client handed back for one: a freshly allocated
+// target rather than a failure. A listing is therefore the empty list and a
+// record the object of absent fields, and the mappings below read the zero Go
+// would have found rather than reaching through an absence.
+const zeroList = <T>(reply: T[] | undefined): T[] => reply ?? [];
+const zeroRecord = <T>(reply: T | undefined): T => reply ?? ({} as T);
+
 // The route a request was made on, with /api in front of it and without the
 // encoding the endpoint was written with.
 //
@@ -140,9 +148,15 @@ export type Workspace = { id: string; name: string; slug: string };
 // and no key at all, so it has no discriminating power and must not be used to
 // check credentials.
 export const listWorkspaces = async (signal?: AbortSignal): Promise<Workspace[]> =>
-  (await call(listOrganization({ ...(signal === undefined ? {} : { signal }) }))).map((org) => workspace(org));
+  zeroList(await call(listOrganization({ ...(signal === undefined ? {} : { signal }) }))).map((org) =>
+    workspace(org),
+  );
 
-const workspace = (org: Organization): Workspace => ({ id: org.id, name: org.name, slug: org.slug });
+const workspace = (org: Organization): Workspace => ({
+  id: org.id ?? "",
+  name: org.name ?? "",
+  slug: org.slug ?? "",
+});
 
 // Changes a workspace's display name. better-auth only touches the slug when
 // data.slug is sent, and Kaneo's own settings page sends the same name-only
@@ -154,13 +168,15 @@ const workspace = (org: Organization): Workspace => ({ id: org.id, name: org.nam
 export const renameWorkspace = async (workspaceId: string, name: string): Promise<Workspace> => {
   const wanted = name.trim();
   if (wanted === "") throw new Error("workspace name is empty");
-  const renamed = await call(updateOrganization({ organizationId: workspaceId, data: { name: wanted } }));
+  const renamed = workspace(
+    zeroRecord(await call(updateOrganization({ organizationId: workspaceId, data: { name: wanted } }))),
+  );
   if (renamed.id !== workspaceId || renamed.name !== wanted) {
     throw new Error(
-      `/auth/organization/update: server answered with workspace ${JSON.stringify(renamed.id)} named ${JSON.stringify(renamed.name)}`,
+      `/auth/organization/update: server answered with workspace ${quoted(renamed.id)} named ${quoted(renamed.name)}`,
     );
   }
-  return workspace(renamed);
+  return renamed;
 };
 
 // A project belongs to exactly one workspace. archivedAt is set once a project
@@ -190,7 +206,7 @@ export const archived = (project: Project): boolean => project.archivedAt !== nu
 // url.Values, which sorts. A query string is part of what a server sees, so the
 // two requests have to be the same request.
 export const listProjectsIn = async (workspaceId: string, includeArchived: boolean): Promise<Project[]> =>
-  (await call(listProjects({ ...(includeArchived ? { includeArchived: "true" } : {}), workspaceId }))).map(
+  zeroList(await call(listProjects({ ...(includeArchived ? { includeArchived: "true" } : {}), workspaceId }))).map(
     project,
   );
 
@@ -203,12 +219,12 @@ type ProjectFields = Pick<
 >;
 
 const project = (item: ProjectFields): Project => ({
-  id: item.id,
-  name: item.name,
-  slug: item.slug,
+  id: item.id ?? "",
+  name: item.name ?? "",
+  slug: item.slug ?? "",
   icon: item.icon ?? "",
   description: item.description ?? "",
-  workspaceId: item.workspaceId,
+  workspaceId: item.workspaceId ?? "",
   isPublic: item.isPublic ?? false,
   archivedAt: isoTimePtr(item.archivedAt),
 });
@@ -220,7 +236,7 @@ const project = (item: ProjectFields): Project => ({
 // applies the command's own deadline as well, and a signal here only ever cuts
 // this one request short.
 export const getProject = async (projectId: string, signal?: AbortSignal): Promise<Project> =>
-  project(await call(readProject(pathParam(projectId), { ...(signal === undefined ? {} : { signal }) })));
+  project(zeroRecord(await call(readProject(pathParam(projectId), { ...(signal === undefined ? {} : { signal }) }))));
 
 // The payload for creating a project. description is not sent: the server's
 // create route takes no description, so it is only here to be set by an update
@@ -231,13 +247,15 @@ export type NewProject = { name: string; workspaceId: string; icon: string; slug
 // supplied when the caller has none.
 export const createProject = async (wanted: NewProject): Promise<Project> =>
   project(
-    await call(
-      postProject({
-        name: wanted.name,
-        workspaceId: wanted.workspaceId,
-        icon: wanted.icon === "" ? "Layers" : wanted.icon,
-        slug: wanted.slug,
-      }),
+    zeroRecord(
+      await call(
+        postProject({
+          name: wanted.name,
+          workspaceId: wanted.workspaceId,
+          icon: wanted.icon === "" ? "Layers" : wanted.icon,
+          slug: wanted.slug,
+        }),
+      ),
     ),
   );
 
@@ -297,14 +315,16 @@ export const updateProject = async (
   }
 
   const after = project(
-    await call(
-      putProject(pathParam(projectId), {
-        name: want.name ?? before.name,
-        icon: want.icon ?? before.icon,
-        slug: want.slug ?? before.slug,
-        description: want.description ?? before.description,
-        isPublic: before.isPublic,
-      }),
+    zeroRecord(
+      await call(
+        putProject(pathParam(projectId), {
+          name: want.name ?? before.name,
+          icon: want.icon ?? before.icon,
+          slug: want.slug ?? before.slug,
+          description: want.description ?? before.description,
+          isPublic: before.isPublic,
+        }),
+      ),
     ),
   );
 
@@ -396,27 +416,30 @@ export const getBoard = async (projectId: string): Promise<Board> => {
 
   for (let page = 1, pages = 1; page <= pages; page++) {
     for (let related = 1, relatedPages = 1; related <= relatedPages; related++) {
-      const response = await call(
-        listTasks(pathParam(projectId), {
-          ...(page > 1 ? { page } : {}),
-          ...(related > 1 ? { relatedPage: related } : {}),
-        }),
+      const response = zeroRecord(
+        await call(
+          listTasks(pathParam(projectId), {
+            ...(page > 1 ? { page } : {}),
+            ...(related > 1 ? { relatedPage: related } : {}),
+          }),
+        ),
       );
       pages = response.pagination?.totalPages ?? 0;
       relatedPages = response.pagination?.relatedTotalPages ?? 0;
 
+      const data = zeroRecord(response.data);
       if (board === undefined) {
-        board = { projectId: response.data.id, projectName: response.data.name, columns: [] };
+        board = { projectId: data.id ?? "", projectName: data.name ?? "", columns: [] };
       }
       const target = board;
-      for (const column of response.data.columns) {
+      for (const column of zeroList(data.columns)) {
         let at = columnAt.get(column.id);
         if (at === undefined) {
           at = target.columns.length;
           columnAt.set(column.id, at);
           target.columns.push({ id: column.id, name: column.name, tasks: [] });
         }
-        for (const task of column.tasks) {
+        for (const task of zeroList(column.tasks)) {
           const seen = taskAt.get(task.id);
           if (seen !== undefined) {
             // A repeat on a related page brings more labels; a repeat on a later
@@ -479,19 +502,19 @@ type TaskFields = Pick<
 >;
 
 const task = (from: TaskFields, extra: Pick<Task, "assigneeId" | "assigneeName" | "labels">): Task => ({
-  id: from.id,
+  id: from.id ?? "",
   // The document types a number and a position as nullable, and the server only
   // ever issues integers, so an absent one is read as zero rather than dropped:
   // the field is always part of the report.
   number: from.number ?? 0,
-  title: from.title,
+  title: from.title ?? "",
   description: from.description ?? "",
-  status: from.status,
-  priority: from.priority,
+  status: from.status ?? "",
+  priority: from.priority ?? "",
   position: from.position ?? 0,
-  projectId: from.projectId,
-  assigneeId: extra.assigneeId,
-  assigneeName: extra.assigneeName,
+  projectId: from.projectId ?? "",
+  assigneeId: extra.assigneeId ?? null,
+  assigneeName: extra.assigneeName ?? null,
   startDate: isoTimePtr(from.startDate),
   dueDate: isoTimePtr(from.dueDate),
   createdAt: isoTime(from.createdAt),
@@ -506,7 +529,7 @@ const toTask = (t: BoardTask): Task =>
 // Fetches one task by id, with its assignee's name resolved. Labels are not part
 // of the reply, so they read as null.
 export const getTask = async (taskId: string): Promise<Task> => {
-  const t = await call(readTask(pathParam(taskId)));
+  const t = zeroRecord(await call(readTask(pathParam(taskId))));
   return task(t, { assigneeId: t.assigneeId, assigneeName: t.assigneeName, labels: null });
 };
 
@@ -527,15 +550,17 @@ export type NewTask = {
 // The write routes answer with the stored task, which names the assignee as
 // userId, resolves no name and carries no labels.
 export const createTask = async (projectId: string, wanted: NewTask): Promise<Task> => {
-  const created = await call(
-    postTask(pathParam(projectId), {
-      title: wanted.title,
-      description: wanted.description,
-      ...(wanted.dueDate === "" ? {} : { dueDate: wanted.dueDate }),
-      priority: unchecked<CreateTaskBody["priority"]>(wanted.priority === "" ? "medium" : wanted.priority),
-      status: wanted.status === "" ? "to-do" : wanted.status,
-      ...(wanted.assigneeId === "" ? {} : { userId: wanted.assigneeId }),
-    }),
+  const created = zeroRecord(
+    await call(
+      postTask(pathParam(projectId), {
+        title: wanted.title,
+        description: wanted.description,
+        ...(wanted.dueDate === "" ? {} : { dueDate: wanted.dueDate }),
+        priority: unchecked<CreateTaskBody["priority"]>(wanted.priority === "" ? "medium" : wanted.priority),
+        status: wanted.status === "" ? "to-do" : wanted.status,
+        ...(wanted.assigneeId === "" ? {} : { userId: wanted.assigneeId }),
+      }),
+    ),
   );
   return task(created, { assigneeId: created.userId, assigneeName: null, labels: null });
 };
@@ -582,10 +607,10 @@ export type Comment = {
 // null one, has not answered who wrote it rather than answered that nobody did,
 // and the name reads as empty.
 export const listComments = async (taskId: string): Promise<Comment[]> =>
-  (await call(getTaskComments(pathParam(taskId)))).map((c) => ({
-    id: c.id,
-    content: c.content,
-    userId: c.userId,
+  zeroList(await call(getTaskComments(pathParam(taskId)))).map((c) => ({
+    id: c.id ?? "",
+    content: c.content ?? "",
+    userId: c.userId ?? "",
     userName: c.user?.name ?? "",
     createdAt: isoTime(c.createdAt),
   }));
@@ -594,11 +619,13 @@ export const listComments = async (taskId: string): Promise<Comment[]> =>
 // which carries no author, so the reply's name is empty and a caller that needs
 // one reads the listing back.
 export const addComment = async (taskId: string, content: string, signal?: AbortSignal): Promise<Comment> => {
-  const a = await call(
-    createTaskComment(pathParam(taskId), { content }, { ...(signal === undefined ? {} : { signal }) }),
+  const a = zeroRecord(
+    await call(
+      createTaskComment(pathParam(taskId), { content }, { ...(signal === undefined ? {} : { signal }) }),
+    ),
   );
   return {
-    id: a.id,
+    id: a.id ?? "",
     content: a.content ?? "",
     userId: a.userId ?? "",
     userName: "",
@@ -619,26 +646,28 @@ export const linkTasks = async (
   relationType: string,
 ): Promise<Relation> =>
   relation(
-    await call(
-      createTaskRelation({
-        sourceTaskId,
-        targetTaskId,
-        relationType: unchecked<CreateTaskRelationBody["relationType"]>(relationType),
-      }),
+    zeroRecord(
+      await call(
+        createTaskRelation({
+          sourceTaskId,
+          targetTaskId,
+          relationType: unchecked<CreateTaskRelationBody["relationType"]>(relationType),
+        }),
+      ),
     ),
   );
 
 // A task's links, as both endpoints of the link.
 export const listRelations = async (taskId: string): Promise<Relation[]> =>
-  (await call(getTaskRelations(pathParam(taskId)))).map(relation);
+  zeroList(await call(getTaskRelations(pathParam(taskId)))).map(relation);
 
 // The listing answers with a summary of each linked task as well; the link itself
 // is what this CLI reports.
 const relation = (r: GenRelation | TaskRelationWithTasks): Relation => ({
-  id: r.id,
-  sourceTaskId: r.sourceTaskId,
-  targetTaskId: r.targetTaskId,
-  relationType: r.relationType,
+  id: r.id ?? "",
+  sourceTaskId: r.sourceTaskId ?? "",
+  targetTaskId: r.targetTaskId ?? "",
+  relationType: r.relationType ?? "",
 });
 
 export type CheckResult = {
@@ -659,7 +688,7 @@ type Document = { paths?: Record<string, Record<string, { operationId?: string }
 // through the transport like every other call so it lands under /api, since the
 // site root answers 200 with the web app's HTML for any path.
 export const checkApi = async (): Promise<CheckResult> => {
-  const document = await call(kaneoFetch<Document>("/openapi", { method: "GET" }));
+  const document = zeroRecord(await call(kaneoFetch<Document>("/openapi", { method: "GET" })));
   const seen = new Set<string>();
   const onServer: string[] = [];
   for (const methods of Object.values(document.paths ?? {})) {

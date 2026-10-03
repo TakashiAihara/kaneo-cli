@@ -143,9 +143,13 @@ export const run = async (argv: string[]): Promise<number> => {
     command.args?.(parsed.args);
 
     out = writerFor(parsed.flags.json === true, parsed.flags.human === true);
+    // parseFlags keys a flag by the name it was declared with, so a dashed flag
+    // only answers to that dashed spelling. Asking for it in any other case
+    // misses without complaining and yields "", which reads as "the user did not
+    // pass it" and hands the weaker layer a value the flag was meant to beat.
     const flags: ResolvedFlags = {
-      apiUrl: String(parsed.flags.apiUrl ?? ""),
-      apiKey: String(parsed.flags.apiKey ?? ""),
+      apiUrl: String(parsed.flags["api-url"] ?? ""),
+      apiKey: String(parsed.flags["api-key"] ?? ""),
       workspaceId: String(parsed.flags.workspace ?? ""),
       projectId: String(parsed.flags.project ?? ""),
     };

@@ -61,7 +61,7 @@ export const normalizeBaseUrl = (raw: string): string => {
 export const keepsCredential = (target: string): boolean => {
   const url = parseUrl(target);
   if (!url) return false;
-  return url.protocol === "https:" || isLoopback(url.hostname);
+  return url.protocol === "https:" || isLoopback(hostName(url));
 };
 
 const parseUrl = (raw: string): URL | undefined => {
@@ -72,13 +72,16 @@ const parseUrl = (raw: string): URL | undefined => {
   }
 };
 
+// The host a URL names, ready to be compared: a URL keeps an IPv6 address in
+// brackets, where Go's url.Hostname does not, and it keeps the case the address
+// was written in, so two spellings of one host would otherwise look like two.
+const hostName = (url: URL): string => url.hostname.toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
+
 const isLoopback = (hostname: string): boolean => {
-  // A URL keeps an IPv6 host in brackets; Go's url.Hostname does not.
-  const host = hostname.replace(/^\[/, "").replace(/\]$/, "");
-  if (host === "localhost") return true;
-  if (host === "::1" || host === "0:0:0:0:0:0:0:1") return true;
+  if (hostname === "localhost") return true;
+  if (hostname === "::1" || hostname === "0:0:0:0:0:0:0:1") return true;
   // The whole of 127.0.0.0/8, which is what net.IP.IsLoopback counts.
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
 };
 
 // Raised instead of sending the key where TLS is not protecting it. The check
@@ -165,9 +168,10 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     }
     const next = redirectTarget(response, target);
     if (!next) break;
-    // The key stays only where it would still be protected; a hop to an
-    // insecure target goes on without it and the server decides.
-    headers = withoutCredential(headers, next);
+    // The key stays only where it would still be protected and where it was
+    // already meant to go; a hop to an insecure host, or to another one, goes
+    // on without it and the server decides.
+    headers = withoutCredential(headers, target, next);
     // 301, 302 and 303 turn a write into a GET the way every other client
     // does, or the write would be replayed against a route that does not take
     // it. 307 and 308 keep the method and body, which is why the body has to
@@ -241,8 +245,16 @@ const redirectTarget = (response: Response, from: URL): URL | undefined => {
   }
 };
 
-const withoutCredential = (headers: Headers, target: URL): Headers => {
-  if (keepsCredential(target.href)) return headers;
+// Whether the redirect is still talking to the host the key was handed to, and
+// still over a connection that protects it.
+//
+// The host is the recipient: the key was given to one server, and a hop that
+// names another server is giving it to somebody who never asked for it. Only the
+// host name is compared, because a redirect that moves the port, or the scheme,
+// is the same server reached another way, and whether the transport is still
+// safe is keepsCredential's question to answer.
+const withoutCredential = (headers: Headers, from: URL, to: URL): Headers => {
+  if (hostName(from) === hostName(to) && keepsCredential(to.href)) return headers;
   const kept = new Headers(headers);
   kept.delete("Authorization");
   return kept;

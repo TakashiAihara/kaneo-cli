@@ -48,15 +48,15 @@ A link between two tasks: `subtask`, `blocks` or `related`. For a subtask link t
 
 ### operation
 
-One server endpoint this client knows how to call, declared in the registry in `internal/api/registry.go` as an `operationId`, method, path template and the command that needs it.
+One server endpoint this client knows how to call, declared in the registry in `src/api/registry.ts` as an `operationId`, method, path template and the command that needs it.
 
-Requests are made by the generated client (`internal/api/gen`), which is generated for exactly the operations in the registry: `gen/cfg.yaml` lists the same ids, and a test fails when the registry, that list and the pinned OpenAPI document disagree on an operation's id, method or path. Request bodies and parameters are typed by the generated code, not by the registry.
+Requests are made by the generated client (`src/api/gen`), which is generated for exactly the operations in the registry: `openapi/transformer.ts` drops every other operation before generation, and `tests/registry.test.ts` fails when the registry, the generated client and the pinned OpenAPI document disagree on an operation's id, method or path. Request bodies and parameters are typed by the generated code, not by the registry.
 
 `kaneo api-check` compares the registry's operation ids against a live server's document. It says whether the server still offers each operation; it does not compare request bodies, so it would not catch a field the server renamed.
 
 ### pinned spec
 
-`internal/api/gen/openapi.json`: the OpenAPI document shipped in the Kaneo release named by `KANEO_VERSION` in the Makefile, copied unchanged. The generated client is built from it plus `gen/overlay.json`, which corrects what the document gets wrong for this client. Not to be confused with the document a running server serves at `/api/openapi`, which is what `api-check` reads and which follows whatever version that server runs.
+`openapi/kaneo-<version>.json`: the OpenAPI document shipped in that Kaneo release, copied unchanged. The generated client is built from it through `openapi/transformer.ts`, which corrects what the document gets wrong. Not to be confused with the document a running server serves at `/api/openapi`, which is what `api-check` reads and which follows whatever version that server runs.
 
 ### operationId
 

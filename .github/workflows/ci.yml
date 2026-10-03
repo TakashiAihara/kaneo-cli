@@ -18,32 +18,30 @@ jobs:
           # leaves in .git/config is readable by whatever the tests execute.
           persist-credentials: false
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          go-version-file: go.mod
-          cache: true
+          bun-version: "1.4.0"
 
-      - name: gofmt
-        run: |
-          unformatted=$(gofmt -l .)
-          if [ -n "$unformatted" ]; then
-            echo "$unformatted"
-            exit 1
-          fi
+      # The workflow pins Bun on its own; a .mise.toml bump that forgets it
+      # would test with one Bun and develop with another.
+      - name: bun version matches .mise.toml
+        run: grep -qx 'bun = "1.4.0"' .mise.toml
+
+      - run: bun install --frozen-lockfile
 
       # The client is generated from the pinned OpenAPI document. A hand edit
-      # to the generated file, or a document or overlay change committed
-      # without regenerating, fails here.
+      # to the generated code, or a document, transformer or registry change
+      # committed without regenerating, fails here.
       - name: generated client matches the pinned spec
         run: |
-          go generate ./internal/api/gen/
-          git diff --exit-code -- internal/api/gen/
+          bun run generate
+          git diff --exit-code -- src/api/gen/
 
-      - run: go vet ./...
+      - run: bun run typecheck
 
-      - run: go test ./... -race
+      - run: bun test
 
-      # Every release ships linux/arm64, so a build failure there has to stop
-      # the pipeline rather than surface at release time.
-      - name: cross-compile every release target
-        run: make cross
+      # Every release ships linux/arm64 and darwin, so a build failure there has
+      # to stop the pipeline rather than surface at release time.
+      - name: build every release target
+        run: bun scripts/build.ts

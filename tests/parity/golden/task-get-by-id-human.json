@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "task-a2",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#2  Ship it\nstatus    in-progress\npriority  no-priority\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/task-a2",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

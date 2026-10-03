@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "99",
+        "--strict"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no task #99 in this project\"\n}\n",
+      "stderr": "Error: no task #99 in this project\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

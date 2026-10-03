@@ -53,9 +53,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          go-version-file: go.mod
+          bun-version: "1.4.0"
 
       - name: decide the tag
         id: decide
@@ -86,11 +86,11 @@ jobs:
           # empty tag, skip the release and still show green.
           tag="$(git tag --points-at HEAD --list 'v*' | head -n 1)"
           if [ -z "$tag" ]; then
-            tag="$(go run ./cmd/next-tag)"
+            tag="$(bun scripts/next-tag.ts)"
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-  goreleaser:
+  publish:
     needs: tag
     if: needs.tag.outputs.tag != ''
     runs-on: ubuntu-latest
@@ -109,18 +109,18 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.event.inputs.tag || github.ref }}
           fetch-depth: 0
-          # goreleaser publishes through the API with GITHUB_TOKEN and never
-          # pushes over git, so the checkout does not need a stored credential.
+          # The release is published through the API with GITHUB_TOKEN and
+          # nothing is pushed over git, so the checkout needs no stored
+          # credential.
           persist-credentials: false
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          go-version-file: go.mod
+          bun-version: "1.4.0"
 
-      # goreleaser reads the version from a tag on HEAD. An automatic release
-      # has none yet, so it is created on the built commit through the API. A
-      # tag this token creates starts no workflow, so the tag-push trigger above
-      # does not release it a second time.
+      # An automatic release has no tag yet, so it is created on the built
+      # commit through the API. A tag this token creates starts no workflow, so
+      # the tag-push trigger above does not release it a second time.
       - name: create the tag if it does not exist
         env:
           GH_TOKEN: ${{ github.token }}
@@ -133,18 +133,28 @@ jobs:
             git tag "$TAG" "$sha"
           fi
 
-      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
-        with:
-          # Pinned exactly. A floating constraint would let a future release
-          # change what this job publishes, and the job holds contents: write.
-          version: "2.18.0"
-          args: release --clean
+      - run: bun install --frozen-lockfile
+
+      # The archive names and checksums.txt are the ones install.sh reads.
+      - name: build every target
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # goreleaser otherwise picks among the tags on HEAD by version sort,
-          # which ranks v0.2.1-rc.3 above v0.2.1: a final tag on a commit that
-          # already has an rc would be released as the rc.
-          GORELEASER_CURRENT_TAG: ${{ needs.tag.outputs.tag }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: bun scripts/build.ts "$TAG"
+
+      # A full release, not a prerelease, even for an rc tag: install.sh
+      # installs whatever GitHub calls the latest release, and that has to be
+      # what is on main. A re-run for the same tag replaces the assets.
+      - name: publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          set -eu
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.tar.gz dist/checksums.txt --clobber
+          else
+            gh release create "$TAG" dist/*.tar.gz dist/checksums.txt --verify-tag --generate-notes --latest
+          fi
 
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:

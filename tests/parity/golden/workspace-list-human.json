@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workspace",
+        "list",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ws-main  Main\nws-other  Other\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

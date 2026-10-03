@@ -1,0 +1,55 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "a b/c?#%é",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/task/a b/c?#%é: 404: Task not found\"\n}\n",
+      "stderr": "Error: GET /api/task/a b/c?#%é: 404: Task not found\n"
+    },
+    {
+      "args": [
+        "comment",
+        "ls",
+        "x/y",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/task/x/y: 404: Task not found\"\n}\n",
+      "stderr": "Error: GET /api/task/x/y: 404: Task not found\n"
+    },
+    {
+      "args": [
+        "project",
+        "get",
+        "p/q",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/project/p/q: 404: Project not found\"\n}\n",
+      "stderr": "Error: GET /api/project/p/q: 404: Project not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/a%20b%2Fc%3F%23%25%C3%A9",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/x%2Fy",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/p%2Fq",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

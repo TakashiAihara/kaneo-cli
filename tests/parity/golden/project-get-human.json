@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "get",
+        "proj-alpha",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

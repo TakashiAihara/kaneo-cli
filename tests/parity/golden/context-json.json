@@ -1,0 +1,15 @@
+{
+  "steps": [
+    {
+      "args": [
+        "context",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-alpha\"\n  ],\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"env\"\n  }\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

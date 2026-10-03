@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "get",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout": "Show one project\n\nUsage:\n  kaneo project get [project-id] [flags]\n\nFlags:\n  -h, --help   help for get\n\nGlobal Flags:\n      --api-key string     API key; prefer KANEO_API_KEY, since a flag is visible in the process list\n      --api-url string     Kaneo base URL (env KANEO_API_URL)\n      --human              force human-readable output, even through a pipe\n      --json               force JSON output\n  -p, --project string     project id (env KANEO_PROJECT)\n      --timeout duration   per-request timeout (default 10s)\n  -w, --workspace string   workspace id (env KANEO_WORKSPACE)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

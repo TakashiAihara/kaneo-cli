@@ -1,0 +1,45 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "1",
+        "--strict"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"taskId\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"projectId\": \"proj-alpha\",\n  \"projectName\": \"Alpha\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
+      "stderr": "kaneo: attach hook failed: exit status 2: \n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-tz host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+      }
+    }
+  ],
+  "files": {
+    ".config/kaneo/config.json": "{\"hooks\":{\"attach\":\"exit 2\"}}",
+    ".config/kaneo/hooks.log": "<TIME>+09:00 session=sess-tz attach hook failed: exit status 2: \n",
+    ".config/kaneo/sessions/sess-tz.json": "{\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}"
+  }
+}

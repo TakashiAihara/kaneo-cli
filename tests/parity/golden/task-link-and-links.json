@@ -1,0 +1,115 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "link",
+        "1",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"rel0002\",\n  \"sourceTaskId\": \"task-a1\",\n  \"targetTaskId\": \"task-a2\",\n  \"relationType\": \"subtask\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "link",
+        "1",
+        "3",
+        "--type",
+        "blocks",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1 blocks #3\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "links",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"rel0002\",\n    \"sourceTaskId\": \"task-a1\",\n    \"targetTaskId\": \"task-a2\",\n    \"relationType\": \"subtask\"\n  },\n  {\n    \"id\": \"rel0003\",\n    \"sourceTaskId\": \"task-a1\",\n    \"targetTaskId\": \"task-a3\",\n    \"relationType\": \"blocks\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "links",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "subtask  task-a1 -> task-a2\nblocks  task-a1 -> task-a3\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task-relation",
+      "query": "",
+      "body": {
+        "sourceTaskId": "task-a1",
+        "targetTaskId": "task-a2",
+        "relationType": "subtask"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task-relation",
+      "query": "",
+      "body": {
+        "sourceTaskId": "task-a1",
+        "targetTaskId": "task-a3",
+        "relationType": "blocks"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

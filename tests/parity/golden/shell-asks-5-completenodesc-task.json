@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "args": [
+        "__completeNoDesc",
+        "task",
+        ""
+      ],
+      "exit": 0,
+      "stdout": "assign\ncreate\nget\nlink\nlinks\nlist\nmove\npriority\nrm\nstatus\n:4\n",
+      "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

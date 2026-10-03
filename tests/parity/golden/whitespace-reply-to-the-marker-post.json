@@ -1,0 +1,54 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "1",
+        "--strict"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskCommentResponse: unexpected end of JSON input\"\n}\n",
+      "stderr": "Error: error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskCommentResponse: unexpected end of JSON input\n"
+    },
+    {
+      "args": [
+        "session",
+        "next",
+        "x",
+        "--strict"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"this session is not attached to a task; name one, or run 'kaneo session attach' first\"\n}\n",
+      "stderr": "Error: this session is not attached to a task; name one, or run 'kaneo session attach' first\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-ws host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+      }
+    }
+  ],
+  "files": {
+    ".config/kaneo/config.json": "{\"hooks\":{\"attach\":\"echo ran > \\\"$HOME/hook-ran\\\"\"}}"
+  }
+}

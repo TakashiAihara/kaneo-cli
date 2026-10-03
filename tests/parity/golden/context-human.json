@@ -1,0 +1,15 @@
+{
+  "steps": [
+    {
+      "args": [
+        "context",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "api url    <URL>  (env)\napi key    set  (env)\nworkspace  ws-main  (env)\nproject    proj-alpha  (env)\n\nrepo       -\nprofile    -\nlocal file -\nconfig     <HOME>/.config/kaneo/config.json\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

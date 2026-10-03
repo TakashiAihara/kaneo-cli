@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "list",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "2026-01-01T00:00:08.000Z  first comment\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

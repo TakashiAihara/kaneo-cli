@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "args": [
+        "__complete",
+        "completion",
+        ""
+      ],
+      "exit": 0,
+      "stdout": "bash\tGenerate the autocompletion script for bash\nfish\tGenerate the autocompletion script for fish\npowershell\tGenerate the autocompletion script for powershell\nzsh\tGenerate the autocompletion script for zsh\n:4\n",
+      "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

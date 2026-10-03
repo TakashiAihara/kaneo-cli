@@ -1,0 +1,250 @@
+import type { Seed } from "./fake";
+
+// The behaviour the Go build had when it was retired, as command sequences run
+// against tests/parity/fake.ts. scripts/record-golden.ts runs them through the
+// Go reference binary and writes tests/parity/golden/; tests/parity/parity.test.ts
+// runs them through this build and compares. Each scenario starts from a fresh
+// fake seeded with SEED, a fresh HOME, and a cwd outside any repository.
+
+export const WS = "ws-main";
+export const P1 = "proj-alpha";
+export const P2 = "proj-beta";
+
+export const SEED: Seed = {
+  workspaces: [
+    { id: WS, name: "Main", slug: "main" },
+    { id: "ws-other", name: "Other", slug: "other" },
+  ],
+  projects: [
+    { id: P1, workspaceId: WS, name: "Alpha", slug: "ALP" },
+    { id: P2, workspaceId: WS, name: "Beta", slug: "BET" },
+    { id: "proj-old", workspaceId: WS, name: "Old", slug: "OLD", archived: true },
+  ],
+  users: [{ id: "user-1", name: "Ada" }],
+  tasks: [
+    { id: "task-a1", projectId: P1, title: "Write the parser", priority: "high", description: "multi\nline" },
+    { id: "task-a2", projectId: P1, title: "Ship it", status: "in-progress", userId: "user-1" },
+    { id: "task-a3", projectId: P1, title: "Old news", status: "done" },
+    { id: "task-b1", projectId: P2, title: "Beta first", priority: "urgent" },
+  ],
+  comments: [{ taskId: "task-a1", content: "first comment" }],
+};
+
+export type Scenario = {
+  name: string;
+  // Each step is one CLI invocation. Global context (-w / -p) is passed in
+  // env, the way a session hook sees it.
+  steps: string[][];
+  env?: Record<string, string>;
+  // Seeds a ~/.config/kaneo/config.json before the first step.
+  config?: unknown;
+  // Writes a .kaneo.json in the parent of the cwd, so the walk-up is exercised.
+  local?: unknown;
+  // Makes the cwd a git repository whose origin is github.com/<repo>.
+  repo?: string;
+  // Writes this text as config.json, for a file that is not valid JSON.
+  rawConfig?: string;
+  // The fake answers like a server older than the pinned document.
+  legacy?: boolean;
+  // The fake holds every response back this long.
+  delayMs?: number;
+  // The fake answers matching "METHOD path" requests with whitespace only.
+  whitespaceOn?: string;
+  pageSize?: number;
+};
+
+const both = (name: string, args: string[]): Scenario[] => [
+  { name: `${name} (json)`, steps: [[...args, "--json"]] },
+  { name: `${name} (human)`, steps: [[...args, "--human"]] },
+];
+
+export const SCENARIOS: Scenario[] = [
+  ...both("whoami", ["whoami"]),
+  ...both("context", ["context"]),
+  ...both("workspace list", ["workspace", "list"]),
+  { name: "workspace rename", steps: [["workspace", "rename", WS, "Renamed", "--json"], ["workspace", "ls", "--human"]] },
+
+  ...both("project list", ["project", "list"]),
+  ...both("project list archived", ["project", "ls", "--archived"]),
+  ...both("project get", ["project", "get", P1]),
+  ...both("project get from env", ["project", "get"]),
+  { name: "project create", steps: [["project", "create", "Gamma", "--slug", "GAM", "-d", "third", "--json"], ["project", "ls", "--human"]] },
+  { name: "project update", steps: [["project", "update", P1, "--name", "Alpha 2", "--slug", "AL2", "--json"], ["project", "get", P1, "--human"]] },
+  { name: "project update clears description", steps: [["project", "update", P1, "-d", "", "--json"]] },
+  { name: "project archive and unarchive", steps: [["project", "archive", P2, "--json"], ["project", "ls", "--human"], ["project", "unarchive", P2, "--human"], ["project", "ls", "--json"]] },
+
+  ...both("task list", ["task", "list"]),
+  ...both("task list all", ["task", "ls", "--all"]),
+  ...both("task list by status", ["task", "ls", "--status", "in-progress"]),
+  ...both("task list by priority", ["task", "ls", "--priority", "high"]),
+  ...both("task get by number", ["task", "get", "1"]),
+  ...both("task get by id", ["task", "get", "task-a2"]),
+  ...both("task get unknown", ["task", "get", "99"]),
+  { name: "task create", steps: [["task", "create", "New one", "-d", "body", "--priority", "low", "--json"], ["task", "ls", "--human"]] },
+  { name: "task create assigned", steps: [["task", "create", "Mine", "--assignee", "user-1", "--status", "in-progress", "--human"], ["task", "get", "4", "--json"]] },
+  { name: "task create bad priority", steps: [["task", "create", "x", "--priority", "huge", "--json"]] },
+  { name: "task status", steps: [["task", "status", "1", "done", "--json"], ["task", "get", "1", "--human"]] },
+  { name: "task priority", steps: [["task", "priority", "1", "urgent", "--human"], ["task", "get", "1", "--json"]] },
+  { name: "task assign and clear", steps: [["task", "assign", "1", "user-1", "--json"], ["task", "assign", "1", "--human"], ["task", "get", "1", "--json"]] },
+  { name: "task move", steps: [["task", "move", "1", "--to", P2, "--json"], ["task", "ls", "-p", P2, "--human"]] },
+  { name: "task move without --to", steps: [["task", "move", "1", "--json"]] },
+  { name: "task rm needs --yes", steps: [["task", "rm", "1", "--human"], ["task", "rm", "1", "--yes", "--json"], ["task", "ls", "--all", "--json"]] },
+  { name: "task link and links", steps: [["task", "link", "1", "2", "--json"], ["task", "link", "1", "3", "--type", "blocks", "--human"], ["task", "links", "1", "--json"], ["task", "links", "1", "--human"]] },
+
+  ...both("comment list", ["comment", "list", "1"]),
+  { name: "comment add", steps: [["comment", "add", "1", "hello", "world", "--json"], ["comment", "ls", "1", "--human"]] },
+
+  {
+    name: "session attach, next, close",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [["session", "attach", "1", "write", "tests", "--strict"], ["session", "next", "ship", "--strict"], ["board", "--json"], ["board", "--human"], ["session", "close", "--strict"], ["board", "--json"]],
+  },
+  { name: "session attach fails quietly", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "99"]] },
+  { name: "session attach strict reports", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "99", "--strict"]] },
+  ...both("board", ["board"]),
+  ...both("board archived", ["board", "--archived"]),
+  { name: "board pages past one page", pageSize: 2, steps: [["task", "ls", "--all", "--json"], ["board", "--json"]] },
+
+  ...both("api-check", ["api-check"]),
+
+  { name: "no api key", env: { KANEO_API_KEY: "" }, steps: [["whoami"], ["task", "ls"]] },
+  { name: "wrong api key", env: { KANEO_API_KEY: "nope" }, steps: [["whoami", "--json"], ["task", "ls", "--json"]] },
+  { name: "no workspace", env: { KANEO_WORKSPACE: "" }, steps: [["project", "ls", "--json"]] },
+  { name: "no project", env: { KANEO_PROJECT: "" }, steps: [["task", "ls", "--json"]] },
+  { name: "unknown command", steps: [["frobnicate"]] },
+  ...[["--help"], ["help"], ["help", "project"], ["task", "--help"], ["task", "create", "--help"], ["project", "get", "--help"], ["session"], ["session", "next", "--help"]].map(
+    (args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] }),
+  ),
+  { name: "unknown flag", steps: [["task", "ls", "--bogus"], ["task", "ls", "-x"], ["--bogus"]] },
+  { name: "control characters in an unknown command", steps: [["\u0001"], ["a\u007fb"], ["tab\there"]] },
+  { name: "completion help", steps: [["completion", "zsh", "--help"], ["completion", "fish", "--help"], ["completion", "powershell", "--help"], ["completion", "bash", "--help"]] },
+  { name: "completion", steps: [["completion", "zsh"], ["completion", "bash"], ["completion", "fish"], ["completion", "powershell"], ["completion"]] },
+  // What a shell asks once the script is installed: cobra's answer carries a
+  // directive line and reports it on stderr, and the NoDesc spelling leaves the
+  // descriptions out.
+  ...[
+    ["__complete", ""],
+    ["__completeNoDesc", ""],
+    ["__complete", "ta"],
+    ["__complete", "task", ""],
+    ["__completeNoDesc", "task", ""],
+    ["__complete", "task", "create", "--"],
+    ["__complete", "--wo"],
+    ["__complete", "completion", ""],
+    ["__complete", "help", ""],
+    ["__complete", "frobnicate", ""],
+    ["__complete", "task", "status", ""],
+    ["__complete", "task", "ls", "--status", ""],
+    ["__complete", "--timeout", ""],
+    ["__complete", "-w", ""],
+    ["__complete", "--version"],
+    ["__complete", "task", "create", "--priority", ""],
+    ["__complete", "session", "attach", ""],
+  ].map((args, i): Scenario => ({ name: `shell asks ${i + 1}: ${args.join(" ")}`, steps: [args] })),
+
+  { name: "server unreachable", env: { KANEO_API_URL: "http://127.0.0.1:9" }, steps: [["whoami", "--json"], ["task", "ls"], ["board"]] },
+  { name: "request timeout", delayMs: 1500, steps: [["whoami", "--json", "--timeout", "300ms"], ["task", "ls", "--timeout", "300ms"]] },
+  { name: "timeout zero or negative", steps: [["whoami", "--json", "--timeout", "0"], ["whoami", "--json", "--timeout", "-1s"], ["whoami", "--timeout", "nonsense"]] },
+
+  { name: "config that is not JSON", env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" }, rawConfig: "{not json", steps: [["context", "--json"], ["task", "ls"]] },
+  { name: "config with a null profile", rawConfig: '{"profiles":{"dev":null},"default_profile":"dev"}', steps: [["context", "--json"]] },
+  { name: "config that is null", rawConfig: "null", steps: [["context", "--json"]] },
+  { name: "config with a malformed number", rawConfig: '{"unknown":1.}', steps: [["context", "--json"]] },
+  {
+    name: "config with a wrong type",
+    env: { KANEO_SESSION_ID: "sess-types" },
+    config: { hooks: { attach: 5 } },
+    steps: [["session", "attach", "1", "--strict"], ["context", "--json"]],
+  },
+  {
+    name: "config keys in another case",
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
+    config: { Default_Profile: "self", Profiles: { self: { Workspace_ID: WS, project_id: P2 } } },
+    steps: [["context", "--json"]],
+  },
+
+  { name: "ids that need escaping", steps: [["task", "get", "a b/c?#%é", "--json"], ["comment", "ls", "x/y", "--json"], ["project", "get", "p/q", "--json"]] },
+
+  ...[["project", "ls", "--json"], ["project", "get", "--json"], ["task", "ls", "--json"], ["task", "ls", "--human"], ["board", "--json"], ["board", "--human"], ["comment", "ls", "1", "--json"], ["comment", "ls", "1", "--human"], ["task", "links", "1", "--json"]].map(
+    (args): Scenario => ({ name: `older server: ${args.join(" ")}`, legacy: true, steps: [args] }),
+  ),
+
+  { name: "no git on PATH", env: { PATH: "/nonexistent" }, steps: [["task", "ls", "--json"], ["context", "--json"]] },
+  { name: "no git on PATH, session", env: { PATH: "/nonexistent", KANEO_SESSION_ID: "sess-nogit" }, steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"]] },
+
+  {
+    name: "a failing hook's output keeps both streams",
+    env: { KANEO_SESSION_ID: "sess-streams" },
+    config: { hooks: { attach: "echo out; echo err >&2; echo out2; exit 4" } },
+    steps: [["session", "attach", "1", "--strict"]],
+  },
+  {
+    name: "a hook killed by a signal",
+    env: { KANEO_SESSION_ID: "sess-signal" },
+    config: { hooks: { attach: "kill -USR1 $$", close: "kill -SEGV $$" } },
+    steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"]],
+  },
+  // Each request alone fits in the timeout; the command's requests together do
+  // not. One deadline for the whole command fails; one per request would pass.
+  { name: "one deadline per command", delayMs: 400, env: { KANEO_SESSION_ID: "sess-budget" }, steps: [["session", "attach", "1", "--strict", "--timeout", "1s"], ["board", "--json", "--timeout", "1s"]] },
+  { name: "whitespace reply to the marker post", whitespaceOn: "^POST /comment/", env: { KANEO_SESSION_ID: "sess-ws" }, config: { hooks: { attach: 'echo ran > "$HOME/hook-ran"' } }, steps: [["session", "attach", "1", "--strict"], ["session", "next", "x", "--strict"]] },
+  { name: "whitespace reply to project get", whitespaceOn: "^GET /project/", steps: [["project", "get", "--json"]] },
+  { name: "whitespace reply to task create", whitespaceOn: "^POST /task/", steps: [["task", "create", "x", "--json"]] },
+  { name: "whitespace reply to the project list", whitespaceOn: "^GET /project$", steps: [["project", "ls", "--json"], ["board", "--json"]] },
+  {
+    name: "hook failure logged in local time",
+    env: { KANEO_SESSION_ID: "sess-tz", TZ: "Asia/Tokyo" },
+    config: { hooks: { attach: "exit 2" } },
+    steps: [["session", "attach", "1", "--strict"]],
+  },
+
+  // An unreleased build reports itself as dev; scripts/build.ts stamps the tag.
+  { name: "version", steps: [["--version"], ["-v"]] },
+
+  {
+    name: "profile supplies workspace and project",
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
+    config: { default_profile: "self", profiles: { self: { workspace_id: WS, project_id: P2 } } },
+    steps: [["context", "--json"], ["task", "ls", "--json"]],
+  },
+  {
+    name: ".kaneo.json found by walking up",
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
+    local: { workspace: WS, project: P2 },
+    steps: [["context", "--json"], ["task", "ls", "--human"]],
+  },
+  {
+    name: "repo map and owner map",
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
+    repo: "acme/widget",
+    config: { repos: { "acme/widget": [P1, P2] }, owners: { acme: WS } },
+    steps: [["context", "--json"], ["board", "--json"]],
+  },
+  {
+    name: "--api-url and --api-key beat the environment",
+    env: { KANEO_API_URL: "http://127.0.0.1:9", KANEO_API_KEY: "wrong-key" },
+    steps: [["whoami", "--json", "--api-url", "<URL>", "--api-key", "test-key"], ["context", "--json", "--api-url", "<URL>"]],
+  },
+  {
+    name: "flag beats env beats profile",
+    config: { default_profile: "self", profiles: { self: { workspace_id: "ws-other", project_id: P2 } } },
+    steps: [["context", "--json"], ["context", "-p", "proj-old", "--json"]],
+  },
+  {
+    name: "hooks run after attach and close",
+    env: { KANEO_SESSION_ID: "sess-hook" },
+    config: {
+      hooks: {
+        attach: 'printf "%s %s %s %s\\n" "$KANEO_HOOK_EVENT" "$KANEO_TASK_ID" "$KANEO_TASK_NUMBER" "$KANEO_TASK_REF" >> "$HOME/.config/kaneo/hook.out"',
+        close: 'printf "%s %s\\n" "$KANEO_HOOK_EVENT" "$KANEO_TASK_ID" >> "$HOME/.config/kaneo/hook.out"',
+      },
+    },
+    steps: [["session", "attach", "2", "--strict"], ["session", "close", "--strict"]],
+  },
+  {
+    name: "a failing hook does not fail the attach",
+    env: { KANEO_SESSION_ID: "sess-hook" },
+    config: { hooks: { attach: 'echo "hook says no" >&2; exit 3' } },
+    steps: [["session", "attach", "1", "--strict"]],
+  },
+];

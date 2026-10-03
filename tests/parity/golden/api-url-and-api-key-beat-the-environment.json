@@ -1,0 +1,36 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "--json",
+        "--api-url",
+        "<URL>",
+        "--api-key",
+        "test-key"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>/api\",\n  \"workspaces\": [\n    {\n      \"id\": \"ws-main\",\n      \"name\": \"Main\",\n      \"slug\": \"main\"\n    },\n    {\n      \"id\": \"ws-other\",\n      \"name\": \"Other\",\n      \"slug\": \"other\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "context",
+        "--json",
+        "--api-url",
+        "<URL>"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-alpha\"\n  ],\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"flag\",\n    \"project\": \"env\",\n    \"workspace\": \"env\"\n  }\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

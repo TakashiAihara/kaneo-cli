@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no API key: set KANEO_API_KEY, or pass --api-key\"\n}\n",
+      "stderr": "Error: no API key: set KANEO_API_KEY, or pass --api-key\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no API key: set KANEO_API_KEY, or pass --api-key\"\n}\n",
+      "stderr": "Error: no API key: set KANEO_API_KEY, or pass --api-key\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

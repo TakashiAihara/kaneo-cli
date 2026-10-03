@@ -1,0 +1,62 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "1",
+        "--strict"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"taskId\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"projectId\": \"proj-alpha\",\n  \"projectName\": \"Alpha\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
+      "stderr": "kaneo: attach hook failed: signal: user defined signal 1: \n"
+    },
+    {
+      "args": [
+        "session",
+        "close",
+        "--strict"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"number\": 1,\n  \"taskId\": \"task-a1\"\n}\n",
+      "stderr": "kaneo: close hook failed: signal: segmentation fault: \n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-signal host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-signal host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-signal`."
+      }
+    }
+  ],
+  "files": {
+    ".config/kaneo/config.json": "{\"hooks\":{\"attach\":\"kill -USR1 $$\",\"close\":\"kill -SEGV $$\"}}",
+    ".config/kaneo/hooks.log": "<TIME>Z session=sess-signal attach hook failed: signal: user defined signal 1: \n<TIME>Z session=sess-signal close hook failed: signal: segmentation fault: \n"
+  }
+}

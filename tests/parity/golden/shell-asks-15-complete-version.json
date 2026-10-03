@@ -1,0 +1,15 @@
+{
+  "steps": [
+    {
+      "args": [
+        "__complete",
+        "--version"
+      ],
+      "exit": 0,
+      "stdout": "--version\tversion for kaneo\n:4\n",
+      "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

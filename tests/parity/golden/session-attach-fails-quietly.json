@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "99"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

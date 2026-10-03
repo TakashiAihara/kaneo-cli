@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "args": [
+        "__complete",
+        "task",
+        ""
+      ],
+      "exit": 0,
+      "stdout": "assign\tAssign a task, or clear the assignee when no user is given\ncreate\tCreate a task in a project\nget\tShow one task\nlink\tRelate two tasks\nlinks\tList a task's relations\nlist\tList the tasks in a project\nmove\tMove a task to another project\npriority\tChange a task's priority\nrm\tDelete a task\nstatus\tMove a task to another column\n:4\n",
+      "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

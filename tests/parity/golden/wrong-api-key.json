@@ -1,0 +1,36 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/auth/organization/list: 401: Unauthorized\"\n}\n",
+      "stderr": "Error: GET /api/auth/organization/list: 401: Unauthorized\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/task/tasks/proj-alpha: 401: Unauthorized\"\n}\n",
+      "stderr": "Error: GET /api/task/tasks/proj-alpha: 401: Unauthorized\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

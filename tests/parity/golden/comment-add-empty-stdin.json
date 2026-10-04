@@ -1,0 +1,18 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "add",
+        "1",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty comment\"\n}\n",
+      "stderr": "Error: empty comment\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

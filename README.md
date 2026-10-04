@@ -155,6 +155,8 @@ kaneo column reorder <column>...   # the new order: every column exactly once, b
 kaneo column rm <column> --yes
 kaneo task ls [--status ...] [--priority ...] [--all]
 kaneo task get <task-id>                 # also lists the task's relations
+kaneo task create <title> [-d TEXT | --description-file PATH] [flags]
+kaneo task update <task> [--title TEXT] [-d TEXT | --description-file PATH] [--status COL] [--priority P]   # only what is passed changes
 kaneo task status <task-id> <status>
 kaneo notification ls [--unread]                             # the newest 50, as the server returns
 kaneo notification read <notification-id>... | --all
@@ -169,7 +171,7 @@ kaneo task link <task> <other> --type <type>    # subtask, blocks or related; th
 kaneo task unlink <relation-id>
 kaneo task unlink <task> <other> [--type <type>]
 kaneo comment ls <task>
-kaneo comment add <task> <text...>
+kaneo comment add <task> <text...> | - | -F PATH
 kaneo comment edit <task> <comment-id> <text...>   # only the author may edit
 kaneo activity ls <task>                            # history: comments and events such as status changes
 kaneo activity add <task> <type> [message...] [--data '{"k":"v"}']   # a history entry only; cannot be removed on its own; Kaneo 2.23.0+
@@ -182,7 +184,9 @@ kaneo label update <label> [--name NAME] [--color COLOR]   # tasks carrying it f
 kaneo label rm <label> --yes         # also removes it from every task
 ```
 
-A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds.
+A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds. `task update` writes the status first, and when a field after it fails the error names the fields that were already updated.
+
+Long text is taken as it was written rather than as a shell passes it: `-` is stdin, `--description-file` and `-F, --file` name a file, and `-d -`, `--description-file -` and `-F -` all read stdin. It is stored byte for byte, trailing newline included, so a heredoc or a note file arrives as it stands — except for a leading BOM, which is dropped as the encoding signature it is. Text that turns out to be nothing but whitespace on the way is refused rather than stored, so clearing a description is `-d ""`.
 
 A project's slug is the prefix of its task identifiers. Without `--slug`, `project create` derives it the way the Kaneo web app does: the first three letters of a one-word name, or the initials of the first three words, upper case, in any script (`Alpha Beta Gamma` → `ABG`, `日本語だけ` → `日本語`). A name with no letter or number derives nothing, and a derived slug another project in the workspace already has is refused; both have to be given `--slug`.
 

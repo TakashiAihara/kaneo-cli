@@ -50,8 +50,10 @@ import type {
   UpdateProjectBody,
   UpdateTaskAssigneeBody,
   UpdateTaskCommentBody,
+  UpdateTaskDescriptionBody,
   UpdateTaskPriorityBody,
   UpdateTaskStatusBody,
+  UpdateTaskTitleBody,
   UpsertNotificationPreferenceWorkspaceRuleBody
 } from './model';
 
@@ -600,6 +602,88 @@ return kaneoFetch<Task>(getUpdateTaskAssigneeUrl(id),
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateTaskAssigneeBody),
+    schema: Task
+  }
+);}
+
+
+
+export const getUpdateTaskTitleUrl = (id: string,) => {
+
+
+
+
+  return `/task/title/${id}`
+}
+
+/**
+ * Rename a task.
+ * @summary Update task title
+ */
+export const updateTaskTitle = async (id: string,
+    updateTaskTitleBody: UpdateTaskTitleBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<Task> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Task>(getUpdateTaskTitleUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateTaskTitleBody),
+    schema: Task
+  }
+);}
+
+
+
+export const getUpdateTaskDescriptionUrl = (id: string,) => {
+
+
+
+
+  return `/task/description/${id}`
+}
+
+/**
+ * Replace a task's description.
+ * @summary Update task description
+ */
+export const updateTaskDescription = async (id: string,
+    updateTaskDescriptionBody: UpdateTaskDescriptionBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<Task> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Task>(getUpdateTaskDescriptionUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateTaskDescriptionBody),
     schema: Task
   }
 );}

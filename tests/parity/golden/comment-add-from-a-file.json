@@ -1,0 +1,33 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "add",
+        "1",
+        "--file",
+        "c.md",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "commented on #1\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "from a file\n"
+      }
+    }
+  ],
+  "files": {}
+}

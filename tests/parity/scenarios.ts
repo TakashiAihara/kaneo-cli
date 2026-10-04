@@ -64,6 +64,12 @@ export type Scenario = {
   delayMs?: number;
   // The fake answers matching "METHOD path" requests with whitespace only.
   whitespaceOn?: string;
+  // The fake answers matching "METHOD path" requests with a 500, having
+  // changed nothing.
+  failOn?: string;
+  // The fake answers a matching PUT with a 200 while storing an altered title or
+  // description, so a read-back finds something the client did not send.
+  misstoreOn?: string;
   pageSize?: number;
   // A seed layered over SEED for this scenario alone, so one that needs a project
   // in the second workspace does not put it in every other scenario's goldens.
@@ -75,6 +81,10 @@ export type Scenario = {
   growTimes?: number;
   // The fake answers the listing without applying status or priority.
   ignoreFilters?: boolean;
+  // Written to every step's stdin, for text a pipe carries.
+  stdin?: string;
+  // Written into the cwd before the first step, for text a flag names as a file.
+  files?: Record<string, string>;
 };
 
 const both = (name: string, args: string[]): Scenario[] => [
@@ -169,6 +179,33 @@ export const SCENARIOS: Scenario[] = [
   { name: "task create", steps: [["task", "create", "New one", "-d", "body", "--priority", "low", "--json"], ["task", "ls", "--human"]] },
   { name: "task create assigned", steps: [["task", "create", "Mine", "--assignee", "user-1", "--status", "in-progress", "--human"], ["task", "get", "4", "--json"]] },
   { name: "task create bad priority", steps: [["task", "create", "x", "--priority", "huge", "--json"]] },
+  { name: "task update title and description", steps: [["task", "update", "1", "--title", "Renamed", "-d", "new body", "--json"], ["task", "get", "1", "--human"]] },
+  { name: "task update status and priority", steps: [["task", "edit", "2", "--status", "done", "--priority", "low", "--human"], ["task", "ls", "--all", "--json"]] },
+  { name: "task update clears the description", steps: [["task", "update", "1", "-d", "", "--json"]] },
+  { name: "task update with nothing to change", steps: [["task", "update", "1", "--json"]] },
+  { name: "task update bad priority changes nothing", steps: [["task", "update", "1", "--title", "x", "--priority", "huge", "--json"], ["task", "get", "1", "--json"]] },
+  { name: "task update bad status changes nothing", steps: [["task", "update", "1", "--title", "x", "--status", "nope", "--json"], ["task", "get", "1", "--json"]] },
+  { name: "task update empty status", steps: [["task", "update", "1", "--status", "", "--json"]] },
+  { name: "task update empty title", steps: [["task", "update", "1", "--title", " ", "--json"]] },
+  { name: "task update json matches task get", steps: [["task", "update", "1", "--priority", "low", "--json"], ["task", "get", "1", "--json"]] },
+  { name: "task update description from stdin", stdin: "line one\nline two\n", steps: [["task", "update", "1", "-d", "-", "--json"]] },
+  { name: "task update empty stdin", stdin: "", steps: [["task", "update", "1", "-d", "-", "--json"]] },
+  { name: "task update blank stdin", stdin: " \n\t\n", steps: [["task", "update", "1", "-d", "-", "--json"]] },
+  { name: "task update typed blank description", steps: [["task", "update", "1", "-d", "  ", "--json"]] },
+  {
+    name: "task update description from a file",
+    files: { "body.md": "# Heading\n\n$HOME and `ticks`\n" },
+    steps: [["task", "update", "1", "--description-file", "body.md", "--json"]],
+  },
+  { name: "task update empty file", files: { "e.md": "" }, steps: [["task", "update", "1", "--description-file", "e.md", "--json"]] },
+  { name: "task update description twice", files: { "body.md": "x" }, steps: [["task", "update", "1", "-d", "a", "--description-file", "body.md", "--json"]] },
+  { name: "task update missing file", steps: [["task", "update", "1", "--description-file", "nope.md", "--json"]] },
+  { name: "task update to archived", steps: [["task", "update", "1", "--status", "archived", "--json"]] },
+  { name: "task update reports what landed", failOn: "^PUT /task/title/", steps: [["task", "update", "1", "--status", "done", "--title", "x", "--json"]] },
+  { name: "task update read-back mismatch", misstoreOn: "^PUT /task/title/", steps: [["task", "update", "1", "--title", "x", "--json"]] },
+  { name: "task update description read-back mismatch", misstoreOn: "^PUT /task/description/", steps: [["task", "update", "1", "-d", "abc", "--json"]] },
+  { name: "task update read-back fails", failOn: "^GET /task/task-a1$", steps: [["task", "update", "1", "--priority", "low", "--json"]] },
+  { name: "task create description from stdin", stdin: "from stdin\n", steps: [["task", "create", "Piped", "-d", "-", "--json"]] },
   { name: "task status", steps: [["task", "status", "1", "done", "--json"], ["task", "get", "1", "--human"]] },
   { name: "task priority", steps: [["task", "priority", "1", "urgent", "--human"], ["task", "get", "1", "--json"]] },
   { name: "task assign and clear", steps: [["task", "assign", "1", "user-1", "--json"], ["task", "assign", "1", "--human"], ["task", "get", "1", "--json"]] },
@@ -301,6 +338,12 @@ export const SCENARIOS: Scenario[] = [
       ["label", "ls", "--human"],
     ],
   },
+  { name: "comment add from stdin", stdin: "multi\nline $comment\n", steps: [["comment", "add", "1", "-", "--json"], ["comment", "ls", "1", "--json"]] },
+  { name: "comment add from a file", files: { "c.md": "from a file\n" }, steps: [["comment", "add", "1", "--file", "c.md", "--human"]] },
+  { name: "comment add with text and a file", files: { "c.md": "x" }, steps: [["comment", "add", "1", "hi", "--file", "c.md", "--json"]] },
+  { name: "comment add empty stdin", stdin: "", steps: [["comment", "add", "1", "-", "--json"]] },
+  { name: "comment add nothing", steps: [["comment", "add", "1", "--json"]] },
+  { name: "comment add blank", steps: [["comment", "add", "1", "   ", "--json"]] },
 
   ...both("notification list", ["notification", "list"]),
   { name: "notification list unread", steps: [["notification", "ls", "--unread", "--json"], ["notification", "ls", "--unread", "--human"]] },

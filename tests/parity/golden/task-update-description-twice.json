@@ -1,0 +1,21 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "-d",
+        "a",
+        "--description-file",
+        "body.md",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"pass --description or --description-file, not both\"\n}\n",
+      "stderr": "Error: pass --description or --description-file, not both\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

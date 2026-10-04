@@ -26,11 +26,14 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     growOnPage: s.growOnPage,
     growTimes: s.growTimes,
     ignoreFilters: s.ignoreFilters,
+    failOn: s.failOn,
+    misstoreOn: s.misstoreOn,
   });
   const home = mkdtempSync(join(tmpdir(), "kaneo-parity-"));
   try {
     const cwd = join(home, "work");
     mkdirSync(cwd);
+    for (const [name, text] of Object.entries(s.files ?? {})) writeFileSync(join(cwd, name), text);
     if (s.local !== undefined) writeFileSync(join(home, ".kaneo.json"), JSON.stringify(s.local));
     if (s.repo !== undefined) {
       for (const args of [["init", "-q"], ["remote", "add", "origin", `git@github.com:${s.repo}.git`]]) {
@@ -87,7 +90,19 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
       // Each step runs in the scenario's own cwd, so a binary given by a path
       // relative to where the suite started is resolved from there first.
       const exe = bin[0]!.includes("/") ? resolve(bin[0]!) : bin[0]!;
-      const p = Bun.spawn([exe, ...bin.slice(1), ...argv], { cwd, env, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+      const p = Bun.spawn([exe, ...bin.slice(1), ...argv], {
+        cwd,
+        env,
+        stdout: "pipe",
+        stderr: "pipe",
+        // A scenario that pipes text in gets a pipe to write it into; one that
+        // does not keeps stdin out of the way, as it was.
+        stdin: s.stdin === undefined ? "ignore" : "pipe",
+      });
+      if (s.stdin !== undefined) {
+        p.stdin!.write(s.stdin);
+        p.stdin!.end();
+      }
       const [stdout, stderr, exit] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
       steps.push({ args, exit, stdout: normalize(stdout), stderr: normalize(stderr) });
     }

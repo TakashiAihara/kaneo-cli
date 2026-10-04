@@ -47,8 +47,10 @@ import {
   updateProject as putProject,
   upsertNotificationPreferenceWorkspaceRule,
   updateTaskAssignee,
+  updateTaskDescription,
   updateTaskPriority,
   updateTaskStatus,
+  updateTaskTitle,
 } from "./gen/kaneo";
 import type {
   Board as GenBoard,
@@ -802,6 +804,17 @@ export const setTaskStatus = async (taskId: string, status: string): Promise<voi
 
 export const setTaskPriority = async (taskId: string, priority: string): Promise<void> => {
   await updateTaskPriority(pathParam(taskId), { priority: unchecked<UpdateTaskPriorityBody["priority"]>(priority) });
+};
+
+// Renames a task.
+export const setTaskTitle = async (taskId: string, title: string): Promise<void> => {
+  await updateTaskTitle(pathParam(taskId), { title });
+};
+
+// Replaces a task's description. An empty description is how it is cleared: the
+// endpoint takes the string as it is.
+export const setTaskDescription = async (taskId: string, description: string): Promise<void> => {
+  await updateTaskDescription(pathParam(taskId), { description });
 };
 
 // Assigns a task to a user, or clears the assignee when userId is empty.

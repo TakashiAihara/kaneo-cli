@@ -55,6 +55,8 @@ export * from './updateOrganizationBody.zod';
 export * from './updateProjectBody.zod';
 export * from './updateTaskAssigneeBody.zod';
 export * from './updateTaskCommentBody.zod';
+export * from './updateTaskDescriptionBody.zod';
 export * from './updateTaskPriorityBody.zod';
 export * from './updateTaskStatusBody.zod';
+export * from './updateTaskTitleBody.zod';
 export * from './upsertNotificationPreferenceWorkspaceRuleBody.zod';

@@ -223,6 +223,47 @@ export const SCENARIOS: Scenario[] = [
     steps: [["context", "--json"], ["board", "--json"]],
   },
   {
+    name: "context for another repo",
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
+    local: { project: "proj-local" },
+    repo: "acme/other",
+    config: { owners: { acme: "ws-acme" }, repos: { "acme/thing": ["proj-x", "proj-y"], "acme/other": ["proj-other"] } },
+    steps: [
+      ["context", "--repo", "acme/thing", "--json"],
+      ["context", "--repo", "git@github.com:acme/thing.git", "--human"],
+      ["context", "--repo", "nobody/else", "--json"],
+      ["context", "--repo", "acme/thing.git", "--json"],
+      ["context", "--repo", "acme/thing", "-p", "proj-flag", "--json"],
+      ["context", "--json"],
+    ],
+  },
+  {
+    name: "context --repo under a profile with a project",
+    config: { owners: { acme: "ws-acme" }, repos: { "acme/thing": ["proj-x"] }, profiles: { main: { project_id: "proj-profile" } } },
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
+    steps: [["context", "--repo", "acme/thing", "--json"]],
+  },
+  {
+    name: "context --repo under KANEO_PROJECT",
+    config: { owners: { acme: "ws-acme" }, repos: { "acme/thing": ["proj-x"] } },
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "proj-env" },
+    steps: [
+      ["context", "--repo", "acme/thing", "--json"],
+      ["context", "--repo", " acme/thing/ ", "--json"],
+    ],
+  },
+  {
+    name: "context --repo that is not a repo",
+    steps: [
+      ["context", "--repo", "just-a-name", "--json"],
+      ["context", "--repo", "a/b/c", "--json"],
+      ["context", "--repo", "", "--json"],
+      ["context", "--repo", "../x", "--json"],
+      ["context", "--repo", "a@b/c", "--json"],
+      ["context", "--repo", "github.com:acme/thing", "--json"],
+    ],
+  },
+  {
     name: "--api-url and --api-key beat the environment",
     env: { KANEO_API_URL: "http://127.0.0.1:9", KANEO_API_KEY: "wrong-key" },
     steps: [["whoami", "--json", "--api-url", "<URL>", "--api-key", "test-key"], ["context", "--json", "--api-url", "<URL>"]],

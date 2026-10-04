@@ -70,6 +70,11 @@ Not every layer answers every setting:
 
 `kaneo context` prints the resolved values and names the layer each one came from.
 
+`kaneo context --repo owner/name` (or a git remote URL) resolves for that repository instead of the one the current directory's remote names, so the maps can be read before a checkout exists.
+
+- The `.kaneo.json` layer is left out entirely, including the ones above the current directory. A checkout of the named repository would still apply them, so the answer can differ from what that checkout resolves to.
+- Flags, the environment and the active profile still apply above the maps. `origin.project` is `repo-map` only when `repos` answered.
+
 ### `.kaneo.json`
 
 ```json

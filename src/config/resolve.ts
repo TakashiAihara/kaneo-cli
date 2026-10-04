@@ -1,5 +1,5 @@
 import { loadGlobal, globalPath, activeProfile, workspaceForOwner, projectsForRepo, type GlobalConfig, type Profile } from "./global";
-import { findLocals, mergeLocals } from "./local";
+import { findLocals, mergeLocals, type Local } from "./local";
 import { currentRepo } from "./repo";
 
 // The hosted Kaneo instance. A self-hosted deployment is selected through a
@@ -30,11 +30,17 @@ export type Resolved = {
 export type Input = {
   flags: Flags;
   env: (name: string) => string;
-  dir: string;
+  // Where the .kaneo.json walk starts, and the directory it stops at. A null
+  // dir leaves the layer out, and there is then nothing for home to bound.
+  dir: string | null;
   home: string;
   global: GlobalConfig;
   repo: string;
 };
+
+// What a run that walks no .kaneo.json at all resolves to: this layer names
+// nothing and reports no file.
+const NO_LOCAL: Local = { workspace: "", project: "", path: "" };
 
 // The precedence chain, from strongest to weakest:
 //
@@ -54,7 +60,7 @@ export type Input = {
 // committed.
 export const resolve = (input: Input): Resolved => {
   const { env } = input;
-  const local = mergeLocals(findLocals(input.dir, input.home));
+  const local = input.dir === null ? NO_LOCAL : mergeLocals(findLocals(input.dir, input.home));
   const active = activeProfile(input.global);
   const profile: Profile = active?.profile ?? {};
   const fromOwnerMap = input.repo === "" ? "" : workspaceForOwner(input.global, input.repo);
@@ -123,4 +129,21 @@ export const resolveFromEnvironment = (flags: Flags): { cfg: Resolved; global: G
   if (home === "") throw new Error("$HOME is not defined");
   const global = loadGlobal(globalPath(home, env));
   return { cfg: resolve({ flags, env, dir: process.cwd(), home, global, repo: currentRepo(process.cwd()) }), global };
+};
+
+// The same chain for a repository the caller named instead of one read from a
+// working copy, and with the .kaneo.json layer left out.
+//
+// The walk starts from the directory the caller is standing in, and naming
+// another repository is saying that directory is not the point. Flags, the
+// environment and the active profile still sit above the maps, and the origins
+// say which layer answered: a caller asking what the maps hold reads
+// origin.project == "repo-map", and with the environment emptied a profile with
+// project_id set still answers in their place.
+//
+// Nor is this what a checkout of that repository resolves to: there the
+// .kaneo.json files from the checkout up to home would apply.
+export const resolveForRepo = (flags: Flags, global: GlobalConfig, repo: string): Resolved => {
+  const env = (name: string): string => process.env[name] ?? "";
+  return resolve({ flags, env, dir: null, home: "", global, repo });
 };

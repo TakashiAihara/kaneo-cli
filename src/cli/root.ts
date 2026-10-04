@@ -168,7 +168,7 @@ export const run = async (argv: string[]): Promise<number> => {
     // share one budget, so a slow server cannot use up the time each was given
     // and still have some left for the one that matters.
     const { deadline, deadlineAt } = deadlineFor(timeout);
-    const app: App = { cfg, global, out, deadline, deadlineAt };
+    const app: App = { cfg, flags, global, out, deadline, deadlineAt };
     configureClient({ baseUrl: cfg.apiUrl, apiKey: cfg.apiKey, timeoutMs: timeout, deadline });
 
     await command.run({

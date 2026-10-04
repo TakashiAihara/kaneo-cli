@@ -17,9 +17,9 @@
         "close",
         "--strict"
       ],
-      "exit": 0,
-      "stdout": "{\n  \"number\": 1,\n  \"taskId\": \"task-a1\"\n}\n",
-      "stderr": ""
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"posted the marker on #1 but it is not among its comments; check kaneo comment ls 1 before retrying\"\n}\n",
+      "stderr": "Error: posted the marker on #1 but it is not among its comments; check kaneo comment ls 1 before retrying\n"
     },
     {
       "args": [

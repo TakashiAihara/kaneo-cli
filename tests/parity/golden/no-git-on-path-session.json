@@ -47,12 +47,22 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/comment/task-a1",
       "query": "",
       "body": {
         "content": "<!-- kn:session id=sess-nogit host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-nogit`."
       }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
     }
   ],
   "files": {

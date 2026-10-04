@@ -1,0 +1,128 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "status",
+        "1",
+        "done",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"status is \\\"to-do\\\" after setting it to \\\"done\\\"\"\n}\n",
+      "stderr": "Error: status is \"to-do\" after setting it to \"done\"\n"
+    },
+    {
+      "args": [
+        "task",
+        "priority",
+        "1",
+        "low",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: priority is \"high\" after setting it to \"low\"\n"
+    },
+    {
+      "args": [
+        "task",
+        "assign",
+        "1",
+        "user-1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"assignee is null after setting it to \\\"user-1\\\"\"\n}\n",
+      "stderr": "Error: assignee is null after setting it to \"user-1\"\n"
+    },
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "proj-beta",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: project is \"proj-alpha\" after setting it to \"proj-beta\"\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/status/task-a1",
+      "query": "",
+      "body": {
+        "status": "done"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/priority/task-a1",
+      "query": "",
+      "body": {
+        "priority": "low"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/assignee/task-a1",
+      "query": "",
+      "body": {
+        "userId": "user-1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-a1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "proj-beta"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

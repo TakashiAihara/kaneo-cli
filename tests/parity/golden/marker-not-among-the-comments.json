@@ -1,0 +1,45 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "1"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"posted the marker on #1 but it is not among its comments; check kaneo comment ls 1 before retrying\"\n}\n",
+      "stderr": "Error: posted the marker on #1 but it is not among its comments; check kaneo comment ls 1 before retrying\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-lost host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

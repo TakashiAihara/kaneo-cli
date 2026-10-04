@@ -84,6 +84,14 @@ export type Scenario = {
   // The fake answers a matching PUT with a 200 while storing an altered title or
   // description, so a read-back finds something the client did not send.
   misstoreOn?: string;
+  // The fake answers a comment listing without the comments whose content
+  // matches, so a marker the server accepted and did not keep can be exercised.
+  dropCommentsMatching?: string;
+  // The fake answers a status, priority, assignee or move write with the task
+  // unchanged.
+  writesNotKept?: boolean;
+  // The fake answers a comment post without the comment's id.
+  commentReplyWithoutId?: boolean;
   pageSize?: number;
   // A seed layered over SEED for this scenario alone, so one that needs a project
   // in the second workspace does not put it in every other scenario's goldens.
@@ -319,10 +327,97 @@ export const SCENARIOS: Scenario[] = [
   { name: "task update description read-back mismatch", misstoreOn: "^PUT /task/description/", steps: [["task", "update", "1", "-d", "abc", "--json"]] },
   { name: "task update read-back fails", failOn: "^GET /task/task-a1$", steps: [["task", "update", "1", "--priority", "low", "--json"]] },
   { name: "task create description from stdin", stdin: "from stdin\n", steps: [["task", "create", "Piped", "-d", "-", "--json"]] },
+  // The marker, the attachment and the hook are `session attach`'s, reached in the
+  // same command: the new number never has to be carried by hand to the next one.
+  {
+    name: "task create --attach",
+    env: { KANEO_SESSION_ID: "sess-create" },
+    steps: [["task", "create", "Brand new", "--attach", "--next", "start", "--json"], ["board", "--json"]],
+  },
+  // The hook is part of the attach, whichever command was reached for it: a
+  // create that attached without running one leaves a statusline holding a task
+  // that never told it about itself.
+  {
+    name: "task create --attach runs the attach hook",
+    env: { KANEO_SESSION_ID: "sess-create" },
+    config: {
+      hooks: {
+        attach: 'printf "%s %s %s %s\\n" "$KANEO_HOOK_EVENT" "$KANEO_TASK_ID" "$KANEO_TASK_NUMBER" "$KANEO_TASK_REF" >> "$HOME/.config/kaneo/hook.out"',
+      },
+    },
+    steps: [["task", "create", "Brand new", "--attach", "--next", "start", "--json"]],
+  },
+  // Checked before the create rather than after it, so nothing is left behind.
+  { name: "task create --attach without a session", steps: [["task", "create", "x", "--attach", "--json"], ["task", "ls", "--all", "--json"]] },
+  { name: "task create --next without --attach", steps: [["task", "create", "x", "--next", "y", "--json"]] },
+  // The flag having been passed decides it, not what it holds.
+  { name: "task create --next empty without --attach", steps: [["task", "create", "x", "--next", "", "--json"], ["task", "ls", "--all", "--json"]] },
+  // The attach fails once the task exists, so the message has to name what is
+  // already on the board to close.
+  {
+    name: "task create --attach when the attach fails",
+    env: { KANEO_SESSION_ID: "sess-create" },
+    failOn: "^POST /comment/",
+    steps: [["task", "create", "Brand new", "--attach", "--json"], ["task", "ls", "--all", "--json"]],
+  },
+  // Alike wording warns where a shared reference refuses: measured over real
+  // boards alike wording flagged distinct work seven times out of ten, while
+  // every pair that shared a reference was the same issue.
+  {
+    name: "task create warns about a similar title",
+    steps: [["task", "create", "Write the parser again", "--json"], ["task", "ls", "--all", "--json"]],
+  },
+  {
+    name: "task create with a shared reference",
+    steps: [["task", "create", "Fix owner/repo#7 crash", "--force", "--json"], ["task", "create", "Follow up on owner/repo#7", "--json"]],
+  },
+  // A spaced reference counts only right after an opening parenthesis: outside one
+  // `name #N` is as often a word and a number ("PR #314"), so it is created.
+  {
+    name: "task create with a spaced reference outside parentheses",
+    steps: [["task", "create", "Fix ccx#7 crash", "--force", "--json"], ["task", "create", "Follow up ccx #7", "--human"]],
+  },
+  {
+    name: "task create with a spaced reference in parentheses",
+    steps: [["task", "create", "Fix ccx#7 crash", "--force", "--json"], ["task", "create", "Follow up (ccx #7)", "--human"]],
+  },
+  {
+    name: "task create --attach with a session id the store refuses",
+    env: { KANEO_SESSION_ID: "a/b" },
+    steps: [["task", "create", "x", "--attach", "--json"], ["task", "ls", "--all", "--json"]],
+  },
   { name: "task status", steps: [["task", "status", "1", "done", "--json"], ["task", "get", "1", "--human"]] },
   { name: "task priority", steps: [["task", "priority", "1", "urgent", "--human"], ["task", "get", "1", "--json"]] },
   { name: "task assign and clear", steps: [["task", "assign", "1", "user-1", "--json"], ["task", "assign", "1", "--human"], ["task", "get", "1", "--json"]] },
+  // Every write reads the task back and prints that, so a value the server did not
+  // take cannot print as one it did. The assignment is read as a person reads it:
+  // the name the server resolved the id to, rather than the id behind it.
+  {
+    name: "writes read back",
+    steps: [["task", "status", "1", "in-progress", "--json"], ["task", "priority", "1", "low", "--human"], ["task", "assign", "1", "user-1", "--human"]],
+  },
+  // The labels of the task the write resolved come along with the read-back, since
+  // only the board listing carries them: a report that dropped or replaced them
+  // would show a labeled task as carrying none.
+  {
+    name: "Labels carried over",
+    extraTasks: [{ id: "task-a4", projectId: P1, title: "Needs triage" }],
+    seed: { labels: [{ taskId: "task-a4", name: "bug" }] },
+    steps: [["task", "status", "4", "in-progress", "--json"]],
+  },
+  // The server answers the write and keeps the old value: what was sent must not
+  // print as what the task holds.
+  {
+    name: "a write the server did not keep",
+    writesNotKept: true,
+    steps: [["task", "status", "1", "done", "--json"], ["task", "priority", "1", "low", "--human"], ["task", "assign", "1", "user-1", "--json"], ["task", "move", "1", "--to", P2, "--human"]],
+  },
+  // The read that confirms a write is the one that can fail after it landed.
+  { name: "a read-back that fails after the write", failOn: "^GET /task/task-a1$", steps: [["task", "status", "1", "done", "--json"]] },
   { name: "task move", steps: [["task", "move", "1", "--to", P2, "--json"], ["task", "ls", "-p", P2, "--human"]] },
+  // The destination as it was typed, so the line shows what was asked for rather
+  // than the id behind it.
+  { name: "task move human", steps: [["task", "move", "1", "--to", "BET", "--human"]] },
   { name: "task move without --to", steps: [["task", "move", "1", "--json"]] },
   { name: "task due set and clear", steps: [["task", "due", "1", "2026-10-31", "--json"], ["task", "get", "1", "--json"], ["task", "due", "1", "--human"], ["task", "get", "1", "--json"]] },
   { name: "task due refuses a bad date", steps: [["task", "due", "1", "someday", "--json"], ["task", "due", "1", "", "--json"], ["task", "due", "1", " 2026-10-31 ", "--human"], ["task", "get", "1", "--human"]] },
@@ -653,6 +748,46 @@ export const SCENARIOS: Scenario[] = [
   },
   { name: "session attach fails quietly", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "99"]] },
   { name: "session attach strict reports", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "99", "--strict"]] },
+  // The server takes the marker and its listing does not hold it. Reported without
+  // --strict, like the local record that could not be written: the session has a
+  // marker on a board nothing here can read.
+  {
+    name: "marker not among the comments",
+    env: { KANEO_SESSION_ID: "sess-lost" },
+    dropCommentsMatching: "kn:session",
+    steps: [["session", "attach", "1"]],
+  },
+  // The marker is posted and the listing that would confirm it fails: still a
+  // failure without --strict, since the marker is on the server either way.
+  {
+    name: "marker that could not be confirmed",
+    env: { KANEO_SESSION_ID: "sess-lost" },
+    failOn: "^GET /comment/task-a1$",
+    steps: [["session", "attach", "1"]],
+  },
+  // A reply with no id has nothing to look for, which is reported as that rather
+  // than as a marker missing from the listing.
+  {
+    name: "marker reply without an id",
+    env: { KANEO_SESSION_ID: "sess-lost" },
+    commentReplyWithoutId: true,
+    steps: [["session", "attach", "1"]],
+  },
+  // `session next` posts a marker too, so it confirms it the same way.
+  {
+    name: "session next marker not among the comments",
+    env: { KANEO_SESSION_ID: "sess-lost" },
+    dropCommentsMatching: "kn:session",
+    steps: [["session", "next", "--task", "1", "step"]],
+  },
+  // The same listing failing is not a failure for `session next`: it keeps no
+  // record of the marker, so the write that landed is the whole of what it did.
+  {
+    name: "session next when the listing fails",
+    env: { KANEO_SESSION_ID: "sess-lost" },
+    failOn: "^GET /comment/task-a1$",
+    steps: [["session", "next", "--task", "1", "step"]],
+  },
   // Reads only what is on this machine, so it answers before anything is
   // attached and makes no request.
   {
@@ -692,6 +827,24 @@ export const SCENARIOS: Scenario[] = [
     // Named the way `session status` prints it, so a reference read off the
     // history can be handed straight back.
     steps: [["session", "close", "--task", "ALP#2", "--strict", "--json"]],
+  },
+  // A close whose marker the server did not keep still clears the attachment
+  // here: the local record is brought up to date before the marker is confirmed,
+  // so a machine never says it holds a task the server has let go of.
+  {
+    name: "session close keeps the local record when the marker is not confirmed",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    // The closed marker alone, so the attach above it is confirmed as usual.
+    dropCommentsMatching: "state=closed",
+    steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"], ["session", "status", "--json"]],
+  },
+  // The listing that would confirm the closed marker fails: the close is done here
+  // and fail-open stays quiet about the unverified marker unless --strict asks.
+  {
+    name: "session close when the listing fails",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    failOn: "^GET /comment/task-a1$",
+    steps: [["session", "close", "--task", "1"], ["session", "close", "--task", "1", "--strict"]],
   },
   {
     name: "session status without a session id",

@@ -16,6 +16,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/task/proj-alpha",
       "query": "",

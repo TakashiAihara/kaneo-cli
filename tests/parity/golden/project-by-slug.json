@@ -75,15 +75,9 @@
       "query": ""
     },
     {
-      "method": "POST",
-      "path": "/task/bet",
-      "query": "",
-      "body": {
-        "title": "x",
-        "description": "",
-        "priority": "medium",
-        "status": "to-do"
-      }
+      "method": "GET",
+      "path": "/task/tasks/bet",
+      "query": ""
     },
     {
       "method": "GET",
@@ -99,6 +93,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
     },
     {
       "method": "POST",

@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "status",
+        "4",
+        "in-progress",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a4\",\n  \"number\": 4,\n  \"title\": \"Needs triage\",\n  \"description\": \"\",\n  \"status\": \"in-progress\",\n  \"priority\": \"no-priority\",\n  \"position\": 3,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:08.000Z\",\n  \"labels\": [\n    {\n      \"id\": \"lbl0002\",\n      \"name\": \"bug\",\n      \"color\": \"gray\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/status/task-a4",
+      "query": "",
+      "body": {
+        "status": "in-progress"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a4",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

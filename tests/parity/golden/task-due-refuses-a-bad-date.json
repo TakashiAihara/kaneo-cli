@@ -9,8 +9,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"PUT /api/task/due-date/task-a1: 400: Invalid dueDate \\\"someday\\\"\"\n}\n",
-      "stderr": "Error: PUT /api/task/due-date/task-a1: 400: Invalid dueDate \"someday\"\n"
+      "stdout": "{\n  \"error\": \"the due date \\\"someday\\\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\"\n}\n",
+      "stderr": "Error: the due date \"someday\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\n"
     },
     {
       "args": [
@@ -59,20 +59,7 @@
       "path": "/task/due-date/task-a1",
       "query": "",
       "body": {
-        "dueDate": "someday"
-      }
-    },
-    {
-      "method": "GET",
-      "path": "/task/tasks/proj-alpha",
-      "query": ""
-    },
-    {
-      "method": "PUT",
-      "path": "/task/due-date/task-a1",
-      "query": "",
-      "body": {
-        "dueDate": "2026-10-31"
+        "dueDate": "<TIME>Z"
       }
     },
     {

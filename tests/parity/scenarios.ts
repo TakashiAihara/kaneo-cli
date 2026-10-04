@@ -268,6 +268,34 @@ export const SCENARIOS: Scenario[] = [
   { name: "task update status and priority", steps: [["task", "edit", "2", "--status", "done", "--priority", "low", "--human"], ["task", "ls", "--all", "--json"]] },
   { name: "task update clears the description", steps: [["task", "update", "1", "-d", "", "--json"]] },
   { name: "task update with nothing to change", steps: [["task", "update", "1", "--json"]] },
+  { name: "task update start date and position keep the rest", steps: [["task", "due", "2", "2026-11-01", "--json"], ["task", "update", "2", "--start-date", "2026-10-20", "--position", "5", "--json"], ["task", "get", "2", "--json"], ["task", "get", "2", "--human"], ["task", "update", "2", "--position", "6", "--human"], ["task", "update", "2", "--start-date", "", "--human"], ["task", "get", "2", "--json"]] },
+  { name: "task update start after the due date changes nothing", steps: [["task", "due", "1", "2026-11-01", "--json"], ["task", "update", "1", "--title", "Renamed", "--start-date", "2026-11-02", "--json"], ["task", "get", "1", "--json"]] },
+  // Dates on 2026-01-01, which the recorder leaves as they are, so the instant
+  // each one is sent as shows in the golden.
+  {
+    name: "task dates are sent as instants",
+    stdin: '[{"title":"Dated","status":"to-do","dueDate":"2026-01-01T12:00+09:00"}]',
+    steps: [
+      ["task", "update", "1", "--start-date", "2026-01-01T09:00+09:00", "--json"],
+      ["task", "due", "1", "2026-01-01T18:00:00+09:00", "--json"],
+      ["task", "bulk", "1", "--due", "2026-01-01", "--json"],
+      ["task", "import", "-", "--json"],
+    ],
+  },
+  { name: "task update position with a stored start past the due date changes nothing", steps: [["task", "update", "1", "--start-date", "2026-11-05", "--json"], ["task", "due", "1", "2026-11-01", "--json"], ["task", "update", "1", "--title", "Renamed", "--position", "3", "--json"], ["task", "get", "1", "--json"], ["task", "update", "1", "--title", "Renamed", "--json"]] },
+  {
+    name: "task dates need a calendar date or an offset",
+    steps: [
+      ["task", "update", "1", "--start-date", "2026-10-20T09:00:00", "--json"],
+      ["task", "update", "1", "--start-date", "1", "--json"],
+      ["task", "update", "1", "--start-date", "2026-02-30", "--json"],
+      ["task", "update", "1", "--start-date", "  ", "--json"],
+      ["task", "due", "1", "October", "--json"],
+      ["task", "bulk", "1", "--due", "2026-10-22T09:00", "--json"],
+    ],
+  },
+  { name: "task update position with a title", steps: [["task", "update", "1", "--title", "Renamed", "--position", "3", "--human"], ["task", "get", "1", "--json"]] },
+  { name: "task update bad start date or position changes nothing", steps: [["task", "update", "1", "--title", "x", "--start-date", "soon", "--json"], ["task", "update", "1", "--title", "x", "--position", "-1", "--json"], ["task", "update", "1", "--position", "1.5", "--json"], ["task", "update", "1", "--position", "2147483647", "--json"], ["task", "get", "1", "--json"]] },
   { name: "task update bad priority changes nothing", steps: [["task", "update", "1", "--title", "x", "--priority", "huge", "--json"], ["task", "get", "1", "--json"]] },
   { name: "task update bad status changes nothing", steps: [["task", "update", "1", "--title", "x", "--status", "nope", "--json"], ["task", "get", "1", "--json"]] },
   { name: "task update empty status", steps: [["task", "update", "1", "--status", "", "--json"]] },

@@ -74,6 +74,7 @@ export * from './updateNotificationPreferencesBody.zod';
 export * from './updateOrganizationBody.zod';
 export * from './updateProjectBody.zod';
 export * from './updateTaskAssigneeBody.zod';
+export * from './updateTaskBody.zod';
 export * from './updateTaskCommentBody.zod';
 export * from './updateTaskDescriptionBody.zod';
 export * from './updateTaskDueDateBody.zod';

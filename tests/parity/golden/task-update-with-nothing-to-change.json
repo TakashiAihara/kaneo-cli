@@ -8,8 +8,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"nothing to update: pass --title, --description, --description-file, --status or --priority\"\n}\n",
-      "stderr": "Error: nothing to update: pass --title, --description, --description-file, --status or --priority\n"
+      "stdout": "{\n  \"error\": \"nothing to update: pass --title, --description, --description-file, --status, --priority, --start-date or --position\"\n}\n",
+      "stderr": "Error: nothing to update: pass --title, --description, --description-file, --status, --priority, --start-date or --position\n"
     }
   ],
   "requests": [],

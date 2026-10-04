@@ -1,0 +1,84 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--title",
+        "x",
+        "--start-date",
+        "soon",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--start-date \\\"soon\\\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\"\n}\n",
+      "stderr": "Error: --start-date \"soon\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\n"
+    },
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--title",
+        "x",
+        "--position",
+        "-1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--position \\\"-1\\\" is not a whole number from 0 to 2147483646\"\n}\n",
+      "stderr": "Error: --position \"-1\" is not a whole number from 0 to 2147483646\n"
+    },
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--position",
+        "1.5",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--position \\\"1.5\\\" is not a whole number from 0 to 2147483646\"\n}\n",
+      "stderr": "Error: --position \"1.5\" is not a whole number from 0 to 2147483646\n"
+    },
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--position",
+        "2147483647",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--position \\\"2147483647\\\" is not a whole number from 0 to 2147483646\"\n}\n",
+      "stderr": "Error: --position \"2147483647\" is not a whole number from 0 to 2147483646\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"description\": \"multi\\nline\",\n  \"status\": \"to-do\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n  \"labels\": [],\n  \"relations\": []\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

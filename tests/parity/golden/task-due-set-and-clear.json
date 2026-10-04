@@ -57,7 +57,7 @@
       "path": "/task/due-date/task-a1",
       "query": "",
       "body": {
-        "dueDate": "2026-10-31"
+        "dueDate": "<TIME>Z"
       }
     },
     {

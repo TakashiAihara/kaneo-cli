@@ -66,6 +66,7 @@ import type {
   UpdateOrganizationBody,
   UpdateProjectBody,
   UpdateTaskAssigneeBody,
+  UpdateTaskBody,
   UpdateTaskCommentBody,
   UpdateTaskDescriptionBody,
   UpdateTaskDueDateBody,
@@ -547,6 +548,47 @@ export const getTask = async (id: string, options?: Parameters<typeof kaneoFetch
 
     ,
     schema: TaskWithAssignee
+  }
+);}
+
+
+
+export const getUpdateTaskUrl = (id: string,) => {
+
+
+
+
+  return `/task/${id}`
+}
+
+/**
+ * Replace every field of a task. Use the single-field routes for narrower edits.
+ * @summary Update task
+ */
+export const updateTask = async (id: string,
+    updateTaskBody: UpdateTaskBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<Task> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Task>(getUpdateTaskUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateTaskBody),
+    schema: Task
   }
 );}
 

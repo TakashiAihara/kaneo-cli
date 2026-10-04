@@ -43,6 +43,7 @@ export const OPERATIONS: Operation[] = [
   { id: "updateTaskDescription", method: "PUT", path: "/task/description/{id}", command: "kaneo task update" },
   { id: "moveTask", method: "PUT", path: "/task/move/{id}", command: "kaneo task move" },
   { id: "updateTaskDueDate", method: "PUT", path: "/task/due-date/{id}", command: "kaneo task due" },
+  { id: "updateTask", method: "PUT", path: "/task/{id}", command: "kaneo task update" },
   { id: "bulkUpdateTasks", method: "PATCH", path: "/task/bulk", command: "kaneo task bulk" },
   { id: "exportTasks", method: "GET", path: "/task/export/{projectId}", command: "kaneo task export" },
   { id: "importTasks", method: "POST", path: "/task/import/{projectId}", command: "kaneo task import" },

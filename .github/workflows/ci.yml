@@ -29,7 +29,6 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-
       # The client is generated from the pinned OpenAPI document. A hand edit
       # to the generated code, or a document, transformer or registry change
       # committed without regenerating, fails here.

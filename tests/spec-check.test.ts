@@ -20,8 +20,9 @@ writeFileSync(
 
 const run = (body: string, ...args: string[]) => {
   const seen = join(dir, "seen");
-  const p = Bun.spawnSync(["bun", "--preload", stub, "scripts/spec.ts", ...args], {
+  const p = Bun.spawnSync(["bun", "--preload", stub, join(import.meta.dir, "../scripts/spec.ts"), ...args], {
     env: { ...process.env, STUB_BODY: body, STUB_SEEN: seen },
+    timeout: 10_000,
   });
   return { exit: p.exitCode, stderr: p.stderr.toString(), seen: () => readFileSync(seen, "utf8") };
 };
@@ -32,9 +33,12 @@ test("passes when the release's document is the pinned file", () => {
   expect(r.seen()).toBe(`https://raw.githubusercontent.com/usekaneo/kaneo/v${SPEC_VERSION}/apps/docs/openapi.json`);
 });
 
+// Same length, so a check that only compared sizes would pass it.
 test("fails when one byte differs", () => {
   const changed = join(dir, "changed.json");
-  writeFileSync(changed, Buffer.concat([readFileSync(SPEC_PATH), Buffer.from(" ")]));
+  const bytes = readFileSync(SPEC_PATH);
+  bytes[Math.floor(bytes.length / 2)] = 0xff;
+  writeFileSync(changed, bytes);
   const r = run(changed, "--check");
   expect(r.exit).toBe(1);
   expect(r.stderr).toContain("corrections go in openapi/transformer.ts");

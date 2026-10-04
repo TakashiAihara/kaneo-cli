@@ -19,7 +19,10 @@ if (process.argv.length !== 3 || !next || !/^\d+\.\d+\.\d+$/.test(next)) {
 }
 const url = `https://raw.githubusercontent.com/usekaneo/kaneo/v${next}/apps/docs/openapi.json`;
 // CI runs this unattended; a stalled connection should fail, not hang the job.
-const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+const res = await fetch(url, { signal: AbortSignal.timeout(30_000) }).catch((e: Error) => {
+  console.error(`${url}: ${e.message}`);
+  process.exit(1);
+});
 if (!res.ok) {
   console.error(`${url}: ${res.status}`);
   process.exit(1);

@@ -855,7 +855,18 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const i = tasks.findIndex((x) => x.id === decodeURIComponent(p![1]));
       if (i < 0) return fail(404, "Task not found");
       const t = tasks[i]!;
-      if (req.method === "GET") return ok(M.TaskWithAssignee, { ...t, assigneeId: t.userId, assigneeName: t.userId ? (users.get(t.userId) ?? null) : null });
+      // The detail view of v2.32.0's get-task.ts. The fake keeps no column
+      // reference on a task, so it is the column the status names; a virtual
+      // status has none.
+      if (req.method === "GET") {
+        return ok(M.TaskWithAssignee, {
+          ...t,
+          columnId: columnsOf(t.projectId).find((c) => c.slug === t.status)?.id ?? null,
+          workspaceId: projects.find((x) => x.id === t.projectId)?.workspaceId,
+          assigneeId: t.userId,
+          assigneeName: t.userId ? (users.get(t.userId) ?? null) : null,
+        });
+      }
       // A full replace, as upstream's update-task.ts does it: a start date, due
       // date or assignee left out is stored as none, a description left out is
       // kept, and moving to another project is refused.

@@ -164,7 +164,9 @@ export const BoardResponse = zod.object({
   "totalPages": zod.number(),
   "relatedPage": zod.number(),
   "relatedPageSize": zod.number(),
-  "relatedTotalPages": zod.number()
+  "relatedTotalPages": zod.number(),
+  "relatedRevision": zod.string().optional().describe('Public board labels and external links revision for this task page. Restart pagination if it changes during related-page continuations.'),
+  "revision": zod.string().optional().describe('Public board content, membership and ordering revision, including related records and visible subtask progress. Restart pagination if it changes between task or related pages.')
 }).describe('Always paginated: 50 tasks by default, at most 100 per page. Continue through totalPages to retrieve all tasks. For each task page, follow relatedPage through relatedTotalPages to retrieve all labels, external links and columns (100 related rows per kind per request, plus up to 100 columns needed to represent the tasks).')
 })
 

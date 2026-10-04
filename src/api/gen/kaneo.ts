@@ -42,6 +42,7 @@ import {
 import type {
   AttachLabelToTaskBody,
   BulkUpdateTasksBody,
+  ClearAllNotificationsParams,
   CreateActivityBody,
   CreateColumnBody,
   CreateLabelBody,
@@ -51,10 +52,14 @@ import type {
   CreateTaskCommentBody,
   CreateTaskRelationBody,
   CreateTimeEntryBody,
+  GetActivitiesParams,
+  GetTaskParams,
   GlobalSearchParams,
   ImportTasksBody,
+  ListNotificationsParams,
   ListProjectsParams,
   ListTasksParams,
+  MarkAllNotificationsAsReadParams,
   MoveTaskBody,
   PendingLabelDeletion,
   ReorderColumnsBody,
@@ -527,21 +532,30 @@ return kaneoFetch<Task>(getCreateTaskUrl(projectId),
 
 
 
-export const getGetTaskUrl = (id: string,) => {
+export const getGetTaskUrl = (id: string,
+    params?: GetTaskParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/task/${id}`
+  return stringifiedParams.length > 0 ? `/task/${id}?${stringifiedParams}` : `/task/${id}`
 }
 
 /**
- * Get a single task by ID, with its assignee's name resolved.
+ * Get a single task by ID, with its assignee name. The board view omits descriptions above 64 KiB and includes task and same-project parent subtask progress.
  * @summary Get task
  */
-export const getTask = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<TaskWithAssignee> => {
+export const getTask = async (id: string,
+    params?: GetTaskParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<TaskWithAssignee> => {
 
-  return kaneoFetch<TaskWithAssignee>(getGetTaskUrl(id),
+  return kaneoFetch<TaskWithAssignee>(getGetTaskUrl(id,params),
   {
     ...options,
     method: 'GET'
@@ -1149,21 +1163,30 @@ export const deleteColumn = async (id: string, options?: Parameters<typeof kaneo
 
 
 
-export const getGetActivitiesUrl = (taskId: string,) => {
+export const getGetActivitiesUrl = (taskId: string,
+    params?: GetActivitiesParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/activity/${taskId}`
+  return stringifiedParams.length > 0 ? `/activity/${taskId}?${stringifiedParams}` : `/activity/${taskId}`
 }
 
 /**
- * Get a task's full activity feed, newest first: comments alongside system events such as status and assignee changes.
+ * Get a task's activity feed, newest first: comments alongside system events such as status and assignee changes. Set limit to request a bounded preview; omit it for the full feed.
  * @summary Get task activity
  */
-export const getActivities = async (taskId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Activity[]> => {
+export const getActivities = async (taskId: string,
+    params?: GetActivitiesParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<Activity[]> => {
 
-  return kaneoFetch<Activity[]>(getGetActivitiesUrl(taskId),
+  return kaneoFetch<Activity[]>(getGetActivitiesUrl(taskId,params),
   {
     ...options,
     method: 'GET'
@@ -1733,21 +1756,28 @@ export const detachLabelFromTask = async (id: string, options?: Parameters<typeo
 
 
 
-export const getListNotificationsUrl = () => {
+export const getListNotificationsUrl = (params?: ListNotificationsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/notification`
+  return stringifiedParams.length > 0 ? `/notification?${stringifiedParams}` : `/notification`
 }
 
 /**
- * Get every notification for the current user, read and unread.
+ * Get up to 50 notifications for the current user, read and unread. Optionally limit them to one workspace before applying the limit.
  * @summary List notifications
  */
-export const listNotifications = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<Notification[]> => {
+export const listNotifications = async (params?: ListNotificationsParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<Notification[]> => {
 
-  return kaneoFetch<Notification[]>(getListNotificationsUrl(),
+  return kaneoFetch<Notification[]>(getListNotificationsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1825,21 +1855,28 @@ export const markNotificationAsRead = async (id: string, options?: Parameters<ty
 
 
 
-export const getMarkAllNotificationsAsReadUrl = () => {
+export const getMarkAllNotificationsAsReadUrl = (params?: MarkAllNotificationsAsReadParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/notification/read-all`
+  return stringifiedParams.length > 0 ? `/notification/read-all?${stringifiedParams}` : `/notification/read-all`
 }
 
 /**
- * Mark every notification for the current user as read.
+ * Mark notifications for the current user as read, optionally limited to one workspace.
  * @summary Mark all read
  */
-export const markAllNotificationsAsRead = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<NotificationBulkResult> => {
+export const markAllNotificationsAsRead = async (params?: MarkAllNotificationsAsReadParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<NotificationBulkResult> => {
 
-  return kaneoFetch<NotificationBulkResult>(getMarkAllNotificationsAsReadUrl(),
+  return kaneoFetch<NotificationBulkResult>(getMarkAllNotificationsAsReadUrl(params),
   {
     ...options,
     method: 'PATCH'
@@ -1851,21 +1888,28 @@ export const markAllNotificationsAsRead = async ( options?: Parameters<typeof ka
 
 
 
-export const getClearAllNotificationsUrl = () => {
+export const getClearAllNotificationsUrl = (params?: ClearAllNotificationsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/notification/clear-all`
+  return stringifiedParams.length > 0 ? `/notification/clear-all?${stringifiedParams}` : `/notification/clear-all`
 }
 
 /**
- * Permanently delete every notification for the current user. This cannot be undone.
+ * Permanently delete notifications for the current user, optionally limited to one workspace. This cannot be undone.
  * @summary Clear all
  */
-export const clearAllNotifications = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<NotificationBulkResult> => {
+export const clearAllNotifications = async (params?: ClearAllNotificationsParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<NotificationBulkResult> => {
 
-  return kaneoFetch<NotificationBulkResult>(getClearAllNotificationsUrl(),
+  return kaneoFetch<NotificationBulkResult>(getClearAllNotificationsUrl(params),
   {
     ...options,
     method: 'DELETE'

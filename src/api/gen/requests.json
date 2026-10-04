@@ -8,7 +8,9 @@
     "body.taskIds": true,
     "body.value": false
   },
-  "clearAllNotifications": {},
+  "clearAllNotifications": {
+    "query.workspaceId": false
+  },
   "createActivity": {
     "body.eventData": false,
     "body.message": true,
@@ -44,6 +46,7 @@
   "createTask": {
     "body.customFields": false,
     "body.description": true,
+    "body.draftAssetIds": false,
     "body.dueDate": false,
     "body.priority": true,
     "body.startDate": false,
@@ -77,14 +80,18 @@
   "deleteWorkflowRule": {},
   "detachLabelFromTask": {},
   "exportTasks": {},
-  "getActivities": {},
+  "getActivities": {
+    "query.limit": false
+  },
   "getColumns": {},
   "getExternalLinksByTask": {},
   "getInvitationDetails": {},
   "getLabel": {},
   "getNotificationPreferences": {},
   "getProject": {},
-  "getTask": {},
+  "getTask": {
+    "query.view": false
+  },
   "getTaskComments": {},
   "getTaskLabels": {},
   "getTaskRelations": {},
@@ -104,7 +111,9 @@
   "importTasks": {
     "body.tasks": true
   },
-  "listNotifications": {},
+  "listNotifications": {
+    "query.workspaceId": false
+  },
   "listOrganization": {},
   "listProjects": {
     "query.includeArchived": false,
@@ -122,7 +131,9 @@
     "query.sortOrder": false,
     "query.status": false
   },
-  "markAllNotificationsAsRead": {},
+  "markAllNotificationsAsRead": {
+    "query.workspaceId": false
+  },
   "markNotificationAsRead": {},
   "moveTask": {
     "body.destinationProjectId": true,

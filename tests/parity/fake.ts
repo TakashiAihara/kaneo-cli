@@ -98,8 +98,9 @@ export type FakeOptions = {
   // Answers a comment post without the comment's id, so a marker that cannot be
   // looked for in the listing is exercised.
   commentReplyWithoutId?: boolean;
-  // Serves the pinned document with createTask no longer taking customFields
-  // and updateTask requiring description, the request drift api-check reports.
+  // Serves the pinned document with createActivity requiring userId, as
+  // Kaneo 2.20 does, and createTask without customFields, the request drift
+  // api-check reports.
   driftedSpec?: boolean;
 };
 
@@ -453,7 +454,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const doc = JSON.parse(readFileSync(SPEC_PATH, "utf8"));
       const body = (p: string, m: string) => doc.paths[p][m].requestBody.content["application/json"].schema;
       delete body("/task/{projectId}", "post").properties.customFields;
-      body("/task/{id}", "put").required.push("description");
+      body("/activity/create", "post").required.push("userId");
       return Response.json(doc);
     }
     if (req.method === "GET" && path === "/auth/organization/list") return ok(z.array(M.Organization), workspaces);

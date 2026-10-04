@@ -107,7 +107,7 @@ One server endpoint this client knows how to call, declared in the registry in `
 
 Requests are made by the generated client (`src/api/gen`), which is generated for exactly the operations in the registry: `openapi/transformer.ts` drops every other operation before generation, and `tests/registry.test.ts` fails when the registry, the generated client and the pinned OpenAPI document disagree on an operation's id, method or path. Request bodies and parameters are typed by the generated code, not by the registry.
 
-`kaneo api-check` compares the registry's operation ids against a live server's document. It says whether the server still offers each operation; it does not compare request bodies, so it would not catch a field the server renamed.
+`kaneo api-check` compares the registry's operation ids against a live server's document and fails when the server lacks one. It also compares each operation's query parameters and top-level body fields, with whether each is required, against the pinned document's (`src/api/gen/requests.json`), and lists the differences as drift without failing: the pinned document is not exactly what the CLI sends, so a drift is a lead to check rather than proof that a command breaks. Path parameters, nested fields and types are not compared.
 
 ### pinned spec
 

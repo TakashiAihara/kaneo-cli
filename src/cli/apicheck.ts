@@ -13,9 +13,9 @@ export const apiCheckCommand = {
   short: "Check this client's operations against the server's OpenAPI document",
   long:
     "Check this client's operations against the server's OpenAPI document.\n\n" +
-    "Exits non-zero when the server is missing an operation this client calls, or\n" +
-    "when a request field this client knows is gone from the server or the server\n" +
-    "requires one the client may leave out.\n" +
+    "Exits non-zero when the server is missing an operation this client calls.\n" +
+    "Also lists request fields whose server definition differs from the pinned\n" +
+    "document (DRIFT): leads to check, which do not change the exit status.\n" +
     "The document needs no authentication, so this works before a key is set.",
   args: (args: string[]) => {
     const first = args[0];
@@ -31,8 +31,8 @@ export const apiCheckCommand = {
     if (result.requestDrift.length > 0) {
       app.out.human("");
       for (const d of result.requestDrift) {
-        const what = d.problem === "gone" ? "not taken by the server" : "required by the server";
-        app.out.human(`DRIFT   ${d.id} ${d.field}: ${what} (${commandOf(d.id)})`);
+        const what = d.problem === "gone" ? "not in the server's document" : "required by the server";
+        app.out.human(`DRIFT   ${d.id.padEnd(width)} ${d.field}: ${what} (${commandOf(d.id)})`);
       }
     }
     if (result.newOnServer.length > 0) {
@@ -50,21 +50,20 @@ export const apiCheckCommand = {
       covered: result.covered.map(asReport),
       missing: result.missing.map(asReport),
       newOnServer: result.newOnServer,
-      requestDrift: result.requestDrift,
+      requestDrift: result.requestDrift.map((d) => ({ ...d, command: commandOf(d.id) })),
     } as Json);
 
     if (result.missing.length > 0) {
       throw new Error(`${result.missing.length} operation(s) this client calls are missing from the server`);
-    }
-    if (result.requestDrift.length > 0) {
-      throw new Error(`${result.requestDrift.length} request field(s) would break a call against this server`);
     }
   },
 };
 
 const commandOf = (id: string): string => OPERATIONS.find((o) => o.id === id)?.command ?? "";
 
-const pad = (operation: Operation): string => operation.id.padEnd(Math.max(...OPERATIONS.map((o) => o.id.length)) + 1);
+const width = Math.max(...OPERATIONS.map((o) => o.id.length)) + 1;
+
+const pad = (operation: Operation): string => operation.id.padEnd(width);
 
 // The registry entries carry no json tags, so the report prints their field
 // names as they are declared rather than in lower case.

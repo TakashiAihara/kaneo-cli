@@ -1928,8 +1928,8 @@ export type CheckResult = {
   missing: Operation[];
   // What the server offers and this client does not use yet.
   newOnServer: string[];
-  // Fields of a covered operation whose call would break against this server:
-  // gone from it, or required by it while the client may leave them out.
+  // Request fields of a covered operation whose server definition differs from
+  // the pinned document's (see requestDrift). Reported, not a failure.
   requestDrift: Drift[];
 };
 

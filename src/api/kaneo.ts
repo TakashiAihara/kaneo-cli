@@ -1,4 +1,6 @@
 import { OPERATIONS, type Operation } from "./registry";
+import { requestDrift, requestShapes, type Drift, type RequestShape } from "./shape";
+import pinnedRequests from "./gen/requests.json";
 import { kaneoFetch, KaneoApiError } from "./http";
 import type { Json } from "../output/json";
 import {
@@ -1926,6 +1928,9 @@ export type CheckResult = {
   missing: Operation[];
   // What the server offers and this client does not use yet.
   newOnServer: string[];
+  // Fields of a covered operation whose call would break against this server:
+  // gone from it, or required by it while the client may leave them out.
+  requestDrift: Drift[];
 };
 
 type Document = { paths?: Record<string, Record<string, { operationId?: string } | undefined> | undefined> };
@@ -1955,6 +1960,7 @@ export const checkApi = async (): Promise<CheckResult> => {
     covered: OPERATIONS.filter((operation) => seen.has(operation.id)),
     missing: OPERATIONS.filter((operation) => !seen.has(operation.id)),
     newOnServer: onServer.filter((id) => !used.has(id)),
+    requestDrift: requestDrift(pinnedRequests as Record<string, RequestShape>, requestShapes(document, used)),
   };
 };
 

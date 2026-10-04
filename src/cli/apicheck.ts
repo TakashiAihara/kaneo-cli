@@ -13,7 +13,9 @@ export const apiCheckCommand = {
   short: "Check this client's operations against the server's OpenAPI document",
   long:
     "Check this client's operations against the server's OpenAPI document.\n\n" +
-    "Exits non-zero when the server is missing an operation this client calls.\n" +
+    "Exits non-zero when the server is missing an operation this client calls, or\n" +
+    "when a request field this client knows is gone from the server or the server\n" +
+    "requires one the client may leave out.\n" +
     "The document needs no authentication, so this works before a key is set.",
   args: (args: string[]) => {
     const first = args[0];
@@ -26,6 +28,13 @@ export const apiCheckCommand = {
 
     for (const operation of result.covered) app.out.human(`ok      ${pad(operation)} ${operation.command}`);
     for (const operation of result.missing) app.out.human(`MISSING ${pad(operation)} ${operation.command}`);
+    if (result.requestDrift.length > 0) {
+      app.out.human("");
+      for (const d of result.requestDrift) {
+        const what = d.problem === "gone" ? "not taken by the server" : "required by the server";
+        app.out.human(`DRIFT   ${d.id} ${d.field}: ${what} (${commandOf(d.id)})`);
+      }
+    }
     if (result.newOnServer.length > 0) {
       app.out.human("");
       app.out.human(`${result.newOnServer.length} server operations this client does not use yet`);
@@ -41,13 +50,19 @@ export const apiCheckCommand = {
       covered: result.covered.map(asReport),
       missing: result.missing.map(asReport),
       newOnServer: result.newOnServer,
+      requestDrift: result.requestDrift,
     } as Json);
 
     if (result.missing.length > 0) {
       throw new Error(`${result.missing.length} operation(s) this client calls are missing from the server`);
     }
+    if (result.requestDrift.length > 0) {
+      throw new Error(`${result.requestDrift.length} request field(s) would break a call against this server`);
+    }
   },
 };
+
+const commandOf = (id: string): string => OPERATIONS.find((o) => o.id === id)?.command ?? "";
 
 const pad = (operation: Operation): string => operation.id.padEnd(Math.max(...OPERATIONS.map((o) => o.id.length)) + 1);
 

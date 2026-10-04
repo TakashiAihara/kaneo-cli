@@ -1,6 +1,7 @@
 import { z } from "zod";
 import * as M from "../../src/api/gen/model";
 import { SPEC_PATH } from "../../openapi/spec";
+import { readFileSync } from "node:fs";
 
 // An in-memory Kaneo that answers the operations in src/api/registry.ts the
 // way a v2.29.2 server does. Every response is parsed with the generated zod
@@ -97,6 +98,9 @@ export type FakeOptions = {
   // Answers a comment post without the comment's id, so a marker that cannot be
   // looked for in the listing is exercised.
   commentReplyWithoutId?: boolean;
+  // Serves the pinned document with createTask no longer taking customFields
+  // and updateTask requiring description, the request drift api-check reports.
+  driftedSpec?: boolean;
 };
 
 export function startFake(seed: Seed, opts: FakeOptions = {}) {
@@ -444,7 +448,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     const m = (re: RegExp) => path.match(re) as Groups | null;
     let p: Groups | null;
 
-    if (req.method === "GET" && path === "/openapi") return new Response(Bun.file(SPEC_PATH));
+    if (req.method === "GET" && path === "/openapi") {
+      if (!opts.driftedSpec) return new Response(Bun.file(SPEC_PATH));
+      const doc = JSON.parse(readFileSync(SPEC_PATH, "utf8"));
+      const body = (p: string, m: string) => doc.paths[p][m].requestBody.content["application/json"].schema;
+      delete body("/task/{projectId}", "post").properties.customFields;
+      body("/task/{id}", "put").required.push("description");
+      return Response.json(doc);
+    }
     if (req.method === "GET" && path === "/auth/organization/list") return ok(z.array(M.Organization), workspaces);
     if (req.method === "POST" && path === "/auth/organization/update") {
       const w = workspaces.find((x) => x.id === (body as any)?.organizationId);

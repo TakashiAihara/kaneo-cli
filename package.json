@@ -4,7 +4,7 @@
   "description": "Command-line interface for Kaneo, the open source project management tool",
   "type": "module",
   "scripts": {
-    "generate": "orval --config orval.config.ts",
+    "generate": "orval --config orval.config.ts && bun scripts/request-shapes.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "knip": "knip",

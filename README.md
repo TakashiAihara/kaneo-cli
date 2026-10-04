@@ -159,6 +159,11 @@ kaneo task links <task>
 kaneo task link <task> <other> --type <type>    # subtask, blocks or related; the type says which way round
 kaneo task unlink <relation-id>
 kaneo task unlink <task> <other> [--type <type>]
+kaneo comment ls <task>
+kaneo comment add <task> <text...>
+kaneo comment edit <task> <comment-id> <text...>   # only the author may edit
+kaneo activity ls <task>                            # history: comments and events such as status changes
+kaneo activity add <task> <type> [message...] [--data '{"k":"v"}']   # a history entry only; cannot be removed on its own; Kaneo 2.23.0+
 ```
 
 A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds.

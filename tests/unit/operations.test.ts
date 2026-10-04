@@ -212,6 +212,62 @@ test("TestListCommentsReadsTheAuthorName", async () => {
   expect(got[0]!.createdAt).toBe(TIME);
 });
 
+const activityRow = (id: string, at: string, extra = "") =>
+  `{"id":"${id}","taskId":"t1","type":"comment","createdAt":"${at}","updatedAt":"${at}","userId":"u1","content":"hi","externalUserName":null,"externalUserAvatar":null,"externalSource":null,"externalUrl":null${extra}}`;
+
+const comment = (id: string): api.Comment => ({ id, content: "old", userId: "u1", userName: "Ada", createdAt: TIME });
+
+// The reply has no author name, so the edit keeps the one the listing gave.
+test("TestEditCommentKeepsTheListedAuthor", async () => {
+  const seen = recorder(activityRow("c1", TIME, ',"content":"new text"').replace('"content":"hi",', ""));
+  const got = await api.editComment(comment("c1"), "new text");
+  expect([seen.method, seen.path]).toEqual(["PUT", "/api/comment/c1"]);
+  expect(JSON.parse(seen.body)).toEqual({ content: "new text" });
+  expect(got).toEqual({ id: "c1", content: "new text", userId: "u1", userName: "Ada", createdAt: TIME });
+});
+
+// A write the server did not echo back did not happen: an empty 2xx, or a reply
+// holding the old text, is a failure rather than an edit or a recorded event.
+test("TestUnechoedWritesFail", async () => {
+  recorder("");
+  expect(String(await failure(api.editComment(comment("c1"), "new text")))).toContain("did not echo");
+  expect(String(await failure(api.addActivity("t1", "note", "", null)))).toContain("did not echo");
+
+  recorder(activityRow("c1", TIME));
+  expect(String(await failure(api.editComment(comment("c1"), "new text")))).toContain("did not echo");
+
+  recorder(activityRow("c2", TIME, ',"content":"new text"').replace('"content":"hi",', ""));
+  expect(String(await failure(api.editComment(comment("c1"), "new text")))).toContain("did not echo");
+
+  // A row for another task or of another type is not the event that was sent.
+  recorder(activityRow("a1", TIME));
+  expect(String(await failure(api.addActivity("t1", "note", "", null)))).toContain("did not echo");
+  recorder(activityRow("a1", TIME).replace('"type":"comment"', '"type":"note"'));
+  expect(String(await failure(api.addActivity("t2", "note", "", null)))).toContain("did not echo");
+  recorder(activityRow("", TIME).replace('"type":"comment"', '"type":"note"'));
+  expect(String(await failure(api.addActivity("t1", "note", "", null)))).toContain("did not echo");
+});
+
+// The server sends the feed newest first; the CLI reads it oldest first, like comments.
+test("TestListActivitiesIsOldestFirst", async () => {
+  recorder(`[${activityRow("new", "2026-09-30T00:00:02.000Z")},${activityRow("old", "2026-09-30T00:00:01.000Z", ',"eventData":{"a":1}')}]`);
+  const got = await api.listActivities("t1");
+  expect(got.map((a) => a.id)).toEqual(["old", "new"]);
+  expect(got[0]!.eventData).toEqual({ a: 1 });
+});
+
+// message is required but nullable: an event without one sends null, not "" or nothing.
+test("TestAddActivitySendsAnEmptyMessageAsNull", async () => {
+  let seen = recorder(activityRow("a1", TIME).replace('"type":"comment"', '"type":"status_changed"'));
+  await api.addActivity("t1", "status_changed", "", { newStatus: "done" });
+  expect(JSON.parse(seen.body)).toEqual({ taskId: "t1", type: "status_changed", message: null, eventData: { newStatus: "done" } });
+
+  seen = recorder(activityRow("a1", TIME).replace('"type":"comment"', '"type":"note"').replace('"content":"hi"', '"content":"hello"'));
+  const got = await api.addActivity("t1", "note", "hello", null);
+  expect(JSON.parse(seen.body)).toEqual({ taskId: "t1", type: "note", message: "hello", eventData: null });
+  expect(got).toEqual({ id: "a1", type: "note", content: "hello", eventData: null, userId: "u1", createdAt: TIME });
+});
+
 // A 201 or 204 is a success like 200. Reported as a failure, a write that
 // happened invites a retry that duplicates it.
 test("TestAnyTwoHundredIsASuccess", async () => {
@@ -247,6 +303,9 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["ListComments", "GET", "/api/comment/a%2Fb", () => api.listComments(id)],
     ["AddComment", "POST", "/api/comment/a%2Fb", () => api.addComment(id, "x")],
     ["DeleteComment", "DELETE", "/api/comment/a%2Fb", () => api.deleteComment(id)],
+    ["EditComment", "PUT", "/api/comment/a%2Fb", () => api.editComment(comment(id), "x")],
+    ["ListActivities", "GET", "/api/activity/a%2Fb", () => api.listActivities(id)],
+    ["AddActivity", "POST", "/api/activity/create", () => api.addActivity(id, "x", "", null)],
     ["ListRelations", "GET", "/api/task-relation/a%2Fb", () => api.listRelations(id)],
     ["LinkTasks", "POST", "/api/task-relation", () => api.linkTasks("s", "d", "blocks")],
     ["DeleteRelation", "DELETE", "/api/task-relation/a%2Fb", () => api.deleteRelation(id)],
@@ -260,13 +319,13 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
       seen.push({ method: req.method, path: new URL(req.url).pathname });
       return new Response(null, { status: 204 });
     });
-    // An empty reply is an error for the board, which must name a project,
-    // and a success for everything else.
+    // An empty reply is an error for the board, which must name a project, and
+    // for the writes that must echo what they wrote; a success for everything else.
     const err = await call().then(
       () => undefined,
       (e) => e,
     );
-    expect(err !== undefined, `${name}: err = ${err}`).toBe(name === "GetBoard");
+    expect(err !== undefined, `${name}: err = ${err}`).toBe(["GetBoard", "EditComment", "AddActivity"].includes(name));
     expect(seen[0]).toEqual({ method, path });
   });
 });

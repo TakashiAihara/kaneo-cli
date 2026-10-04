@@ -158,6 +158,19 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   };
   for (const c of seed.comments ?? []) addComment(c.taskId, c.content, c.id, c.userId);
 
+  // Comments are activity rows on the server, so the feed is the comments plus
+  // the events recorded beside them.
+  const events: z.input<typeof M.Activity>[] = [];
+  const asActivity = (a: { id: string; taskId: string; userId: string | null; content: string | null; createdAt: string; updatedAt: string }, type = "comment", eventData: unknown = null) => ({
+    ...a,
+    type,
+    eventData,
+    externalUserName: null,
+    externalUserAvatar: null,
+    externalSource: null,
+    externalUrl: null,
+  });
+
   const relations: z.input<typeof M.TaskRelation>[] = [];
   const requests: Recorded[] = [];
 
@@ -225,6 +238,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["PUT", /^\/task\/move\/[^/]+$/, M.MoveTaskBody],
       ["POST", /^\/task-relation$/, M.CreateTaskRelationBody],
       ["POST", /^\/comment\/[^/]+$/, M.CreateTaskCommentBody],
+      ["PUT", /^\/comment\/[^/]+$/, M.UpdateTaskCommentBody],
+      ["POST", /^\/activity\/create$/, M.CreateActivityBody],
     ];
     for (const [method, re, schema] of BODIES) {
       if (req.method !== method || !re.test(path)) continue;
@@ -399,11 +414,36 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       return reply;
     }
 
-    if ((p = m(/^\/comment\/([^/]+)$/))) {
+    if ((p = m(/^\/comment\/([^/]+)$/)) && req.method !== "PUT") {
       const taskId = decodeURIComponent(p[1]);
       if (!tasks.some((t) => t.id === taskId)) return fail(404, "Task not found");
       if (req.method === "GET") return ok(z.array(M.Comment), comments.filter((c) => c.taskId === taskId));
       if (req.method === "POST") return ok(M.Comment, addComment(taskId, (body as any).content));
+    }
+    // PUT takes the comment's id where GET and POST take the task's, and
+    // answers like DELETE for an unknown id and for someone else's comment.
+    if ((p = m(/^\/comment\/([^/]+)$/)) && req.method === "PUT") {
+      const c = comments.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!c) return fail(400, "Workspace ID could not be determined");
+      if (c.userId !== "user-self") return fail(404, "Comment not found or you are not the author");
+      Object.assign(c, { content: (body as any).content, updatedAt: now() });
+      return ok(M.Activity, asActivity(c));
+    }
+
+    if ((p = m(/^\/activity\/([^/]+)$/)) && req.method === "GET") {
+      const taskId = decodeURIComponent(p[1]);
+      const feed = [...comments.filter((c) => c.taskId === taskId).map((c) => asActivity(c)), ...events.filter((e) => e.taskId === taskId)];
+      return ok(z.array(M.Activity), feed.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    }
+    if (req.method === "POST" && path === "/activity/create") {
+      const b = body as any;
+      // 400 for both, as the pinned document has it; comments are refused here from 2.27.0.
+      if (!tasks.some((t) => t.id === b.taskId)) return fail(400, "Task not found");
+      if (b.type === "comment") return fail(400, "Use the comment endpoint");
+      const at = now();
+      const e = asActivity({ id: id("act"), taskId: b.taskId, userId: "user-self", content: b.message, createdAt: at, updatedAt: at }, b.type, b.eventData ?? null);
+      events.push(e);
+      return ok(M.Activity, e);
     }
 
     if (req.method === "POST" && path === "/task-relation") {

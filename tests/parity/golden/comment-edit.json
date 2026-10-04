@@ -1,0 +1,164 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "edit",
+        "2",
+        "cmt0001",
+        "x"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no comment \\\"cmt0001\\\" on #2; see `kaneo comment list 2 --json`\"\n}\n",
+      "stderr": "Error: no comment \"cmt0001\" on #2; see `kaneo comment list 2 --json`\n"
+    },
+    {
+      "args": [
+        "comment",
+        "edit",
+        "1",
+        "nope",
+        "x"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no comment \\\"nope\\\" on #1; see `kaneo comment list 1 --json`\"\n}\n",
+      "stderr": "Error: no comment \"nope\" on #1; see `kaneo comment list 1 --json`\n"
+    },
+    {
+      "args": [
+        "comment",
+        "edit",
+        "1",
+        "cmt0001",
+        ""
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/comment/cmt0001: 400: Invalid key: content: Too small: expected string to have \\u003e=1 characters\"\n}\n",
+      "stderr": "Error: PUT /api/comment/cmt0001: 400: Invalid key: content: Too small: expected string to have >=1 characters\n"
+    },
+    {
+      "args": [
+        "comment",
+        "edit",
+        "3",
+        "cmt-other",
+        "x"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/comment/cmt-other: 404: Comment not found or you are not the author\"\n}\n",
+      "stderr": "Error: PUT /api/comment/cmt-other: 404: Comment not found or you are not the author\n"
+    },
+    {
+      "args": [
+        "comment",
+        "edit",
+        "1",
+        "cmt0001",
+        "rewritten",
+        "text",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"cmt0001\",\n  \"content\": \"rewritten text\",\n  \"userId\": \"user-self\",\n  \"userName\": \"Self\",\n  \"createdAt\": \"2026-01-01T00:00:08.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
+        "ls",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "2026-01-01T00:00:08.000Z  rewritten text\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/comment/cmt0001",
+      "query": "",
+      "body": {
+        "content": ""
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a3",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/comment/cmt-other",
+      "query": "",
+      "body": {
+        "content": "x"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/comment/cmt0001",
+      "query": "",
+      "body": {
+        "content": "rewritten text"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

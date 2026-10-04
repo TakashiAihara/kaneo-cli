@@ -1,0 +1,120 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy",
+        "--ntfy-server",
+        "https://ntfy.example",
+        "--ntfy-topic",
+        "kaneo",
+        "--ntfy-token",
+        "tk_abcdef123456",
+        "--email",
+        "--reminder-lead",
+        "2h",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"emailAddress\": \"self@example.com\",\n  \"emailEnabled\": true,\n  \"ntfyEnabled\": true,\n  \"ntfyConfigured\": true,\n  \"ntfyServerUrl\": \"https://ntfy.example\",\n  \"ntfyTopic\": \"kaneo\",\n  \"ntfyTokenConfigured\": true,\n  \"maskedNtfyToken\": \"tk_a…3456\",\n  \"gotifyEnabled\": false,\n  \"gotifyConfigured\": false,\n  \"gotifyServerUrl\": null,\n  \"gotifyTokenConfigured\": false,\n  \"maskedGotifyToken\": null,\n  \"webhookEnabled\": false,\n  \"webhookConfigured\": false,\n  \"webhookUrl\": null,\n  \"webhookSecretConfigured\": false,\n  \"maskedWebhookSecret\": null,\n  \"taskAssignmentEnabled\": true,\n  \"taskCommentEnabled\": true,\n  \"taskStatusChangeEnabled\": true,\n  \"dueDateReminderEnabled\": true,\n  \"dueDateReminderLeadTimeMinutes\": 120,\n  \"workspaces\": [],\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy-token",
+        "",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "email               on   self@example.com\nntfy                on   https://ntfy.example  kaneo\ngotify              off\nwebhook             off\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   120m before\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy-server",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--ntfy-server cannot be cleared; the server keeps the stored value\"\n}\n",
+      "stderr": "Error: --ntfy-server cannot be cleared; the server keeps the stored value\n"
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: nothing to change: pass at least one of --email, --ntfy, --gotify, --webhook, --task-assignment, --task-comment, --task-status-change, --due-date-reminder, --ntfy-server, --ntfy-topic, --ntfy-token, --gotify-server, --gotify-token, --webhook-url, --webhook-secret, --reminder-lead\n"
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--reminder-lead",
+        "90s",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--reminder-lead must be a whole number of minutes\"\n}\n",
+      "stderr": "Error: --reminder-lead must be a whole number of minutes\n"
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--reminder-lead",
+        "1m",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/notification-preferences: 400: Invalid key: dueDateReminderLeadTimeMinutes: Too small: expected number to be \\u003e=5\"\n}\n",
+      "stderr": "Error: PUT /api/notification-preferences: 400: Invalid key: dueDateReminderLeadTimeMinutes: Too small: expected number to be >=5\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "emailEnabled": true,
+        "ntfyEnabled": true,
+        "ntfyServerUrl": "https://ntfy.example",
+        "ntfyTopic": "kaneo",
+        "ntfyToken": "tk_abcdef123456",
+        "dueDateReminderLeadTimeMinutes": 120
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "ntfyToken": null
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "dueDateReminderLeadTimeMinutes": 1
+      }
+    }
+  ],
+  "files": {}
+}

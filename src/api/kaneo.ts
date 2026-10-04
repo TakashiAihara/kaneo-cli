@@ -3,6 +3,8 @@ import { kaneoFetch, KaneoApiError } from "./http";
 import type { Json } from "../output/json";
 import {
   archiveProject,
+  clearAllNotifications,
+  createNotification as postNotification,
   createColumn as postColumn,
   createActivity,
   getActivities,
@@ -19,8 +21,10 @@ import {
   createTask as postTask,
   createTaskComment,
   createTaskRelation,
+  deleteNotificationPreferenceWorkspaceRule,
   deleteColumn as removeColumn,
   deleteTask as removeTask,
+  getNotificationPreferences as readNotificationPreferences,
   deleteTaskComment,
   deleteTaskRelation as removeRelation,
   getColumns as readColumns,
@@ -28,23 +32,31 @@ import {
   getTask as readTask,
   getTaskComments,
   getTaskRelations,
+  listNotifications as getNotifications,
   listOrganization,
   listProjects,
   listTasks,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
   moveTask as putTaskMove,
   reorderColumns as putColumns,
   unarchiveProject,
+  updateNotificationPreferences as putNotificationPreferences,
   updateColumn as putColumn,
   updateOrganization,
   updateProject as putProject,
+  upsertNotificationPreferenceWorkspaceRule,
   updateTaskAssignee,
   updateTaskPriority,
   updateTaskStatus,
 } from "./gen/kaneo";
 import type {
   BoardTask,
+  CreateNotificationBody,
   Column as GenColumn,
   CreateTaskBody,
+  Notification as GenNotification,
+  NotificationPreferences as GenNotificationPreferences,
   CreateTaskRelationBody,
   Activity as GenActivity,
   Label as GenLabel,
@@ -55,7 +67,9 @@ import type {
   Task as GenTask,
   TaskRelation as GenRelation,
   TaskRelationWithTasks,
+  UpdateNotificationPreferencesBody,
   UpdateTaskPriorityBody,
+  UpsertNotificationPreferenceWorkspaceRuleBody,
 } from "./gen/model";
 
 // What this CLI makes of a Kaneo server.
@@ -858,6 +872,96 @@ export const taskSummary = (t: Task): RelationTask => ({
   status: t.status,
   projectId: t.projectId,
 });
+
+// A notification for the user the key belongs to. content is null for the ones
+// the server raises from task and workspace events: their text is meant to be
+// rendered from type and eventData, so both are kept as sent.
+export type Notification = {
+  id: string;
+  type: string;
+  title: string | null;
+  content: string | null;
+  eventData: unknown;
+  isRead: boolean;
+  resourceType: string | null;
+  resourceId: string | null;
+  createdAt: string;
+};
+
+const notification = (n: GenNotification): Notification => ({
+  id: n.id ?? "",
+  type: n.type ?? "",
+  title: n.title ?? null,
+  content: n.content ?? null,
+  eventData: n.eventData ?? null,
+  // The document allows null; the column defaults to unread, and a notification
+  // nobody has opened is the fact a null stands for.
+  isRead: n.isRead === true,
+  resourceType: n.resourceType ?? null,
+  resourceId: n.resourceId ?? null,
+  createdAt: isoTime("createdAt", n.createdAt),
+});
+
+// The newest 50 notifications, read and unread, newest first: the server caps
+// the listing there and takes no page.
+export const listNotifications = async (): Promise<Notification[]> =>
+  zeroList(await getNotifications()).map(notification);
+
+export const markNotificationRead = async (id: string): Promise<Notification> =>
+  notification(zeroRecord(await markNotificationAsRead(pathParam(id))));
+
+export const markAllNotificationsRead = async (): Promise<void> => {
+  await markAllNotificationsAsRead();
+};
+
+export const clearNotifications = async (): Promise<void> => {
+  await clearAllNotifications();
+};
+
+export type NewNotification = {
+  type: string;
+  title: string;
+  message: string;
+  resourceType: string;
+  resourceId: string;
+};
+
+// Raises a notification for the key's own user. The server answers null when
+// that user has turned the category off, or cannot reach the task or workspace
+// it points at; neither is a failure: the request was accepted and nothing was
+// stored.
+export const createNotification = async (wanted: NewNotification): Promise<Notification | null> => {
+  const body: CreateNotificationBody = { type: wanted.type };
+  if (wanted.title !== "") body.title = wanted.title;
+  if (wanted.message !== "") body.message = wanted.message;
+  if (wanted.resourceType !== "") body.relatedEntityType = wanted.resourceType;
+  if (wanted.resourceId !== "") body.relatedEntityId = wanted.resourceId;
+  const created = await postNotification(body);
+  return created === null || created === undefined ? null : notification(created);
+};
+
+// How the key's user is notified. Secrets come back as booleans and a masked
+// preview only, so the record is passed on as the server sent it.
+export type NotificationPreferences = GenNotificationPreferences;
+export type NotificationPreferenceChanges = UpdateNotificationPreferencesBody;
+export type WorkspaceRule = UpsertNotificationPreferenceWorkspaceRuleBody;
+
+export const getNotificationPreferences = async (): Promise<NotificationPreferences> =>
+  zeroRecord(await readNotificationPreferences());
+
+// Only the fields in changes are sent. The server leaves the other settings
+// alone, but carries a channel switch into the active workspace rules that have
+// a channel on.
+export const updateNotificationPreferences = async (
+  changes: NotificationPreferenceChanges,
+): Promise<NotificationPreferences> => zeroRecord(await putNotificationPreferences(changes));
+
+// Replaces a workspace's rule whole: the server takes every field or none.
+export const setWorkspaceRule = async (workspaceId: string, rule: WorkspaceRule): Promise<NotificationPreferences> =>
+  zeroRecord(await upsertNotificationPreferenceWorkspaceRule(pathParam(workspaceId), rule));
+
+export const removeWorkspaceRule = async (workspaceId: string): Promise<NotificationPreferences> =>
+  zeroRecord(await deleteNotificationPreferenceWorkspaceRule(pathParam(workspaceId)));
 
 // A label as the label routes return it. The server keeps two kinds of row
 // under one table: a workspace label (taskId null), which is what the web app

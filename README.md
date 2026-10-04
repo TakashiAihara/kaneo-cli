@@ -156,6 +156,14 @@ kaneo column rm <column> --yes
 kaneo task ls [--status ...] [--priority ...] [--all]
 kaneo task get <task-id>                 # also lists the task's relations
 kaneo task status <task-id> <status>
+kaneo notification ls [--unread]                             # the newest 50, as the server returns
+kaneo notification read <notification-id>... | --all
+kaneo notification create <message> [--title T] [--type T]   # to yourself
+kaneo notification clear --yes                               # deletes every notification
+kaneo notification preferences get
+kaneo notification preferences set [--email=false] [--ntfy] [--ntfy-topic T] [--reminder-lead 2h] ...   # only what is passed changes
+kaneo notification preferences workspace set <workspace-id> [--active=false] [--webhook] [--projects id,id]
+kaneo notification preferences workspace rm <workspace-id>   # the workspace is then sent nothing outside the app
 kaneo task links <task>
 kaneo task link <task> <other> --type <type>    # subtask, blocks or related; the type says which way round
 kaneo task unlink <relation-id>

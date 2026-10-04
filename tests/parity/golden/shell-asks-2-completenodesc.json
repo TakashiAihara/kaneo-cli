@@ -6,7 +6,7 @@
         ""
       ],
       "exit": 0,
-      "stdout": "activity\napi-check\nboard\ncolumn\ncomment\ncompletion\ncontext\nhelp\nlabel\nproject\nsession\ntask\nwhoami\nworkspace\n:4\n",
+      "stdout": "activity\napi-check\nboard\ncolumn\ncomment\ncompletion\ncontext\nhelp\nlabel\nnotification\nproject\nsession\ntask\nwhoami\nworkspace\n:4\n",
       "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
     }
   ],

@@ -26,6 +26,8 @@ export type Seed = {
   comments?: { taskId: string; content: string; id?: string; userId?: string }[];
   // Users the server knows, so assign has a name to report.
   users?: { id: string; name: string }[];
+  // The key's own notifications, oldest first.
+  notifications?: { type: string; title?: string | null; content?: string | null; isRead?: boolean | null; eventData?: unknown }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
@@ -183,6 +185,77 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   };
   const requests: Recorded[] = [];
 
+  // Notifications number and date themselves apart from everything else, so
+  // seeding them leaves the ids and times the other scenarios record alone.
+  // Workspace rules draw on the same counter.
+  let nseq = 0;
+  let nclock = 0;
+  const nid = (prefix: string) => `${prefix}${String(++nseq).padStart(4, "0")}`;
+  const nnow = () => new Date(T0 + 86_400_000 + 1000 * nclock++).toISOString();
+  let notifications: z.input<typeof M.Notification>[] = [];
+  const addNotification = (n: { type: string; title?: string | null; content?: string | null; isRead?: boolean | null; eventData?: unknown; resourceId?: string | null; resourceType?: string | null }) => {
+    const at = nnow();
+    const row = { id: nid("ntf"), userId: "user-self", title: n.title ?? null, content: n.content ?? null, type: n.type, eventData: n.eventData ?? null, isRead: n.isRead === undefined ? false : n.isRead, resourceId: n.resourceId ?? null, resourceType: n.resourceType ?? null, createdAt: at, updatedAt: at };
+    notifications.push(row);
+    return row;
+  };
+  for (const n of seed.notifications ?? []) addNotification(n);
+
+  // Preferences as v2.29.2 keeps them: its defaults, its masking, and the
+  // checks and carry-overs of notification-preferences/service.ts.
+  const prefsAt = nnow();
+  const secrets: Record<string, string | null> = { ntfyToken: null, gotifyToken: null, webhookSecret: null };
+  const settings = {
+    emailAddress: "self@example.com" as string | null,
+    emailEnabled: false,
+    ntfyEnabled: false,
+    ntfyServerUrl: null as string | null,
+    ntfyTopic: null as string | null,
+    gotifyEnabled: false,
+    gotifyServerUrl: null as string | null,
+    webhookEnabled: false,
+    webhookUrl: null as string | null,
+    taskAssignmentEnabled: true,
+    taskCommentEnabled: true,
+    taskStatusChangeEnabled: true,
+    dueDateReminderEnabled: true,
+    dueDateReminderLeadTimeMinutes: 1440,
+  };
+  const rules: z.input<typeof M.NotificationPreferenceWorkspaceRule>[] = [];
+  const masked = (s: string | null) => (!s ? null : s.length > 8 ? `${s.slice(0, 4)}…${s.slice(-4)}` : "••••");
+  // Whether each channel can deliver at all, which is what a rule may turn on.
+  const usable = () => ({
+    emailEnabled: settings.emailEnabled && !!settings.emailAddress,
+    ntfyEnabled: settings.ntfyEnabled && !!settings.ntfyServerUrl && !!settings.ntfyTopic,
+    gotifyEnabled: settings.gotifyEnabled && !!settings.gotifyServerUrl && !!secrets.gotifyToken,
+    webhookEnabled: settings.webhookEnabled && !!settings.webhookUrl,
+  });
+  const preferences = (): z.input<typeof M.NotificationPreferences> => ({
+    ...settings,
+    ntfyConfigured: !!(settings.ntfyServerUrl && settings.ntfyTopic),
+    ntfyTokenConfigured: !!secrets.ntfyToken,
+    maskedNtfyToken: masked(secrets.ntfyToken!),
+    gotifyConfigured: !!(settings.gotifyServerUrl && secrets.gotifyToken),
+    gotifyTokenConfigured: !!secrets.gotifyToken,
+    maskedGotifyToken: masked(secrets.gotifyToken!),
+    webhookConfigured: !!settings.webhookUrl,
+    webhookSecretConfigured: !!secrets.webhookSecret,
+    maskedWebhookSecret: masked(secrets.webhookSecret!),
+    workspaces: rules,
+    createdAt: prefsAt,
+    updatedAt: prefsAt,
+  });
+  // The categories a user can turn off; a notification of a muted one is not stored.
+  const CATEGORY: Record<string, keyof typeof settings> = {
+    task_assignee_changed: "taskAssignmentEnabled",
+    task_created: "taskAssignmentEnabled",
+    task_comment: "taskCommentEnabled",
+    task_mention: "taskCommentEnabled",
+    task_status_changed: "taskStatusChangeEnabled",
+    due_date_reminder: "dueDateReminderEnabled",
+    task_overdue: "dueDateReminderEnabled",
+  };
+
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
@@ -252,6 +325,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["PUT", /^\/task\/move\/[^/]+$/, M.MoveTaskBody],
       ["POST", /^\/task-relation$/, M.CreateTaskRelationBody],
       ["POST", /^\/comment\/[^/]+$/, M.CreateTaskCommentBody],
+      ["POST", /^\/notification$/, M.CreateNotificationBody],
+      ["PUT", /^\/notification-preferences$/, M.UpdateNotificationPreferencesBody],
+      ["PUT", /^\/notification-preferences\/workspaces\/[^/]+$/, M.UpsertNotificationPreferenceWorkspaceRuleBody],
       ["PUT", /^\/comment\/[^/]+$/, M.UpdateTaskCommentBody],
       ["POST", /^\/activity\/create$/, M.CreateActivityBody],
       ["POST", /^\/label$/, M.CreateLabelBody],
@@ -481,6 +557,115 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         const i = relations.findIndex((r) => r.id === key);
         if (i < 0) return fail(404, "Relation not found");
         return ok(M.TaskRelation, relations.splice(i, 1)[0]!);
+      }
+    }
+
+    if (req.method === "GET" && path === "/notification") {
+      return ok(z.array(M.Notification), [...notifications].reverse().slice(0, 50));
+    }
+    if (req.method === "POST" && path === "/notification") {
+      const b = body as any;
+      const reachable =
+        (b.relatedEntityId === undefined && b.relatedEntityType === undefined) ||
+        (b.relatedEntityType === "task" && tasks.some((t) => t.id === b.relatedEntityId)) ||
+        (b.relatedEntityType === "workspace" && workspaces.some((w) => w.id === b.relatedEntityId));
+      const category = CATEGORY[b.type];
+      if (!reachable || (category && settings[category] === false)) return Response.json(null);
+      return ok(M.Notification, addNotification({ type: b.type, title: b.title, content: b.message, resourceId: b.relatedEntityId, resourceType: b.relatedEntityType }));
+    }
+    if (req.method === "PATCH" && path === "/notification/read-all") {
+      for (const n of notifications) n.isRead = true;
+      return ok(M.NotificationBulkResult, { success: true });
+    }
+    if (req.method === "DELETE" && path === "/notification/clear-all") {
+      notifications = [];
+      return ok(M.NotificationBulkResult, { success: true });
+    }
+    if (req.method === "PATCH" && (p = m(/^\/notification\/([^/]+)\/read$/))) {
+      const n = notifications.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!n) return new Response("Notification not found", { status: 404 });
+      n.isRead = true;
+      return ok(M.Notification, n);
+    }
+    if (req.method === "GET" && path === "/notification-preferences") return ok(M.NotificationPreferences, preferences());
+    if (req.method === "PUT" && path === "/notification-preferences") {
+      const b = body as Record<string, unknown>;
+      // Stored flags before the write: the carry-over below compares with them.
+      const had = { emailEnabled: settings.emailEnabled, ntfyEnabled: settings.ntfyEnabled, gotifyEnabled: settings.gotifyEnabled, webhookEnabled: settings.webhookEnabled };
+      const next = { ...settings };
+      const nextSecrets = { ...secrets };
+      for (const [k, v] of Object.entries(b)) {
+        if (k in nextSecrets) {
+          if (v !== undefined) nextSecrets[k] = v === null || v === "" ? null : (v as string);
+        }
+        // A null address keeps the stored one: the server reads `input ?? existing`.
+        else if (v !== null) (next as any)[k] = v;
+      }
+      if (next.emailEnabled && !next.emailAddress) return new Response("Email notifications require an account email address", { status: 400 });
+      if ((next.ntfyEnabled || "ntfyServerUrl" in b || "ntfyTopic" in b || "ntfyToken" in b) && (!next.ntfyServerUrl || !next.ntfyTopic)) {
+        return new Response("ntfy requires a server URL and topic", { status: 400 });
+      }
+      if ((next.gotifyEnabled || "gotifyServerUrl" in b || "gotifyToken" in b) && (!next.gotifyServerUrl || !nextSecrets.gotifyToken)) {
+        return new Response("Gotify requires a server URL and app token", { status: 400 });
+      }
+      if ((next.webhookEnabled || "webhookUrl" in b || "webhookSecret" in b) && !next.webhookUrl) {
+        return new Response("Webhook notifications require an endpoint URL", { status: 400 });
+      }
+      Object.assign(settings, next);
+      Object.assign(secrets, nextSecrets);
+
+      // The server carries the switches into the active rules that have some
+      // channel on, and into no other: a channel that cannot deliver is turned
+      // off there, and one switched on just now is turned on there.
+      const off = {
+        emailEnabled: !settings.emailEnabled,
+        ntfyEnabled: !settings.ntfyEnabled || !settings.ntfyServerUrl || !settings.ntfyTopic,
+        gotifyEnabled: !settings.gotifyEnabled || !settings.gotifyServerUrl || !secrets.gotifyToken,
+        webhookEnabled: !settings.webhookEnabled || !settings.webhookUrl,
+      };
+      const on = {
+        emailEnabled: settings.emailEnabled && !had.emailEnabled && !!settings.emailAddress,
+        ntfyEnabled: settings.ntfyEnabled && !had.ntfyEnabled && !off.ntfyEnabled,
+        gotifyEnabled: settings.gotifyEnabled && !had.gotifyEnabled && !off.gotifyEnabled,
+        webhookEnabled: settings.webhookEnabled && !had.webhookEnabled && !off.webhookEnabled,
+      };
+      for (const rule of rules) {
+        if (!rule.isActive || !(rule.emailEnabled || rule.ntfyEnabled || rule.gotifyEnabled || rule.webhookEnabled)) continue;
+        for (const channel of Object.keys(off) as (keyof typeof off)[]) {
+          if (off[channel]) rule[channel] = false;
+          else if (on[channel]) rule[channel] = true;
+        }
+      }
+      return ok(M.NotificationPreferences, preferences());
+    }
+    if ((p = m(/^\/notification-preferences\/workspaces\/([^/]+)$/))) {
+      const ws = workspaces.find((w) => w.id === decodeURIComponent(p![1]));
+      if (!ws) return new Response("No access to the workspace", { status: 403 });
+      const i = rules.findIndex((r) => r.workspaceId === ws.id);
+      if (req.method === "PUT") {
+        const b = body as any;
+        if (b.projectMode === "selected") {
+          const ids: string[] = b.selectedProjectIds ?? [];
+          if (ids.length === 0) return new Response("Select at least one project for selected project mode", { status: 400 });
+          // Counted as rows found, so a repeated id fails like an unknown one.
+          if (projects.filter((x) => x.workspaceId === ws.id && ids.includes(x.id)).length !== ids.length) {
+            return new Response("One or more selected projects are invalid", { status: 400 });
+          }
+        }
+        const can = usable();
+        for (const [channel, name] of [["emailEnabled", "email"], ["ntfyEnabled", "ntfy"], ["webhookEnabled", "webhook"], ["gotifyEnabled", "Gotify"]] as const) {
+          if (b[channel] && !can[channel]) return new Response(`Enable ${name} notifications globally before using them here`, { status: 400 });
+        }
+        const at = nnow();
+        const rule = { id: i < 0 ? nid("rule") : rules[i]!.id, workspaceId: ws.id, workspaceName: ws.name, ...b, selectedProjectIds: b.projectMode === "selected" ? b.selectedProjectIds : [], createdAt: i < 0 ? at : rules[i]!.createdAt, updatedAt: at } as z.input<typeof M.NotificationPreferenceWorkspaceRule>;
+        if (i < 0) rules.push(rule);
+        else rules[i] = rule;
+        return ok(M.NotificationPreferences, preferences());
+      }
+      if (req.method === "DELETE") {
+        if (i < 0) return new Response("Workspace rule not found", { status: 404 });
+        rules.splice(i, 1);
+        return ok(M.NotificationPreferences, preferences());
       }
     }
 

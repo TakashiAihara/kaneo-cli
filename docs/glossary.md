@@ -51,6 +51,18 @@ A tag, scoped to a workspace rather than a project. The server keeps two kinds o
 - workspace label: `taskId` null. What the web app offers to pick from, and what `kaneo label ls` lists.
 - task copy: a row with the same name and its own id, inserted on a task when the label is attached and deleted when it is detached. Renaming or deleting the workspace label carries over to its copies; a deletion takes the copies that existed when it started, so one attached while it is still running stays. `kaneo label detach` and `DELETE /label/{id}/task` take the copy's id, not the workspace label's.
 
+### notification
+
+A message to one user, raised by the server from task and workspace events or posted through `POST /notification`. One raised from an event carries no text of its own, only a `type` and `eventData`. The listing returns the newest 50 and takes no page.
+
+### channel
+
+A way a notification leaves the app: email, ntfy, gotify or a webhook. Switched on globally in the notification preferences; the API calls the switches `emailEnabled`, `ntfyEnabled` and so on.
+
+### workspace rule
+
+The per-workspace part of the notification preferences: whether the workspace is notified at all (`isActive`), which channels, and for which projects. A workspace without a rule is sent nothing outside the app on v2.29.2, although the document says it follows the global settings. The server replaces a rule whole, and carries a global channel switch into the active rules that have a channel on; inactive rules keep their channels.
+
 ### relation
 
 A link between two tasks: `subtask`, `blocks` or `related`. Relations cannot cross workspaces.

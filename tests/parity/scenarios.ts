@@ -30,7 +30,17 @@ export const SEED: Seed = {
     { id: "task-b1", projectId: P2, title: "Beta first", priority: "urgent" },
   ],
   comments: [{ taskId: "task-a1", content: "first comment" }, { taskId: "task-a3", content: "not mine", id: "cmt-other", userId: "user-1" }],
+  notifications: [
+    { type: "info", title: "Welcome", content: "hello there", isRead: true },
+    { type: "task_status_changed", eventData: { taskTitle: "Write the parser", oldStatus: "to-do", newStatus: "in-progress" } },
+    { type: "info", content: "read state never set", isRead: null },
+  ],
 };
+
+// The seeded notifications' ids, in the fake's own sequence for them.
+const N1 = "ntf0001";
+const N2 = "ntf0002";
+const N3 = "ntf0003";
 
 export type Scenario = {
   name: string;
@@ -248,6 +258,87 @@ export const SCENARIOS: Scenario[] = [
       ["label", "detach", "1", "lbl0002", "--human"],
       ["label", "ls", "1", "--human"],
       ["label", "ls", "--human"],
+    ],
+  },
+
+  ...both("notification list", ["notification", "list"]),
+  { name: "notification list unread", steps: [["notification", "ls", "--unread", "--json"], ["notification", "ls", "--unread", "--human"]] },
+  {
+    name: "notification read",
+    steps: [
+      ["notification", "read", N2, N3, "--json"],
+      ["notification", "read", N1, "nope", "--json"],
+      ["notification", "read", "--human"],
+      ["notification", "read", N1, "--all"],
+      ["notification", "read", "a/b?#c", "--json"],
+      ["notification", "ls", "--json"],
+    ],
+  },
+  { name: "notification read all", steps: [["notification", "read", "--all", "--human"], ["notification", "ls", "--json"]] },
+  { name: "notification clear needs --yes", steps: [["notification", "clear", "--human"], ["notification", "clear", "--yes", "--json"], ["notification", "ls", "--json"]] },
+  {
+    name: "notification create",
+    steps: [
+      ["notification", "create", "build", "is", "green", "--title", "CI", "--resource-type", "task", "--resource-id", "task-a1", "--json"],
+      ["notification", "create", "plain", "--human"],
+      ["notification", "create", "x", "--resource-type", "task", "--json"],
+      ["notification", "create", "x", "--resource-type", "banana", "--resource-id", "b1", "--json"],
+      ["notification", "create", "unreachable", "--resource-type", "task", "--resource-id", "task-nobody", "--human"],
+      ["notification", "preferences", "set", "--task-comment=false", "--json"],
+      ["notification", "create", "muted", "--type", "task_mention", "--human"],
+      ["notification", "create", "muted", "--type", "task_comment", "--json"],
+      ["notification", "ls", "--human"],
+    ],
+  },
+  ...both("notification preferences get", ["notification", "preferences", "get"]),
+  {
+    name: "notification preferences set",
+    steps: [
+      ["notification", "prefs", "set", "--ntfy", "--ntfy-server", "https://ntfy.example", "--ntfy-topic", "kaneo", "--ntfy-token", "tk_abcdef123456", "--email", "--reminder-lead", "2h", "--json"],
+      ["notification", "prefs", "set", "--ntfy-token", "", "--human"],
+      ["notification", "prefs", "set", "--ntfy-server", "", "--json"],
+      ["notification", "prefs", "set", "--human"],
+      ["notification", "prefs", "set", "--reminder-lead", "90s", "--json"],
+      ["notification", "prefs", "set", "--reminder-lead", "1m", "--json"],
+    ],
+  },
+  {
+    name: "notification preferences carry into rules",
+    steps: [
+      ["notification", "prefs", "set", "--email", "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--active", "--human"],
+      ["notification", "prefs", "ws", "set", "ws-other", "--active=false", "--human"],
+      ["notification", "prefs", "set", "--webhook", "--webhook-url", "https://example.com/hook", "--human"],
+      ["notification", "prefs", "set", "--email=false", "--human"],
+      // The inactive rule kept email, which can no longer deliver.
+      ["notification", "prefs", "ws", "set", "ws-other", "--active", "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--email", "--json"],
+      // A rule with no channel on is not reached; an active one with a channel is,
+      // but only for a channel that was off before.
+      ["notification", "prefs", "ws", "set", "ws-other", "--webhook=false", "--human"],
+      ["notification", "prefs", "set", "--email", "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--email=false", "--human"],
+      ["notification", "prefs", "set", "--email", "--human"],
+      ["notification", "prefs", "set", "--gotify-token", "", "--json"],
+    ],
+  },
+  {
+    name: "notification preferences workspace rule",
+    steps: [
+      ["notification", "prefs", "ws", "set", WS, "--webhook", "--json"],
+      ["notification", "prefs", "set", "--email", "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--projects", P1, "--json"],
+      ["notification", "prefs", "ws", "set", WS, "--email=false", "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--email", "--active=false", "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--projects", `${P1}, ${P2}`, "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--projects", "proj-nowhere", "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--active", "--projects", "", "--human"],
+      ["notification", "prefs", "set", "--email=false", "--human"],
+      ["notification", "prefs", "ws", "set", "ws-nobody", "--active=false", "--json"],
+      ["notification", "prefs", "ws", "rm", "a/b?#c", "--json"],
+      ["notification", "prefs", "ws", "rm", WS, "--json"],
+      ["notification", "prefs", "ws", "rm", WS, "--human"],
     ],
   },
 

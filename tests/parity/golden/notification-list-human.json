@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "list",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ntf0003  <TIME>Z  unread  info  read state never set\nntf0002  <TIME>Z  unread  task_status_changed  Write the parser\nntf0001  <TIME>Z  read    info  Welcome: hello there\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/notification",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

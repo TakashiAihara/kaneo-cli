@@ -24,6 +24,7 @@ import { boardCommand } from "./board";
 import { sessionCommand } from "./session";
 import { activityCommand } from "./activity";
 import { commentCommand } from "./comment";
+import { notificationCommand } from "./notification";
 import { labelCommand } from "./label";
 import { apiCheckCommand } from "./apicheck";
 import { completeCommand, completionCommand } from "./completion";
@@ -96,6 +97,7 @@ const rootCommand = (): { root: Command<App> } => {
     boardCommand,
     sessionCommand,
     commentCommand,
+    notificationCommand,
     activityCommand,
     labelCommand,
     apiCheckCommand,

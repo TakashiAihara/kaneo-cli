@@ -14,8 +14,12 @@ import {
   BoardResponse,
   Column,
   Comment,
+  CreateNotification200,
   Label,
   MoveTaskResult,
+  Notification,
+  NotificationBulkResult,
+  NotificationPreferences,
   Organization,
   Project,
   ProjectListItem,
@@ -29,6 +33,7 @@ import type {
   CreateActivityBody,
   CreateColumnBody,
   CreateLabelBody,
+  CreateNotificationBody,
   CreateProjectBody,
   CreateTaskBody,
   CreateTaskCommentBody,
@@ -40,12 +45,14 @@ import type {
   ReorderColumnsBody,
   UpdateColumnBody,
   UpdateLabelBody,
+  UpdateNotificationPreferencesBody,
   UpdateOrganizationBody,
   UpdateProjectBody,
   UpdateTaskAssigneeBody,
   UpdateTaskCommentBody,
   UpdateTaskPriorityBody,
-  UpdateTaskStatusBody
+  UpdateTaskStatusBody,
+  UpsertNotificationPreferenceWorkspaceRuleBody
 } from './model';
 
 import { kaneoFetch } from '../http';
@@ -1220,6 +1227,283 @@ export const detachLabelFromTask = async (id: string, options?: Parameters<typeo
 
     ,
     schema: Label
+  }
+);}
+
+
+
+export const getListNotificationsUrl = () => {
+
+
+
+
+  return `/notification`
+}
+
+/**
+ * Get every notification for the current user, read and unread.
+ * @summary List notifications
+ */
+export const listNotifications = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<Notification[]> => {
+
+  return kaneoFetch<Notification[]>(getListNotificationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(Notification)
+  }
+);}
+
+
+
+export const getCreateNotificationUrl = () => {
+
+
+
+
+  return `/notification`
+}
+
+/**
+ * Create a notification for the current user. Most notifications are raised by the server from task and workspace events; this exists for integrations. Returns null when the user has turned off this notification category in their preferences.
+ * @summary Create notification
+ */
+export const createNotification = async (createNotificationBody: CreateNotificationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<CreateNotification200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<CreateNotification200>(getCreateNotificationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createNotificationBody),
+    schema: CreateNotification200
+  }
+);}
+
+
+
+export const getMarkNotificationAsReadUrl = (id: string,) => {
+
+
+
+
+  return `/notification/${id}/read`
+}
+
+/**
+ * Mark one notification as read. Scoped to the current user, so another user's notification is not found.
+ * @summary Mark notification read
+ */
+export const markNotificationAsRead = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Notification> => {
+
+  return kaneoFetch<Notification>(getMarkNotificationAsReadUrl(id),
+  {
+    ...options,
+    method: 'PATCH'
+
+    ,
+    schema: Notification
+  }
+);}
+
+
+
+export const getMarkAllNotificationsAsReadUrl = () => {
+
+
+
+
+  return `/notification/read-all`
+}
+
+/**
+ * Mark every notification for the current user as read.
+ * @summary Mark all read
+ */
+export const markAllNotificationsAsRead = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<NotificationBulkResult> => {
+
+  return kaneoFetch<NotificationBulkResult>(getMarkAllNotificationsAsReadUrl(),
+  {
+    ...options,
+    method: 'PATCH'
+
+    ,
+    schema: NotificationBulkResult
+  }
+);}
+
+
+
+export const getClearAllNotificationsUrl = () => {
+
+
+
+
+  return `/notification/clear-all`
+}
+
+/**
+ * Permanently delete every notification for the current user. This cannot be undone.
+ * @summary Clear all
+ */
+export const clearAllNotifications = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<NotificationBulkResult> => {
+
+  return kaneoFetch<NotificationBulkResult>(getClearAllNotificationsUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: NotificationBulkResult
+  }
+);}
+
+
+
+export const getGetNotificationPreferencesUrl = () => {
+
+
+
+
+  return `/notification-preferences`
+}
+
+/**
+ * Get how the current user is notified, globally and per workspace. Configured secrets are reported as booleans plus a masked preview, never in full.
+ * @summary Get notification preferences
+ */
+export const getNotificationPreferences = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<NotificationPreferences> => {
+
+  return kaneoFetch<NotificationPreferences>(getGetNotificationPreferencesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: NotificationPreferences
+  }
+);}
+
+
+
+export const getUpdateNotificationPreferencesUrl = () => {
+
+
+
+
+  return `/notification-preferences`
+}
+
+/**
+ * Update the global delivery settings. Omitted fields are left unchanged; a secret sent as null is cleared.
+ * @summary Update notification preferences
+ */
+export const updateNotificationPreferences = async (updateNotificationPreferencesBody: UpdateNotificationPreferencesBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<NotificationPreferences> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<NotificationPreferences>(getUpdateNotificationPreferencesUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateNotificationPreferencesBody),
+    schema: NotificationPreferences
+  }
+);}
+
+
+
+export const getUpsertNotificationPreferenceWorkspaceRuleUrl = (workspaceId: string,) => {
+
+
+
+
+  return `/notification-preferences/workspaces/${workspaceId}`
+}
+
+/**
+ * Create or replace the notification rule for one workspace, overriding the global settings there.
+ * @summary Upsert workspace rule
+ */
+export const upsertNotificationPreferenceWorkspaceRule = async (workspaceId: string,
+    upsertNotificationPreferenceWorkspaceRuleBody: UpsertNotificationPreferenceWorkspaceRuleBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<NotificationPreferences> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<NotificationPreferences>(getUpsertNotificationPreferenceWorkspaceRuleUrl(workspaceId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(upsertNotificationPreferenceWorkspaceRuleBody),
+    schema: NotificationPreferences
+  }
+);}
+
+
+
+export const getDeleteNotificationPreferenceWorkspaceRuleUrl = (workspaceId: string,) => {
+
+
+
+
+  return `/notification-preferences/workspaces/${workspaceId}`
+}
+
+/**
+ * Remove a workspace's rule so the workspace falls back to the global settings.
+ * @summary Delete workspace rule
+ */
+export const deleteNotificationPreferenceWorkspaceRule = async (workspaceId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<NotificationPreferences> => {
+
+  return kaneoFetch<NotificationPreferences>(getDeleteNotificationPreferenceWorkspaceRuleUrl(workspaceId),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: NotificationPreferences
   }
 );}
 

@@ -23,6 +23,8 @@ import {
   setTaskAssignee,
   setTaskDescription,
   setTaskDueDate,
+  setTaskSchedule,
+  MAX_TASK_POSITION,
   setTaskPriority,
   setTaskStatus,
   taskSummary,
@@ -90,6 +92,7 @@ export const taskCommand = {
         app.out.human(`#${task.number}  ${task.title}`);
         app.out.human(`status    ${task.status}`);
         app.out.human(`priority  ${task.priority}`);
+        if (task.startDate !== null) app.out.human(`start     ${task.startDate}`);
         if (task.dueDate !== null) app.out.human(`due       ${task.dueDate}`);
         if (relations.length > 0) {
           app.out.human("");
@@ -158,7 +161,7 @@ export const taskCommand = {
       name: "update",
       aliases: ["edit"],
       use: "update <task>",
-      short: "Change a task's title, description, status or priority; the rest is kept",
+      short: "Change a task's title, description, status, priority, start date or position; the rest is kept",
       args: exactArgs(1),
       flags: [
         { name: "title", type: "string" as const, usage: "new title", defaultValue: "" },
@@ -182,15 +185,29 @@ export const taskCommand = {
           usage: `one of: ${PRIORITIES.join(", ")}`,
           defaultValue: "",
         },
+        { name: "start-date", type: "string" as const, usage: "when the task starts; empty clears it", defaultValue: "" },
+        {
+          name: "position",
+          type: "string" as const,
+          usage: "order within its column, from 0",
+          defaultValue: "",
+        },
       ],
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
         // Only a flag that was passed is a change: `-d ""` clears the description
         // and leaving the flag out has to keep it.
         const pass = (name: string) => changed.has(name);
         const wantsDescription = pass("description") || pass("description-file");
-        if (!pass("title") && !wantsDescription && !pass("priority") && !pass("status")) {
+        if (
+          !pass("title") &&
+          !wantsDescription &&
+          !pass("priority") &&
+          !pass("status") &&
+          !pass("start-date") &&
+          !pass("position")
+        ) {
           throw new Error(
-            "nothing to update: pass --title, --description, --description-file, --status or --priority",
+            "nothing to update: pass --title, --description, --description-file, --status, --priority, --start-date or --position",
           );
         }
 
@@ -203,6 +220,8 @@ export const taskCommand = {
         const status = pass("status") ? wantedStatus(String(flags.status ?? "").trim()) : undefined;
         const description = wantsDescription ? await descriptionOf(flags, changed) : undefined;
         const priority = pass("priority") ? knownPriority(String(flags.priority ?? "").trim()) : undefined;
+        const startDate = pass("start-date") ? wantedStartDate(String(flags["start-date"] ?? "")) : undefined;
+        const position = pass("position") ? wantedPosition(String(flags.position ?? "")) : undefined;
 
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
@@ -231,6 +250,17 @@ export const taskCommand = {
         if (title !== undefined) await write("title", () => setTaskTitle(task.id, title));
         if (description !== undefined) await write("description", () => setTaskDescription(task.id, description));
         if (priority !== undefined) await write("priority", () => setTaskPriority(task.id, priority));
+        // Last, so the full update it goes through reads the task with the writes
+        // above already in it and sends them back rather than undoing them.
+        if (startDate !== undefined || position !== undefined) {
+          const fields = [...(startDate === undefined ? [] : ["start date"]), ...(position === undefined ? [] : ["position"])];
+          await write(names(fields), async () => {
+            await setTaskSchedule(task.id, {
+              ...(startDate === undefined ? {} : { startDate }),
+              ...(position === undefined ? {} : { position }),
+            });
+          });
+        }
 
         // Read the task back by id rather than by the number it was given as: the
         // board listing leaves a task out of every column once it has been
@@ -263,6 +293,18 @@ export const taskCommand = {
               field === "description"
                 ? `description reads back differently from the one that was sent (${after.description.length} characters read, ${sent.length} sent)`
                 : `${field} reads back as ${JSON.stringify(after[field])}, not ${JSON.stringify(sent)}`
+            }`,
+          );
+        }
+        const startOff =
+          startDate !== undefined &&
+          (startDate === null ? after.startDate !== null : after.startDate === null || Date.parse(after.startDate) !== Date.parse(startDate));
+        if (startOff || (position !== undefined && after.position !== position)) {
+          throw new Error(
+            `${landed()}, but task #${after.number} ${
+              startOff
+                ? `start date reads back as ${JSON.stringify(after.startDate)}, not ${JSON.stringify(startDate)}`
+                : `position reads back as ${after.position}, not ${position}`
             }`,
           );
         }
@@ -798,6 +840,28 @@ const wantedStatus = (status: string): string => {
   return status;
 };
 
+// A start date, or null to clear it. A blank value clears, as `-d ""` clears a
+// description; one Date cannot read is refused before the first write, so a typo
+// does not land the other fields of the same command without it. The server
+// parses it the same way, so what passes here is what it stores.
+const wantedStartDate = (given: string): string | null => {
+  const date = given.trim();
+  if (date === "") return null;
+  if (Number.isNaN(Date.parse(date))) throw new Error(`--start-date ${JSON.stringify(given)} is not a date`);
+  return date;
+};
+
+// A position as the route takes it: a whole number from 0 up to the largest the
+// server stores.
+const wantedPosition = (given: string): number => {
+  const text = given.trim();
+  const position = /^\d+$/.test(text) ? Number(text) : Number.NaN;
+  if (!(position <= MAX_TASK_POSITION)) {
+    throw new Error(`--position ${JSON.stringify(given)} is not a whole number from 0 to ${MAX_TASK_POSITION}`);
+  }
+  return position;
+};
+
 // Fields named as one English list, so a sentence reporting several of them
 // reads as one sentence: "status and title were updated".
 const names = (fields: string[]): string =>
@@ -838,6 +902,8 @@ const showTask = (task: Task, app: App): void => {
   app.out.human(`#${task.number}  ${task.title}`);
   app.out.human(`status    ${task.status}`);
   app.out.human(`priority  ${task.priority}`);
+  if (task.startDate !== null) app.out.human(`start     ${task.startDate}`);
+  if (task.dueDate !== null) app.out.human(`due       ${task.dueDate}`);
   if (task.description !== "") {
     app.out.human("");
     app.out.human(task.description);

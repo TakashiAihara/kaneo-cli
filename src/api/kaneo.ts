@@ -63,6 +63,7 @@ import {
   updateTaskAssignee,
   updateTaskDescription,
   updateTaskDueDate,
+  updateTask as putTask,
   updateTaskPriority,
   updateTaskStatus,
   updateTaskTitle,
@@ -94,11 +95,13 @@ import type {
   TaskRelationWithTasks,
   UpdateNotificationPreferencesBody,
   TimeEntry as GenTimeEntry,
+  UpdateTaskBody,
   UpdateTaskPriorityBody,
   UpsertNotificationPreferenceWorkspaceRuleBody,
   WorkflowRule as GenWorkflowRule,
   WorkflowRuleRow as GenWorkflowRuleRow,
 } from "./gen/model";
+import { updateTaskBodyPositionMax } from "./gen/model";
 
 // What this CLI makes of a Kaneo server.
 //
@@ -1093,6 +1096,61 @@ export const setTaskDescription = async (taskId: string, description: string): P
 // Assigns a task to a user, or clears the assignee when userId is empty.
 export const setTaskAssignee = async (taskId: string, userId: string): Promise<void> => {
   await updateTaskAssignee(pathParam(taskId), { userId: userId === "" ? null : userId });
+};
+
+// What a full update changes that no single-field route can: when a task starts
+// (null clears it) and its order within its column.
+export type ScheduleChanges = { startDate?: string | null; position?: number };
+
+// The largest position the route takes, as the document states it.
+export const MAX_TASK_POSITION = updateTaskBodyPositionMax;
+
+// Changes a task's start date or position through PUT /task/{id}, the only route
+// that writes either.
+//
+// The route replaces the whole task: a start date, due date or assignee left out
+// of the body is stored as none, and title, priority, status, projectId and
+// position are required (a server older than the pinned document also requires
+// the description). So the task is read by id and every field not being changed
+// is sent back as read; a change made elsewhere between the read and the write is
+// overwritten, as project update does. The description is sent back whole, which
+// the detail route carries even when the listing leaves it out.
+//
+// The reply is checked against what was written, field by field, since a write
+// the server did not echo back did not happen.
+export const setTaskSchedule = async (taskId: string, changes: ScheduleChanges): Promise<Task> => {
+  const before = await getTask(taskId);
+  if (before.id !== taskId || before.projectId === "" || before.title === "") {
+    throw new Error(
+      `reading task ${taskId} before the update got id ${quoted(before.id)}, project ${quoted(before.projectId)}, title ${quoted(before.title)}; not writing`,
+    );
+  }
+  const startDate = changes.startDate === undefined ? before.startDate : changes.startDate;
+  const position = changes.position ?? before.position;
+  const body: UpdateTaskBody = {
+    title: before.title,
+    description: before.description,
+    priority: unchecked<UpdateTaskBody["priority"]>(before.priority),
+    status: before.status,
+    projectId: before.projectId,
+    position,
+    ...(startDate === null ? {} : { startDate }),
+    ...(before.dueDate === null ? {} : { dueDate: before.dueDate }),
+    ...(before.assigneeId === null ? {} : { userId: before.assigneeId }),
+  };
+  const t = zeroRecord(await putTask(pathParam(taskId), body));
+  const after = task(t, { assigneeId: t.userId, assigneeName: before.assigneeName, labels: null });
+
+  const sameInstant = (a: string | null, b: string | null) =>
+    a === null || b === null ? a === b : Date.parse(a) === Date.parse(b);
+  const off: string[] = [];
+  if (after.id !== taskId) off.push(`id ${quoted(after.id)}, want ${quoted(taskId)}`);
+  if (!sameInstant(after.startDate, startDate)) off.push(`startDate ${quoted(String(after.startDate))}, want ${quoted(String(startDate))}`);
+  if (after.position !== position) off.push(`position ${after.position}, want ${position}`);
+  if (!sameInstant(after.dueDate, before.dueDate)) off.push(`dueDate ${quoted(String(after.dueDate))}, want ${quoted(String(before.dueDate))}`);
+  if (after.assigneeId !== before.assigneeId) off.push(`assignee ${quoted(String(after.assigneeId))}, want ${quoted(String(before.assigneeId))}`);
+  if (off.length > 0) throw new Error(`/task/${taskId}: server did not echo the update: ${off.join("; ")}`);
+  return after;
 };
 
 // Sets a task's due date, or clears it when dueDate is empty. The body leaves the

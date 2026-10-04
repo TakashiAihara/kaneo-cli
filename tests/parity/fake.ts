@@ -393,6 +393,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["PUT", /^\/task\/priority\/[^/]+$/, M.UpdateTaskPriorityBody],
       ["PUT", /^\/task\/assignee\/[^/]+$/, M.UpdateTaskAssigneeBody],
       ["PUT", /^\/task\/move\/[^/]+$/, M.MoveTaskBody],
+      ["PUT", /^\/task\/[^/]+$/, M.UpdateTaskBody],
       ["PUT", /^\/task\/title\/[^/]+$/, M.UpdateTaskTitleBody],
       ["PUT", /^\/task\/description\/[^/]+$/, M.UpdateTaskDescriptionBody],
       ["PUT", /^\/task\/due-date\/[^/]+$/, M.UpdateTaskDueDateBody],
@@ -819,6 +820,33 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (i < 0) return fail(404, "Task not found");
       const t = tasks[i]!;
       if (req.method === "GET") return ok(M.TaskWithAssignee, { ...t, assigneeId: t.userId, assigneeName: t.userId ? (users.get(t.userId) ?? null) : null });
+      // A full replace, as upstream's update-task.ts does it: a start date, due
+      // date or assignee left out is stored as none, a description left out is
+      // kept, and moving to another project is refused.
+      if (req.method === "PUT") {
+        const b = body as z.input<typeof M.UpdateTaskBody>;
+        if (b.projectId !== t.projectId) return fail(400, "Use the task move endpoint to move tasks between projects");
+        if (!columnsOf(t.projectId).some((c) => c.slug === b.status) && !VIRTUAL_STATUSES.includes(b.status)) {
+          return fail(400, `Invalid status "${b.status}"`);
+        }
+        const assignee = b.userId?.trim() || null;
+        if (assignee && !users.has(assignee)) return fail(403, "Assignee is not a member of this workspace");
+        const start = b.startDate === undefined ? null : parsedDate(b.startDate, "startDate");
+        if (start !== null && typeof start !== "string") return start;
+        const due = b.dueDate === undefined ? null : parsedDate(b.dueDate, "dueDate");
+        if (due !== null && typeof due !== "string") return due;
+        Object.assign(t, {
+          title: b.title,
+          status: b.status,
+          priority: b.priority,
+          position: b.position,
+          startDate: start,
+          dueDate: due,
+          userId: assignee,
+          ...(b.description === undefined ? {} : { description: b.description }),
+        });
+        return ok(M.Task, t);
+      }
       if (req.method === "DELETE") {
         tasks.splice(i, 1);
         // The document says a task takes its time entries with it.

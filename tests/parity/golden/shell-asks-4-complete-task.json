@@ -7,7 +7,7 @@
         ""
       ],
       "exit": 0,
-      "stdout": "assign\tAssign a task, or clear the assignee when no user is given\nbulk\tApply one change to many tasks in one request\ncreate\tCreate a task in a project\ndue\tSet a task's due date, or clear it when no date is given\nexport\tWrite a project's tasks as JSON, in the form task import reads\nexternal-links\tList a task's external links\nget\tShow one task\nimport\tCreate tasks in a project from a JSON file (- reads stdin)\nlink\tRelate two tasks\nlinks\tList a task's relations\nlist\tList the tasks in a project\nmove\tMove a task to another project\npriority\tChange a task's priority\nrm\tDelete a task\nstatus\tMove a task to another column\nunlink\tRemove the link between two tasks\nupdate\tChange a task's title, description, status or priority; the rest is kept\n:4\n",
+      "stdout": "assign\tAssign a task, or clear the assignee when no user is given\nbulk\tApply one change to many tasks in one request\ncreate\tCreate a task in a project\ndue\tSet a task's due date, or clear it when no date is given\nexport\tWrite a project's tasks as JSON, in the form task import reads\nexternal-links\tList a task's external links\nget\tShow one task\nimport\tCreate tasks in a project from a JSON file (- reads stdin)\nlink\tRelate two tasks\nlinks\tList a task's relations\nlist\tList the tasks in a project\nmove\tMove a task to another project\npriority\tChange a task's priority\nrm\tDelete a task\nstatus\tMove a task to another column\nunlink\tRemove the link between two tasks\nupdate\tChange a task's title, description, status, priority, start date or position; the rest is kept\n:4\n",
       "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
     }
   ],

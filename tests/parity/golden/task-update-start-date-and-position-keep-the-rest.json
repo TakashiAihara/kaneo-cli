@@ -1,0 +1,228 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "due",
+        "2",
+        "2026-11-01",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a2\",\n  \"number\": 2,\n  \"dueDate\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "update",
+        "2",
+        "--start-date",
+        "2026-10-20",
+        "--position",
+        "5",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a2\",\n  \"number\": 2,\n  \"title\": \"Ship it\",\n  \"description\": \"\",\n  \"status\": \"in-progress\",\n  \"priority\": \"no-priority\",\n  \"position\": 5,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": \"user-1\",\n  \"assigneeName\": \"Ada\",\n  \"startDate\": \"<TIME>Z\",\n  \"dueDate\": \"<TIME>Z\",\n  \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n  \"labels\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a2\",\n  \"number\": 2,\n  \"title\": \"Ship it\",\n  \"description\": \"\",\n  \"status\": \"in-progress\",\n  \"priority\": \"no-priority\",\n  \"position\": 5,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": \"user-1\",\n  \"assigneeName\": \"Ada\",\n  \"startDate\": \"<TIME>Z\",\n  \"dueDate\": \"<TIME>Z\",\n  \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n  \"labels\": [],\n  \"relations\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "2",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#2  Ship it\nstatus    in-progress\npriority  no-priority\nstart     <TIME>Z\ndue       <TIME>Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "update",
+        "2",
+        "--position",
+        "6",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#2  Ship it\nstatus    in-progress\npriority  no-priority\nstart     <TIME>Z\ndue       <TIME>Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "update",
+        "2",
+        "--start-date",
+        "",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#2  Ship it\nstatus    in-progress\npriority  no-priority\ndue       <TIME>Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a2\",\n  \"number\": 2,\n  \"title\": \"Ship it\",\n  \"description\": \"\",\n  \"status\": \"in-progress\",\n  \"priority\": \"no-priority\",\n  \"position\": 6,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": \"user-1\",\n  \"assigneeName\": \"Ada\",\n  \"startDate\": null,\n  \"dueDate\": \"<TIME>Z\",\n  \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n  \"labels\": [],\n  \"relations\": []\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/due-date/task-a2",
+      "query": "",
+      "body": {
+        "dueDate": "2026-11-01"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a2",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/task-a2",
+      "query": "",
+      "body": {
+        "title": "Ship it",
+        "description": "",
+        "priority": "no-priority",
+        "status": "in-progress",
+        "projectId": "proj-alpha",
+        "position": 5,
+        "startDate": "2026-10-20",
+        "dueDate": "<TIME>Z",
+        "userId": "user-1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a2",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/task-a2",
+      "query": "",
+      "body": {
+        "title": "Ship it",
+        "description": "",
+        "priority": "no-priority",
+        "status": "in-progress",
+        "projectId": "proj-alpha",
+        "position": 6,
+        "startDate": "<TIME>Z",
+        "dueDate": "<TIME>Z",
+        "userId": "user-1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a2",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/task-a2",
+      "query": "",
+      "body": {
+        "title": "Ship it",
+        "description": "",
+        "priority": "no-priority",
+        "status": "in-progress",
+        "projectId": "proj-alpha",
+        "position": 6,
+        "dueDate": "<TIME>Z",
+        "userId": "user-1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a2",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

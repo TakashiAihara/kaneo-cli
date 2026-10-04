@@ -423,6 +423,7 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["SetTaskPriority", "PUT", "/api/task/priority/a%2Fb", () => api.setTaskPriority(id, "low")],
     ["SetTaskAssignee", "PUT", "/api/task/assignee/a%2Fb", () => api.setTaskAssignee(id, "")],
     ["MoveTask", "PUT", "/api/task/move/a%2Fb", () => api.moveTask(id, "p")],
+    ["SetTaskSchedule", "GET", "/api/task/a%2Fb", () => api.setTaskSchedule(id, { position: 1 })],
     ["SetTaskDueDate", "PUT", "/api/task/due-date/a%2Fb", () => api.setTaskDueDate(id, "")],
     ["ExportTasks", "GET", "/api/task/export/a%2Fb", () => api.exportProjectTasks(id)],
     ["ImportTasks", "POST", "/api/task/import/a%2Fb", () => api.importProjectTasks(id, [{ title: "t", status: "to-do" }])],
@@ -477,6 +478,7 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
         "ExportTasks",
         "ImportTasks",
         "BulkUpdate",
+        "SetTaskSchedule",
       ].includes(name),
     );
     expect(seen[0]).toEqual({ method, path });
@@ -809,6 +811,91 @@ describe("TestReadsMapEveryField", () => {
 });
 
 // What each write puts on the wire.
+describe("TestScheduleSendsTheTaskBack", () => {
+  const stored = {
+    id: "t1",
+    projectId: "p1",
+    number: 4,
+    title: "x",
+    description: "body",
+    status: "to-do",
+    priority: "high",
+    position: 2,
+    startDate: null as string | null,
+    dueDate: "2026-11-01T00:00:00.000Z",
+    userId: "u1",
+    assigneeId: "u1",
+    assigneeName: "Ada",
+    createdAt: TIME,
+  };
+
+  // Answers the read with the stored task and the write with what the write
+  // asked for, unless echo says otherwise.
+  const server = (echo: (sent: Record<string, unknown>) => Record<string, unknown> = (sent) => sent) => {
+    const seen: { method: string; body: string }[] = [];
+    newServer(async (req) => {
+      const body = await req.text();
+      seen.push({ method: req.method, body });
+      if (req.method === "GET") return Response.json(stored);
+      // The server stores a date as an instant and answers it in ISO form.
+      const iso = (value: unknown) => (typeof value === "string" ? new Date(value).toISOString() : null);
+      const reply = echo(JSON.parse(body) as Record<string, unknown>);
+      return Response.json({ ...stored, ...reply, startDate: iso(reply.startDate), dueDate: iso(reply.dueDate), userId: reply.userId ?? null });
+    });
+    return seen;
+  };
+
+  // Every field the route would otherwise store as none or refuse is sent back
+  // as read; a cleared start date is left out of the body.
+  test("position", async () => {
+    const seen = server();
+    const after = await api.setTaskSchedule("t1", { position: 7 });
+    expect(seen.map((s) => s.method)).toEqual(["GET", "PUT"]);
+    expect(seen[1]!.body).toBe(
+      '{"title":"x","description":"body","priority":"high","status":"to-do","projectId":"p1","position":7,"dueDate":"2026-11-01T00:00:00.000Z","userId":"u1"}',
+    );
+    expect([after.position, after.startDate, after.dueDate, after.assigneeId]).toEqual([7, null, "2026-11-01T00:00:00.000Z", "u1"]);
+  });
+
+  test("start date", async () => {
+    const seen = server();
+    const after = await api.setTaskSchedule("t1", { startDate: "2026-10-20" });
+    expect(JSON.parse(seen[1]!.body)).toMatchObject({ startDate: "2026-10-20", position: 2 });
+    expect(after.startDate).toBe("2026-10-20T00:00:00.000Z");
+  });
+
+  // Every field of the read is written back, so a read that came back empty or
+  // as another task stops the write rather than blanking the task.
+  test.each([
+    ["an empty read", {}],
+    ["another task", { ...stored, id: "t2" }],
+    ["no project", { ...stored, projectId: "" }],
+    ["no title", { ...stored, title: "" }],
+  ])("%s writes nothing", async (_, read) => {
+    const seen: string[] = [];
+    newServer((req) => {
+      seen.push(req.method);
+      return Response.json(read);
+    });
+    expect(String(await failure(api.setTaskSchedule("t1", { position: 7 })))).toContain("before the update got");
+    expect(seen).toEqual(["GET"]);
+  });
+
+  // A write the server did not echo is refused, field by field.
+  test.each([
+    ["position", { position: 7 }, () => ({ position: 2 })],
+    ["start date", { startDate: "2026-10-20" }, (s: Record<string, unknown>) => ({ ...s, startDate: "2026-12-01" })],
+    ["due date", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, dueDate: null })],
+    ["assignee", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, userId: null })],
+    ["id", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, id: "t2" })],
+  ] as const)("%s not echoed", async (field, changes, echo) => {
+    server(echo as (s: Record<string, unknown>) => Record<string, unknown>);
+    const err = String(await failure(api.setTaskSchedule("t1", changes)));
+    expect(err).toContain("/task/t1: server did not echo the update");
+    expect(err).toContain(field === "start date" ? "startDate" : field === "due date" ? "dueDate" : field);
+  });
+});
+
 describe("TestWritesSendEveryField", () => {
   // Clearing leaves the field out: the route takes a string or nothing, never
   // null, and the server stores nothing for a missing one.

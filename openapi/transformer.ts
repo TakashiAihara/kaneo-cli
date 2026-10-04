@@ -1,4 +1,4 @@
-import type { OpenApiDocument as OpenAPIObject } from "orval";
+import type { OpenApiDocument } from "orval";
 import { OPERATIONS } from "../src/api/registry";
 
 // Orval filters by tag or schema only, so the operation filter lives here:
@@ -7,7 +7,12 @@ import { OPERATIONS } from "../src/api/registry";
 const keep = new Set(OPERATIONS.map((op) => op.id));
 const METHODS = ["get", "put", "post", "delete", "patch", "options", "head", "trace"];
 
-export default (doc: OpenAPIObject): OpenAPIObject => {
+// The document with its paths present, which every step here walks.
+type Doc = OpenApiDocument & { paths: NonNullable<OpenApiDocument["paths"]> };
+
+export default (input: OpenApiDocument): OpenApiDocument => {
+  if (!input.paths) throw new Error("openapi/transformer.ts: the document has no paths");
+  const doc = input as Doc;
   correctOrganization(doc);
   correctLabel(doc);
 
@@ -27,7 +32,7 @@ export default (doc: OpenAPIObject): OpenAPIObject => {
 // workspace listing and rename would decode to nothing. The server answers
 // with the organization itself. REMOVE WHEN the upstream document gives these
 // two responses a schema.
-function correctOrganization(doc: OpenAPIObject) {
+function correctOrganization(doc: Doc) {
   const ref = { $ref: "#/components/schemas/Organization" };
   doc.components ??= {};
   doc.components.schemas ??= {};
@@ -37,15 +42,15 @@ function correctOrganization(doc: OpenAPIObject) {
     required: ["id", "name", "slug"],
   };
   const json = (op: any) => op.responses["200"].content["application/json"];
-  json(doc.paths["/auth/organization/list"].get).schema.items = ref;
-  json(doc.paths["/auth/organization/update"].post).schema = ref;
+  json(doc.paths["/auth/organization/list"]?.get).schema.items = ref;
+  json(doc.paths["/auth/organization/update"]?.post).schema = ref;
 }
 
 // The server sends deletionStartedAt as null on every label not being deleted
 // (apps/api/src/label/response.ts declares it nullable), but the published
 // document drops the null, so every label reply fails the schema check that
 // KANEO_DEBUG reports. REMOVE WHEN the upstream document marks it nullable.
-function correctLabel(doc: OpenAPIObject) {
+function correctLabel(doc: Doc) {
   const field = (doc.components?.schemas?.Label as any)?.properties?.deletionStartedAt;
   // Missing means the document changed shape, and this correction would stop
   // applying without anyone noticing.
@@ -53,7 +58,7 @@ function correctLabel(doc: OpenAPIObject) {
   field.type = ["string", "null"];
 }
 
-function pruneComponents(doc: OpenAPIObject) {
+function pruneComponents(doc: Doc) {
   const reached = new Set<string>();
   const walk = (node: unknown) => {
     if (Array.isArray(node)) return node.forEach(walk);
@@ -62,7 +67,7 @@ function pruneComponents(doc: OpenAPIObject) {
       if (k === "$ref" && typeof v === "string" && !reached.has(v)) {
         reached.add(v);
         const [, , section, name] = v.split("/");
-        walk((doc.components as any)?.[section]?.[name]);
+        walk((doc.components as any)?.[section!]?.[name!]);
       } else walk(v);
     }
   };

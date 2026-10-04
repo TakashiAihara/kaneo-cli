@@ -8,8 +8,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"--repo wants owner/name, got \\\"just-a-name\\\"\"\n}\n",
-      "stderr": "Error: --repo wants owner/name, got \"just-a-name\"\n"
+      "stdout": "{\n  \"error\": \"--repo wants owner/name or a git remote URL, got \\\"just-a-name\\\"\"\n}\n",
+      "stderr": "Error: --repo wants owner/name or a git remote URL, got \"just-a-name\"\n"
     },
     {
       "args": [
@@ -19,8 +19,41 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"--repo wants owner/name, got \\\"a/b/c\\\"\"\n}\n",
-      "stderr": "Error: --repo wants owner/name, got \"a/b/c\"\n"
+      "stdout": "{\n  \"error\": \"--repo wants owner/name or a git remote URL, got \\\"a/b/c\\\"\"\n}\n",
+      "stderr": "Error: --repo wants owner/name or a git remote URL, got \"a/b/c\"\n"
+    },
+    {
+      "args": [
+        "context",
+        "--repo",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--repo wants owner/name or a git remote URL, got \\\"\\\"\"\n}\n",
+      "stderr": "Error: --repo wants owner/name or a git remote URL, got \"\"\n"
+    },
+    {
+      "args": [
+        "context",
+        "--repo",
+        "../x",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--repo wants owner/name or a git remote URL, got \\\"../x\\\"\"\n}\n",
+      "stderr": "Error: --repo wants owner/name or a git remote URL, got \"../x\"\n"
+    },
+    {
+      "args": [
+        "context",
+        "--repo",
+        "github.com:acme/thing",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--repo wants owner/name or a git remote URL, got \\\"github.com:acme/thing\\\"\"\n}\n",
+      "stderr": "Error: --repo wants owner/name or a git remote URL, got \"github.com:acme/thing\"\n"
     }
   ],
   "requests": [],

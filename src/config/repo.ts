@@ -21,7 +21,10 @@ export const parseRemote = (remote: string): string => {
   return "";
 };
 
-const OWNER_REPO = /^[^/\s]+\/[^/\s]+$/;
+// GitHub's own charset, so a value that could only be a typo (`../x`,
+// `host:owner/name` without a user, `a@b/c`) is refused rather than looked up
+// and reported as not registered, which reads as an answer.
+const OWNER_REPO = /^([A-Za-z0-9_-][A-Za-z0-9._-]*)\/([A-Za-z0-9._-]+?)(?:\.git)?$/;
 
 // The owner/repo a caller named, or "" when the value names no repository.
 //
@@ -34,7 +37,9 @@ const OWNER_REPO = /^[^/\s]+\/[^/\s]+$/;
 // path.
 export const parseRepo = (value: string): string => {
   const remote = parseRemote(value);
-  return remote === "" && OWNER_REPO.test(value) ? value : remote;
+  if (remote !== "") return remote;
+  const match = OWNER_REPO.exec(value);
+  return match === null ? "" : `${match[1]}/${match[2]}`;
 };
 
 // Knowing the remote is a convenience for resolving a project, never worth

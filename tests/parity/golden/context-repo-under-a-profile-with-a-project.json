@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "args": [
+        "context",
+        "--repo",
+        "acme/thing",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-profile\"\n  ],\n  \"repo\": \"acme/thing\",\n  \"profile\": \"main\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"profile\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [],
+  "files": {
+    ".config/kaneo/config.json": "{\"owners\":{\"acme\":\"ws-acme\"},\"repos\":{\"acme/thing\":[\"proj-x\"]},\"profiles\":{\"main\":{\"project_id\":\"proj-profile\"}}}"
+  }
+}

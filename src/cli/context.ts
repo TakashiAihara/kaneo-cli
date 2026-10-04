@@ -30,12 +30,12 @@ const omitted = (value: string): string | undefined => (value === "" ? undefined
 // this directory's remote names. Only context takes --repo, so no other command
 // resolves differently.
 //
-// A value that names no repository is refused rather than read as an empty one:
-// an empty repo falls through to the weaker layers without saying so, and the
-// maps --repo exists to answer would then be the only ones left asking.
+// A value that names no repository is refused rather than resolved as if no
+// repository were named: the maps would then report unset, which reads as "not
+// registered" and is the very answer --repo is asked for.
 const forRepo = (value: string, app: App): Resolved => {
   const repo = parseRepo(value);
-  if (repo === "") throw new Error(`--repo wants owner/name, got ${JSON.stringify(value)}`);
+  if (repo === "") throw new Error(`--repo wants owner/name or a git remote URL, got ${JSON.stringify(value)}`);
   return resolveForRepo(app.flags, app.global, repo);
 };
 

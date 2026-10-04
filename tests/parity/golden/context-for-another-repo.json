@@ -36,15 +36,39 @@
     {
       "args": [
         "context",
+        "--repo",
+        "acme/thing.git",
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"\",\n  \"projects\": [\n    \"proj-local\"\n  ],\n  \"local_file\": \"<HOME>/.kaneo.json\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"local\",\n    \"workspace\": \"unset\"\n  }\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-x\",\n    \"proj-y\"\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"repo-map\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "context",
+        "--repo",
+        "acme/thing",
+        "-p",
+        "proj-flag",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-flag\"\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"flag\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "context",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-local\"\n  ],\n  \"repo\": \"acme/other\",\n  \"local_file\": \"<HOME>/.kaneo.json\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"local\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
       "stderr": ""
     }
   ],
   "requests": [],
   "files": {
-    ".config/kaneo/config.json": "{\"owners\":{\"acme\":\"ws-acme\"},\"repos\":{\"acme/thing\":[\"proj-x\",\"proj-y\"]}}"
+    ".config/kaneo/config.json": "{\"owners\":{\"acme\":\"ws-acme\"},\"repos\":{\"acme/thing\":[\"proj-x\",\"proj-y\"],\"acme/other\":[\"proj-other\"]}}"
   }
 }

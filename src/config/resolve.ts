@@ -30,10 +30,9 @@ export type Resolved = {
 export type Input = {
   flags: Flags;
   env: (name: string) => string;
-  // Where the .kaneo.json walk starts, and the directory it stops at. An empty
-  // dir leaves the layer out rather than naming a directory, and there is then
-  // nothing for home to bound.
-  dir: string;
+  // Where the .kaneo.json walk starts, and the directory it stops at. A null
+  // dir leaves the layer out, and there is then nothing for home to bound.
+  dir: string | null;
   home: string;
   global: GlobalConfig;
   repo: string;
@@ -61,7 +60,7 @@ const NO_LOCAL: Local = { workspace: "", project: "", path: "" };
 // committed.
 export const resolve = (input: Input): Resolved => {
   const { env } = input;
-  const local = input.dir === "" ? NO_LOCAL : mergeLocals(findLocals(input.dir, input.home));
+  const local = input.dir === null ? NO_LOCAL : mergeLocals(findLocals(input.dir, input.home));
   const active = activeProfile(input.global);
   const profile: Profile = active?.profile ?? {};
   const fromOwnerMap = input.repo === "" ? "" : workspaceForOwner(input.global, input.repo);
@@ -136,10 +135,15 @@ export const resolveFromEnvironment = (flags: Flags): { cfg: Resolved; global: G
 // working copy, and with the .kaneo.json layer left out.
 //
 // The file belongs to the directory the caller is standing in, and naming
-// another repository is saying that directory is not the point. Every other
-// layer still applies and the origins still say which one answered, so a caller
-// who wants only what the maps hold empties the environment first.
+// another repository is saying that directory is not the point. Flags, the
+// environment and the active profile still sit above the maps, and the origins
+// say which layer answered: a caller asking what the maps hold reads
+// origin.project == "repo-map", and a profile with project_id set answers in
+// their place however the environment is set.
+//
+// Nor is this what a checkout of that repository resolves to: a .kaneo.json
+// committed there would win, and without the checkout it cannot be read.
 export const resolveForRepo = (flags: Flags, global: GlobalConfig, repo: string): Resolved => {
   const env = (name: string): string => process.env[name] ?? "";
-  return resolve({ flags, env, dir: "", home: "", global, repo });
+  return resolve({ flags, env, dir: null, home: "", global, repo });
 };

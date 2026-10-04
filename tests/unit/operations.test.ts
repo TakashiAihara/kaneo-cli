@@ -249,6 +249,7 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["DeleteComment", "DELETE", "/api/comment/a%2Fb", () => api.deleteComment(id)],
     ["ListRelations", "GET", "/api/task-relation/a%2Fb", () => api.listRelations(id)],
     ["LinkTasks", "POST", "/api/task-relation", () => api.linkTasks("s", "d", "blocks")],
+    ["DeleteRelation", "DELETE", "/api/task-relation/a%2Fb", () => api.deleteRelation(id)],
     ["CreateProject", "POST", "/api/project", () => api.createProject({ name: "n", workspaceId: "w", icon: "", slug: "", description: "" })],
     ["ListProjects", "GET", "/api/project", () => api.listProjectsIn("w", false)],
     ["ListWorkspaces", "GET", "/api/auth/organization/list", () => api.listWorkspaces()],
@@ -307,9 +308,44 @@ describe("TestReadsMapEveryField", () => {
     expect([got.number, got.assigneeId, got.assigneeName, got.dueDate]).toEqual([7, "u1", "Ann", "2026-10-01T00:00:00.000Z"]);
   });
 
+  // The listing answers with a summary of each linked task, which is what a link
+  // is reported by number from; a server that sends none leaves them null.
   test("relations", async () => {
-    recorder(`[{"id":"r1","sourceTaskId":"s","targetTaskId":"d","relationType":"blocks","createdAt":"${TIME}"}]`);
-    expect(await api.listRelations("s")).toEqual([{ id: "r1", sourceTaskId: "s", targetTaskId: "d", relationType: "blocks" }]);
+    recorder(
+      `[{"id":"r1","sourceTaskId":"s","targetTaskId":"d","relationType":"blocks","createdAt":"${TIME}",` +
+        `"sourceTask":{"id":"s","title":"S","status":"to-do","isCompleted":false,"priority":"low","number":7,"projectId":"p1","userId":null,"assigneeName":null},` +
+        `"targetTask":null},` +
+        `{"id":"r2","sourceTaskId":"s","targetTaskId":"e","relationType":"related","createdAt":"${TIME}",` +
+        `"sourceTask":{"id":"s","title":"S","status":"to-do","number":7,"projectId":"p1"},` +
+        `"targetTask":{"id":"e","title":"E","status":"done","number":null,"projectId":"p1"}}]`,
+    );
+    expect(await api.listRelations("s")).toEqual([
+      {
+        id: "r1",
+        sourceTaskId: "s",
+        targetTaskId: "d",
+        relationType: "blocks",
+        sourceTask: { id: "s", number: 7, title: "S", status: "to-do", projectId: "p1" },
+        targetTask: null,
+      },
+      {
+        id: "r2",
+        sourceTaskId: "s",
+        targetTaskId: "e",
+        relationType: "related",
+        sourceTask: { id: "s", number: 7, title: "S", status: "to-do", projectId: "p1" },
+        targetTask: { id: "e", number: null, title: "E", status: "done", projectId: "p1" },
+      },
+    ]);
+  });
+
+  test("deleted relation", async () => {
+    const seen = recorder(
+      `{"id":"r1","sourceTaskId":"s","targetTaskId":"d","relationType":"blocks","createdAt":"${TIME}"}`,
+    );
+    const removed = await api.deleteRelation("r1");
+    expect([seen.method, seen.path]).toEqual(["DELETE", "/api/task-relation/r1"]);
+    expect(removed).toEqual({ id: "r1", sourceTaskId: "s", targetTaskId: "d", relationType: "blocks", sourceTask: null, targetTask: null });
   });
 
   // icon and color are nullable on the wire, and a column carries neither.

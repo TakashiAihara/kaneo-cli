@@ -44,7 +44,11 @@ A tag, scoped to a workspace rather than a project.
 
 ### relation
 
-A link between two tasks: `subtask`, `blocks` or `related`. For a subtask link the source is the parent. Relations cannot cross workspaces.
+A link between two tasks: `subtask`, `blocks` or `related`. Relations cannot cross workspaces.
+
+The type carries the direction, so the same link reads as two different words depending on which end it is read from. `task links` and `task get` word it from the task being shown: `blocks` / `blocked by`, `parent of` / `subtask of` (a subtask link's source is the parent), and `related`, which has no direction.
+
+The listing answers with a summary of each task at either end, so a link is shown by number and title. Where a summary or its number is null, which the server's document allows, the task's id is shown instead.
 
 ## This CLI's concepts
 

@@ -10,6 +10,7 @@ import {
   deleteColumn as removeColumn,
   deleteTask as removeTask,
   deleteTaskComment,
+  deleteTaskRelation as removeRelation,
   getColumns as readColumns,
   getProject as readProject,
   getTask as readTask,
@@ -35,6 +36,7 @@ import type {
   CreateTaskRelationBody,
   Organization,
   ProjectListItem,
+  RelatedTask,
   TaskLabel,
   Task as GenTask,
   TaskRelation as GenRelation,
@@ -745,10 +747,25 @@ export const deleteComment = async (commentId: string): Promise<void> => {
 // The links the server accepts between two tasks.
 export const RELATION_TYPES = ["subtask", "blocks", "related"];
 
+// What the listing says about a task at one end of a link: enough to name it the
+// way the board does. Null when the server sends none, which the document allows;
+// a blank object would read as task #0.
+export type RelationTask = { id: string; number: number | null; title: string; status: string; projectId: string };
+
 // A link between two tasks.
-export type Relation = { id: string; sourceTaskId: string; targetTaskId: string; relationType: string };
+export type Relation = {
+  id: string;
+  sourceTaskId: string;
+  targetTaskId: string;
+  relationType: string;
+  sourceTask: RelationTask | null;
+  targetTask: RelationTask | null;
+};
 
 // Relates two tasks. For a subtask link, source is the parent.
+//
+// The create reply carries neither summary of the two tasks, so both stay null
+// here; a caller holding the two tasks fills them in.
 export const linkTasks = async (
   sourceTaskId: string,
   targetTaskId: string,
@@ -770,13 +787,34 @@ export const linkTasks = async (
 export const listRelations = async (taskId: string): Promise<Relation[]> =>
   zeroList(await call(getTaskRelations(pathParam(taskId)))).map(relation);
 
-// The listing answers with a summary of each linked task as well; the link itself
-// is what this CLI reports.
+// Removes one link and answers with the relation as the server held it, which
+// like a creation reply has no summaries.
+export const deleteRelation = async (relationId: string): Promise<Relation> =>
+  relation(zeroRecord(await call(removeRelation(pathParam(relationId)))));
+
+// The listing answers with a summary of each linked task as well, which is what
+// lets a link be shown by number rather than by id.
 const relation = (r: GenRelation | TaskRelationWithTasks): Relation => ({
   id: r.id ?? "",
   sourceTaskId: r.sourceTaskId ?? "",
   targetTaskId: r.targetTaskId ?? "",
   relationType: r.relationType ?? "",
+  sourceTask: relationTask((r as TaskRelationWithTasks).sourceTask),
+  targetTask: relationTask((r as TaskRelationWithTasks).targetTask),
+});
+
+const relationTask = (t: RelatedTask | null | undefined): RelationTask | null =>
+  t === null || t === undefined
+    ? null
+    : { id: t.id ?? "", number: t.number ?? null, title: t.title ?? "", status: t.status ?? "", projectId: t.projectId ?? "" };
+
+// The summary a relation carries for a task already in hand.
+export const taskSummary = (t: Task): RelationTask => ({
+  id: t.id,
+  number: t.number,
+  title: t.title,
+  status: t.status,
+  projectId: t.projectId,
 });
 
 export type CheckResult = {

@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "unlink",
+        "1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"one argument is a relation id; to unlink two tasks give both: unlink 1 \\u003cother-task\\u003e\"\n}\n",
+      "stderr": "Error: one argument is a relation id; to unlink two tasks give both: unlink 1 <other-task>\n"
+    },
+    {
+      "args": [
+        "task",
+        "unlink",
+        "#1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"one argument is a relation id; to unlink two tasks give both: unlink #1 \\u003cother-task\\u003e\"\n}\n",
+      "stderr": "Error: one argument is a relation id; to unlink two tasks give both: unlink #1 <other-task>\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

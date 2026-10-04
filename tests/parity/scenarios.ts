@@ -95,6 +95,7 @@ export const SCENARIOS: Scenario[] = [
   ...both("task get by number", ["task", "get", "1"]),
   ...both("task get by id", ["task", "get", "task-a2"]),
   ...both("task get unknown", ["task", "get", "99"]),
+  { name: "task get with no relations", steps: [["task", "get", "2", "--json"]] },
   { name: "task create", steps: [["task", "create", "New one", "-d", "body", "--priority", "low", "--json"], ["task", "ls", "--human"]] },
   { name: "task create assigned", steps: [["task", "create", "Mine", "--assignee", "user-1", "--status", "in-progress", "--human"], ["task", "get", "4", "--json"]] },
   { name: "task create bad priority", steps: [["task", "create", "x", "--priority", "huge", "--json"]] },
@@ -104,7 +105,14 @@ export const SCENARIOS: Scenario[] = [
   { name: "task move", steps: [["task", "move", "1", "--to", P2, "--json"], ["task", "ls", "-p", P2, "--human"]] },
   { name: "task move without --to", steps: [["task", "move", "1", "--json"]] },
   { name: "task rm needs --yes", steps: [["task", "rm", "1", "--human"], ["task", "rm", "1", "--yes", "--json"], ["task", "ls", "--all", "--json"]] },
-  { name: "task link and links", steps: [["task", "link", "1", "2", "--json"], ["task", "link", "1", "3", "--type", "blocks", "--human"], ["task", "links", "1", "--json"], ["task", "links", "1", "--human"]] },
+  { name: "task link and links", steps: [["task", "link", "1", "2", "--type", "subtask", "--json"], ["task", "links", "2", "--human"], ["task", "link", "1", "3", "--type", "blocks", "--human"], ["task", "links", "1", "--json"], ["task", "links", "1", "--human"], ["task", "get", "1", "--human"], ["task", "get", "1", "--json"], ["task", "links", "3", "--human"], ["task", "link", "2", "3", "--type", "subtask", "--human"]] },
+  { name: "task link unknown type", steps: [["task", "link", "1", "2", "--type", "blocker", "--json"], ["task", "unlink", "1", "2", "--type", "blocker", "--json"]] },
+  { name: "task link without --type", steps: [["task", "link", "1", "2", "--json"], ["task", "links", "1", "--json"]] },
+  { name: "task unlink by tasks", steps: [["task", "link", "1", "2", "--type", "related", "--json"], ["task", "unlink", "2", "1", "--human"], ["task", "links", "1", "--json"], ["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "unlink", "2", "1", "--json"]] },
+  { name: "task unlink by relation id", steps: [["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "unlink", "rel0002", "--type", "blocks", "--json"], ["task", "unlink", "rel0002", "--human"], ["task", "links", "1", "--json"]] },
+  { name: "task unlink one task number", steps: [["task", "unlink", "1", "--json"], ["task", "unlink", "#1", "--json"]] },
+  { name: "task unlink ambiguous", steps: [["task", "link", "1", "2", "--type", "related", "--json"], ["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "unlink", "1", "2", "--json"], ["task", "unlink", "1", "2", "--type", "blocks", "--human"], ["task", "links", "1", "--human"]] },
+  { name: "task unlink nothing to unlink", steps: [["task", "unlink", "1", "2", "--json"]] },
 
   // --jq, the one flag every command carries: what a caller pipes a field into
   // python3 instead, and what must not cost a jq the reader has to install.
@@ -210,6 +218,7 @@ export const SCENARIOS: Scenario[] = [
   { name: "no workspace", env: { KANEO_WORKSPACE: "" }, steps: [["project", "ls", "--json"]] },
   { name: "no project", env: { KANEO_PROJECT: "" }, steps: [["task", "ls", "--json"]] },
   { name: "unknown command", steps: [["frobnicate"]] },
+  { name: "unknown subcommand", steps: [["task", "frob"], ["comment", "nope", "--json"], ["session", "x"], ["task"]] },
   ...[["--help"], ["help"], ["help", "project"], ["task", "--help"], ["task", "create", "--help"], ["project", "get", "--help"], ["session"], ["session", "next", "--help"]].map(
     (args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] }),
   ),
@@ -266,6 +275,8 @@ export const SCENARIOS: Scenario[] = [
   ...[["project", "ls", "--json"], ["project", "get", "--json"], ["task", "ls", "--json"], ["task", "ls", "--human"], ["board", "--json"], ["board", "--human"], ["comment", "ls", "1", "--json"], ["comment", "ls", "1", "--human"], ["task", "links", "1", "--json"]].map(
     (args): Scenario => ({ name: `older server: ${args.join(" ")}`, legacy: true, steps: [args] }),
   ),
+  { name: "older server: task get", legacy: true, steps: [["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "get", "1", "--human"], ["task", "get", "1", "--json"]] },
+  { name: "older server: task links human", legacy: true, steps: [["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "links", "1", "--human"]] },
 
   { name: "no git on PATH", env: { PATH: "/nonexistent" }, steps: [["task", "ls", "--json"], ["context", "--json"]] },
   { name: "no git on PATH, session", env: { PATH: "/nonexistent", KANEO_SESSION_ID: "sess-nogit" }, steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"]] },

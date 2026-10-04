@@ -112,6 +112,8 @@ export const SCENARIOS: Scenario[] = [
   { name: "jq with a bad expression", steps: [["task", "ls", "--jq", ".[", "--json"]] },
   { name: "jq runtime error", steps: [["task", "get", "1", "--jq", ".title | tonumber"]] },
   { name: "jq leaves stdout empty on a command error", steps: [["task", "get", "99", "--jq", ".number"]] },
+  // Refused while parsing, before the filter exists, and still kept off stdout.
+  { name: "jq leaves stdout empty on a usage error", steps: [["task", "get", "--jq", ".number"], ["task", "get", "1", "--bogus", "--jq=.number"]] },
   { name: "jq keeps empty strings", steps: [["task", "ls", "--all", "--jq", ".[] | .description"]] },
   // Fail-open hides an unreachable server, not a broken expression.
   { name: "jq fails a fail-open command", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "1", "--jq", ".nope | tonumber"]] },

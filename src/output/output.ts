@@ -55,8 +55,8 @@ export class Writer {
   // what a reader of stdout gets to see of it.
   constructor(
     readonly mode: Mode,
-    readonly filter?: Filter,
-    readonly terminal: boolean = isTTY(1),
+    readonly filter: Filter | undefined,
+    readonly terminal: boolean,
   ) {}
 
   // The payload of a command. In JSON mode it is the only thing on stdout, and

@@ -6,6 +6,7 @@
 // never pays to instantiate a module it will not run.
 
 import { writeSync } from "node:fs";
+import { isTTY, sanitizeControl } from "./output";
 
 // A JSON document in, whatever the expression makes of it out.
 export type Filter = (json: string) => string;
@@ -26,17 +27,20 @@ export class JqFailure extends Error {}
 const failure = (stderr: string, after = ""): JqFailure =>
   new JqFailure(`--jq: ${stderr.trim().replace(/ \(at \/dev\/stdin:\d+\)/g, "")}${after}`);
 
-// By the time the payload reaches the filter the command has done its work, and
-// a caller that retries on a non-zero exit has to know a retry would do it again.
-const RAN = "\nthe command itself succeeded; only the --jq expression failed";
+// Every command hands over its payload as its last step, so by the time the
+// filter runs, whatever the command changes has been changed — and a caller that
+// retries on a non-zero exit has to know a retry would do it again. That says
+// nothing about whether the command went on to fail (api-check does, after
+// reporting), so the message does not claim it succeeded.
+const RAN = "\nthe command had already run when --jq failed; anything it changes has been changed";
 
 // A string prints as itself, as gh --jq does it, so `--jq .number` and
 // `--jq .title` are both something a script can read. Anything else is already
 // the compact JSON gh prints to a pipe.
 const unquoted = (value: string): string => (value.startsWith('"') ? JSON.parse(value) : value);
 
-// One line per value, each terminated, so an expression that printed nothing
-// stays nothing rather than turning into a blank line.
+// Each value ends with a newline (a raw string may hold more of its own), so an
+// expression that printed nothing stays nothing rather than a blank line.
 const lines = (stdout: string): string =>
   stdout
     .split("\n")
@@ -44,7 +48,7 @@ const lines = (stdout: string): string =>
     .map((value) => `${unquoted(value)}\n`)
     .join("");
 
-// Loads jq and the expression, once, for the whole command.
+// Loads jq once for the whole command and checks the expression against it.
 export const loadFilter = async (expression: string): Promise<Filter> => {
   const { loadJq } = await import("jq-wasm/inline");
   const jq = await loadJq();
@@ -58,8 +62,9 @@ export const loadFilter = async (expression: string): Promise<Filter> => {
   return (json) => {
     const { stdout, stderr, exitCode } = jq.raw(json, expression, FLAGS);
     if (exitCode !== 0) throw failure(stderr, RAN);
-    // What `debug` and `stderr` print, as jq itself would show it.
-    if (stderr !== "") writeSync(2, `${stderr}\n`);
+    // What `debug` and `stderr` print, as jq itself would show it. It can carry
+    // server text, so a terminal gets it with control characters neutralised.
+    if (stderr !== "") writeSync(2, `${isTTY(2) ? sanitizeControl(stderr) : stderr}\n`);
     return lines(stdout);
   };
 };

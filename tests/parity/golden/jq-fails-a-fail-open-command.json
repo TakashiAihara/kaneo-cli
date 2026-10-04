@@ -10,7 +10,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: --jq: jq: error: null (null) cannot be parsed as a number\nthe command itself succeeded; only the --jq expression failed\n"
+      "stderr": "Error: --jq: jq: error: null (null) cannot be parsed as a number\nthe command had already run when --jq failed; anything it changes has been changed\n"
     }
   ],
   "requests": [

@@ -17,7 +17,7 @@ const cleanEnv = () => {
 
 const run = (json: boolean, body: string) => {
   const p = Bun.spawnSync(
-    ["bun", "-e", `import { Writer } from ${JSON.stringify(OUTPUT)}; const w = new Writer({ json: ${json}, color: false }); ${body}`],
+    ["bun", "-e", `import { Writer } from ${JSON.stringify(OUTPUT)}; const w = new Writer({ json: ${json}, color: false }, undefined, false); ${body}`],
     { env: cleanEnv(), stdout: "pipe", stderr: "pipe" },
   );
   if (p.exitCode !== 0) throw new Error(`child failed: ${p.stderr.toString()}`);
@@ -128,7 +128,6 @@ describe("Writer with a --jq filter", () => {
     expect(out).toBe('{"title":"Ship it","tags":["a"]}\n');
   });
 
-
   // An expression that prints nothing leaves nothing: a line terminator on its
   // own would be output the caller never asked for.
   test("TestJQPrintsNothingForAnEmptyExpression", () => {
@@ -158,6 +157,22 @@ describe("Writer with a --jq filter", () => {
     expect(out).toBe("a�[2Jb\n");
   });
 
+  // What debug prints goes to stderr as jq would show it, alongside the answer.
+  test("TestJQPassesDebugThrough", () => {
+    const { out, err, exit } = runJq(".number | debug", `w.data({ number: 7 });`);
+    expect(exit).toBe(0);
+    expect(out).toBe("7\n");
+    expect(err).toBe('["DEBUG:",7]\n');
+  });
+
+  // The position jq names is a line of kaneo's own serialisation, not anything
+  // the caller wrote.
+  test("TestJQDropsThePositionFromAnError", () => {
+    const { err } = runJq(".title | .[0]", `w.data({ title: "Ship it" });`);
+    expect(err).toContain("Cannot index string");
+    expect(err).not.toContain("/dev/stdin");
+  });
+
   test("TestJQKeepsControlCharactersForAPipe", () => {
     const { out } = runJq(".title", `w.data({ title: "a\\x1b[2Jb" });`);
     expect(out).toBe("a\x1b[2Jb\n");
@@ -174,7 +189,7 @@ describe("Writer with a --jq filter", () => {
   // before the command runs; the words on stderr are jq's own.
   test("TestJQReportsARuntimeError", () => {
     const { out, err, exit } = runJq(".title | tonumber", `w.data({ title: "Ship it" });`);
-    expect(exit).not.toBe(0);
+    expect(exit).toBe(1);
     expect(out).toBe("");
     expect(err).toContain("--jq: jq: error");
     expect(err).toContain('cannot be parsed as a number');
@@ -184,7 +199,7 @@ describe("Writer with a --jq filter", () => {
   // body never runs.
   test("TestJQRefusesAnExpressionItCannotCompile", () => {
     const { out, err, exit } = runJq(".[", `process.stderr.write("body ran"); w.data({ number: 7 });`);
-    expect(exit).not.toBe(0);
+    expect(exit).toBe(1);
     expect(out).toBe("");
     expect(err).not.toContain("body ran");
     expect(err).toContain("--jq: jq: error");

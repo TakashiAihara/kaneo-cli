@@ -1,0 +1,29 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "--jq",
+        ".number"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: accepts 1 arg(s), received 0\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--bogus",
+        "--jq=.number"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: unknown flag: --bogus\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

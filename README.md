@@ -216,13 +216,14 @@ kaneo task create "fix the parser" --jq .number   # 4
 kaneo task get 1 --jq .status                    # to-do
 ```
 
-jq runs inside the binary, so nothing has to be installed. Output follows `gh --jq` to a pipe: one value per line, strings raw and everything else as compact JSON. `--jq` implies `--json` and wins over `--human`.
+jq runs inside the binary, so nothing has to be installed. Output follows `gh --jq` to a pipe: each value ends with a newline, strings print raw and everything else as compact JSON. `--jq` implies `--json` and wins over `--human`.
 
 When something fails, stdout stays empty and the exit code is 1:
 
 - an expression jq cannot compile is refused before any request is made
-- an expression that fails on the payload reports jq's message on stderr, which also says the command itself succeeded — `task create … --jq` that exits 1 this way has still created the task, so do not retry it blindly
+- an expression that fails on the payload reports jq's message on stderr, followed by a line saying the command had already run — `task create … --jq` that exits 1 this way has still created the task, so do not retry it blindly
 - a failing command reports its error on stderr only; the `{"error": ...}` object `--json` prints is left out
+- `api-check` is the exception: its report is its output, so a failed check still prints what the expression makes of the report
 
 ## Develop
 

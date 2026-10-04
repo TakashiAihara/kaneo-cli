@@ -33,8 +33,10 @@ export const failOpen =
       // staying quiet would leave the caller believing a half-done operation
       // succeeded.
       if (e instanceof HardError) throw e;
-      // A --jq expression that failed is the caller's mistake, not an outage, and
-      // it fails only after the command has already done its work.
+      // A --jq failure surfaces, though it can follow from an outage (a field the
+      // command fills best-effort left unset): a caller who asked for a value
+      // reads empty output with exit 0 as an answer, and the command's work is
+      // already done either way.
       if (e instanceof JqFailure) throw e;
       debug(e instanceof Error ? e.message : String(e));
     }

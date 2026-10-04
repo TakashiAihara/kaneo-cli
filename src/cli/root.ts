@@ -119,6 +119,7 @@ const writerFor = (filter: Filter | undefined, json: boolean, human: boolean): W
   new Writer(
     filter === undefined ? resolveMode(json, human, stdoutIsTTY(), noColor()) : resolveMode(true, false, stdoutIsTTY(), noColor()),
     filter,
+    stdoutIsTTY(),
   );
 
 // Whether the raw arguments asked for a mode. A failure during parsing happens
@@ -129,6 +130,19 @@ const askedFor = (argv: string[], name: string): boolean => {
   for (const arg of argv) {
     if (arg === name) return true;
     if (arg === "--") return false;
+  }
+  return false;
+};
+
+// Whether the raw arguments carry a --jq expression, for a failure that comes
+// before the filter is loaded: its caller reads stdout as the answer, so the
+// error must not land there either. An empty expression is no filter at all.
+const askedForJq = (argv: string[]): boolean => {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--") return false;
+    if (arg === "--jq") return (argv[i + 1] ?? "") !== "";
+    if (arg.startsWith("--jq=")) return arg !== "--jq=";
   }
   return false;
 };
@@ -202,14 +216,17 @@ export const run = async (argv: string[]): Promise<number> => {
     });
     return 0;
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
     // A failure of the expression is not the command's: there is no payload to
     // report it with, and the filter cannot be run over the object that says so.
-    if (e instanceof JqFailure) {
-      writeSync(2, `Error: ${sanitizeControl(e.message)}\n`);
+    // A failure before the filter is loaded is reported the way the Writer would
+    // with one.
+    if (e instanceof JqFailure || (out === undefined && askedForJq(argv))) {
+      writeSync(2, `Error: ${sanitizeControl(message)}\n`);
       return 1;
     }
     const writer = out ?? writerFor(undefined, askedFor(argv, "--json"), askedFor(argv, "--human"));
-    writer.error(e instanceof Error ? e.message : String(e));
+    writer.error(message);
     return 1;
   }
 };

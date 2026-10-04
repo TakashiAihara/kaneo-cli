@@ -4,9 +4,10 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 // Builds a standalone binary for every release target and packs each one the
 // way install.sh expects: dist/kaneo_<os>_<arch>.tar.gz holding kaneo, README.md,
-// LICENSE and THIRD_PARTY_NOTICES (the binary embeds jq, whose licences require
-// their notices to travel with it), plus dist/checksums.txt in sha256sum format. The names are the
-// ones the Go releases used, so install.sh and existing installs keep working.
+// LICENSE and THIRD_PARTY_NOTICES, plus dist/checksums.txt in sha256sum format.
+// The binary embeds jq, whose licences require their notices to travel with it.
+// The names are the ones the Go releases used, so install.sh and existing
+// installs keep working.
 //
 // Usage: bun scripts/build.ts [version]   (version defaults to "dev")
 

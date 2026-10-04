@@ -106,6 +106,25 @@ test("TestGeneratedCallFailuresKeepTheServerMessage", async () => {
   expect(e.messages).toEqual(['Invalid key: Expected "destinationProjectId"']);
 });
 
+// The server sends an HTTPException as a plain-text body. A short line of it is
+// the message, the way an envelope's would be; markup, other JSON, several lines
+// or a long body stay a body only. The first case is the transport's trim.
+test.each([
+  ["Workspace ID could not be determined\n", ["Workspace ID could not be determined"]],
+  ["<html><body>Bad Gateway</body></html>", []],
+  ['{"message":"Internal Server Error"}', []],
+  ['["x"]', []],
+  ["first line\nsecond line", []],
+  ["x".repeat(201), []],
+  ["x".repeat(200), ["x".repeat(200)]],
+  ["", []],
+])("TestPlainTextFailuresCarryTheirMessage (%#)", async (body, want) => {
+  newServer(() => new Response(body, { status: 400, headers: { "content-type": "text/plain;charset=UTF-8" } }));
+  const err = await failure(api.getBoard("p1"));
+  expect(err).toBeInstanceOf(KaneoApiError);
+  expect((err as KaneoApiError).messages).toEqual(want);
+});
+
 const boardPage = (page: number, pages: number, related: number, relatedPages: number, columns: unknown[]) =>
   JSON.stringify({
     data: { id: "p1", name: "Board", slug: "b", workspaceId: "w", columns, archivedTasks: [], plannedTasks: [] },
@@ -212,6 +231,62 @@ test("TestListCommentsReadsTheAuthorName", async () => {
   expect(got[0]!.createdAt).toBe(TIME);
 });
 
+const activityRow = (id: string, at: string, extra = "") =>
+  `{"id":"${id}","taskId":"t1","type":"comment","createdAt":"${at}","updatedAt":"${at}","userId":"u1","content":"hi","externalUserName":null,"externalUserAvatar":null,"externalSource":null,"externalUrl":null${extra}}`;
+
+const comment = (id: string): api.Comment => ({ id, content: "old", userId: "u1", userName: "Ada", createdAt: TIME });
+
+// The reply has no author name, so the edit keeps the one the listing gave.
+test("TestEditCommentKeepsTheListedAuthor", async () => {
+  const seen = recorder(activityRow("c1", TIME, ',"content":"new text"').replace('"content":"hi",', ""));
+  const got = await api.editComment(comment("c1"), "new text");
+  expect([seen.method, seen.path]).toEqual(["PUT", "/api/comment/c1"]);
+  expect(JSON.parse(seen.body)).toEqual({ content: "new text" });
+  expect(got).toEqual({ id: "c1", content: "new text", userId: "u1", userName: "Ada", createdAt: TIME });
+});
+
+// A write the server did not echo back did not happen: an empty 2xx, or a reply
+// holding the old text, is a failure rather than an edit or a recorded event.
+test("TestUnechoedWritesFail", async () => {
+  recorder("");
+  expect(String(await failure(api.editComment(comment("c1"), "new text")))).toContain("did not echo");
+  expect(String(await failure(api.addActivity("t1", "note", "", null)))).toContain("did not echo");
+
+  recorder(activityRow("c1", TIME));
+  expect(String(await failure(api.editComment(comment("c1"), "new text")))).toContain("did not echo");
+
+  recorder(activityRow("c2", TIME, ',"content":"new text"').replace('"content":"hi",', ""));
+  expect(String(await failure(api.editComment(comment("c1"), "new text")))).toContain("did not echo");
+
+  // A row for another task or of another type is not the event that was sent.
+  recorder(activityRow("a1", TIME));
+  expect(String(await failure(api.addActivity("t1", "note", "", null)))).toContain("did not echo");
+  recorder(activityRow("a1", TIME).replace('"type":"comment"', '"type":"note"'));
+  expect(String(await failure(api.addActivity("t2", "note", "", null)))).toContain("did not echo");
+  recorder(activityRow("", TIME).replace('"type":"comment"', '"type":"note"'));
+  expect(String(await failure(api.addActivity("t1", "note", "", null)))).toContain("did not echo");
+});
+
+// The server sends the feed newest first; the CLI reads it oldest first, like comments.
+test("TestListActivitiesIsOldestFirst", async () => {
+  recorder(`[${activityRow("new", "2026-09-30T00:00:02.000Z")},${activityRow("old", "2026-09-30T00:00:01.000Z", ',"eventData":{"a":1}')}]`);
+  const got = await api.listActivities("t1");
+  expect(got.map((a) => a.id)).toEqual(["old", "new"]);
+  expect(got[0]!.eventData).toEqual({ a: 1 });
+});
+
+// message is required but nullable: an event without one sends null, not "" or nothing.
+test("TestAddActivitySendsAnEmptyMessageAsNull", async () => {
+  let seen = recorder(activityRow("a1", TIME).replace('"type":"comment"', '"type":"status_changed"'));
+  await api.addActivity("t1", "status_changed", "", { newStatus: "done" });
+  expect(JSON.parse(seen.body)).toEqual({ taskId: "t1", type: "status_changed", message: null, eventData: { newStatus: "done" } });
+
+  seen = recorder(activityRow("a1", TIME).replace('"type":"comment"', '"type":"note"').replace('"content":"hi"', '"content":"hello"'));
+  const got = await api.addActivity("t1", "note", "hello", null);
+  expect(JSON.parse(seen.body)).toEqual({ taskId: "t1", type: "note", message: "hello", eventData: null });
+  expect(got).toEqual({ id: "a1", type: "note", content: "hello", eventData: null, userId: "u1", createdAt: TIME });
+});
+
 // A 201 or 204 is a success like 200. Reported as a failure, a write that
 // happened invites a retry that duplicates it.
 test("TestAnyTwoHundredIsASuccess", async () => {
@@ -247,12 +322,22 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["ListComments", "GET", "/api/comment/a%2Fb", () => api.listComments(id)],
     ["AddComment", "POST", "/api/comment/a%2Fb", () => api.addComment(id, "x")],
     ["DeleteComment", "DELETE", "/api/comment/a%2Fb", () => api.deleteComment(id)],
+    ["EditComment", "PUT", "/api/comment/a%2Fb", () => api.editComment(comment(id), "x")],
+    ["ListActivities", "GET", "/api/activity/a%2Fb", () => api.listActivities(id)],
+    ["AddActivity", "POST", "/api/activity/create", () => api.addActivity(id, "x", "", null)],
     ["ListRelations", "GET", "/api/task-relation/a%2Fb", () => api.listRelations(id)],
     ["LinkTasks", "POST", "/api/task-relation", () => api.linkTasks("s", "d", "blocks")],
     ["DeleteRelation", "DELETE", "/api/task-relation/a%2Fb", () => api.deleteRelation(id)],
     ["CreateProject", "POST", "/api/project", () => api.createProject({ name: "n", workspaceId: "w", icon: "", slug: "", description: "" })],
     ["ListProjects", "GET", "/api/project", () => api.listProjectsIn("w", false)],
     ["ListWorkspaces", "GET", "/api/auth/organization/list", () => api.listWorkspaces()],
+    ["ListWorkspaceLabels", "GET", "/api/label/workspace/a%2Fb", () => api.listWorkspaceLabels(id)],
+    ["ListTaskLabels", "GET", "/api/label/task/a%2Fb", () => api.listTaskLabels(id)],
+    ["GetLabel", "GET", "/api/label/a%2Fb", () => api.getLabel(id)],
+    ["CreateLabel", "POST", "/api/label", () => api.createLabel("w", "bug", "red")],
+    ["DeleteLabel", "DELETE", "/api/label/a%2Fb", () => api.deleteLabel(id)],
+    ["AttachLabel", "PUT", "/api/label/a%2Fb/task", () => api.attachLabel(id, "t")],
+    ["DetachLabel", "DELETE", "/api/label/a%2Fb/task", () => api.detachLabel(id)],
   ];
   test.each(calls)("%s", async (name, method, path, call) => {
     const seen: { method: string; path: string }[] = [];
@@ -260,15 +345,166 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
       seen.push({ method: req.method, path: new URL(req.url).pathname });
       return new Response(null, { status: 204 });
     });
-    // An empty reply is an error for the board, which must name a project,
-    // and a success for everything else.
+    // An empty reply is an error for the board, which must name a project, and
+    // for the writes that must echo what they wrote; a success for everything else.
     const err = await call().then(
       () => undefined,
       (e) => e,
     );
-    expect(err !== undefined, `${name}: err = ${err}`).toBe(name === "GetBoard");
+    expect(err !== undefined, `${name}: err = ${err}`).toBe(["GetBoard", "EditComment", "AddActivity"].includes(name));
     expect(seen[0]).toEqual({ method, path });
   });
+});
+
+const LABEL = (extra = "") =>
+  `{"id":"l1","name":"bug","color":"red","createdAt":"${TIME}","updatedAt":"${TIME}","taskId":null,"workspaceId":"w1"${extra}}`;
+
+// A workspace label's deletion goes on in batches: the server answers 202 with
+// pendingDeletion until the last one, and the same request has to be repeated
+// until it answers 200, or the label and its remaining task copies stay.
+test("TestDeleteLabelRepeatsUntilTheServerIsDone", async () => {
+  let calls = 0;
+  newServer((req) => {
+    calls++;
+    expect([req.method, new URL(req.url).pathname]).toEqual(["DELETE", "/api/label/l1"]);
+    return calls < 3
+      ? new Response(LABEL(`,"pendingDeletion":true`), { status: 202, headers: { "content-type": "application/json" } })
+      : new Response(LABEL(), { headers: { "content-type": "application/json" } });
+  });
+  const got = await api.deleteLabel("l1");
+  expect(calls).toBe(3);
+  expect(got.id).toBe("l1");
+});
+
+// The server's update replaces name and color together, so a change to one
+// sends the other back as it was read.
+test("TestUpdateLabelKeepsTheFieldNotAsked", async () => {
+  const sent: string[] = [];
+  newServer(async (req) => {
+    if (req.method === "PUT") sent.push(await req.text());
+    return new Response(LABEL(), { headers: { "content-type": "application/json" } });
+  });
+  await api.updateLabel("l1", { color: "green" });
+  await api.updateLabel("l1", { name: "defect" });
+  expect(sent.map((s) => JSON.parse(s))).toEqual([
+    { name: "bug", color: "green" },
+    { name: "defect", color: "red" },
+  ]);
+});
+
+// A busy server (429) is waited out, and the count of retries starts over
+// after a batch that went through: five busy answers, a batch, one more busy
+// answer and the end is a deletion that finishes, not one given up on.
+test("TestDeleteLabelWaitsOutABusyServer", async () => {
+  const replies = [429, 429, 429, 429, 429, 202, 429, 200];
+  let calls = 0;
+  newServer(() => {
+    const status = replies[calls++]!;
+    if (status === 429) return new Response("Label deletion is busy; retry this request", { status, headers: { "Retry-After": "1" } });
+    return new Response(LABEL(status === 202 ? `,"pendingDeletion":true` : ""), { status, headers: { "content-type": "application/json" } });
+  });
+  expect((await api.deleteLabel("l1")).id).toBe("l1");
+  expect(calls).toBe(8);
+}, 15_000);
+
+// Five busy answers in a row are given up on, so a server that stays busy
+// does not hold the command until its deadline.
+test("TestDeleteLabelGivesUpOnAServerThatStaysBusy", async () => {
+  let calls = 0;
+  newServer(() => {
+    calls++;
+    return new Response("busy", { status: 429 });
+  });
+  const err = await failure(api.deleteLabel("l1"));
+  expect(err).toBeInstanceOf(KaneoApiError);
+  expect(calls).toBe(6);
+}, 10_000);
+
+// The server starts deleting inside the first request, so any failure but a
+// refusal (4xx) on the first request may have left the label partly deleted,
+// and says how to finish it. The failure keeps its type, so a caller can
+// still read the status.
+test("TestDeleteLabelSaysAPartialDeletionResumes", async () => {
+  for (const [replies, partly] of [[[202, 500], true], [[500], true], [[403], false]] as const) {
+    let calls = 0;
+    newServer(() => {
+      const status = replies[calls++]!;
+      return status === 202
+        ? new Response(LABEL(`,"pendingDeletion":true`), { status, headers: { "content-type": "application/json" } })
+        : new Response("boom", { status });
+    });
+    const err = await failure(api.deleteLabel("l1"));
+    expect(err).toBeInstanceOf(KaneoApiError);
+    expect((err as KaneoApiError).statusCode).toBe(replies.at(-1)!);
+    expect(String(err).includes("run `kaneo label rm l1 --yes` again")).toBe(partly);
+  }
+});
+
+// Another client can finish the same deletion while this one waits out a
+// busy answer; the label is then gone and the server cannot place its id.
+// That is the deletion done, not a failure.
+test("TestDeleteLabelTakesAGoneLabelAfterABatchAsDone", async () => {
+  for (const gone of [400, 404]) {
+    const replies = [202, gone];
+    let calls = 0;
+    newServer(() => {
+      const status = replies[calls++]!;
+      return status === 202
+        ? new Response(LABEL(`,"pendingDeletion":true`), { status, headers: { "content-type": "application/json" } })
+        : new Response(JSON.stringify({ message: "Workspace ID could not be determined" }), { status });
+    });
+    expect((await api.deleteLabel("l1")).id).toBe("l1");
+    expect(calls).toBe(2);
+  }
+  // Before any batch, the same answer is an unknown label and fails.
+  newServer(() => new Response("unknown", { status: 400 }));
+  expect(await failure(api.deleteLabel("l1"))).toBeInstanceOf(KaneoApiError);
+});
+
+// The PUT goes to the label's own route with its id escaped, like every
+// other call; it is not in the table above because it reads first.
+test("TestUpdateLabelWritesToItsRouteWithTheIDEscaped", async () => {
+  const seen: string[] = [];
+  newServer((req) => {
+    seen.push(`${req.method} ${new URL(req.url).pathname}`);
+    return new Response(LABEL().replace('"id":"l1"', '"id":"a/b"'), { headers: { "content-type": "application/json" } });
+  });
+  await api.updateLabel("a/b", { color: "green" });
+  expect(seen).toEqual(["GET /api/label/a%2Fb", "PUT /api/label/a%2Fb"]);
+});
+
+// A read that answers a different label must not be written over this one.
+test("TestUpdateLabelRefusesAReadOfAnotherLabel", async () => {
+  const methods: string[] = [];
+  newServer((req) => {
+    methods.push(req.method);
+    return new Response(LABEL().replace('"id":"l1"', '"id":"l2"'), { headers: { "content-type": "application/json" } });
+  });
+  expect(String(await failure(api.updateLabel("l1", { color: "green" })))).toContain("not writing");
+  expect(methods).toEqual(["GET"]);
+});
+
+// A blank color would leave a label the web app draws in its fallback grey.
+test("TestLabelColorMustNotBeBlank", async () => {
+  const methods: string[] = [];
+  newServer((req) => {
+    methods.push(req.method);
+    return new Response(LABEL(), { headers: { "content-type": "application/json" } });
+  });
+  expect(String(await failure(api.createLabel("w", "bug", " ")))).toContain("label color is empty");
+  expect(String(await failure(api.updateLabel("l1", { color: "" })))).toContain("label color is empty");
+  expect(methods).toEqual([]);
+});
+
+// A read that came back empty must not be written back as a blank label.
+test("TestUpdateLabelRefusesAnEmptyRead", async () => {
+  const methods: string[] = [];
+  newServer((req) => {
+    methods.push(req.method);
+    return new Response(null, { status: 204 });
+  });
+  expect(String(await failure(api.updateLabel("l1", { color: "green" })))).toContain("not writing");
+  expect(methods).toEqual(["GET"]);
 });
 
 // What each read maps onto the CLI's types, field by field.

@@ -9,6 +9,7 @@ const METHODS = ["get", "put", "post", "delete", "patch", "options", "head", "tr
 
 export default (doc: OpenAPIObject): OpenAPIObject => {
   correctOrganization(doc);
+  correctLabel(doc);
 
   for (const [path, item] of Object.entries(doc.paths)) {
     for (const method of METHODS) {
@@ -38,6 +39,18 @@ function correctOrganization(doc: OpenAPIObject) {
   const json = (op: any) => op.responses["200"].content["application/json"];
   json(doc.paths["/auth/organization/list"].get).schema.items = ref;
   json(doc.paths["/auth/organization/update"].post).schema = ref;
+}
+
+// The server sends deletionStartedAt as null on every label not being deleted
+// (apps/api/src/label/response.ts declares it nullable), but the published
+// document drops the null, so every label reply fails the schema check that
+// KANEO_DEBUG reports. REMOVE WHEN the upstream document marks it nullable.
+function correctLabel(doc: OpenAPIObject) {
+  const field = (doc.components?.schemas?.Label as any)?.properties?.deletionStartedAt;
+  // Missing means the document changed shape, and this correction would stop
+  // applying without anyone noticing.
+  if (!field) throw new Error("openapi/transformer.ts: Label.deletionStartedAt is gone from the document; revisit correctLabel");
+  field.type = ["string", "null"];
 }
 
 function pruneComponents(doc: OpenAPIObject) {

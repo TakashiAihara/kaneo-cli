@@ -38,9 +38,18 @@ A note on a task. Also the only place a client can store structured data of its 
 
 `GET /task/export/{projectId}` does **not** include comments, so an export-and-reimport loses everything kept there.
 
+### activity
+
+One entry of a task's history (`GET /activity/{taskId}`): a comment, or an event the server records such as `status_changed`, whose details are in `eventData`. A comment's activity id is its comment id, so the API's `/activity/comment` routes and its `/comment` routes reach the same rows; this CLI uses only the `/comment` ones, which also refuse empty text and check the `task:update` permission.
+
+`kaneo activity add` writes an entry into the history and nothing else: the task does not change, and no route removes the entry on its own (deleting the task removes its history). Type `comment` is refused (Kaneo 2.27.0 and later refuse it too). Servers before Kaneo 2.23.0 also want a `userId` in that request, and answer 400 without one.
+
 ### label
 
-A tag, scoped to a workspace rather than a project.
+A tag, scoped to a workspace rather than a project. The server keeps two kinds of row in one `label` table, and the CLI's words for them are:
+
+- workspace label: `taskId` null. What the web app offers to pick from, and what `kaneo label ls` lists.
+- task copy: a row with the same name and its own id, inserted on a task when the label is attached and deleted when it is detached. Renaming or deleting the workspace label carries over to its copies; a deletion takes the copies that existed when it started, so one attached while it is still running stays. `kaneo label detach` and `DELETE /label/{id}/task` take the copy's id, not the workspace label's.
 
 ### notification
 

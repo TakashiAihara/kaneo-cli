@@ -1,0 +1,27 @@
+{
+  "steps": [
+    {
+      "args": [
+        "label",
+        "ls",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no workspace: pass --workspace, set KANEO_WORKSPACE, or add one to .kaneo.json\"\n}\n",
+      "stderr": "Error: no workspace: pass --workspace, set KANEO_WORKSPACE, or add one to .kaneo.json\n"
+    },
+    {
+      "args": [
+        "label",
+        "create",
+        "bug",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: no workspace: pass --workspace, set KANEO_WORKSPACE, or add one to .kaneo.json\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

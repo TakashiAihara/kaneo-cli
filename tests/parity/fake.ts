@@ -160,7 +160,29 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   };
   for (const c of seed.comments ?? []) addComment(c.taskId, c.content, c.id, c.userId);
 
+  // Comments are activity rows on the server, so the feed is the comments plus
+  // the events recorded beside them.
+  const events: z.input<typeof M.Activity>[] = [];
+  const asActivity = (a: { id: string; taskId: string; userId: string | null; content: string | null; createdAt: string; updatedAt: string }, type = "comment", eventData: unknown = null) => ({
+    ...a,
+    type,
+    eventData,
+    externalUserName: null,
+    externalUserAvatar: null,
+    externalSource: null,
+    externalUrl: null,
+  });
+
   const relations: z.input<typeof M.TaskRelation>[] = [];
+  // One table for both kinds, as the server keeps them: a workspace label has
+  // taskId null, and attaching inserts a copy carrying the task's id.
+  const labels: z.input<typeof M.Label>[] = [];
+  const addLabel = (name: string, color: string, workspaceId: string, taskId: string | null) => {
+    const at = now();
+    const l = { id: id("lbl"), name, color, createdAt: at, updatedAt: at, deletionStartedAt: null, taskId, workspaceId };
+    labels.push(l);
+    return l;
+  };
   const requests: Recorded[] = [];
 
   // Notifications number and date themselves apart from everything else, so
@@ -237,6 +259,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
+  // What the real server sends for an HTTPException (its workspace middleware,
+  // and the routes that throw one): the message as a text/plain body, with no
+  // JSON envelope around it.
+  const failText = (status: number, message: string) =>
+    new Response(message, { status, headers: { "content-type": "text/plain;charset=UTF-8" } });
 
   const boardTask = (t: (typeof tasks)[number]) => ({
     id: t.id,
@@ -255,7 +282,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     assigneeImage: null,
     projectId: t.projectId,
     subtaskCounts: { completed: 0, total: 0 },
-    labels: [],
+    labels: labels.filter((l) => l.taskId === t.id).map((l) => ({ id: l.id, name: l.name, color: l.color })),
     externalLinks: [],
   });
   const related = (t: (typeof tasks)[number] | undefined) =>
@@ -301,6 +328,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/notification$/, M.CreateNotificationBody],
       ["PUT", /^\/notification-preferences$/, M.UpdateNotificationPreferencesBody],
       ["PUT", /^\/notification-preferences\/workspaces\/[^/]+$/, M.UpsertNotificationPreferenceWorkspaceRuleBody],
+      ["PUT", /^\/comment\/[^/]+$/, M.UpdateTaskCommentBody],
+      ["POST", /^\/activity\/create$/, M.CreateActivityBody],
+      ["POST", /^\/label$/, M.CreateLabelBody],
+      ["PUT", /^\/label\/[^/]+$/, M.UpdateLabelBody],
+      ["PUT", /^\/label\/[^/]+\/task$/, M.AttachLabelToTaskBody],
     ];
     for (const [method, re, schema] of BODIES) {
       if (req.method !== method || !re.test(path)) continue;
@@ -353,7 +385,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       // Checked by the server's workspace middleware before the route runs, as on
       // the task routes below.
-      if (!proj) return fail(400, "Workspace ID could not be determined");
+      if (!proj) return failText(400, "Workspace ID could not be determined");
       if (req.method === "GET" && !p[2]) return ok(M.Project, proj);
       if (req.method === "PUT" && !p[2]) {
         Object.assign(proj, body);
@@ -410,7 +442,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // The real server reads the path segment as a project id, finds no such
       // project and falls back to guessing a workspace from the key, which it
       // cannot: 400 with that complaint rather than a 404.
-      if (!proj) return fail(400, "Workspace ID could not be determined");
+      if (!proj) return failText(400, "Workspace ID could not be determined");
       const mine = tasks.filter((t) => t.projectId === proj.id);
       const size = opts.pageSize ?? 50;
       const page = Number(url.searchParams.get("page") ?? 1);
@@ -428,7 +460,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "POST" && (p = m(/^\/task\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj) return fail(400, "Workspace ID could not be determined");
+      if (!proj) return failText(400, "Workspace ID could not be determined");
       return ok(M.Task, addTask(proj.id, body as any));
     }
     if ((p = m(/^\/task\/(status|priority|assignee|move)\/([^/]+)$/)) && req.method === "PUT") {
@@ -445,7 +477,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (!b?.destinationProjectId) return fail(400, 'Invalid key: Expected "destinationProjectId" but received undefined');
         const from = t.projectId;
         const dest = projects.find((x) => x.id === b.destinationProjectId);
-        if (!dest) return fail(404, "Project not found");
+        if (!dest) return failText(404, "Project not found");
         dest.lastTaskNumber += 1;
         Object.assign(t, { projectId: dest.id, number: dest.lastTaskNumber, status: b.destinationStatus ?? firstColumn });
         return ok(M.MoveTaskResult, { task: t, sourceProjectId: from, destinationProjectId: dest.id });
@@ -467,7 +499,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // Upstream resolves the comment's workspace first and only then looks
       // for it among the caller's own comments.
       const i = comments.findIndex((c) => c.id === decodeURIComponent(p![1]));
-      if (i < 0) return fail(400, "Workspace ID could not be determined");
+      if (i < 0) return failText(400, "Workspace ID could not be determined");
       if (comments[i]!.userId !== "user-self") return fail(404, "Comment not found or you are not the author");
       const { user: _, ...c } = comments[i]!;
       const reply = ok(M.Activity, { ...c, type: "comment", externalUserName: null, externalUserAvatar: null, externalSource: null, externalUrl: null });
@@ -475,11 +507,36 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       return reply;
     }
 
-    if ((p = m(/^\/comment\/([^/]+)$/))) {
+    if ((p = m(/^\/comment\/([^/]+)$/)) && req.method !== "PUT") {
       const taskId = decodeURIComponent(p[1]);
       if (!tasks.some((t) => t.id === taskId)) return fail(404, "Task not found");
       if (req.method === "GET") return ok(z.array(M.Comment), comments.filter((c) => c.taskId === taskId));
       if (req.method === "POST") return ok(M.Comment, addComment(taskId, (body as any).content));
+    }
+    // PUT takes the comment's id where GET and POST take the task's, and
+    // answers like DELETE for an unknown id and for someone else's comment.
+    if ((p = m(/^\/comment\/([^/]+)$/)) && req.method === "PUT") {
+      const c = comments.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!c) return fail(400, "Workspace ID could not be determined");
+      if (c.userId !== "user-self") return fail(404, "Comment not found or you are not the author");
+      Object.assign(c, { content: (body as any).content, updatedAt: now() });
+      return ok(M.Activity, asActivity(c));
+    }
+
+    if ((p = m(/^\/activity\/([^/]+)$/)) && req.method === "GET") {
+      const taskId = decodeURIComponent(p[1]);
+      const feed = [...comments.filter((c) => c.taskId === taskId).map((c) => asActivity(c)), ...events.filter((e) => e.taskId === taskId)];
+      return ok(z.array(M.Activity), feed.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    }
+    if (req.method === "POST" && path === "/activity/create") {
+      const b = body as any;
+      // 400 for both, as the pinned document has it; comments are refused here from 2.27.0.
+      if (!tasks.some((t) => t.id === b.taskId)) return fail(400, "Task not found");
+      if (b.type === "comment") return fail(400, "Use the comment endpoint");
+      const at = now();
+      const e = asActivity({ id: id("act"), taskId: b.taskId, userId: "user-self", content: b.message, createdAt: at, updatedAt: at }, b.type, b.eventData ?? null);
+      events.push(e);
+      return ok(M.Activity, e);
     }
 
     if (req.method === "POST" && path === "/task-relation") {
@@ -609,6 +666,56 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (i < 0) return new Response("Workspace rule not found", { status: 404 });
         rules.splice(i, 1);
         return ok(M.NotificationPreferences, preferences());
+      }
+    }
+
+    const workspaceOf = (taskId: string) => projects.find((x) => x.id === tasks.find((t) => t.id === taskId)?.projectId)?.workspaceId;
+    if (req.method === "GET" && (p = m(/^\/label\/workspace\/([^/]+)$/))) {
+      return ok(z.array(M.Label), labels.filter((l) => l.workspaceId === decodeURIComponent(p![1])));
+    }
+    if (req.method === "GET" && (p = m(/^\/label\/task\/([^/]+)$/))) {
+      return ok(z.array(M.Label), labels.filter((l) => l.taskId === decodeURIComponent(p![1])));
+    }
+    if (req.method === "POST" && path === "/label") {
+      const b = body as any;
+      // An existing name answers with the label it names, as the server's
+      // insert-or-nothing does.
+      const have = labels.find((l) => l.workspaceId === b.workspaceId && l.name === b.name && l.taskId === null);
+      return ok(M.Label, have ?? addLabel(b.name, b.color, b.workspaceId, null));
+    }
+    if ((p = m(/^\/label\/([^/]+)(\/task)?$/))) {
+      const l = labels.find((x) => x.id === decodeURIComponent(p![1]));
+      // The server's workspace check runs first and cannot place an unknown id.
+      if (!l) return fail(400, "Workspace ID could not be determined");
+      if (req.method === "GET" && !p[2]) return ok(M.Label, l);
+      if (req.method === "PUT" && !p[2]) {
+        const b = body as any;
+        // A workspace label carries the change to its copies.
+        if (l.taskId === null) for (const c of labels) if (c.taskId !== null && c.workspaceId === l.workspaceId && c.name === l.name) Object.assign(c, { name: b.name, color: b.color });
+        return ok(M.Label, Object.assign(l, { name: b.name, color: b.color, updatedAt: now() }));
+      }
+      if (req.method === "DELETE" && !p[2]) {
+        // The server removes copies 25 at a time and answers 202 until none
+        // are left; one at a time here, so two copies go through the repeat.
+        const copies = l.taskId === null ? labels.filter((c) => c.taskId !== null && c.workspaceId === l.workspaceId && c.name === l.name) : [];
+        if (copies.length > 0) {
+          labels.splice(labels.indexOf(copies[0]!), 1);
+          if (copies.length > 1) return ok(M.PendingLabelDeletion, { ...l, pendingDeletion: true }, 202);
+        }
+        return ok(M.Label, labels.splice(labels.indexOf(l), 1)[0]!);
+      }
+      if (req.method === "PUT" && p[2]) {
+        const taskId = (body as any).taskId;
+        if (workspaceOf(taskId) === undefined) return fail(404, "Task not found");
+        if (workspaceOf(taskId) !== l.workspaceId) return fail(400, "Label and task must belong to the same workspace");
+        if (l.taskId === taskId) return ok(M.Label, l);
+        if (l.taskId !== null) labels.splice(labels.indexOf(l), 1);
+        const have = labels.find((c) => c.taskId === taskId && c.name === l.name);
+        return ok(M.Label, have ?? addLabel(l.name, l.color, l.workspaceId!, taskId));
+      }
+      if (req.method === "DELETE" && p[2]) {
+        if (l.taskId === null) return fail(400, "Label is not assigned to a task");
+        return ok(M.Label, labels.splice(labels.indexOf(l), 1)[0]!);
       }
     }
 

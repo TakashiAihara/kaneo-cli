@@ -7,8 +7,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"error decoding response: status=200, content-type=application/json, content-length=3, target-type=ListProjectsResponse: unexpected end of JSON input\"\n}\n",
-      "stderr": "Error: error decoding response: status=200, content-type=application/json, content-length=3, target-type=ListProjectsResponse: unexpected end of JSON input\n"
+      "stdout": "{\n  \"error\": \"GET /api/project: error decoding response: status=200, content-type=application/json, content-length=3, target-type=ListProjectsResponse: unexpected end of JSON input\"\n}\n",
+      "stderr": "Error: GET /api/project: error decoding response: status=200, content-type=application/json, content-length=3, target-type=ListProjectsResponse: unexpected end of JSON input\n"
     },
     {
       "args": [

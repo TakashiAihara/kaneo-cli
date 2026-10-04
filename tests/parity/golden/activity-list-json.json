@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "args": [
+        "activity",
+        "list",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"cmt0001\",\n    \"type\": \"comment\",\n    \"content\": \"first comment\",\n    \"eventData\": null,\n    \"userId\": \"user-self\",\n    \"createdAt\": \"2026-01-01T00:00:08.000Z\"\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/activity/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

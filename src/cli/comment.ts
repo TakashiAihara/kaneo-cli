@@ -1,5 +1,5 @@
 import { apiKey, type App } from "./app";
-import { addComment, deleteComment, listComments, type Comment } from "../api/kaneo";
+import { addComment, deleteComment, editComment, listComments, type Comment } from "../api/kaneo";
 import { exactArgs, minimumArgs, type RunContext } from "./args";
 import { resolveTask } from "./task";
 
@@ -69,6 +69,25 @@ export const commentCommand = {
         await deleteComment(comment.id);
         app.out.human(`deleted comment ${comment.id} from #${task.number}`);
         app.out.human(commentLine(comment));
+        app.out.data(comment);
+      },
+    },
+    {
+      name: "edit",
+      use: "edit <task> <comment-id> <text...>",
+      short: "Replace the text of a comment on a task",
+      args: minimumArgs(3),
+      run: async ({ args, app }: RunContext<App>) => {
+        apiKey(app);
+        const task = await resolveTask(app, args[0]!);
+        // The server edits by comment id alone. Checking the comment is on the
+        // named task keeps a mistyped id from rewriting a comment elsewhere.
+        const found = (await listComments(task.id)).find((c) => c.id === args[1]);
+        if (found === undefined) {
+          throw new Error(`no comment ${JSON.stringify(args[1])} on #${task.number}; see \`kaneo comment list ${task.number} --json\``);
+        }
+        const comment = await editComment(found, args.slice(2).join(" "));
+        app.out.human(`edited comment ${comment.id} on #${task.number}`);
         app.out.data(comment);
       },
     },

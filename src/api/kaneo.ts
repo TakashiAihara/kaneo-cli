@@ -1,10 +1,22 @@
 import { OPERATIONS, type Operation } from "./registry";
 import { kaneoFetch, KaneoApiError } from "./http";
+import type { Json } from "../output/json";
 import {
   archiveProject,
   clearAllNotifications,
   createNotification as postNotification,
   createColumn as postColumn,
+  createActivity,
+  getActivities,
+  updateTaskComment,
+  attachLabelToTask,
+  createLabel as postLabel,
+  deleteLabel as removeLabel,
+  detachLabelFromTask,
+  getLabel as readLabel,
+  getTaskLabels,
+  getWorkspaceLabels,
+  updateLabel as putLabel,
   createProject as postProject,
   createTask as postTask,
   createTaskComment,
@@ -46,6 +58,8 @@ import type {
   Notification as GenNotification,
   NotificationPreferences as GenNotificationPreferences,
   CreateTaskRelationBody,
+  Activity as GenActivity,
+  Label as GenLabel,
   Organization,
   ProjectListItem,
   RelatedTask,
@@ -62,30 +76,11 @@ import type {
 //
 // Requests and response shapes come from the generated client, so a call that
 // drifts from what the server documents fails to build rather than at the
-// server. This module keeps what the document cannot say: where the key may be
-// sent, how a failure is reported, and the CLI's own view of workspaces,
-// projects and tasks.
-
-// A call through the generated client, with a failure reported the way the Go
-// build reported it: naming the path the request was made on, /api included, so
-// the message can be pasted into curl as it is. The transport quotes the path
-// the generated client wrote, which is the endpoint without that prefix.
-//
-// The quoted path is also decoded and stripped of its query, because that is what
-// Go reported: it read the failure off the request's URL.Path, which holds the
-// route as the server saw it. An id that had to be escaped reads back as the id
-// that was asked for rather than as its percent-encoding.
-const call = async <T>(pending: Promise<T>): Promise<T> => {
-  try {
-    return await pending;
-  } catch (e) {
-    if (e instanceof KaneoApiError) {
-      const [route] = e.path.split("?");
-      throw new KaneoApiError(e.method, served(route!), e.statusCode, e.messages, e.body);
-    }
-    throw e;
-  }
-};
+// server. This module keeps what the document cannot say: the CLI's own view of
+// workspaces, projects and tasks, and what a reply that leaves a field out, or
+// puts something unusable in one, means. The failures themselves are the
+// transport's to report, so a message names the request the same way whichever
+// call it came from.
 
 // A 2xx reply with no body is the zero value of the type the document declares,
 // which is what Go's generated client handed back for one: a freshly allocated
@@ -95,48 +90,54 @@ const call = async <T>(pending: Promise<T>): Promise<T> => {
 const zeroList = <T>(reply: T[] | undefined): T[] => reply ?? [];
 const zeroRecord = <T>(reply: T | undefined): T => reply ?? ({} as T);
 
-// The route a request was made on, with /api in front of it and without the
-// encoding the endpoint was written with.
-//
-// The check is on the whole segment rather than on the spelling: /apix is a
-// path of its own, and prefixing it with /api would name a route nobody called.
-const served = (path: string): string => {
-  const route = decoded(path);
-  return route === "/api" || route.startsWith("/api/") ? route : `/api${route}`;
-};
-
-// A percent-encoded path as the server saw it, read back as the route it names.
-// A sequence that is not valid encoding is left alone: a path this build did not
-// encode must not be turned into a different one by trying.
-const decoded = (path: string): string => {
-  try {
-    return decodeURIComponent(path);
-  } catch {
-    return path;
-  }
-};
-
 // The server writes timestamps the way JavaScript's toISOString does — UTC,
 // milliseconds — so a time read and printed again comes out as the server sent
 // it. A timestamp written any other way is shown as the same instant in that
-// form, and one the reply left out is the Go build's zero time rather than an
-// empty string, because that is what its zero time.Time formatted as and a task
-// with no createdAt is a fact the report has to be able to show.
-const isoTime = (value: string | null | undefined): string => {
-  const at = Date.parse(value ?? "");
+// form.
+//
+// Go decoded these fields into a time.Time, so a field it could not parse failed
+// the decode there rather than becoming a timestamp nobody can act on, and this
+// fails the call with the field and the value for the same reason. What is
+// accepted is RFC 3339 and nothing looser: Date.parse also takes a bare year, a
+// date alone, or a time with no offset, which it reads in the local zone, so the
+// same reply would name a different instant on another machine. Go's own check
+// is looser in a few spellings no server writes (a comma before the fraction, a
+// one-digit hour, an offset of +24:00); those are refused here, as the design
+// document records. The value is cut in the message, since the reply decides
+// how long it is.
+const isoTime = (field: string, value: unknown): string => {
+  if (value === null || value === undefined) return ZERO_TIME;
+  const at = typeof value === "string" && isRfc3339(value) ? Date.parse(value) : Number.NaN;
   if (!Number.isNaN(at)) return new Date(at).toISOString();
-  return value === null || value === undefined || value === "" ? ZERO_TIME : value;
+  const shown = Array.from(JSON.stringify(value));
+  throw new Error(
+    `${field} ${shown.length > VALUE_LIMIT ? `${shown.slice(0, VALUE_LIMIT).join("")}...` : shown.join("")} is not a timestamp`,
+  );
 };
 
+// time.RFC3339 with any fraction of a second: upper-case T and Z, and an offset
+// that is always written. The day and the hour are checked here because
+// Date.parse carries a 30 February into March and 24:00 into the next day where
+// Go refuses both; the other fields out of range it refuses on its own.
+const isRfc3339 = (value: string): boolean => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!m) return false;
+  const [year, month, day, hour] = m.slice(1).map(Number);
+  const leap = year! % 4 === 0 && (year! % 100 !== 0 || year! % 400 === 0);
+  const daysInMonth = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month! - 1] ?? 0;
+  return day! <= daysInMonth && hour! <= 23;
+};
+const VALUE_LIMIT = 200;
+
 // The instant Go's zero time.Time holds, which is what a reply that carried no
-// timestamp decoded to.
+// timestamp, or a null one, decoded to.
 const ZERO_TIME = "0001-01-01T00:00:00.000Z";
 
 // The same, for a field that is a timestamp or nothing at all. An absent one
 // stays absent rather than becoming an empty string, because a task with no due
 // date and a task due at the epoch are not the same fact.
-const isoTimePtr = (value: string | null | undefined): string | null =>
-  value === null || value === undefined ? null : isoTime(value);
+const isoTimePtr = (field: string, value: unknown): string | null =>
+  value === null || value === undefined ? null : isoTime(field, value);
 
 // A value the document types as a closed list, handed to the server unchanged so
 // it can answer 400 for one it does not accept. That message names the field and
@@ -178,9 +179,7 @@ export type Workspace = { id: string; name: string; slug: string };
 // and no key at all, so it has no discriminating power and must not be used to
 // check credentials.
 export const listWorkspaces = async (signal?: AbortSignal): Promise<Workspace[]> =>
-  zeroList(await call(listOrganization({ ...(signal === undefined ? {} : { signal }) }))).map((org) =>
-    workspace(org),
-  );
+  zeroList(await listOrganization({ ...(signal === undefined ? {} : { signal }) })).map((org) => workspace(org));
 
 const workspace = (org: Organization): Workspace => ({
   id: org.id ?? "",
@@ -199,7 +198,7 @@ export const renameWorkspace = async (workspaceId: string, name: string): Promis
   const wanted = name.trim();
   if (wanted === "") throw new Error("workspace name is empty");
   const renamed = workspace(
-    zeroRecord(await call(updateOrganization({ organizationId: workspaceId, data: { name: wanted } }))),
+    zeroRecord(await updateOrganization({ organizationId: workspaceId, data: { name: wanted } })),
   );
   if (renamed.id !== workspaceId || renamed.name !== wanted) {
     throw new Error(
@@ -236,9 +235,7 @@ export const archived = (project: Project): boolean => project.archivedAt !== nu
 // url.Values, which sorts. A query string is part of what a server sees, so the
 // two requests have to be the same request.
 export const listProjectsIn = async (workspaceId: string, includeArchived: boolean): Promise<Project[]> =>
-  zeroList(await call(listProjects({ ...(includeArchived ? { includeArchived: "true" } : {}), workspaceId }))).map(
-    project,
-  );
+  zeroList(await listProjects({ ...(includeArchived ? { includeArchived: "true" } : {}), workspaceId })).map(project);
 
 // What every route that returns a project agrees on. The listing adds rollup
 // statistics and the detail route adds timestamps; neither is part of what this
@@ -256,7 +253,7 @@ const project = (item: ProjectFields): Project => ({
   description: item.description ?? "",
   workspaceId: item.workspaceId ?? "",
   isPublic: item.isPublic ?? false,
-  archivedAt: isoTimePtr(item.archivedAt),
+  archivedAt: isoTimePtr("archivedAt", item.archivedAt),
 });
 
 // Fetches one project by id.
@@ -266,7 +263,7 @@ const project = (item: ProjectFields): Project => ({
 // applies the command's own deadline as well, and a signal here only ever cuts
 // this one request short.
 export const getProject = async (projectId: string, signal?: AbortSignal): Promise<Project> =>
-  project(zeroRecord(await call(readProject(pathParam(projectId), { ...(signal === undefined ? {} : { signal }) }))));
+  project(zeroRecord(await readProject(pathParam(projectId), { ...(signal === undefined ? {} : { signal }) })));
 
 // The payload for creating a project. description is not sent: the server's
 // create route takes no description, so it is only here to be set by an update
@@ -278,14 +275,12 @@ export type NewProject = { name: string; workspaceId: string; icon: string; slug
 export const createProject = async (wanted: NewProject): Promise<Project> =>
   project(
     zeroRecord(
-      await call(
-        postProject({
-          name: wanted.name,
-          workspaceId: wanted.workspaceId,
-          icon: wanted.icon === "" ? "Layers" : wanted.icon,
-          slug: wanted.slug,
-        }),
-      ),
+      await postProject({
+        name: wanted.name,
+        workspaceId: wanted.workspaceId,
+        icon: wanted.icon === "" ? "Layers" : wanted.icon,
+        slug: wanted.slug,
+      }),
     ),
   );
 
@@ -296,7 +291,7 @@ export const createProject = async (wanted: NewProject): Promise<Project> =>
 // showing it. Nothing is deleted, so the change is reversible.
 export const setProjectArchived = async (projectId: string, archived: boolean): Promise<void> => {
   const id = pathParam(projectId);
-  await call(archived ? archiveProject(id) : unarchiveProject(id));
+  await (archived ? archiveProject(id) : unarchiveProject(id));
 };
 
 // The fields to change. A field left out is written back as it was read, so
@@ -346,15 +341,13 @@ export const updateProject = async (
 
   const after = project(
     zeroRecord(
-      await call(
-        putProject(pathParam(projectId), {
-          name: want.name ?? before.name,
-          icon: want.icon ?? before.icon,
-          slug: want.slug ?? before.slug,
-          description: want.description ?? before.description,
-          isPublic: before.isPublic,
-        }),
-      ),
+      await putProject(pathParam(projectId), {
+        name: want.name ?? before.name,
+        icon: want.icon ?? before.icon,
+        slug: want.slug ?? before.slug,
+        description: want.description ?? before.description,
+        isPublic: before.isPublic,
+      }),
     ),
   );
 
@@ -412,7 +405,7 @@ const column = (c: GenColumn): Column => ({
 
 // A project's columns, in board order.
 export const listColumns = async (projectId: string): Promise<Column[]> =>
-  zeroList(await call(readColumns(pathParam(projectId)))).map(column);
+  zeroList(await readColumns(pathParam(projectId))).map(column);
 
 // The payload for creating a column. An icon and a color are left out of the body
 // when there are none: the route takes a string or nothing at all, never null,
@@ -424,14 +417,12 @@ export type NewColumn = { name: string; icon: string; color: string; isFinal: bo
 export const createColumn = async (projectId: string, wanted: NewColumn): Promise<Column> =>
   column(
     zeroRecord(
-      await call(
-        postColumn(pathParam(projectId), {
-          name: wanted.name,
-          isFinal: wanted.isFinal,
-          ...(wanted.icon === "" ? {} : { icon: wanted.icon }),
-          ...(wanted.color === "" ? {} : { color: wanted.color }),
-        }),
-      ),
+      await postColumn(pathParam(projectId), {
+        name: wanted.name,
+        isFinal: wanted.isFinal,
+        ...(wanted.icon === "" ? {} : { icon: wanted.icon }),
+        ...(wanted.color === "" ? {} : { color: wanted.color }),
+      }),
     ),
   );
 
@@ -439,11 +430,9 @@ export const createColumn = async (projectId: string, wanted: NewColumn): Promis
 // whole set rather than the one column that moved.
 export const reorderColumns = async (projectId: string, columnIds: string[]): Promise<Column[]> =>
   zeroList(
-    await call(
-      putColumns(pathParam(projectId), {
-        columns: columnIds.map((id, position) => ({ id, position })),
-      }),
-    ),
+    await putColumns(pathParam(projectId), {
+      columns: columnIds.map((id, position) => ({ id, position })),
+    }),
   ).map(column);
 
 // Renames a column.
@@ -452,11 +441,11 @@ export const reorderColumns = async (projectId: string, columnIds: string[]): Pr
 // created and the update route takes no slug at all, so the slug — which is what
 // every task in the column stores as its status — stays as it was.
 export const renameColumn = async (columnId: string, name: string): Promise<Column> =>
-  column(zeroRecord(await call(putColumn(pathParam(columnId), { name }))));
+  column(zeroRecord(await putColumn(pathParam(columnId), { name })));
 
 // Deletes a column, which the server allows only while the column holds no tasks.
 export const deleteColumn = async (columnId: string): Promise<Column> =>
-  column(zeroRecord(await call(removeColumn(pathParam(columnId)))));
+  column(zeroRecord(await removeColumn(pathParam(columnId))));
 
 export type Label = { id: string; name: string; color: string };
 
@@ -530,12 +519,10 @@ export const getBoard = async (projectId: string): Promise<Board> => {
   for (let page = 1, pages = 1; page <= pages; page++) {
     for (let related = 1, relatedPages = 1; related <= relatedPages; related++) {
       const response = zeroRecord(
-        await call(
-          listTasks(pathParam(projectId), {
-            ...(page > 1 ? { page } : {}),
-            ...(related > 1 ? { relatedPage: related } : {}),
-          }),
-        ),
+        await listTasks(pathParam(projectId), {
+          ...(page > 1 ? { page } : {}),
+          ...(related > 1 ? { relatedPage: related } : {}),
+        }),
       );
       pages = response.pagination?.totalPages ?? 0;
       relatedPages = response.pagination?.relatedTotalPages ?? 0;
@@ -633,9 +620,9 @@ const task = (from: TaskFields, extra: Pick<Task, "assigneeId" | "assigneeName" 
   projectId: from.projectId ?? "",
   assigneeId: extra.assigneeId ?? null,
   assigneeName: extra.assigneeName ?? null,
-  startDate: isoTimePtr(from.startDate),
-  dueDate: isoTimePtr(from.dueDate),
-  createdAt: isoTime(from.createdAt),
+  startDate: isoTimePtr("startDate", from.startDate),
+  dueDate: isoTimePtr("dueDate", from.dueDate),
+  createdAt: isoTime("createdAt", from.createdAt),
   labels: extra.labels,
 });
 
@@ -647,7 +634,7 @@ const toTask = (t: BoardTask): Task =>
 // Fetches one task by id, with its assignee's name resolved. Labels are not part
 // of the reply, so they read as null.
 export const getTask = async (taskId: string): Promise<Task> => {
-  const t = zeroRecord(await call(readTask(pathParam(taskId))));
+  const t = zeroRecord(await readTask(pathParam(taskId)));
   return task(t, { assigneeId: t.assigneeId, assigneeName: t.assigneeName, labels: null });
 };
 
@@ -669,16 +656,14 @@ export type NewTask = {
 // userId, resolves no name and carries no labels.
 export const createTask = async (projectId: string, wanted: NewTask): Promise<Task> => {
   const created = zeroRecord(
-    await call(
-      postTask(pathParam(projectId), {
-        title: wanted.title,
-        description: wanted.description,
-        ...(wanted.dueDate === "" ? {} : { dueDate: wanted.dueDate }),
-        priority: unchecked<CreateTaskBody["priority"]>(wanted.priority === "" ? "medium" : wanted.priority),
-        status: wanted.status === "" ? "to-do" : wanted.status,
-        ...(wanted.assigneeId === "" ? {} : { userId: wanted.assigneeId }),
-      }),
-    ),
+    await postTask(pathParam(projectId), {
+      title: wanted.title,
+      description: wanted.description,
+      ...(wanted.dueDate === "" ? {} : { dueDate: wanted.dueDate }),
+      priority: unchecked<CreateTaskBody["priority"]>(wanted.priority === "" ? "medium" : wanted.priority),
+      status: wanted.status === "" ? "to-do" : wanted.status,
+      ...(wanted.assigneeId === "" ? {} : { userId: wanted.assigneeId }),
+    }),
   );
   return task(created, { assigneeId: created.userId, assigneeName: null, labels: null });
 };
@@ -688,24 +673,24 @@ export const createTask = async (projectId: string, wanted: NewTask): Promise<Ta
 // The dedicated endpoint is used rather than PUT /task/{id}, which requires
 // every field and answers 400 when used for a partial update.
 export const setTaskStatus = async (taskId: string, status: string): Promise<void> => {
-  await call(updateTaskStatus(pathParam(taskId), { status }));
+  await updateTaskStatus(pathParam(taskId), { status });
 };
 
 export const setTaskPriority = async (taskId: string, priority: string): Promise<void> => {
-  await call(updateTaskPriority(pathParam(taskId), { priority: unchecked<UpdateTaskPriorityBody["priority"]>(priority) }));
+  await updateTaskPriority(pathParam(taskId), { priority: unchecked<UpdateTaskPriorityBody["priority"]>(priority) });
 };
 
 // Assigns a task to a user, or clears the assignee when userId is empty.
 export const setTaskAssignee = async (taskId: string, userId: string): Promise<void> => {
-  await call(updateTaskAssignee(pathParam(taskId), { userId: userId === "" ? null : userId }));
+  await updateTaskAssignee(pathParam(taskId), { userId: userId === "" ? null : userId });
 };
 
 export const moveTask = async (taskId: string, projectId: string): Promise<void> => {
-  await call(putTaskMove(pathParam(taskId), { destinationProjectId: projectId }));
+  await putTaskMove(pathParam(taskId), { destinationProjectId: projectId });
 };
 
 export const deleteTask = async (taskId: string): Promise<void> => {
-  await call(removeTask(pathParam(taskId)));
+  await removeTask(pathParam(taskId));
 };
 
 // A comment on a task. It is also where the session's metadata lives, since a
@@ -725,12 +710,12 @@ export type Comment = {
 // null one, has not answered who wrote it rather than answered that nobody did,
 // and the name reads as empty.
 export const listComments = async (taskId: string): Promise<Comment[]> =>
-  zeroList(await call(getTaskComments(pathParam(taskId)))).map((c) => ({
+  zeroList(await getTaskComments(pathParam(taskId))).map((c) => ({
     id: c.id ?? "",
     content: c.content ?? "",
     userId: c.userId ?? "",
     userName: c.user?.name ?? "",
-    createdAt: isoTime(c.createdAt),
+    createdAt: isoTime("createdAt", c.createdAt),
   }));
 
 // Posts a comment on a task. The server answers with the stored activity row,
@@ -738,16 +723,14 @@ export const listComments = async (taskId: string): Promise<Comment[]> =>
 // one reads the listing back.
 export const addComment = async (taskId: string, content: string, signal?: AbortSignal): Promise<Comment> => {
   const a = zeroRecord(
-    await call(
-      createTaskComment(pathParam(taskId), { content }, { ...(signal === undefined ? {} : { signal }) }),
-    ),
+    await createTaskComment(pathParam(taskId), { content }, { ...(signal === undefined ? {} : { signal }) }),
   );
   return {
     id: a.id ?? "",
     content: a.content ?? "",
     userId: a.userId ?? "",
     userName: "",
-    createdAt: isoTime(a.createdAt),
+    createdAt: isoTime("createdAt", a.createdAt),
   };
 };
 
@@ -755,7 +738,66 @@ export const addComment = async (taskId: string, content: string, signal?: Abort
 // workspace cannot be found. Someone else's comment answers 404: the server
 // looks only among the caller's own. A key without task:update answers 403.
 export const deleteComment = async (commentId: string): Promise<void> => {
-  await call(deleteTaskComment(pathParam(commentId)));
+  await deleteTaskComment(pathParam(commentId));
+};
+
+// Rewrites a comment's text. The reply carries no author name, so the comment
+// as listed is returned with its new text.
+//
+// A write the server did not echo back is reported, as with updateProject: an
+// empty 2xx would otherwise read as an edit. It may still have been stored, so
+// the message says where to look.
+export const editComment = async (comment: Comment, content: string): Promise<Comment> => {
+  const a = zeroRecord(await updateTaskComment(pathParam(comment.id), { content }));
+  if (a.id !== comment.id || a.content !== content) {
+    throw new Error(`/comment/${comment.id}: server did not echo the edit; check \`kaneo comment ls\``);
+  }
+  return { ...comment, content: a.content };
+};
+
+// One entry of a task's history: a comment, or an event such as a status
+// change, whose details are in eventData rather than in content.
+export type Activity = {
+  id: string;
+  type: string;
+  content: string;
+  eventData: Json;
+  userId: string;
+  createdAt: string;
+};
+
+const activity = (a: GenActivity): Activity => ({
+  id: a.id ?? "",
+  type: a.type ?? "",
+  content: a.content ?? "",
+  // It came off the wire as JSON, so it is JSON.
+  eventData: (a.eventData ?? null) as Json,
+  userId: a.userId ?? "",
+  createdAt: isoTime("createdAt", a.createdAt),
+});
+
+// A task's history, oldest first like its comments. The server sends it newest
+// first.
+export const listActivities = async (taskId: string): Promise<Activity[]> =>
+  zeroList(await getActivities(pathParam(taskId))).map(activity).reverse();
+
+// Records an event on a task, the way an importer writes one. An empty message
+// is sent as null, which is how the server stores an event that has none.
+//
+// The pinned document's body. A server before Kaneo 2.23.0 also requires
+// userId and answers 400 without it; that is left to fail rather than sent,
+// since this client targets the pinned release.
+export const addActivity = async (
+  taskId: string,
+  type: string,
+  message: string,
+  eventData: Record<string, unknown> | null,
+): Promise<Activity> => {
+  const a = zeroRecord(await createActivity({ taskId, type, message: message === "" ? null : message, eventData }));
+  if (!a.id || a.taskId !== taskId || a.type !== type) {
+    throw new Error("/activity/create: server did not echo the event; check `kaneo activity ls`");
+  }
+  return activity(a);
 };
 
 // The links the server accepts between two tasks.
@@ -787,24 +829,22 @@ export const linkTasks = async (
 ): Promise<Relation> =>
   relation(
     zeroRecord(
-      await call(
-        createTaskRelation({
-          sourceTaskId,
-          targetTaskId,
-          relationType: unchecked<CreateTaskRelationBody["relationType"]>(relationType),
-        }),
-      ),
+      await createTaskRelation({
+        sourceTaskId,
+        targetTaskId,
+        relationType: unchecked<CreateTaskRelationBody["relationType"]>(relationType),
+      }),
     ),
   );
 
 // A task's links, as both endpoints of the link.
 export const listRelations = async (taskId: string): Promise<Relation[]> =>
-  zeroList(await call(getTaskRelations(pathParam(taskId)))).map(relation);
+  zeroList(await getTaskRelations(pathParam(taskId))).map(relation);
 
 // Removes one link and answers with the relation as the server held it, which
 // like a creation reply has no summaries.
 export const deleteRelation = async (relationId: string): Promise<Relation> =>
-  relation(zeroRecord(await call(removeRelation(pathParam(relationId)))));
+  relation(zeroRecord(await removeRelation(pathParam(relationId))));
 
 // The listing answers with a summary of each linked task as well, which is what
 // lets a link be shown by number rather than by id.
@@ -857,23 +897,23 @@ const notification = (n: GenNotification): Notification => ({
   isRead: n.isRead === true,
   resourceType: n.resourceType ?? null,
   resourceId: n.resourceId ?? null,
-  createdAt: isoTime(n.createdAt),
+  createdAt: isoTime("createdAt", n.createdAt),
 });
 
 // The newest 50 notifications, read and unread, newest first: the server caps
 // the listing there and takes no page.
 export const listNotifications = async (): Promise<Notification[]> =>
-  zeroList(await call(getNotifications())).map(notification);
+  zeroList(await getNotifications()).map(notification);
 
 export const markNotificationRead = async (id: string): Promise<Notification> =>
-  notification(zeroRecord(await call(markNotificationAsRead(pathParam(id)))));
+  notification(zeroRecord(await markNotificationAsRead(pathParam(id))));
 
 export const markAllNotificationsRead = async (): Promise<void> => {
-  await call(markAllNotificationsAsRead());
+  await markAllNotificationsAsRead();
 };
 
 export const clearNotifications = async (): Promise<void> => {
-  await call(clearAllNotifications());
+  await clearAllNotifications();
 };
 
 export type NewNotification = {
@@ -894,7 +934,7 @@ export const createNotification = async (wanted: NewNotification): Promise<Notif
   if (wanted.message !== "") body.message = wanted.message;
   if (wanted.resourceType !== "") body.relatedEntityType = wanted.resourceType;
   if (wanted.resourceId !== "") body.relatedEntityId = wanted.resourceId;
-  const created = await call(postNotification(body));
+  const created = await postNotification(body);
   return created === null || created === undefined ? null : notification(created);
 };
 
@@ -905,21 +945,159 @@ export type NotificationPreferenceChanges = UpdateNotificationPreferencesBody;
 export type WorkspaceRule = UpsertNotificationPreferenceWorkspaceRuleBody;
 
 export const getNotificationPreferences = async (): Promise<NotificationPreferences> =>
-  zeroRecord(await call(readNotificationPreferences()));
+  zeroRecord(await readNotificationPreferences());
 
 // Only the fields in changes are sent. The server leaves the other settings
 // alone, but carries a channel switch into the active workspace rules that have
 // a channel on.
 export const updateNotificationPreferences = async (
   changes: NotificationPreferenceChanges,
-): Promise<NotificationPreferences> => zeroRecord(await call(putNotificationPreferences(changes)));
+): Promise<NotificationPreferences> => zeroRecord(await putNotificationPreferences(changes));
 
 // Replaces a workspace's rule whole: the server takes every field or none.
 export const setWorkspaceRule = async (workspaceId: string, rule: WorkspaceRule): Promise<NotificationPreferences> =>
-  zeroRecord(await call(upsertNotificationPreferenceWorkspaceRule(pathParam(workspaceId), rule)));
+  zeroRecord(await upsertNotificationPreferenceWorkspaceRule(pathParam(workspaceId), rule));
 
 export const removeWorkspaceRule = async (workspaceId: string): Promise<NotificationPreferences> =>
-  zeroRecord(await call(deleteNotificationPreferenceWorkspaceRule(pathParam(workspaceId))));
+  zeroRecord(await deleteNotificationPreferenceWorkspaceRule(pathParam(workspaceId)));
+
+// A label as the label routes return it. The server keeps two kinds of row
+// under one table: a workspace label (taskId null), which is what the web app
+// offers to pick from, and a copy of it on each task it is attached to, with
+// the same name and its own id. Attaching inserts a copy and detaching deletes
+// one, so the workspace label itself never moves.
+export type LabelRecord = Label & {
+  taskId: string | null;
+  workspaceId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Set once a deletion has started and not yet finished; the server refuses
+  // to attach or change such a label, and the same delete resumes it.
+  deletionStartedAt: string | null;
+};
+
+const labelRecord = (l: GenLabel): LabelRecord => ({
+  id: l.id ?? "",
+  name: l.name ?? "",
+  color: l.color ?? "",
+  taskId: l.taskId ?? null,
+  workspaceId: l.workspaceId ?? null,
+  createdAt: isoTime("createdAt", l.createdAt),
+  updatedAt: isoTime("updatedAt", l.updatedAt),
+  deletionStartedAt: isoTimePtr("deletionStartedAt", l.deletionStartedAt),
+});
+
+// Every label row in a workspace, the task copies included; the caller picks
+// out the workspace labels when that is what it wants.
+export const listWorkspaceLabels = async (workspaceId: string): Promise<LabelRecord[]> =>
+  zeroList(await getWorkspaceLabels(pathParam(workspaceId))).map(labelRecord);
+
+// The copies attached to one task.
+export const listTaskLabels = async (taskId: string): Promise<LabelRecord[]> =>
+  zeroList(await getTaskLabels(pathParam(taskId))).map(labelRecord);
+
+export const getLabel = async (labelId: string): Promise<LabelRecord> =>
+  labelRecord(zeroRecord(await readLabel(pathParam(labelId))));
+
+// Creates a workspace label. The server answers with the existing one when the
+// name is already taken in the workspace rather than failing, so creating is
+// safe to repeat.
+export const createLabel = async (workspaceId: string, name: string, color: string): Promise<LabelRecord> => {
+  const wanted = name.trim();
+  if (wanted === "") throw new Error("label name is empty");
+  if (color.trim() === "") throw new Error("label color is empty");
+  return labelRecord(zeroRecord(await postLabel({ name: wanted, color, workspaceId })));
+};
+
+export type LabelChanges = { name?: string; color?: string };
+
+// Changes a label's name or color and keeps the other. The server's update
+// takes both, so the label is read first and the field not asked for is sent
+// back as read. On a workspace label the server carries the change to every
+// task copy, which is what renaming a label means in the web app as well.
+export const updateLabel = async (
+  labelId: string,
+  changes: LabelChanges,
+): Promise<{ before: LabelRecord; after: LabelRecord }> => {
+  const name = changes.name?.trim();
+  if (name === "") throw new Error("label name is empty");
+  if (changes.color?.trim() === "") throw new Error("label color is empty");
+  const before = await getLabel(labelId);
+  // A read that decoded to nothing would write a blank name back.
+  if (before.id !== labelId || before.name === "") {
+    throw new Error(`reading label ${labelId} before the update got id ${quoted(before.id)}, name ${quoted(before.name)}; not writing`);
+  }
+  const after = labelRecord(
+    zeroRecord(
+      await putLabel(pathParam(labelId), { name: name ?? before.name, color: changes.color ?? before.color }),
+    ),
+  );
+  return { before, after };
+};
+
+// Deletes a label. A workspace label takes its task copies with it, and the
+// server removes those 25 at a time: it answers 202 with pendingDeletion until
+// the last batch, and the same request resumes where the previous one stopped.
+// So the request is repeated until the server says it is done. A server older
+// than the batching answers 200 the first time, which ends the loop at once.
+//
+// 429 means the server's few deletion slots are taken, or another client is
+// deleting this label right now; it asks to retry after a second. That is
+// retried the way the web app does, five times in a row at most, the count
+// starting over after each batch that went through.
+export const deleteLabel = async (labelId: string): Promise<LabelRecord> => {
+  const id = pathParam(labelId);
+  // The last batch's answer: the label as it stood once a batch went through.
+  let last: GenLabel | undefined;
+  let busy = 0;
+  for (;;) {
+    let reply: GenLabel | (GenLabel & { pendingDeletion: true });
+    try {
+      reply = zeroRecord(await removeLabel(id));
+    } catch (e) {
+      const status = e instanceof KaneoApiError ? e.statusCode : 0;
+      if (status === 429 && busy < LABEL_DELETE_BUSY_RETRIES) {
+        busy++;
+        await Bun.sleep(LABEL_DELETE_BUSY_WAIT_MS);
+        continue;
+      }
+      // Another client finished this deletion while this one waited: the
+      // label is gone, which the server reports as an id it cannot place
+      // (400) or, past that check, as not found (404).
+      if (last !== undefined && (status === 400 || status === 404)) return labelRecord(last);
+      // The server starts deleting inside the first request, before it
+      // answers, and keeps what it did; the same request resumes from there.
+      // Only a refusal on the first request (a 4xx, which the server gives
+      // before touching the label) means nothing changed.
+      if (last === undefined && status >= 400 && status < 500) throw e;
+      const hint = `; the label may be partly deleted, run \`kaneo label rm ${labelId} --yes\` again to finish`;
+      if (e instanceof Error) {
+        e.message += hint;
+        throw e;
+      }
+      throw new Error(`${String(e)}${hint}`);
+    }
+    if (!("pendingDeletion" in reply && reply.pendingDeletion === true)) return labelRecord(reply);
+    last = reply;
+    busy = 0;
+  }
+};
+
+// The web app's numbers (apps/web/src/fetchers/label/delete-label.ts, v2.29.2);
+// the server's 429 carries Retry-After: 1.
+const LABEL_DELETE_BUSY_RETRIES = 5;
+const LABEL_DELETE_BUSY_WAIT_MS = 1000;
+
+// Attaches a label to a task, which inserts a copy of it on the task and
+// answers with that copy. Attaching a label the task already carries answers
+// with the copy it has.
+export const attachLabel = async (labelId: string, taskId: string): Promise<LabelRecord> =>
+  labelRecord(zeroRecord(await attachLabelToTask(pathParam(labelId), { taskId })));
+
+// Detaches a task copy, which deletes it. The id is the copy's, not the
+// workspace label's: the server answers 400 for a label on no task.
+export const detachLabel = async (copyId: string): Promise<LabelRecord> =>
+  labelRecord(zeroRecord(await detachLabelFromTask(pathParam(copyId))));
 
 export type CheckResult = {
   serverOperations: number;
@@ -939,7 +1117,7 @@ type Document = { paths?: Record<string, Record<string, { operationId?: string }
 // through the transport like every other call so it lands under /api, since the
 // site root answers 200 with the web app's HTML for any path.
 export const checkApi = async (): Promise<CheckResult> => {
-  const document = zeroRecord(await call(kaneoFetch<Document>("/openapi", { method: "GET" })));
+  const document = zeroRecord(await kaneoFetch<Document>("/openapi", { method: "GET" }));
   const seen = new Set<string>();
   const onServer: string[] = [];
   for (const methods of Object.values(document.paths ?? {})) {

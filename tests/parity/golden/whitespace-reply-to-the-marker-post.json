@@ -8,8 +8,8 @@
         "--strict"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskCommentResponse: unexpected end of JSON input\"\n}\n",
-      "stderr": "Error: error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskCommentResponse: unexpected end of JSON input\n"
+      "stdout": "{\n  \"error\": \"POST /api/comment/task-a1: error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskCommentResponse: unexpected end of JSON input\"\n}\n",
+      "stderr": "Error: POST /api/comment/task-a1: error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskCommentResponse: unexpected end of JSON input\n"
     },
     {
       "args": [

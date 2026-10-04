@@ -1,0 +1,126 @@
+{
+  "steps": [
+    {
+      "args": [
+        "label",
+        "create",
+        "bug",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"lbl0002\",\n  \"name\": \"bug\",\n  \"color\": \"gray\",\n  \"taskId\": null,\n  \"workspaceId\": \"ws-main\",\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:10.000Z\",\n  \"deletionStartedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "attach",
+        "1",
+        "bug",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"lbl0003\",\n  \"name\": \"bug\",\n  \"color\": \"gray\",\n  \"taskId\": \"task-a1\",\n  \"workspaceId\": \"ws-main\",\n  \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:11.000Z\",\n  \"deletionStartedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "get",
+        "bug",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "lbl0002  bug  (gray)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "get",
+        "lbl0003",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"lbl0003\",\n  \"name\": \"bug\",\n  \"color\": \"gray\",\n  \"taskId\": \"task-a1\",\n  \"workspaceId\": \"ws-main\",\n  \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:11.000Z\",\n  \"deletionStartedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "get",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/label/nope: 400: Workspace ID could not be determined\"\n}\n",
+      "stderr": "Error: GET /api/label/nope: 400: Workspace ID could not be determined\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/label",
+      "query": "",
+      "body": {
+        "name": "bug",
+        "color": "gray",
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/label/lbl0002/task",
+      "query": "",
+      "body": {
+        "taskId": "task-a1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/lbl0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/lbl0003",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/nope",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

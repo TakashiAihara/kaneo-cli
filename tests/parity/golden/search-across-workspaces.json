@@ -18,7 +18,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "task  GAM#1  Filed elsewhere first  (to-do)\n",
+      "stdout": "task  GAM#1  Filed elsewhere first  (to-do)  (Other)\n",
       "stderr": ""
     },
     {
@@ -42,7 +42,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "task  GAM#1  Filed elsewhere first  (to-do)\ntask  BET#1  Beta first  (to-do)\n2 shown; there may be more (--limit up to 50)\n",
+      "stdout": "task  GAM#1  Filed elsewhere first  (to-do)  (Other)\ntask  BET#1  Beta first  (to-do)  (Main)\n2 shown; there may be more (--limit up to 50)\n",
       "stderr": ""
     },
     {
@@ -82,6 +82,71 @@
       "exit": 0,
       "stdout": "{\n  \"query\": \"other\",\n  \"results\": [\n    {\n      \"id\": \"ws-other\",\n      \"type\": \"workspace\",\n      \"title\": \"Other\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": null,\n      \"projectName\": null,\n      \"projectSlug\": null,\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ],\n  \"totalCount\": 1\n}\n",
       "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "er",
+        "-A",
+        "--limit",
+        "2",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace         Other\ntask       GAM#1  Filed elsewhere first  (to-do)  (Other)\n2 shown; there may be more (--limit up to 50)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "first",
+        "-A",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"first\",\n  \"results\": [\n    {\n      \"id\": \"task-g1\",\n      \"type\": \"task\",\n      \"title\": \"Filed elsewhere first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-gamma\",\n      \"projectName\": \"Gamma\",\n      \"projectSlug\": \"GAM\",\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"priority\": \"low\",\n      \"status\": \"to-do\"\n    }\n  ],\n  \"totalCount\": 3\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "x",
+        "-A",
+        "--limit",
+        "0",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--limit must be a whole number from 1 to 50\"\n}\n",
+      "stderr": "Error: --limit must be a whole number from 1 to 50\n"
+    },
+    {
+      "args": [
+        "search",
+        "x",
+        "-A",
+        "--limit",
+        "51",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --limit must be a whole number from 1 to 50\n"
+    },
+    {
+      "args": [
+        "search",
+        "x",
+        "-A",
+        "--limit",
+        "1.5",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --limit must be a whole number from 1 to 50\n"
     }
   ],
   "requests": [
@@ -103,12 +168,12 @@
     {
       "method": "GET",
       "path": "/search",
-      "query": "?q=elsewhere&workspaceId=ws-main"
+      "query": "?limit=50&q=elsewhere&workspaceId=ws-main"
     },
     {
       "method": "GET",
       "path": "/search",
-      "query": "?q=elsewhere&workspaceId=ws-other"
+      "query": "?limit=50&q=elsewhere&workspaceId=ws-other"
     },
     {
       "method": "GET",
@@ -118,12 +183,12 @@
     {
       "method": "GET",
       "path": "/search",
-      "query": "?q=first&workspaceId=ws-main"
+      "query": "?limit=50&q=first&workspaceId=ws-main"
     },
     {
       "method": "GET",
       "path": "/search",
-      "query": "?q=first&workspaceId=ws-other"
+      "query": "?limit=50&q=first&workspaceId=ws-other"
     },
     {
       "method": "GET",
@@ -133,12 +198,12 @@
     {
       "method": "GET",
       "path": "/search",
-      "query": "?limit=2&q=first&workspaceId=ws-main"
+      "query": "?limit=50&q=first&workspaceId=ws-main"
     },
     {
       "method": "GET",
       "path": "/search",
-      "query": "?limit=2&q=first&workspaceId=ws-other"
+      "query": "?limit=50&q=first&workspaceId=ws-other"
     },
     {
       "method": "GET",
@@ -148,12 +213,42 @@
     {
       "method": "GET",
       "path": "/search",
-      "query": "?q=other&type=workspaces&workspaceId=ws-main"
+      "query": "?limit=50&q=other&type=workspaces&workspaceId=ws-main"
     },
     {
       "method": "GET",
       "path": "/search",
-      "query": "?q=other&type=workspaces&workspaceId=ws-other"
+      "query": "?limit=50&q=other&type=workspaces&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=er&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=er&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-other"
     }
   ],
   "files": {}

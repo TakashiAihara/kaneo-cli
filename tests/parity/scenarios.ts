@@ -192,18 +192,22 @@ export const SCENARIOS: Scenario[] = [
 
   ...both("search", ["search", "first"]),
   { name: "search narrowed", steps: [["search", "first", "--in-project", "--json"], ["search", "first", "-p", "BET", "--human"], ["search", "first", "--in-project", "-p", "nope", "--human"], ["search", "a", "--in-project", "--type", "projects", "--human"], ["search", "e", "--type", "tasks", "--limit", "1", "--json"], ["search", "e", "--limit", "50", "--human"], ["search", "beta", "--type", "projects", "--human"], ["search", "e", "--limit", "2", "--human"], ["search", "x", "--type", "bogus", "--json"], ["search", " ", "--json"]] },
-  { name: "search at the server's limit", seed: { tasks: Array.from({ length: 50 }, (_, i) => ({ id: `task-m${i}`, projectId: P1, title: `match ${i}` })) }, steps: [["search", "match", "--type", "tasks", "--limit", "50", "--human"]] },
+  { name: "search at the server's limit", seed: { tasks: Array.from({ length: 50 }, (_, i) => ({ id: `task-m${i}`, projectId: P1, title: `match ${i}` })) }, steps: [["search", "match", "--type", "tasks", "--limit", "50", "--human"], ["search", "match", "-A", "--type", "tasks", "--human"]] },
   { name: "search and members need a workspace", env: { KANEO_WORKSPACE: "" }, steps: [["search", "first", "--json"], ["workspace", "members", "--json"]] },
+  { name: "search across workspaces needs none", env: { KANEO_WORKSPACE: "" }, steps: [["search", "first", "-A", "--human"]] },
   {
     // A project in the second workspace whose task matches alone ("elsewhere") and
     // alongside the first workspace's ("first"), so the merge, its ranking and the
-    // cut to --limit across workspaces all show in the output.
+    // cut to --limit across workspaces all show in the output. Two members make
+    // the server repeat each workspace match, which fills a page of --limit 2 for
+    // "er" with "Other" alone unless every workspace is asked for a full page.
     name: "search across workspaces",
     seed: {
+      members: MEMBERS,
       projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
       tasks: [...SEED.tasks, { id: "task-g1", projectId: "proj-gamma", title: "Filed elsewhere first", priority: "low" }],
     },
-    steps: [["search", "elsewhere", "--json"], ["search", "elsewhere", "-A", "--human"], ["search", "first", "--all-workspaces", "--json"], ["search", "first", "-A", "--limit", "2", "--human"], ["search", "first", "-A", "--in-project", "--json"], ["search", "first", "-A", "-p", "BET", "--human"], ["search", "other", "-A", "--type", "workspaces", "--json"]],
+    steps: [["search", "elsewhere", "--json"], ["search", "elsewhere", "-A", "--human"], ["search", "first", "--all-workspaces", "--json"], ["search", "first", "-A", "--limit", "2", "--human"], ["search", "first", "-A", "--in-project", "--json"], ["search", "first", "-A", "-p", "BET", "--human"], ["search", "other", "-A", "--type", "workspaces", "--json"], ["search", "er", "-A", "--limit", "2", "--human"], ["search", "first", "-A", "--limit", "1", "--json"], ["search", "x", "-A", "--limit", "0", "--json"], ["search", "x", "-A", "--limit", "51", "--human"], ["search", "x", "-A", "--limit", "1.5", "--human"]],
   },
   ...both("workspace members", ["workspace", "members"]).map((s) => ({ ...s, seed: { members: MEMBERS } })),
   { name: "workspace members by name", seed: { members: MEMBERS }, env: { KANEO_WORKSPACE: "Other" }, steps: [["workspace", "members", "--human"]] },

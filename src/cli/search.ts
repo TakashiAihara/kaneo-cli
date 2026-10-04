@@ -8,12 +8,12 @@ import { resolveWorkspace, withProject } from "./lookup";
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
 
-// Searches from the resolved workspace: tasks, projects, comments and activities
-// in one ranked list.
+// Searches from the resolved workspace, or from every one with -A: tasks,
+// projects, comments and activities in one ranked list.
 export const searchCommand = {
   name: "search",
   use: "search <text...>",
-  short: "Search a workspace's tasks, projects, comments and activities",
+  short: "Search a workspace's tasks, projects, comments and activities, or every workspace's",
   long:
     "Search a workspace's tasks, projects, comments and activities.\n\n" +
     "The whole workspace is searched even when the settings resolve a project,\n" +
@@ -65,7 +65,11 @@ export const searchCommand = {
     const refWidth = refs.reduce((at, r) => Math.max(at, r.length), 0);
     for (const [at, r] of found.results.entries()) {
       const status = r.status !== null ? `  (${r.status})` : "";
-      app.out.human(`${r.type.padEnd(typeWidth)}  ${refs[at]!.padEnd(refWidth)}  ${r.title}${status}`);
+      // Slugs are unique only inside a workspace, so a reference from more than
+      // one has to say which, as `project ls -A` does. A workspace match is named
+      // by its own title.
+      const where = acrossAll && r.type !== "workspace" ? `  (${r.workspaceName})` : "";
+      app.out.human(`${r.type.padEnd(typeWidth)}  ${refs[at]!.padEnd(refWidth)}  ${r.title}${status}${where}`);
     }
     // totalCount cannot say whether matches were cut (see Search), so a full page
     // is taken to mean there may be more.
@@ -84,12 +88,21 @@ export const searchCommand = {
 // One search per workspace, merged the way v2.29.2 merges its per-type queries:
 // by relevance, newest first on a tie, then cut to the limit. The server takes
 // workspace matches from every workspace the key can reach whichever one is
-// asked, so the same workspace comes back from every search and is kept once.
+// asked, and repeats each once per member (v2.29.2 joins the members without
+// narrowing them), so the same workspace comes back many times and is kept once.
+// Those repeats take places in each workspace's page, so every workspace is asked
+// for the most the server returns rather than for --limit, which the server then
+// no longer checks; it is checked here instead.
+// ponytail: a workspace with more than 50 matches can still lose some that would rank in.
 const searchEverywhere = async (wanted: SearchQuery): Promise<Search> => {
+  const limit = wanted.limit === "" ? DEFAULT_LIMIT : Number(wanted.limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
+    throw new Error(`--limit must be a whole number from 1 to ${MAX_LIMIT}`);
+  }
   const seen = new Set<string>();
   const merged: SearchResult[] = [];
   for (const w of await listWorkspaces()) {
-    for (const r of (await search({ ...wanted, workspaceId: w.id })).results) {
+    for (const r of (await search({ ...wanted, workspaceId: w.id, limit: String(MAX_LIMIT) })).results) {
       const key = `${r.type} ${r.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -97,7 +110,7 @@ const searchEverywhere = async (wanted: SearchQuery): Promise<Search> => {
     }
   }
   merged.sort((a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  const limit = wanted.limit === "" ? DEFAULT_LIMIT : Number(wanted.limit);
+  // totalCount counts the matches before the cut, as the server's does.
   return { query: wanted.query, results: merged.slice(0, limit), totalCount: merged.length };
 };
 

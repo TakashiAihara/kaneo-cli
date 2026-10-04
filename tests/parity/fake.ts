@@ -482,12 +482,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const taskHits: Hit[] = [];
       const commentHits: Hit[] = [];
       // Workspaces are matched across every one the key can reach whichever
-      // workspace is asked, as in v2.29.2, so the same match comes back from a
-      // search of each.
+      // workspace is asked, and each once per member, as in v2.29.2 (it joins
+      // the members without narrowing them), so the same match comes back from a
+      // search of each, and more than once.
       const workspaceHits: Hit[] = [];
       for (const w of workspaces) {
         if ((type === "all" || type === "workspaces") && hit(w.name)) {
-          workspaceHits.push({ id: w.id, type: "workspace", title: w.name, createdAt: seededAt, relevanceScore: 3, workspaceId: w.id, workspaceName: w.name });
+          for (let n = 0; n < Math.max(1, seed.members?.length ?? 0); n++) {
+            workspaceHits.push({ id: w.id, type: "workspace", title: w.name, createdAt: seededAt, relevanceScore: 3, workspaceId: w.id, workspaceName: w.name });
+          }
         }
       }
       for (const x of inWorkspace) {

@@ -318,11 +318,17 @@ export type Search = { query: string; results: SearchResult[]; totalCount: numbe
 // type, 20 results), and projectId is "" to search the whole workspace.
 export type SearchQuery = { query: string; workspaceId: string; projectId: string; type: string; limit: string };
 
+// One page of a search, and how many rows the server sent for it. v2.29.2
+// repeats each workspace match once per member (it joins the members without
+// narrowing them), so the page keeps each match once, and rows — the repeats
+// counted — is what says whether the server filled the page.
+export type SearchPage = { found: Search; rows: number };
+
 // Searches from one workspace: tasks, comments and activities in it, though the
 // server takes workspace matches from every workspace the key can reach. The
 // query keys are in sorted order, as every other query this client sends is, so
 // a request reads the same however the call was written.
-export const search = async (wanted: SearchQuery): Promise<Search> => {
+export const search = async (wanted: SearchQuery): Promise<SearchPage> => {
   const reply = zeroRecord(
     await globalSearch({
       ...(wanted.limit === "" ? {} : { limit: wanted.limit }),
@@ -332,10 +338,18 @@ export const search = async (wanted: SearchQuery): Promise<Search> => {
       workspaceId: wanted.workspaceId,
     }),
   );
-  return {
+  const rows = zeroList(reply.results);
+  const seen = new Set<string>();
+  const kept = rows.filter((r) => {
+    const key = `${r.type} ${r.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const found = {
     query: reply.searchQuery ?? "",
     totalCount: reply.totalCount ?? 0,
-    results: zeroList(reply.results).map((r) => ({
+    results: kept.map((r) => ({
       id: r.id ?? "",
       type: r.type ?? "",
       title: r.title ?? "",
@@ -355,6 +369,7 @@ export const search = async (wanted: SearchQuery): Promise<Search> => {
       status: r.status ?? null,
     })),
   };
+  return { found, rows: rows.length };
 };
 
 // A project belongs to exactly one workspace. archivedAt is set once a project

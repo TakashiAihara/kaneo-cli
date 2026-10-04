@@ -26,6 +26,21 @@
       "exit": 0,
       "stdout": "task  ALP#50  match 49  (to-do)  (Main)\ntask  ALP#49  match 48  (to-do)  (Main)\ntask  ALP#48  match 47  (to-do)  (Main)\ntask  ALP#47  match 46  (to-do)  (Main)\ntask  ALP#46  match 45  (to-do)  (Main)\ntask  ALP#45  match 44  (to-do)  (Main)\ntask  ALP#44  match 43  (to-do)  (Main)\ntask  ALP#43  match 42  (to-do)  (Main)\ntask  ALP#42  match 41  (to-do)  (Main)\ntask  ALP#41  match 40  (to-do)  (Main)\ntask  ALP#40  match 39  (to-do)  (Main)\ntask  ALP#39  match 38  (to-do)  (Main)\ntask  ALP#38  match 37  (to-do)  (Main)\ntask  ALP#37  match 36  (to-do)  (Main)\ntask  ALP#36  match 35  (to-do)  (Main)\ntask  ALP#35  match 34  (to-do)  (Main)\ntask  ALP#34  match 33  (to-do)  (Main)\ntask  ALP#33  match 32  (to-do)  (Main)\ntask  ALP#32  match 31  (to-do)  (Main)\ntask  ALP#31  match 30  (to-do)  (Main)\n20 shown; there may be more (--limit up to 50)\n",
       "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "match",
+        "-A",
+        "--type",
+        "tasks",
+        "--limit",
+        "50",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "task  ALP#50  match 49  (to-do)  (Main)\ntask  ALP#49  match 48  (to-do)  (Main)\ntask  ALP#48  match 47  (to-do)  (Main)\ntask  ALP#47  match 46  (to-do)  (Main)\ntask  ALP#46  match 45  (to-do)  (Main)\ntask  ALP#45  match 44  (to-do)  (Main)\ntask  ALP#44  match 43  (to-do)  (Main)\ntask  ALP#43  match 42  (to-do)  (Main)\ntask  ALP#42  match 41  (to-do)  (Main)\ntask  ALP#41  match 40  (to-do)  (Main)\ntask  ALP#40  match 39  (to-do)  (Main)\ntask  ALP#39  match 38  (to-do)  (Main)\ntask  ALP#38  match 37  (to-do)  (Main)\ntask  ALP#37  match 36  (to-do)  (Main)\ntask  ALP#36  match 35  (to-do)  (Main)\ntask  ALP#35  match 34  (to-do)  (Main)\ntask  ALP#34  match 33  (to-do)  (Main)\ntask  ALP#33  match 32  (to-do)  (Main)\ntask  ALP#32  match 31  (to-do)  (Main)\ntask  ALP#31  match 30  (to-do)  (Main)\ntask  ALP#30  match 29  (to-do)  (Main)\ntask  ALP#29  match 28  (to-do)  (Main)\ntask  ALP#28  match 27  (to-do)  (Main)\ntask  ALP#27  match 26  (to-do)  (Main)\ntask  ALP#26  match 25  (to-do)  (Main)\ntask  ALP#25  match 24  (to-do)  (Main)\ntask  ALP#24  match 23  (to-do)  (Main)\ntask  ALP#23  match 22  (to-do)  (Main)\ntask  ALP#22  match 21  (to-do)  (Main)\ntask  ALP#21  match 20  (to-do)  (Main)\ntask  ALP#20  match 19  (to-do)  (Main)\ntask  ALP#19  match 18  (to-do)  (Main)\ntask  ALP#18  match 17  (to-do)  (Main)\ntask  ALP#17  match 16  (to-do)  (Main)\ntask  ALP#16  match 15  (to-do)  (Main)\ntask  ALP#15  match 14  (to-do)  (Main)\ntask  ALP#14  match 13  (to-do)  (Main)\ntask  ALP#13  match 12  (to-do)  (Main)\ntask  ALP#12  match 11  (to-do)  (Main)\ntask  ALP#11  match 10  (to-do)  (Main)\ntask  ALP#10  match 9  (to-do)  (Main)\ntask  ALP#9   match 8  (to-do)  (Main)\ntask  ALP#8   match 7  (to-do)  (Main)\ntask  ALP#7   match 6  (to-do)  (Main)\ntask  ALP#6   match 5  (to-do)  (Main)\ntask  ALP#5   match 4  (to-do)  (Main)\ntask  ALP#4   match 3  (to-do)  (Main)\ntask  ALP#3   match 2  (to-do)  (Main)\ntask  ALP#2   match 1  (to-do)  (Main)\ntask  ALP#1   match 0  (to-do)  (Main)\n50 shown, the most the server returns; there may be more\n",
+      "stderr": ""
     }
   ],
   "requests": [
@@ -38,6 +53,21 @@
       "method": "GET",
       "path": "/search",
       "query": "?limit=50&q=match&type=tasks&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=match&type=tasks&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=match&type=tasks&workspaceId=ws-other"
     },
     {
       "method": "GET",

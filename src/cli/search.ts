@@ -1,5 +1,5 @@
 import { apiKey, project, workspace, type App } from "./app";
-import { getProject, listWorkspaces, search, type Search, type SearchQuery, type SearchResult } from "../api/kaneo";
+import { getProject, listWorkspaces, search, type SearchQuery, type SearchResult } from "../api/kaneo";
 import { minimumArgs, type FlagValues } from "./args";
 import { resolveWorkspace, withProject } from "./lookup";
 
@@ -46,18 +46,24 @@ export const searchCommand = {
     if (narrow && acrossAll) throw new Error("--all-workspaces searches every workspace, so it cannot be narrowed to a project");
     const limit = String(flags.limit ?? "");
     const type = String(flags.type ?? "");
-    let found: Search;
+    const wanted = limit === "" ? DEFAULT_LIMIT : Number(limit);
+    let found;
+    let more: boolean;
     if (acrossAll) {
-      found = await searchEverywhere({ query, workspaceId: "", projectId: "", type, limit });
+      ({ found, more } = await searchEverywhere({ query, workspaceId: "", projectId: "", type, limit }, wanted));
     } else {
       const inProject = narrow ? await withProject(app, project(app), (id) => getProject(id)) : undefined;
-      found = await search({
+      const page = await search({
         query,
         workspaceId: inProject?.workspaceId ?? (await resolveWorkspace(app, workspace(app))),
         projectId: inProject?.id ?? "",
         type,
         limit,
       });
+      found = page.found;
+      // totalCount cannot say whether matches were cut (see Search), so a page
+      // the server filled, repeats counted, is taken to mean there may be more.
+      more = page.rows >= wanted;
     }
 
     const refs = found.results.map(ref);
@@ -71,10 +77,7 @@ export const searchCommand = {
       const where = acrossAll && r.type !== "workspace" ? `  (${r.workspaceName})` : "";
       app.out.human(`${r.type.padEnd(typeWidth)}  ${refs[at]!.padEnd(refWidth)}  ${r.title}${status}${where}`);
     }
-    // totalCount cannot say whether matches were cut (see Search), so a full page
-    // is taken to mean there may be more.
-    const wanted = limit === "" ? DEFAULT_LIMIT : Number(limit);
-    if (found.results.length >= wanted) {
+    if (more) {
       app.out.human(
         wanted < MAX_LIMIT
           ? `${found.results.length} shown; there may be more (--limit up to ${MAX_LIMIT})`
@@ -92,17 +95,20 @@ export const searchCommand = {
 // narrowing them), so the same workspace comes back many times and is kept once.
 // Those repeats take places in each workspace's page, so every workspace is asked
 // for the most the server returns rather than for --limit, which the server then
-// no longer checks; it is checked here instead.
-// ponytail: a workspace with more than 50 matches can still lose some that would rank in.
-const searchEverywhere = async (wanted: SearchQuery): Promise<Search> => {
-  const limit = wanted.limit === "" ? DEFAULT_LIMIT : Number(wanted.limit);
+// no longer checks; it is checked here instead. There may be more when the merge
+// had to be cut, or when a workspace's page came back full.
+// ponytail: repeats that fill a workspace's page of 50 still push out matches that would rank in; the hint then says there may be more.
+const searchEverywhere = async (wanted: SearchQuery, limit: number) => {
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
     throw new Error(`--limit must be a whole number from 1 to ${MAX_LIMIT}`);
   }
   const seen = new Set<string>();
   const merged: SearchResult[] = [];
+  let pageFull = false;
   for (const w of await listWorkspaces()) {
-    for (const r of (await search({ ...wanted, workspaceId: w.id, limit: String(MAX_LIMIT) })).results) {
+    const page = await search({ ...wanted, workspaceId: w.id, limit: String(MAX_LIMIT) });
+    pageFull ||= page.rows >= MAX_LIMIT;
+    for (const r of page.found.results) {
       const key = `${r.type} ${r.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -110,8 +116,10 @@ const searchEverywhere = async (wanted: SearchQuery): Promise<Search> => {
     }
   }
   merged.sort((a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  // totalCount counts the matches before the cut, as the server's does.
-  return { query: wanted.query, results: merged.slice(0, limit), totalCount: merged.length };
+  // totalCount counts the matches before the cut, each workspace's page capped
+  // at 50 as the server caps each type's.
+  const found = { query: wanted.query, results: merged.slice(0, limit), totalCount: merged.length };
+  return { found, more: pageFull || merged.length > limit };
 };
 
 // Where a match lives, written the way a task reference is: <project>#<number>

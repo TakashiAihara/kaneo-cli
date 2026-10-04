@@ -92,6 +92,8 @@ export type Scenario = {
   writesNotKept?: boolean;
   // The fake answers a comment post without the comment's id.
   commentReplyWithoutId?: boolean;
+  // The fake's OpenAPI document drifts from the pinned one in two request fields.
+  driftedSpec?: boolean;
   pageSize?: number;
   // A seed layered over SEED for this scenario alone, so one that needs a project
   // in the second workspace does not put it in every other scenario's goldens.
@@ -862,6 +864,7 @@ export const SCENARIOS: Scenario[] = [
   { name: "board keeps changing", pageSize: 2, growOnPage: 2, steps: [["task", "ls", "--all", "--json"]] },
 
   ...both("api-check", ["api-check"]),
+  ...both("api-check request drift", ["api-check"]).map((s): Scenario => ({ ...s, driftedSpec: true })),
 
   { name: "no api key", env: { KANEO_API_KEY: "" }, steps: [["whoami"], ["task", "ls"]] },
   { name: "wrong api key", env: { KANEO_API_KEY: "nope" }, steps: [["whoami", "--json"], ["task", "ls", "--json"]] },

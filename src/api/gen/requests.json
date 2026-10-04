@@ -1,0 +1,229 @@
+{
+  "archiveProject": {},
+  "attachLabelToTask": {
+    "body.taskId": true
+  },
+  "bulkUpdateTasks": {
+    "body.operation": true,
+    "body.taskIds": true,
+    "body.value": false
+  },
+  "clearAllNotifications": {},
+  "createActivity": {
+    "body.eventData": false,
+    "body.message": true,
+    "body.taskId": true,
+    "body.type": true
+  },
+  "createColumn": {
+    "body.color": false,
+    "body.icon": false,
+    "body.isFinal": false,
+    "body.name": true
+  },
+  "createLabel": {
+    "body.color": true,
+    "body.name": true,
+    "body.taskId": false,
+    "body.workspaceId": true
+  },
+  "createNotification": {
+    "body.eventData": false,
+    "body.message": false,
+    "body.relatedEntityId": false,
+    "body.relatedEntityType": false,
+    "body.title": false,
+    "body.type": true
+  },
+  "createProject": {
+    "body.icon": true,
+    "body.name": true,
+    "body.slug": true,
+    "body.workspaceId": true
+  },
+  "createTask": {
+    "body.customFields": false,
+    "body.description": true,
+    "body.dueDate": false,
+    "body.priority": true,
+    "body.startDate": false,
+    "body.status": true,
+    "body.title": true,
+    "body.userId": false
+  },
+  "createTaskComment": {
+    "body.content": true,
+    "body.externalSource": false,
+    "body.externalUserName": false
+  },
+  "createTaskRelation": {
+    "body.relationType": true,
+    "body.sourceTaskId": true,
+    "body.targetTaskId": true
+  },
+  "createTimeEntry": {
+    "body.description": false,
+    "body.endTime": false,
+    "body.startTime": true,
+    "body.taskId": true
+  },
+  "deleteColumn": {},
+  "deleteLabel": {},
+  "deleteNotificationPreferenceWorkspaceRule": {},
+  "deleteProject": {},
+  "deleteTask": {},
+  "deleteTaskComment": {},
+  "deleteTaskRelation": {},
+  "deleteWorkflowRule": {},
+  "detachLabelFromTask": {},
+  "exportTasks": {},
+  "getActivities": {},
+  "getColumns": {},
+  "getExternalLinksByTask": {},
+  "getInvitationDetails": {},
+  "getLabel": {},
+  "getNotificationPreferences": {},
+  "getProject": {},
+  "getTask": {},
+  "getTaskComments": {},
+  "getTaskLabels": {},
+  "getTaskRelations": {},
+  "getTaskTimeEntries": {},
+  "getTimeEntry": {},
+  "getWorkflowRules": {},
+  "getWorkspaceLabels": {},
+  "getWorkspaceMembers": {},
+  "globalSearch": {
+    "query.limit": false,
+    "query.projectId": false,
+    "query.q": true,
+    "query.type": false,
+    "query.userEmail": false,
+    "query.workspaceId": true
+  },
+  "importTasks": {
+    "body.tasks": true
+  },
+  "listNotifications": {},
+  "listOrganization": {},
+  "listProjects": {
+    "query.includeArchived": false,
+    "query.workspaceId": true
+  },
+  "listTasks": {
+    "query.assigneeId": false,
+    "query.dueAfter": false,
+    "query.dueBefore": false,
+    "query.limit": false,
+    "query.page": false,
+    "query.priority": false,
+    "query.relatedPage": false,
+    "query.sortBy": false,
+    "query.sortOrder": false,
+    "query.status": false
+  },
+  "markAllNotificationsAsRead": {},
+  "markNotificationAsRead": {},
+  "moveTask": {
+    "body.destinationProjectId": true,
+    "body.destinationStatus": false
+  },
+  "reorderColumns": {
+    "body.columns": true
+  },
+  "reorderProjects": {
+    "body.projects": true,
+    "query.workspaceId": true
+  },
+  "unarchiveProject": {},
+  "updateColumn": {
+    "body.color": false,
+    "body.icon": false,
+    "body.isFinal": false,
+    "body.name": false
+  },
+  "updateLabel": {
+    "body.color": true,
+    "body.name": true
+  },
+  "updateNotificationPreferences": {
+    "body.dueDateReminderEnabled": false,
+    "body.dueDateReminderLeadTimeMinutes": false,
+    "body.emailEnabled": false,
+    "body.gotifyEnabled": false,
+    "body.gotifyServerUrl": false,
+    "body.gotifyToken": false,
+    "body.ntfyEnabled": false,
+    "body.ntfyServerUrl": false,
+    "body.ntfyToken": false,
+    "body.ntfyTopic": false,
+    "body.taskAssignmentEnabled": false,
+    "body.taskCommentEnabled": false,
+    "body.taskStatusChangeEnabled": false,
+    "body.webhookEnabled": false,
+    "body.webhookSecret": false,
+    "body.webhookUrl": false
+  },
+  "updateOrganization": {
+    "body.data": true,
+    "body.organizationId": false
+  },
+  "updateProject": {
+    "body.description": true,
+    "body.icon": true,
+    "body.isPublic": true,
+    "body.name": true,
+    "body.slug": true
+  },
+  "updateTask": {
+    "body.description": false,
+    "body.dueDate": false,
+    "body.position": true,
+    "body.priority": true,
+    "body.projectId": true,
+    "body.startDate": false,
+    "body.status": true,
+    "body.title": true,
+    "body.userId": false
+  },
+  "updateTaskAssignee": {
+    "body.userId": true
+  },
+  "updateTaskComment": {
+    "body.content": true
+  },
+  "updateTaskDescription": {
+    "body.description": true
+  },
+  "updateTaskDueDate": {
+    "body.dueDate": false
+  },
+  "updateTaskPriority": {
+    "body.priority": true
+  },
+  "updateTaskStatus": {
+    "body.status": true
+  },
+  "updateTaskTitle": {
+    "body.title": true
+  },
+  "updateTimeEntry": {
+    "body.description": false,
+    "body.endTime": false,
+    "body.startTime": true
+  },
+  "upsertNotificationPreferenceWorkspaceRule": {
+    "body.emailEnabled": true,
+    "body.gotifyEnabled": true,
+    "body.isActive": true,
+    "body.ntfyEnabled": true,
+    "body.projectMode": true,
+    "body.selectedProjectIds": false,
+    "body.webhookEnabled": true
+  },
+  "upsertWorkflowRule": {
+    "body.columnId": true,
+    "body.eventType": true,
+    "body.integrationType": true
+  }
+}

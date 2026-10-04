@@ -340,7 +340,7 @@ Other ways to run it:
 
 Every push to `main` that passes CI is released as the next release candidate (`v0.2.0` → `v0.2.1-rc.1` → `v0.2.1-rc.2`), so the latest release and `install.sh` follow the newest commit on `main` that passed CI. A final version is cut by pushing its tag by hand, or by running the release workflow with that tag.
 
-`kaneo api-check` compares the operations this client calls against the server's OpenAPI document and exits non-zero if the server is missing one, so it works as a CI gate against a specific deployment.
+`kaneo api-check` compares the operations this client calls against the server's OpenAPI document and exits non-zero if the server is missing one, so it works as a CI gate against a specific deployment. It also compares the request side of each operation (query and header parameters and top-level body fields, with whether each is required) with the pinned document's, kept in `src/api/gen/requests.json` by `bun run generate`, and lists as `DRIFT` a field the server's document lacks, or one it requires that the pinned document leaves optional or does not have. Drift does not change the exit status: the pinned document is not exactly what the CLI sends, so each one is a lead to check. Servers before Kaneo 2.26 show some.
 
 ## Glossary
 

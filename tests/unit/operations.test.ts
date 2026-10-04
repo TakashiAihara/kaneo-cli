@@ -888,6 +888,7 @@ describe("TestWritesSendEveryField", () => {
     ["counts that do not add up", `{"results":{"total":2,"successful":1,"failed":0,"tasks":[{"success":true},{"success":true}]}}`],
     ["a total past what was sent", `{"results":{"total":3,"successful":2,"failed":0,"tasks":[{"success":true},{"success":true}]}}`],
     ["a short task list", `{"results":{"total":2,"successful":2,"failed":0,"tasks":[{"success":true}]}}`],
+    ["a count that hides a failure", `{"results":{"total":2,"successful":2,"failed":0,"tasks":[{"success":true},{"success":false}]}}`],
   ])("import with %s", async (_, reply) => {
     recorder(reply);
     const err = String(await failure(api.importProjectTasks("p1", [{ title: "a", status: "x" }, { title: "b", status: "x" }])));

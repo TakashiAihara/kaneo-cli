@@ -1169,7 +1169,10 @@ export type ImportResult = { total: number; successful: number; failed: number; 
 //
 // The summary is checked against what was sent: a reply that accounts for fewer
 // tasks than the request carried (none at all, or a truncated list) would
-// otherwise read as an import that went through.
+// otherwise read as an import that went through. Its success count is checked
+// against the outcomes too, since the command fails on the count: a failed
+// outcome the count leaves out would be printed and still exit 0. With the
+// lengths equal, that also fixes the failure count.
 export const importProjectTasks = async (projectId: string, tasks: ImportedTask[]): Promise<ImportResult> => {
   const summary = zeroRecord(zeroRecord(await postImport(pathParam(projectId), { tasks })).results);
   const result: ImportResult = {
@@ -1181,7 +1184,8 @@ export const importProjectTasks = async (projectId: string, tasks: ImportedTask[
   if (
     result.total !== tasks.length ||
     result.successful + result.failed !== tasks.length ||
-    result.tasks.length !== tasks.length
+    result.tasks.length !== tasks.length ||
+    result.successful !== result.tasks.filter((t) => t.success).length
   ) {
     throw new Error(
       `/task/import/${projectId}: sent ${tasks.length} task(s), server reported ${result.total} (${result.successful} imported, ${result.failed} failed)`,

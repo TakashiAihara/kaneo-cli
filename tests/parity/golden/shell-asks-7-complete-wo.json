@@ -6,7 +6,7 @@
         "--wo"
       ],
       "exit": 0,
-      "stdout": "--workspace\tworkspace id (env KANEO_WORKSPACE)\n:4\n",
+      "stdout": "--workspace\tworkspace id, slug or name (env KANEO_WORKSPACE)\n:4\n",
       "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
     }
   ],

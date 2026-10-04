@@ -1,6 +1,7 @@
 import { apiKey, projects, type App } from "./app";
 import { archived, boardTasks, getBoard, getProject, listComments, type Task } from "../api/kaneo";
 import { noArgs, type RunContext } from "./args";
+import { withProject } from "./lookup";
 import { latestPerSession, parse, running } from "../session/marker";
 
 // One session's record on a task, as the board reports it. nextStep is left out
@@ -61,14 +62,14 @@ export const boardCommand = {
         // point of archiving it.
         let open;
         try {
-          open = await getProject(id);
+          open = await withProject(app, id, (projectId) => getProject(projectId));
         } catch (e) {
           throw new Error(`project ${id}: ${(e as Error).message}`);
         }
         if (archived(open)) continue;
       }
       try {
-        reports.push(await buildBoard(id));
+        reports.push(await withProject(app, id, (projectId) => buildBoard(projectId)));
       } catch (e) {
         // A board with one project missing reads, to a caller, as that project
         // having nothing on it (#16).

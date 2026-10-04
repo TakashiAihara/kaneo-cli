@@ -1,0 +1,61 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "ls",
+        "-w",
+        "other",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "ls",
+        "-w",
+        "Main",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha\nproj-beta  Beta\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=Main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

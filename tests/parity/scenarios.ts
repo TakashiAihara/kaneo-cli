@@ -53,6 +53,9 @@ export type Scenario = {
   // The fake answers matching "METHOD path" requests with whitespace only.
   whitespaceOn?: string;
   pageSize?: number;
+  // A seed layered over SEED for this scenario alone, so one that needs a project
+  // in the second workspace does not put it in every other scenario's goldens.
+  seed?: Partial<Seed>;
 };
 
 const both = (name: string, args: string[]): Scenario[] => [
@@ -304,5 +307,37 @@ export const SCENARIOS: Scenario[] = [
     env: { KANEO_SESSION_ID: "sess-hook" },
     config: { hooks: { attach: 'echo "hook says no" >&2; exit 3' } },
     steps: [["session", "attach", "1", "--strict"]],
+  },
+
+  // The settings take a project's id, a slug or a name, and a value the server
+  // does not know is looked up across the workspaces the key can reach.
+  { name: "project by slug", steps: [["task", "ls", "-p", "BET", "--json"], ["task", "create", "x", "-p", "bet", "--human"], ["project", "get", "ALP", "--human"]] },
+  { name: "project by name", steps: [["task", "ls", "-p", "Beta", "--human"]] },
+  { name: "project not found", steps: [["task", "ls", "-p", "nope", "--json"]] },
+  { name: "task reference with a slug", steps: [["task", "get", "BET#1", "--json"], ["comment", "add", "ALP#2", "hi", "--human"]] },
+  { name: "workspace by slug and name", steps: [["project", "ls", "-w", "other", "--json"], ["project", "ls", "-w", "Main", "--human"]] },
+  { name: "workspace not found", steps: [["project", "ls", "-w", "nope", "--json"]] },
+  { name: "task lookup error names the project", steps: [["task", "get", "99", "--json"]] },
+  {
+    // The same failure with the project named by a .kaneo.json rather than the
+    // environment, so the origin the message reports is the other layer's.
+    name: "task lookup error names the project from a local config",
+    env: { KANEO_PROJECT: "" },
+    local: { project: P2 },
+    steps: [["task", "get", "99", "--human"]],
+  },
+  {
+    // One project in the second workspace, so a listing across workspaces has
+    // something there to show and `find` has somewhere else to look.
+    name: "project list across workspaces",
+    seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
+    steps: [["project", "ls", "-A", "--json"], ["project", "ls", "--all-workspaces", "--archived", "--human"]],
+  },
+  {
+    // A second match in the second workspace, so the search reaching outside the
+    // workspace the settings name is what the output shows.
+    name: "project find",
+    seed: { projects: [...SEED.projects, { id: "proj-beacon", workspaceId: "ws-other", name: "Beacon", slug: "BCN" }] },
+    steps: [["project", "find", "be", "--json"], ["project", "find", "OLD", "--human"], ["project", "find", "zzz", "--json"]],
   },
 ];

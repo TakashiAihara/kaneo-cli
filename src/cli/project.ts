@@ -10,6 +10,7 @@ import {
   type ProjectChanges,
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
+import { allProjects, withProject, withWorkspace, type ProjectIn } from "./lookup";
 
 // `archive` and `unarchive` are the same request with the opposite verb, so they
 // are built from one place rather than written out twice.
@@ -29,12 +30,29 @@ const archiveCommand = (verb: "archive" | "unarchive") => {
     run: async ({ args, app }: { args: string[]; app: App }) => {
       apiKey(app);
       const id = args[0] ?? project(app);
-      await setProjectArchived(id, archived);
+      await withProject(app, id, (projectId) => setProjectArchived(projectId, archived));
       app.out.human(`${archived ? "archived" : "unarchived"} ${id}`);
       app.out.data({ archived, project: id });
     },
   };
 };
+
+// One project, named the way a listing prints it.
+//
+// Across workspaces a project is only unique inside its own, so the slug and the
+// workspace it is in are what tell two of them apart; inside one workspace the
+// name already says enough and the line stays as it was.
+const projectLine = (project: Project, workspaceName = ""): string => {
+  const columns = [project.id, project.name];
+  if (workspaceName !== "") columns.push(`[${project.slug}]`, `(${workspaceName})`);
+  if (archived(project)) columns.push("(archived)");
+  return columns.join("  ");
+};
+
+// A project as the JSON report carries it when it came from more than one
+// workspace: the same fields as a single-workspace listing, plus the workspace it
+// belongs to at the end, where a reader looking for it will look last.
+const named = ({ project, workspaceName }: ProjectIn) => ({ ...project, workspaceName });
 
 // The projects in a workspace, and the changes to one of them.
 export const projectCommand = {
@@ -54,21 +72,48 @@ export const projectCommand = {
           usage: "include archived projects, so one can be found again to unarchive",
           defaultValue: "false",
         },
+        {
+          name: "all-workspaces",
+          shorthand: "A",
+          type: "bool" as const,
+          usage: "list every workspace the key can reach, naming the workspace each project is in",
+          defaultValue: "false",
+        },
       ],
       run: async ({ flags, app }: { flags: FlagValues; app: App }) => {
         apiKey(app);
-        const projects: Project[] = await listProjectsIn(
-          workspace(app),
-          flags.archived === true,
+        const includeArchived = flags.archived === true;
+        const acrossAll = flags["all-workspaces"] === true;
+        // One list either way. Only whether a workspace is part of each entry
+        // differs, and it can only be named when the listing covers more than one.
+        const found = acrossAll
+          ? await allProjects(app, includeArchived)
+          : (await withWorkspace(app, workspace(app), (id) => listProjectsIn(id, includeArchived))).map(
+              (project) => ({ project, workspaceName: "" }),
+            );
+        for (const { project, workspaceName } of found) app.out.human(projectLine(project, workspaceName));
+        app.out.data(acrossAll ? found.map(named) : found.map((entry) => entry.project));
+      },
+    },
+    {
+      name: "find",
+      use: "find <text>",
+      short: "Find projects by name or slug, in every workspace",
+      // Substring rather than an exact match, because what is being searched for
+      // is half-remembered: `find be` has to reach `Beta`. Archived projects are
+      // included, since one that has been archived is exactly the one somebody is
+      // most often looking for.
+      args: exactArgs(1),
+      run: async ({ args, app }: { args: string[]; app: App }) => {
+        apiKey(app);
+        const wanted = args[0]!.toLowerCase();
+        const found = (await allProjects(app, true)).filter(
+          (p) =>
+            p.project.name.toLowerCase().includes(wanted) || p.project.slug.toLowerCase().includes(wanted),
         );
-        for (const project of projects) {
-          app.out.human(
-            archived(project)
-              ? `${project.id}  ${project.name}  (archived)`
-              : `${project.id}  ${project.name}`,
-          );
-        }
-        app.out.data(projects);
+        if (found.length === 0) throw new Error(`no project matches ${JSON.stringify(args[0])}`);
+        for (const { project, workspaceName } of found) app.out.human(projectLine(project, workspaceName));
+        app.out.data(found.map(named));
       },
     },
     {
@@ -80,7 +125,7 @@ export const projectCommand = {
       args: maximumArgs(1),
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
-        const found = await getProject(args[0] ?? project(app));
+        const found = await withProject(app, args[0] ?? project(app), (id) => getProject(id));
         app.out.human(`${found.id}  ${found.name}`);
         if (found.description !== "") app.out.human(found.description);
         app.out.data(found);
@@ -100,13 +145,15 @@ export const projectCommand = {
       ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const created = await createProject({
+        const wanted = {
           name: args.join(" "),
-          workspaceId: workspace(app),
           icon: String(flags.icon ?? ""),
           slug: String(flags.slug ?? ""),
           description: String(flags.description ?? ""),
-        });
+        };
+        const created = await withWorkspace(app, workspace(app), (workspaceId) =>
+          createProject({ ...wanted, workspaceId }),
+        );
         app.out.human(`created ${created.id}  ${created.name}`);
         app.out.data(created);
       },
@@ -148,7 +195,10 @@ export const projectCommand = {
         }
 
         apiKey(app);
-        const { before, after } = await updateProject(args[0]!, changes);
+        // The read of the project comes first inside updateProject, so a value the
+        // server does not know is retried before anything is written rather than
+        // after.
+        const { before, after } = await withProject(app, args[0]!, (id) => updateProject(id, changes));
         app.out.human(`updated ${after.id}`);
         for (const [field, from, to] of [
           ["name", before.name, after.name],

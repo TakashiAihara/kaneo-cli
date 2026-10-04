@@ -46,6 +46,12 @@ A link between two tasks: `subtask`, `blocks` or `related`. For a subtask link t
 
 ## This CLI's concepts
 
+### task reference
+
+What a task is named by on a command line: a task id, a number with or without a leading `#`, or `<project-slug>#<number>`.
+
+The last form names a board as well as a number, which is why it is the form a task reference is written in everywhere else — `KANEO_TASK_REF` and the `kaneo <project slug>#<number>` a session hook receives. The part before the `#` is resolved as a project by id, slug or name, so a reference copied out of another tool works unchanged.
+
 ### operation
 
 One server endpoint this client knows how to call, declared in the registry in `src/api/registry.ts` as an `operationId`, method, path template and the command that needs it.
@@ -117,6 +123,7 @@ It covers failures that changed nothing: an unreachable server, a missing key, n
 | Not the same | Difference |
 | --- | --- |
 | task `number` and task `id` | The number is per-project and human-facing; the id is opaque and what the API takes. Sending a number as an id makes the server answer `400 Workspace ID could not be determined`, which names neither |
+| a project's `id`, `slug` and `name` | Three names for one board. The API takes the id, so the other two are resolved to it by looking the value up across the workspaces the key can see, and only once the server has said it does not know it — a value that works as an id costs no extra request |
 | workspace and project | A workspace holds projects. `repos` maps a repo to a *project*; the workspace follows from it |
 | reading a board and writing to one | `board` reads, so it can cover several projects at once. Everything else writes, and a write has to name the board it lands on — so a repository mapped to several projects makes those commands ask for `--project` rather than pick |
 | status and column | The same string. A status *is* a column id |

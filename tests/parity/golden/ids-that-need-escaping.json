@@ -30,8 +30,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/project/p/q: 404: Project not found\"\n}\n",
-      "stderr": "Error: GET /api/project/p/q: 404: Project not found\n"
+      "stdout": "{\n  \"error\": \"GET /api/project/p/q: 404: Project not found: no project has the id, slug or name \\\"p/q\\\" (kaneo project find \\u003ctext\\u003e searches by name)\"\n}\n",
+      "stderr": "Error: GET /api/project/p/q: 404: Project not found: no project has the id, slug or name \"p/q\" (kaneo project find <text> searches by name)\n"
     }
   ],
   "requests": [
@@ -49,6 +49,21 @@
       "method": "GET",
       "path": "/project/p%2Fq",
       "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
     }
   ],
   "files": {}

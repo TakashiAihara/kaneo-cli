@@ -244,12 +244,22 @@ export const SCENARIOS: Scenario[] = [
     steps: [["context", "--repo", "acme/thing", "--json"]],
   },
   {
+    name: "context --repo under KANEO_PROJECT",
+    config: { owners: { acme: "ws-acme" }, repos: { "acme/thing": ["proj-x"] } },
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "proj-env" },
+    steps: [
+      ["context", "--repo", "acme/thing", "--json"],
+      ["context", "--repo", " acme/thing/ ", "--json"],
+    ],
+  },
+  {
     name: "context --repo that is not a repo",
     steps: [
       ["context", "--repo", "just-a-name", "--json"],
       ["context", "--repo", "a/b/c", "--json"],
       ["context", "--repo", "", "--json"],
       ["context", "--repo", "../x", "--json"],
+      ["context", "--repo", "a@b/c", "--json"],
       ["context", "--repo", "github.com:acme/thing", "--json"],
     ],
   },

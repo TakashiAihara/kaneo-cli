@@ -48,6 +48,17 @@
       "args": [
         "context",
         "--repo",
+        "a@b/c",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--repo wants owner/name or a git remote URL, got \\\"a@b/c\\\"\"\n}\n",
+      "stderr": "Error: --repo wants owner/name or a git remote URL, got \"a@b/c\"\n"
+    },
+    {
+      "args": [
+        "context",
+        "--repo",
         "github.com:acme/thing",
         "--json"
       ],

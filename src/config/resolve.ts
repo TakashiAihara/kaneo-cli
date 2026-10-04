@@ -134,15 +134,15 @@ export const resolveFromEnvironment = (flags: Flags): { cfg: Resolved; global: G
 // The same chain for a repository the caller named instead of one read from a
 // working copy, and with the .kaneo.json layer left out.
 //
-// The file belongs to the directory the caller is standing in, and naming
+// The walk starts from the directory the caller is standing in, and naming
 // another repository is saying that directory is not the point. Flags, the
 // environment and the active profile still sit above the maps, and the origins
 // say which layer answered: a caller asking what the maps hold reads
-// origin.project == "repo-map", and a profile with project_id set answers in
-// their place however the environment is set.
+// origin.project == "repo-map", and with the environment emptied a profile with
+// project_id set still answers in their place.
 //
-// Nor is this what a checkout of that repository resolves to: a .kaneo.json
-// committed there would win, and without the checkout it cannot be read.
+// Nor is this what a checkout of that repository resolves to: there the
+// .kaneo.json files from the checkout up to home would apply.
 export const resolveForRepo = (flags: Flags, global: GlobalConfig, repo: string): Resolved => {
   const env = (name: string): string => process.env[name] ?? "";
   return resolve({ flags, env, dir: null, home: "", global, repo });

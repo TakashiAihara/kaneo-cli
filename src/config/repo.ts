@@ -21,24 +21,22 @@ export const parseRemote = (remote: string): string => {
   return "";
 };
 
-// GitHub's own charset, so a value that could only be a typo (`../x`,
-// `host:owner/name` without a user, `a@b/c`) is refused rather than looked up
-// and reported as not registered, which reads as an answer.
-const OWNER_REPO = /^([A-Za-z0-9_-][A-Za-z0-9._-]*)\/([A-Za-z0-9._-]+?)(?:\.git)?$/;
+// Close to GitHub's charset, so a value that names no repository (`../x`,
+// `a@b/c`) is refused rather than looked up and reported as not registered,
+// which reads as an answer. A scp-style remote without a user (`host:owner/name`)
+// is refused for the same reason parseRemote refuses it: nothing tells it apart
+// from a host alias the maps know nothing about.
+const OWNER_REPO = /^([A-Za-z0-9_-][A-Za-z0-9._-]*)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/;
 
 // The owner/repo a caller named, or "" when the value names no repository.
 //
 // Both spellings are taken because the maps are keyed by one and a person has
 // the other in front of them: `git remote get-url` prints a URL, and pasting
 // that back in should not have to be edited down to it first.
-//
-// The remotes are read first, since a scp-style one holds a slash as well and
-// would otherwise pass for an owner and a repository named after a host and a
-// path.
 export const parseRepo = (value: string): string => {
   const remote = parseRemote(value);
   if (remote !== "") return remote;
-  const match = OWNER_REPO.exec(value);
+  const match = OWNER_REPO.exec(value.trim());
   return match === null ? "" : `${match[1]}/${match[2]}`;
 };
 

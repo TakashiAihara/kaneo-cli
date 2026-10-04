@@ -1,6 +1,6 @@
 # Manual check against a real Kaneo
 
-The parity suite runs against a fake that follows the v2.29.2 document. This check runs the built binary against a real server, which may be older or newer than the document. Everything below is copy-paste once `KANEO_API_KEY` (a key for a user in the test workspace) and `KANEO_WORKSPACE` (the workspace id to test in) are exported.
+The parity suite runs against a fake that follows the pinned document (`openapi/spec.ts`). This check runs the built binary against a real server, which may be older or newer than the document. Everything below is copy-paste once `KANEO_API_KEY` (a key for a user in the test workspace) and `KANEO_WORKSPACE` (the workspace id to test in) are exported.
 
 ## Setup
 

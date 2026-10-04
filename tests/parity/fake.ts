@@ -4,7 +4,10 @@ import { SPEC_PATH } from "../../openapi/spec";
 import { readFileSync } from "node:fs";
 
 // An in-memory Kaneo that answers the operations in src/api/registry.ts the
-// way a v2.29.2 server does. Every response is parsed with the generated zod
+// way the pinned release's server does. Behaviour checked against a release
+// is named with it below (most of it against v2.29.2, before the pin moved to
+// 2.32.0); 2.32.0 changes are followed only where the generated schema
+// requires it. Every response is parsed with the generated zod
 // schema before it is sent, so the fake cannot drift from the document the
 // client is generated from. Ids and timestamps are deterministic, so two runs
 // of the same scenario (the Go reference and the TS build) see the same bytes.

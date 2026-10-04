@@ -1,0 +1,20 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "add",
+        "1",
+        "hi",
+        "--file",
+        "c.md",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"pass the comment as arguments or with --file, not both\"\n}\n",
+      "stderr": "Error: pass the comment as arguments or with --file, not both\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

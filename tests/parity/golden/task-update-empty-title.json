@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--title",
+        " ",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty --title\"\n}\n",
+      "stderr": "Error: empty --title\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

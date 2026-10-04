@@ -1,0 +1,53 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "add",
+        "1",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"cmt0002\",\n  \"content\": \"multi\\nline $comment\\n\",\n  \"userId\": \"user-self\",\n  \"userName\": \"\",\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
+        "ls",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"cmt0001\",\n    \"content\": \"first comment\",\n    \"userId\": \"user-self\",\n    \"userName\": \"Self\",\n    \"createdAt\": \"2026-01-01T00:00:08.000Z\"\n  },\n  {\n    \"id\": \"cmt0002\",\n    \"content\": \"multi\\nline $comment\\n\",\n    \"userId\": \"user-self\",\n    \"userName\": \"Self\",\n    \"createdAt\": \"2026-01-01T00:00:10.000Z\"\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "multi\nline $comment\n"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

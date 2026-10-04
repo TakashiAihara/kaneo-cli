@@ -1,0 +1,38 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--priority",
+        "low",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"priority was updated; reading the task back failed: GET /api/task/task-a1: 500: injected failure\"\n}\n",
+      "stderr": "Error: priority was updated; reading the task back failed: GET /api/task/task-a1: 500: injected failure\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/priority/task-a1",
+      "query": "",
+      "body": {
+        "priority": "low"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

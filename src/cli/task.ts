@@ -15,14 +15,17 @@ import {
   projectTasks,
   RELATION_TYPES,
   setTaskAssignee,
+  setTaskDescription,
   setTaskPriority,
   setTaskStatus,
   taskSummary,
   type NewTask,
   type Relation,
+  setTaskTitle,
   type Task,
 } from "../api/kaneo";
-import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues } from "./args";
+import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunContext } from "./args";
+import { readInput, sourceName } from "./input";
 import { withProject } from "./lookup";
 
 export const taskCommand = {
@@ -96,7 +99,19 @@ export const taskCommand = {
       // not three.
       args: minimumArgs(1),
       flags: [
-        { name: "description", shorthand: "d", type: "string" as const, usage: "task description", defaultValue: "" },
+        {
+          name: "description",
+          shorthand: "d",
+          type: "string" as const,
+          usage: "task description; - reads stdin",
+          defaultValue: "",
+        },
+        {
+          name: "description-file",
+          type: "string" as const,
+          usage: "read the description from a file; - reads stdin",
+          defaultValue: "",
+        },
         {
           name: "priority",
           type: "string" as const,
@@ -112,11 +127,11 @@ export const taskCommand = {
         { name: "due-date", type: "string" as const, usage: "due date", defaultValue: "" },
         { name: "assignee", type: "string" as const, usage: "user id to assign", defaultValue: "" },
       ],
-      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
+      run: async ({ args, flags, changed, app }: RunContext<App>) => {
         apiKey(app);
         const wanted: NewTask = {
           title: args.join(" "),
-          description: String(flags.description ?? ""),
+          description: await descriptionOf(flags, changed),
           priority: String(flags.priority ?? ""),
           status: String(flags.status ?? ""),
           dueDate: String(flags["due-date"] ?? ""),
@@ -125,6 +140,123 @@ export const taskCommand = {
         const task = await withProject(app, project(app), (id) => createTask(id, wanted));
         app.out.human(`created #${task.number} ${task.title}`);
         app.out.data(task);
+      },
+    },
+    {
+      name: "update",
+      aliases: ["edit"],
+      use: "update <task>",
+      short: "Change a task's title, description, status or priority; the rest is kept",
+      args: exactArgs(1),
+      flags: [
+        { name: "title", type: "string" as const, usage: "new title", defaultValue: "" },
+        {
+          name: "description",
+          shorthand: "d",
+          type: "string" as const,
+          usage: "new description; - reads stdin, empty clears it",
+          defaultValue: "",
+        },
+        {
+          name: "description-file",
+          type: "string" as const,
+          usage: "read the new description from a file; - reads stdin",
+          defaultValue: "",
+        },
+        { name: "status", type: "string" as const, usage: "column id to move the task to", defaultValue: "" },
+        {
+          name: "priority",
+          type: "string" as const,
+          usage: `one of: ${PRIORITIES.join(", ")}`,
+          defaultValue: "",
+        },
+      ],
+      run: async ({ args, flags, changed, app }: RunContext<App>) => {
+        // Only a flag that was passed is a change: `-d ""` clears the description
+        // and leaving the flag out has to keep it.
+        const pass = (name: string) => changed.has(name);
+        const wantsDescription = pass("description") || pass("description-file");
+        if (!pass("title") && !wantsDescription && !pass("priority") && !pass("status")) {
+          throw new Error(
+            "nothing to update: pass --title, --description, --description-file, --status or --priority",
+          );
+        }
+
+        // What can be judged here is judged before the first write, so an
+        // invocation that cannot be carried out leaves the task as it was. A
+        // status is the one field the CLI cannot judge: only the server knows
+        // which columns the project has, so it is written first and a column the
+        // project does not have stops the rest of the change from landing.
+        const title = pass("title") ? wantedTitle(String(flags.title ?? "")) : undefined;
+        const status = pass("status") ? wantedStatus(String(flags.status ?? "").trim()) : undefined;
+        const description = wantsDescription ? await descriptionOf(flags, changed) : undefined;
+        const priority = pass("priority") ? knownPriority(String(flags.priority ?? "").trim()) : undefined;
+
+        apiKey(app);
+        const task = await resolveTask(app, args[0]!);
+
+        // Each field is written by its own endpoint rather than by PUT
+        // /task/{id}, which requires title, priority, status, projectId and
+        // position: sending them means reading the task first and writing those
+        // values back, and a change made elsewhere in between would be
+        // overwritten. The per-field endpoints also keep the activity row the
+        // server writes for the field that changed.
+        const wrote: string[] = [];
+        const landed = () => `${names(wrote)} ${wrote.length === 1 ? "was" : "were"} updated`;
+        const write = async (field: string, put: () => Promise<void>): Promise<void> => {
+          try {
+            await put();
+          } catch (e) {
+            // The first write failing means nothing landed, so its own error is
+            // the whole story. After one that succeeded, the failure has to say
+            // what did land or the task is left half changed with no word.
+            if (wrote.length === 0) throw e;
+            throw new Error(`${landed()}; ${field} failed: ${e instanceof Error ? e.message : String(e)}`);
+          }
+          wrote.push(field);
+        };
+        if (status !== undefined) await write("status", () => setTaskStatus(task.id, status));
+        if (title !== undefined) await write("title", () => setTaskTitle(task.id, title));
+        if (description !== undefined) await write("description", () => setTaskDescription(task.id, description));
+        if (priority !== undefined) await write("priority", () => setTaskPriority(task.id, priority));
+
+        // Read the task back by id rather than by the number it was given as: the
+        // board listing leaves a task out of every column once it has been
+        // archived or only planned, and it leaves a description over 64 KiB out,
+        // so a read that went by the board would call this command's own write a
+        // mismatch for a task it just moved.
+        //
+        // Every field written is checked against what was sent, since a write the
+        // server did not store is not an update. The fields not written are ones
+        // this command never read and so cannot judge.
+        let after: Task;
+        try {
+          after = await getTask(task.id);
+        } catch (e) {
+          throw new Error(
+            `${landed()}; reading the task back failed: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+        for (const [field, sent] of [
+          ["title", title],
+          ["description", description],
+          ["priority", priority],
+          ["status", status],
+        ] as const) {
+          if (sent === undefined || after[field] === sent) continue;
+          // A description is reported by its length alone: printing one that did
+          // not land fills a terminal with text nobody can read to the end of.
+          throw new Error(
+            `${landed()}, but task #${after.number} ${
+              field === "description"
+                ? `description reads back differently from the one that was sent (${after.description.length} characters read, ${sent.length} sent)`
+                : `${field} reads back as ${JSON.stringify(after[field])}, not ${JSON.stringify(sent)}`
+            }`,
+          );
+        }
+        // The labels come from the task resolved above, since only the board
+        // listing carries them and this report is shaped as `task get` shapes it.
+        showTask({ ...after, labels: task.labels }, app);
       },
     },
     {
@@ -154,14 +286,7 @@ export const taskCommand = {
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
-        const priority = args[1]!.trim();
-        // Refused here rather than sent: the server's list of priorities is
-        // fixed, and this command has nothing else to do with the answer.
-        if (priorityRank(priority) === PRIORITIES.length) {
-          throw new Error(
-            `unknown priority ${JSON.stringify(priority)}; use one of: ${PRIORITIES.join(", ")}`,
-          );
-        }
+        const priority = knownPriority(args[1]!.trim());
         await setTaskPriority(task.id, priority);
         app.out.human(`#${task.number} priority ${priority}`);
         app.out.data({ id: task.id, number: task.number, priority });
@@ -456,6 +581,80 @@ const withDescription = async (task: Task): Promise<Task> =>
 // that merely starts with digits stays a task id.
 const asNumber = (text: string): number | undefined =>
   /^[+-]?\d+$/.test(text) ? Number.parseInt(text, 10) : undefined;
+
+// A priority the server accepts, checked where it was typed.
+//
+// Refused rather than sent: the list of priorities is fixed, and a command that
+// only names one has nothing to do with the server's answer but fail.
+const knownPriority = (priority: string): string => {
+  if (priorityRank(priority) === PRIORITIES.length) {
+    throw new Error(`unknown priority ${JSON.stringify(priority)}; use one of: ${PRIORITIES.join(", ")}`);
+  }
+  return priority;
+};
+
+// A title as it was typed, refused only when it holds nothing to read. The
+// server takes whitespace, and a task whose title is one space is a task nobody
+// can pick out of a board listing.
+const wantedTitle = (title: string): string => {
+  if (title.trim() === "") throw new Error("empty --title");
+  return title;
+};
+
+// A status with a column in it. Which column that is has to be asked of the
+// server, and its answer names the columns the project has; what can be refused
+// here is the empty value, which would move the task nowhere.
+const wantedStatus = (status: string): string => {
+  if (status === "") throw new Error("empty --status");
+  return status;
+};
+
+// Fields named as one English list, so a sentence reporting several of them
+// reads as one sentence: "status and title were updated".
+const names = (fields: string[]): string =>
+  fields.length === 1 ? fields[0]! : `${fields.slice(0, -1).join(", ")} and ${fields[fields.length - 1]}`;
+
+// The description a command line asked for: as it was typed, or from a file or
+// stdin, which is how a long one is passed without a shell holding it.
+//
+// Two sources at once is a contradiction rather than a choice between them, so
+// it is refused rather than one of them quietly winning.
+//
+// Text that was read and turned out to be nothing but whitespace is refused as
+// well: `-d ""` is how a description is cleared, so a pipe or a file that
+// carried nothing is far more likely to be a mistake than a request to clear
+// the description. A description typed on the command line is taken as typed,
+// whitespace and all, since nothing went missing on the way to it.
+const descriptionOf = async (flags: FlagValues, changed: ReadonlySet<string>): Promise<string> => {
+  const typed = changed.has("description");
+  const fromFile = changed.has("description-file");
+  if (typed && fromFile) throw new Error("pass --description or --description-file, not both");
+
+  let source: string | undefined;
+  if (fromFile) source = String(flags["description-file"] ?? "");
+  else if (typed && String(flags.description ?? "") === "-") source = "-";
+  if (source === undefined) return String(flags.description ?? "");
+
+  const read = await readInput(source);
+  if (read.trim() === "") {
+    throw new Error(`empty description from ${sourceName(source)}; pass -d "" for an empty description`);
+  }
+  return read;
+};
+
+// The task `task update` just wrote, in the lines `task get` opens with. Its
+// relations are left out: the update did not touch them, and reading them is a
+// request of its own.
+const showTask = (task: Task, app: App): void => {
+  app.out.human(`#${task.number}  ${task.title}`);
+  app.out.human(`status    ${task.status}`);
+  app.out.human(`priority  ${task.priority}`);
+  if (task.description !== "") {
+    app.out.human("");
+    app.out.human(task.description);
+  }
+  app.out.data(task);
+};
 
 // The statuses the listing leaves out unless they are asked for by name:
 // finished and filed-away work accumulates without bound. A --status naming one

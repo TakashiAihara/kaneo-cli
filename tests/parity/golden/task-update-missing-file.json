@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--description-file",
+        "nope.md",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"reading nope.md: ENOENT: no such file or directory, open 'nope.md'\"\n}\n",
+      "stderr": "Error: reading nope.md: ENOENT: no such file or directory, open 'nope.md'\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

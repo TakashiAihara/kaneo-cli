@@ -1,0 +1,43 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--status",
+        "done",
+        "--title",
+        "x",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"status was updated; title failed: PUT /api/task/title/task-a1: 500: injected failure\"\n}\n",
+      "stderr": "Error: status was updated; title failed: PUT /api/task/title/task-a1: 500: injected failure\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/status/task-a1",
+      "query": "",
+      "body": {
+        "status": "done"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/task/title/task-a1",
+      "query": "",
+      "body": {
+        "title": "x"
+      }
+    }
+  ],
+  "files": {}
+}

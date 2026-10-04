@@ -1,0 +1,38 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--title",
+        "x",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"title was updated, but task #1 title reads back as \\\"x (altered)\\\", not \\\"x\\\"\"\n}\n",
+      "stderr": "Error: title was updated, but task #1 title reads back as \"x (altered)\", not \"x\"\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/title/task-a1",
+      "query": "",
+      "body": {
+        "title": "x"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

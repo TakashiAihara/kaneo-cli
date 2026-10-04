@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--description-file",
+        "e.md",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty description from e.md; pass -d \\\"\\\" for an empty description\"\n}\n",
+      "stderr": "Error: empty description from e.md; pass -d \"\" for an empty description\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

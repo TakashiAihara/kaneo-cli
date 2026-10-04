@@ -64,6 +64,13 @@ export type FakeOptions = {
   // Answers the listing without applying status or priority, so what the CLI
   // prints is seen not to rest on the server having filtered.
   ignoreFilters?: boolean;
+  // Answers a request whose "METHOD path" matches with a 500, having changed
+  // nothing, for a write that is refused or a read that fails.
+  failOn?: string;
+  // Answers a matching PUT with the ordinary 200 while storing its title or
+  // description with " (altered)" appended, so a client that reads the task
+  // back finds something other than what it sent.
+  misstoreOn?: string;
 };
 
 export function startFake(seed: Seed, opts: FakeOptions = {}) {
@@ -318,6 +325,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         }
       : null;
 
+  const failing = opts.failOn ? new RegExp(opts.failOn) : undefined;
+  const misstoring = opts.misstoreOn ? new RegExp(opts.misstoreOn) : undefined;
+
   const route = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/api/, "");
@@ -326,6 +336,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (!url.pathname.startsWith("/api/")) return new Response("<html>app</html>", { headers: { "content-type": "text/html" } });
     if (req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
+    if (failing?.test(`${req.method} ${path}`)) return fail(500, "injected failure");
 
     // The server validates request bodies against the same schemas the
     // document declares, and answers 400 with the first issue.
@@ -341,6 +352,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["PUT", /^\/task\/priority\/[^/]+$/, M.UpdateTaskPriorityBody],
       ["PUT", /^\/task\/assignee\/[^/]+$/, M.UpdateTaskAssigneeBody],
       ["PUT", /^\/task\/move\/[^/]+$/, M.MoveTaskBody],
+      ["PUT", /^\/task\/title\/[^/]+$/, M.UpdateTaskTitleBody],
+      ["PUT", /^\/task\/description\/[^/]+$/, M.UpdateTaskDescriptionBody],
       ["POST", /^\/task-relation$/, M.CreateTaskRelationBody],
       ["POST", /^\/comment\/[^/]+$/, M.CreateTaskCommentBody],
       ["POST", /^\/notification$/, M.CreateNotificationBody],
@@ -496,12 +509,26 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (!proj) return failText(400, "Workspace ID could not be determined");
       return ok(M.Task, addTask(proj.id, body as any));
     }
-    if ((p = m(/^\/task\/(status|priority|assignee|move)\/([^/]+)$/)) && req.method === "PUT") {
+    if ((p = m(/^\/task\/(status|priority|assignee|move|title|description)\/([^/]+)$/)) && req.method === "PUT") {
       const t = tasks.find((x) => x.id === decodeURIComponent(p![2]));
       if (!t) return fail(404, "Task not found");
       const b = body as any;
-      if (p[1] === "status") t.status = b.status;
+      if (p[1] === "status") {
+        // The only write the server judges against the project rather than
+        // against a fixed list: a column is the project's own, and the two
+        // virtual statuses a task can hold are valid beside them. The 400 names
+        // them all, the way apps/api/src/task/validate-task-fields.ts does.
+        const statuses = [...columnsOf(t.projectId).map((c) => c.slug), ...VIRTUAL_STATUSES];
+        if (!statuses.includes(b.status)) {
+          return fail(400, `Invalid status "${b.status}". Valid statuses for this project: ${statuses.join(", ")}`);
+        }
+        t.status = b.status;
+      }
+
       if (p[1] === "priority") t.priority = b.priority;
+      const altered = misstoring?.test(`${req.method} ${path}`) === true;
+      if (p[1] === "title") t.title = altered ? `${b.title} (altered)` : b.title;
+      if (p[1] === "description") t.description = altered ? `${b.description} (altered)` : b.description;
       if (p[1] === "assignee") {
         if (!("userId" in (b ?? {}))) return fail(400, 'Invalid key: Expected "userId" but received undefined');
         t.userId = b.userId;

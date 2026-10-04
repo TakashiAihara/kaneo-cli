@@ -1,0 +1,38 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "-d",
+        "abc",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"description was updated, but task #1 description reads back differently from the one that was sent (13 characters read, 3 sent)\"\n}\n",
+      "stderr": "Error: description was updated, but task #1 description reads back differently from the one that was sent (13 characters read, 3 sent)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/description/task-a1",
+      "query": "",
+      "body": {
+        "description": "abc"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

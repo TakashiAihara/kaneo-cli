@@ -821,7 +821,7 @@ export const listRelations = async (taskId: string): Promise<Relation[]> =>
 // Removes one link and answers with the relation as the server held it, which
 // like a creation reply has no summaries.
 export const deleteRelation = async (relationId: string): Promise<Relation> =>
-  relation(zeroRecord(await call(removeRelation(pathParam(relationId)))));
+  relation(zeroRecord(await removeRelation(pathParam(relationId))));
 
 // The listing answers with a summary of each linked task as well, which is what
 // lets a link be shown by number rather than by id.

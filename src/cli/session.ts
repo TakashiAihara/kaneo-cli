@@ -125,17 +125,18 @@ export const sessionCommand = {
         "Mark a task this session was working on as no longer held.\n\n" +
         "Without --task, the task in the attachment is closed: the one a plain\n" +
         "`session attach` took, and the one whose attachment file is then removed.\n" +
-        "With --task, that task is closed instead, by number or id (a number is\n" +
-        "looked up in the current project; -p picks another), which releases\n" +
-        "one of several a session may hold. The attachment is only removed when it\n" +
-        "is that task, so a session attached elsewhere stays attached there, and a\n" +
-        "task this session attached earlier can be closed with no attachment at all.",
+        "With --task, that task is closed instead, as slug#number (the form\n" +
+        "`session status` prints), a number in the current project, or an id. That\n" +
+        "releases one of several a session may hold. The attachment is only removed\n" +
+        "when it is that task, so a session attached elsewhere stays attached there,\n" +
+        "and a task this session attached earlier can be closed with no attachment\n" +
+        "at all.",
       args: noArgs("kaneo session close"),
       flags: [
         {
           name: "task",
           type: "string" as const,
-          usage: "task to close, by number or id; defaults to the attached one",
+          usage: "task to close, as slug#number, number or id; defaults to the attached one",
           defaultValue: "",
         },
         strictFlag,
@@ -150,7 +151,7 @@ export const sessionCommand = {
         // A named task is allowed with no attachment: a session that attached,
         // re-attached elsewhere and now wants the first one released is the case
         // --task is for, so the attachment is not the gate.
-        const task = named === "" ? undefined : await resolveTask(taskProject(app), named);
+        const task = named === "" ? undefined : await resolveTask(app, named);
         // What the marker is written against and what the attachment holds can
         // differ once one of several tasks is named, so the attachment is only
         // dropped for the task it actually names.

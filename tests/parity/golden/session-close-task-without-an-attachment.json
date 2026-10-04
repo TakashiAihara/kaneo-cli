@@ -5,7 +5,7 @@
         "session",
         "close",
         "--task",
-        "2",
+        "ALP#2",
         "--strict",
         "--json"
       ],
@@ -15,6 +15,26 @@
     }
   ],
   "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
     {
       "method": "GET",
       "path": "/task/tasks/proj-alpha",

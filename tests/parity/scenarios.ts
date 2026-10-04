@@ -180,7 +180,9 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "session close --task without an attachment",
     env: { KANEO_SESSION_ID: "sess-test" },
-    steps: [["session", "close", "--task", "2", "--strict", "--json"]],
+    // Named the way `session status` prints it, so a reference read off the
+    // history can be handed straight back.
+    steps: [["session", "close", "--task", "ALP#2", "--strict", "--json"]],
   },
   {
     name: "session status without a session id",

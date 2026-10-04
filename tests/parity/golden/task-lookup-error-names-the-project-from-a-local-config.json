@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "99",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: no task #99 in project BET (proj-beta, from local); pass --project to look elsewhere\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

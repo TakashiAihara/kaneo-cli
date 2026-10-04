@@ -7,7 +7,7 @@
         ""
       ],
       "exit": 0,
-      "stdout": "assign\ncreate\nget\nlink\nlinks\nlist\nmove\npriority\nrm\nstatus\n:4\n",
+      "stdout": "assign\ncreate\nget\nlink\nlinks\nlist\nmove\npriority\nrm\nstatus\nunlink\n:4\n",
       "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
     }
   ],

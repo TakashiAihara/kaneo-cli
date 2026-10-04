@@ -45,6 +45,8 @@ const TIME = "2026-09-30T00:00:00.000Z";
 const taskReply = (extra = "") =>
   `{"id":"t1","projectId":"p1","title":"x","status":"to-do","priority":"medium","createdAt":"${TIME}"${extra}}`;
 
+const columnReply = `{"id":"c1","projectId":"p1","name":"Waiting","slug":"waiting","position":3,"icon":null,"color":null,"isFinal":false,"createdAt":"${TIME}","updatedAt":"${TIME}"}`;
+
 const emptyNewTask: api.NewTask = { title: "", description: "", priority: "", status: "", dueDate: "", assigneeId: "" };
 const newTask = (t: Partial<api.NewTask>): api.NewTask => ({ ...emptyNewTask, ...t });
 
@@ -229,6 +231,11 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["GetProject", "GET", "/api/project/a%2Fb", () => api.getProject(id)],
     ["Archive", "PUT", "/api/project/a%2Fb/archive", () => api.setProjectArchived(id, true)],
     ["Unarchive", "PUT", "/api/project/a%2Fb/unarchive", () => api.setProjectArchived(id, false)],
+    ["ListColumns", "GET", "/api/column/a%2Fb", () => api.listColumns(id)],
+    ["CreateColumn", "POST", "/api/column/a%2Fb", () => api.createColumn(id, { name: "n", icon: "", color: "", isFinal: false })],
+    ["ReorderColumns", "PUT", "/api/column/reorder/a%2Fb", () => api.reorderColumns(id, [id])],
+    ["RenameColumn", "PUT", "/api/column/a%2Fb", () => api.renameColumn(id, "n")],
+    ["DeleteColumn", "DELETE", "/api/column/a%2Fb", () => api.deleteColumn(id)],
     ["GetBoard", "GET", "/api/task/tasks/a%2Fb", () => api.getBoard(id)],
     ["GetTask", "GET", "/api/task/a%2Fb", () => api.getTask(id)],
     ["SetTaskStatus", "PUT", "/api/task/status/a%2Fb", () => api.setTaskStatus(id, "x")],
@@ -239,8 +246,10 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["CreateTask", "POST", "/api/task/a%2Fb", () => api.createTask(id, newTask({}))],
     ["ListComments", "GET", "/api/comment/a%2Fb", () => api.listComments(id)],
     ["AddComment", "POST", "/api/comment/a%2Fb", () => api.addComment(id, "x")],
+    ["DeleteComment", "DELETE", "/api/comment/a%2Fb", () => api.deleteComment(id)],
     ["ListRelations", "GET", "/api/task-relation/a%2Fb", () => api.listRelations(id)],
     ["LinkTasks", "POST", "/api/task-relation", () => api.linkTasks("s", "d", "blocks")],
+    ["DeleteRelation", "DELETE", "/api/task-relation/a%2Fb", () => api.deleteRelation(id)],
     ["CreateProject", "POST", "/api/project", () => api.createProject({ name: "n", workspaceId: "w", icon: "", slug: "", description: "" })],
     ["ListProjects", "GET", "/api/project", () => api.listProjectsIn("w", false)],
     ["ListWorkspaces", "GET", "/api/auth/organization/list", () => api.listWorkspaces()],
@@ -299,9 +308,59 @@ describe("TestReadsMapEveryField", () => {
     expect([got.number, got.assigneeId, got.assigneeName, got.dueDate]).toEqual([7, "u1", "Ann", "2026-10-01T00:00:00.000Z"]);
   });
 
+  // The listing answers with a summary of each linked task, which is what a link
+  // is reported by number from; a server that sends none leaves them null.
   test("relations", async () => {
-    recorder(`[{"id":"r1","sourceTaskId":"s","targetTaskId":"d","relationType":"blocks","createdAt":"${TIME}"}]`);
-    expect(await api.listRelations("s")).toEqual([{ id: "r1", sourceTaskId: "s", targetTaskId: "d", relationType: "blocks" }]);
+    recorder(
+      `[{"id":"r1","sourceTaskId":"s","targetTaskId":"d","relationType":"blocks","createdAt":"${TIME}",` +
+        `"sourceTask":{"id":"s","title":"S","status":"to-do","isCompleted":false,"priority":"low","number":7,"projectId":"p1","userId":null,"assigneeName":null},` +
+        `"targetTask":null},` +
+        `{"id":"r2","sourceTaskId":"s","targetTaskId":"e","relationType":"related","createdAt":"${TIME}",` +
+        `"sourceTask":{"id":"s","title":"S","status":"to-do","number":7,"projectId":"p1"},` +
+        `"targetTask":{"id":"e","title":"E","status":"done","number":null,"projectId":"p1"}}]`,
+    );
+    expect(await api.listRelations("s")).toEqual([
+      {
+        id: "r1",
+        sourceTaskId: "s",
+        targetTaskId: "d",
+        relationType: "blocks",
+        sourceTask: { id: "s", number: 7, title: "S", status: "to-do", projectId: "p1" },
+        targetTask: null,
+      },
+      {
+        id: "r2",
+        sourceTaskId: "s",
+        targetTaskId: "e",
+        relationType: "related",
+        sourceTask: { id: "s", number: 7, title: "S", status: "to-do", projectId: "p1" },
+        targetTask: { id: "e", number: null, title: "E", status: "done", projectId: "p1" },
+      },
+    ]);
+  });
+
+  test("deleted relation", async () => {
+    const seen = recorder(
+      `{"id":"r1","sourceTaskId":"s","targetTaskId":"d","relationType":"blocks","createdAt":"${TIME}"}`,
+    );
+    const removed = await api.deleteRelation("r1");
+    expect([seen.method, seen.path]).toEqual(["DELETE", "/api/task-relation/r1"]);
+    expect(removed).toEqual({ id: "r1", sourceTaskId: "s", targetTaskId: "d", relationType: "blocks", sourceTask: null, targetTask: null });
+  });
+
+  // icon and color are nullable on the wire, and a column carries neither.
+  test("column", async () => {
+    recorder(`[${columnReply}]`);
+    expect(await api.listColumns("p1")).toEqual([
+      { id: "c1", slug: "waiting", name: "Waiting", position: 3, isFinal: false, icon: null, color: null },
+    ]);
+  });
+
+  test("column with an icon and a color", async () => {
+    recorder(`[${columnReply.replace('"icon":null,"color":null', () => '"icon":"Clock","color":"#f00"')}]`);
+    expect(await api.listColumns("p1")).toEqual([
+      { id: "c1", slug: "waiting", name: "Waiting", position: 3, isFinal: false, icon: "Clock", color: "#f00" },
+    ]);
   });
 
   test("added comment", async () => {
@@ -326,6 +385,37 @@ describe("TestWritesSendEveryField", () => {
     const seen = recorder(taskReply());
     await api.createTask("p1", newTask({ title: "x" }));
     expect(seen.body).toBe('{"title":"x","description":"","priority":"medium","status":"to-do"}');
+  });
+
+  // The slug comes from the name, so it is not sent, and an icon and a color are
+  // left out of the body when there are none: the route takes a string or
+  // nothing, never null.
+  test("create column", async () => {
+    const seen = recorder(columnReply);
+    await api.createColumn("p1", { name: "Waiting", icon: "", color: "", isFinal: false });
+    expect(seen.body).toBe('{"name":"Waiting","isFinal":false}');
+  });
+
+  test("create column with an icon, a color and a done state", async () => {
+    const seen = recorder(columnReply);
+    await api.createColumn("p1", { name: "Waiting", icon: "Clock", color: "#f00", isFinal: true });
+    expect(seen.body).toBe('{"name":"Waiting","isFinal":true,"icon":"Clock","color":"#f00"}');
+  });
+
+  // A rename sends the name and nothing else, so a column keeps the slug its
+  // tasks store as their status.
+  test("rename column", async () => {
+    const seen = recorder(columnReply);
+    await api.renameColumn("c1", "Doing");
+    expect(seen.body).toBe('{"name":"Doing"}');
+  });
+
+  // The whole new order in one request, numbered from zero.
+  test("reorder columns", async () => {
+    const seen = recorder(`[${columnReply}]`);
+    const columns = await api.reorderColumns("p1", ["c1", "c2", "c3"]);
+    expect(seen.body).toBe('{"columns":[{"id":"c1","position":0},{"id":"c2","position":1},{"id":"c3","position":2}]}');
+    expect(columns.map((c) => c.slug)).toEqual(["waiting"]);
   });
 
   test.each([

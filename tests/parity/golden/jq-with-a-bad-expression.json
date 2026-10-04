@@ -1,0 +1,18 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "--jq",
+        ".[",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --jq: jq: error: syntax error, unexpected end of file at <top-level>, line 1, column 2:\n    .[\n     ^\njq: 1 compile error\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

@@ -9,7 +9,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: no task #99 in this project\n"
+      "stderr": "Error: no task #99 in project ALP (proj-alpha, from env); pass --project to look elsewhere\n"
     }
   ],
   "requests": [

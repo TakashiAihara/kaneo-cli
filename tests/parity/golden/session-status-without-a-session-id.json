@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "status",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no session id: set KANEO_SESSION_ID\"\n}\n",
+      "stderr": "Error: no session id: set KANEO_SESSION_ID\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

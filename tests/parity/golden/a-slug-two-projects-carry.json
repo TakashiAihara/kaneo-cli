@@ -1,0 +1,75 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "-p",
+        "BET",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"\\\"BET\\\" matches several projects: BET (proj-beta) in Main, BET (proj-bet2) in Other; pass the id\"\n}\n",
+      "stderr": "Error: \"BET\" matches several projects: BET (proj-beta) in Main, BET (proj-bet2) in Other; pass the id\n"
+    },
+    {
+      "args": [
+        "project",
+        "get",
+        "alp",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-lower  Lower\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/alp",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-lower",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -20,7 +20,9 @@ A board, belonging to exactly one workspace. Holds columns, which hold tasks.
 
 ### column
 
-A lane on the board. **A column's id is also the `status` value of every task in it** — there is no separate status vocabulary. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define others, so nothing here treats that list as closed.
+A lane on the board. **A column's slug is also the `status` value of every task in it** — there is no separate status vocabulary. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define others, so nothing here treats that list as closed. Besides the columns, the server takes two statuses that no column holds, `planned` and `archived`.
+
+`kaneo column` reads and changes them: `ls`, `create`, `rename`, `reorder`, `rm`, all against the resolved project. A column is named by its id (the opaque `id` in `kaneo column ls --json`), its slug, or its name when no other column shares it, anywhere one is taken. Its slug is derived from its name when the column is created and the server's update route takes no slug at all, which is why a rename leaves the slug, and every task's status in the column, as it was.
 
 ### task
 
@@ -54,9 +56,19 @@ The per-workspace part of the notification preferences: whether the workspace is
 
 ### relation
 
-A link between two tasks: `subtask`, `blocks` or `related`. For a subtask link the source is the parent. Relations cannot cross workspaces.
+A link between two tasks: `subtask`, `blocks` or `related`. Relations cannot cross workspaces.
+
+The type carries the direction, so the same link reads as two different words depending on which end it is read from. `task links` and `task get` word it from the task being shown: `blocks` / `blocked by`, `parent of` / `subtask of` (a subtask link's source is the parent), and `related`, which has no direction.
+
+The listing answers with a summary of each task at either end, so a link is shown by number and title. Where a summary or its number is null, which the server's document allows, the task's id is shown instead.
 
 ## This CLI's concepts
+
+### task reference
+
+What a task is named by on a command line: a task id, a number with or without a leading `#`, or `<project-slug>#<number>`.
+
+The last form names a board as well as a number, which is why it is the form a task reference is written in everywhere else — `KANEO_TASK_REF` and the `kaneo <project slug>#<number>` a session hook receives. The part before the `#` is resolved as a project by id, slug or name; the leading `kaneo ` is not part of what the commands take.
 
 ### operation
 
@@ -116,6 +128,16 @@ The prefix is `kn:` rather than `kaneo:` because that is what is already written
 
 Values are percent-encoded where they contain whitespace. Fields are separated by spaces, so a raw space inside a value is indistinguishable from the start of the next field — a path like `/work/client foo=bar` would otherwise be read back as `/work/client`. Markers written by the older implementation carry raw values and are still read as-is.
 
+### attachment
+
+The record of which task a session currently holds, written beside the markers as `~/.config/kaneo/sessions/<session id>.json` when `session attach` succeeds and removed when the session closes that task. It carries the task's id, number and title, and the project and workspace it is on — including the project slug, which is what a task reference is written as, so a reader can print `slug#number` without an API call. Each of those is left out when unknown rather than written empty.
+
+### attach history
+
+Every attach and close a session made, one JSON line each in `~/.config/kaneo/sessions/<session id>.history.jsonl`, holding the time, the task and the board as the attachment had it at that moment. Lines are only ever appended to.
+
+It exists because the attachment is deleted on close, which leaves nothing that says the session was ever working on anything; a retro or a check that runs afterwards reads this instead. It is kept for that reason alone: the attachment stays the record of what is held *now*, since other tools read it as "currently attached", and a history that outlived every close would say nothing about the present. `session status` prints both, from these files alone.
+
 ### fail-open
 
 Producing no output and exiting 0 on failure. The `session` commands do this because they run from a session-start hook, where a missing board is a smaller harm than a broken session. Every other command reports failures normally, `board` included: its callers read the board to decide something, and an empty answer from a failure read as "no tasks" (#16).
@@ -129,9 +151,11 @@ It covers failures that changed nothing: an unreachable server, a missing key, n
 | Not the same | Difference |
 | --- | --- |
 | task `number` and task `id` | The number is per-project and human-facing; the id is opaque and what the API takes. Sending a number as an id makes the server answer `400 Workspace ID could not be determined`, which names neither |
+| a project's `id`, `slug` and `name` | Three names for one board. The API takes the id, so the other two are resolved to it by looking the value up across the workspaces the key can see, and only once the server has said it does not know it — a value that works as an id costs no extra request |
 | workspace and project | A workspace holds projects. `repos` maps a repo to a *project*; the workspace follows from it |
 | reading a board and writing to one | `board` reads, so it can cover several projects at once. Everything else writes, and a write has to name the board it lands on — so a repository mapped to several projects makes those commands ask for `--project` rather than pick |
-| status and column | The same string. A status *is* a column id |
+| status and column | The same string. A status *is* a column slug |
+| column id and column slug | `kaneo column ls --json` shows both. The id is opaque and is what the column routes take; the slug is the status. The board route reports a column's `id` as its slug, so only the column routes show the opaque one |
 | site root and API root | The root serves the web app and answers 200 with HTML for any path. Only `/api/...` is the API, which is why the configured URL is normalised to end in `/api` |
 | `/auth/get-session` and `/auth/organization/list` | The first answers 200 with `null` for a valid key, an invalid key and no key, so it cannot check a credential. The second answers 401 on a bad key |
 | a hosted remote and a local one | git accepts a filesystem path as a remote, and its trailing components look exactly like `owner/repo`. `/home/me/acme/thing` must not resolve to the `acme` workspace, so only SSH and URL remotes are parsed |

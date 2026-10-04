@@ -12,6 +12,7 @@ import {
 import {
   Activity,
   BoardResponse,
+  Column,
   Comment,
   CreateNotification200,
   MoveTaskResult,
@@ -27,6 +28,7 @@ import {
   TaskWithAssignee
 } from './model';
 import type {
+  CreateColumnBody,
   CreateNotificationBody,
   CreateProjectBody,
   CreateTaskBody,
@@ -35,6 +37,8 @@ import type {
   ListProjectsParams,
   ListTasksParams,
   MoveTaskBody,
+  ReorderColumnsBody,
+  UpdateColumnBody,
   UpdateNotificationPreferencesBody,
   UpdateOrganizationBody,
   UpdateProjectBody,
@@ -595,6 +599,181 @@ return kaneoFetch<Task>(getUpdateTaskAssigneeUrl(id),
 
 
 
+export const getGetColumnsUrl = (projectId: string,) => {
+
+
+
+
+  return `/column/${projectId}`
+}
+
+/**
+ * Get a project's board columns, ordered by position.
+ * @summary Get columns
+ */
+export const getColumns = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Column[]> => {
+
+  return kaneoFetch<Column[]>(getGetColumnsUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(Column)
+  }
+);}
+
+
+
+export const getCreateColumnUrl = (projectId: string,) => {
+
+
+
+
+  return `/column/${projectId}`
+}
+
+/**
+ * Add a column to the end of a project's board. The slug is derived from the name.
+ * @summary Create column
+ */
+export const createColumn = async (projectId: string,
+    createColumnBody: CreateColumnBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<Column> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Column>(getCreateColumnUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createColumnBody),
+    schema: Column
+  }
+);}
+
+
+
+export const getReorderColumnsUrl = (projectId: string,) => {
+
+
+
+
+  return `/column/reorder/${projectId}`
+}
+
+/**
+ * Set new positions for a project's columns and return the whole board in its new order.
+ * @summary Reorder columns
+ */
+export const reorderColumns = async (projectId: string,
+    reorderColumnsBody: ReorderColumnsBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<Column[]> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Column[]>(getReorderColumnsUrl(projectId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reorderColumnsBody),
+    schema: zod.array(Column)
+  }
+);}
+
+
+
+export const getUpdateColumnUrl = (id: string,) => {
+
+
+
+
+  return `/column/${id}`
+}
+
+/**
+ * Update a column. Omitted fields are left unchanged; icon and color accept null to clear them.
+ * @summary Update column
+ */
+export const updateColumn = async (id: string,
+    updateColumnBody: UpdateColumnBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<Column> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Column>(getUpdateColumnUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateColumnBody),
+    schema: Column
+  }
+);}
+
+
+
+export const getDeleteColumnUrl = (id: string,) => {
+
+
+
+
+  return `/column/${id}`
+}
+
+/**
+ * Delete an empty column. A column holding tasks is refused until they are moved or deleted.
+ * @summary Delete column
+ */
+export const deleteColumn = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Column> => {
+
+  return kaneoFetch<Column>(getDeleteColumnUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: Column
+  }
+);}
+
+
+
 export const getGetTaskCommentsUrl = (taskId: string,) => {
 
 
@@ -656,6 +835,32 @@ return kaneoFetch<Activity>(getCreateTaskCommentUrl(taskId),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createTaskCommentBody),
+    schema: Activity
+  }
+);}
+
+
+
+export const getDeleteTaskCommentUrl = (id: string,) => {
+
+
+
+
+  return `/comment/${id}`
+}
+
+/**
+ * Delete a comment. Only the comment's author may do this.
+ * @summary Delete task comment
+ */
+export const deleteTaskComment = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Activity> => {
+
+  return kaneoFetch<Activity>(getDeleteTaskCommentUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
     schema: Activity
   }
 );}

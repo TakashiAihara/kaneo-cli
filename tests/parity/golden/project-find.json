@@ -1,0 +1,85 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "find",
+        "be",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"proj-beta\",\n    \"name\": \"Beta\",\n    \"slug\": \"BET\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null,\n    \"workspaceName\": \"Main\"\n  },\n  {\n    \"id\": \"proj-beacon\",\n    \"name\": \"Beacon\",\n    \"slug\": \"BCN\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-other\",\n    \"isPublic\": false,\n    \"archivedAt\": null,\n    \"workspaceName\": \"Other\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "find",
+        "OLD",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-old  Old  [OLD]  (Main)  (archived)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "find",
+        "zzz",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no project matches \\\"zzz\\\"\"\n}\n",
+      "stderr": "Error: no project matches \"zzz\"\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    }
+  ],
+  "files": {}
+}

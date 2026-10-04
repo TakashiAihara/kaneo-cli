@@ -7,7 +7,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "ntf0003  2026-01-02T00:00:02.000Z  unread  info  read state never set\nntf0002  2026-01-02T00:00:01.000Z  unread  task_status_changed  Write the parser\nntf0001  2026-01-02T00:00:00.000Z  read    info  Welcome: hello there\n",
+      "stdout": "ntf0003  <TIME>Z  unread  info  read state never set\nntf0002  <TIME>Z  unread  task_status_changed  Write the parser\nntf0001  <TIME>Z  read    info  Welcome: hello there\n",
       "stderr": ""
     }
   ],

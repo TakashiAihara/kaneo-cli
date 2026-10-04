@@ -16,7 +16,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"ntf0004\",\n  \"type\": \"info\",\n  \"title\": \"CI\",\n  \"content\": \"build is green\",\n  \"eventData\": null,\n  \"isRead\": false,\n  \"resourceType\": \"task\",\n  \"resourceId\": \"task-a1\",\n  \"createdAt\": \"2026-01-02T00:00:04.000Z\"\n}\n",
+      "stdout": "{\n  \"id\": \"ntf0004\",\n  \"type\": \"info\",\n  \"title\": \"CI\",\n  \"content\": \"build is green\",\n  \"eventData\": null,\n  \"isRead\": false,\n  \"resourceType\": \"task\",\n  \"resourceId\": \"task-a1\",\n  \"createdAt\": \"<TIME>Z\"\n}\n",
       "stderr": ""
     },
     {
@@ -82,7 +82,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"emailAddress\": \"self@example.com\",\n  \"emailEnabled\": false,\n  \"ntfyEnabled\": false,\n  \"ntfyConfigured\": false,\n  \"ntfyServerUrl\": null,\n  \"ntfyTopic\": null,\n  \"ntfyTokenConfigured\": false,\n  \"maskedNtfyToken\": null,\n  \"gotifyEnabled\": false,\n  \"gotifyConfigured\": false,\n  \"gotifyServerUrl\": null,\n  \"gotifyTokenConfigured\": false,\n  \"maskedGotifyToken\": null,\n  \"webhookEnabled\": false,\n  \"webhookConfigured\": false,\n  \"webhookUrl\": null,\n  \"webhookSecretConfigured\": false,\n  \"maskedWebhookSecret\": null,\n  \"taskAssignmentEnabled\": true,\n  \"taskCommentEnabled\": false,\n  \"taskStatusChangeEnabled\": true,\n  \"dueDateReminderEnabled\": true,\n  \"dueDateReminderLeadTimeMinutes\": 1440,\n  \"workspaces\": [],\n  \"createdAt\": \"2026-01-02T00:00:03.000Z\",\n  \"updatedAt\": \"2026-01-02T00:00:03.000Z\"\n}\n",
+      "stdout": "{\n  \"emailAddress\": \"self@example.com\",\n  \"emailEnabled\": false,\n  \"ntfyEnabled\": false,\n  \"ntfyConfigured\": false,\n  \"ntfyServerUrl\": null,\n  \"ntfyTopic\": null,\n  \"ntfyTokenConfigured\": false,\n  \"maskedNtfyToken\": null,\n  \"gotifyEnabled\": false,\n  \"gotifyConfigured\": false,\n  \"gotifyServerUrl\": null,\n  \"gotifyTokenConfigured\": false,\n  \"maskedGotifyToken\": null,\n  \"webhookEnabled\": false,\n  \"webhookConfigured\": false,\n  \"webhookUrl\": null,\n  \"webhookSecretConfigured\": false,\n  \"maskedWebhookSecret\": null,\n  \"taskAssignmentEnabled\": true,\n  \"taskCommentEnabled\": false,\n  \"taskStatusChangeEnabled\": true,\n  \"dueDateReminderEnabled\": true,\n  \"dueDateReminderLeadTimeMinutes\": 1440,\n  \"workspaces\": [],\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
       "stderr": ""
     },
     {
@@ -118,7 +118,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "ntf0005  2026-01-02T00:00:05.000Z  unread  info  plain\nntf0004  2026-01-02T00:00:04.000Z  unread  info  CI: build is green\nntf0003  2026-01-02T00:00:02.000Z  unread  info  read state never set\nntf0002  2026-01-02T00:00:01.000Z  unread  task_status_changed  Write the parser\nntf0001  2026-01-02T00:00:00.000Z  read    info  Welcome: hello there\n",
+      "stdout": "ntf0005  <TIME>Z  unread  info  plain\nntf0004  <TIME>Z  unread  info  CI: build is green\nntf0003  <TIME>Z  unread  info  read state never set\nntf0002  <TIME>Z  unread  task_status_changed  Write the parser\nntf0001  <TIME>Z  read    info  Welcome: hello there\n",
       "stderr": ""
     }
   ],

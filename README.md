@@ -70,6 +70,19 @@ Not every layer answers every setting:
 
 `kaneo context` prints the resolved values and names the layer each one came from.
 
+`kaneo context --repo owner/name` (or a git remote URL) resolves for that repository instead of the one the current directory's remote names, so the maps can be read before a checkout exists.
+
+- The `.kaneo.json` layer is left out entirely, including the ones above the current directory. A checkout of the named repository would still apply them, so the answer can differ from what that checkout resolves to.
+- Flags, the environment and the active profile still apply above the maps. `origin.project` is `repo-map` only when `repos` answered.
+
+### Ids, slugs and names
+
+`--project`, `--workspace` and `task move --to` take an id, a slug or a name, matched in that order: an id exactly, a slug or a name exactly before ignoring case. A slug or a name matching exactly one is used; several matches are all listed so the id can pick one.
+
+A project is sent as an id first, so an id costs no extra request; only when the server says it does not know the value is it looked up across every workspace the key can reach (one listing per workspace), which a slug kept in `.kaneo.json` or the repo map pays on every command. A workspace is matched against `workspace ls` before it is sent — one request — because an instance admin's key gets an empty project list, not an error, for a workspace that does not exist. That listing holds only the workspaces the key's user is a member of.
+
+That is what lets the two forms people actually type work: a slug is the prefix of every task reference, and `workspace ls` prints names next to their ids.
+
 ### `.kaneo.json`
 
 ```json
@@ -130,11 +143,17 @@ kaneo context                       # what did the settings resolve to, and from
 kaneo whoami                        # is the key accepted, and what can it reach
 kaneo workspace ls
 kaneo workspace rename <workspace-id> <name>   # name only; slug and description unchanged
-kaneo project ls
+kaneo project ls [-A]           # -A lists every workspace, naming the workspace each project is in
+kaneo project find <text>       # substring match on name and slug, across every workspace
 kaneo project get [project-id]
 kaneo project update <project-id> [--name NAME] [--slug SLUG] [-d TEXT] [--icon ICON]   # only what is passed changes
+kaneo column ls                    # the resolved project's columns, in board order
+kaneo column create <name...> [--final] [--icon ICON] [--color COLOR]
+kaneo column rename <column> <new name...>   # the slug, and so every status in it, stays
+kaneo column reorder <column>...   # the new order: every column exactly once, by id, slug or name
+kaneo column rm <column> --yes
 kaneo task ls [--status ...] [--priority ...] [--all]
-kaneo task get <task-id>
+kaneo task get <task-id>                 # also lists the task's relations
 kaneo task status <task-id> <status>
 kaneo notification ls [--unread]                             # the newest 50, as the server returns
 kaneo notification read <notification-id>... | --all
@@ -144,11 +163,17 @@ kaneo notification preferences get
 kaneo notification preferences set [--email=false] [--ntfy] [--ntfy-topic T] [--reminder-lead 2h] ...   # only what is passed changes
 kaneo notification preferences workspace set <workspace-id> [--active=false] [--webhook] [--projects id,id]
 kaneo notification preferences workspace rm <workspace-id>   # the workspace is then sent nothing outside the app
+kaneo task links <task>
+kaneo task link <task> <other> --type <type>    # subtask, blocks or related; the type says which way round
+kaneo task unlink <relation-id>
+kaneo task unlink <task> <other> [--type <type>]
 ```
 
-A status is a column id. The defaults are `to-do`, `in-progress`, `in-review` and `done`.
+A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds.
 
-Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing.
+Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project>#<number>` names a board and a number on it: `kaneo task get kaneo-cli#3` reads the reference written as `kaneo kaneo-cli#3`, which is also what `KANEO_TASK_REF` holds after its `kaneo ` prefix. The project before the `#` is an id, slug or name.
+
+`task link` will not guess the type: a link written with one nobody asked for has to be undone before the right one can be written. `task unlink` takes two tasks and removes the one link joining them in either direction, or one relation id from `task links --json`.
 
 ### Shell completion
 
@@ -171,7 +196,11 @@ kaneo board                     # open tasks, and which sessions hold them
 
 The session is identified by `KANEO_SESSION_ID`, falling back to `CLAUDE_CODE_SESSION_ID`.
 
-The `session` commands are **fail-open**: an unreachable server, a missing key or an unconfigured project makes them print nothing and exit 0, so a session-start hook is not broken by any of them. `--strict` turns that off and `KANEO_DEBUG=1` prints the reason that was swallowed. `board` is not: it fails like any other command, so an empty board and one that could not be read look different.
+`kaneo session close [--task <task>]` acts on the task in the attachment, the one last attached; `--task` names another one, as `slug#number` (the form `session status` prints), a number in the current project, or an id, so a session that has attached to several tasks releases only the one named. The attachment is only removed when it is that task, and a task can be closed by name with no attachment at all — a session that attached, re-attached elsewhere and then wants the first one released.
+
+What a session holds is kept in `~/.config/kaneo/sessions/<session id>.json`, and every attach and close is appended to `<session id>.history.jsonl` beside it, one JSON line each, holding the time, the task and the board it was on. Close removes the attachment — other tools read that file as "currently attached" — and keeps the history, so a check running after the session has ended can still see what it did. `kaneo session status` prints the attachment and the history, reading only those files: no request is made and no key is needed.
+
+The `session` commands are **fail-open**, `session status` excepted: it makes no request, so there is nothing for fail-open to swallow, and a session id nobody set is worth reporting. An unreachable server, a missing key or an unconfigured project makes the others print nothing and exit 0, so a session-start hook is not broken by any of them. `--strict` turns that off and `KANEO_DEBUG=1` prints the reason that was swallowed. `board` is not: it fails like any other command, so an empty board and one that could not be read look different.
 
 A failure that already changed something elsewhere is reported regardless — `session attach` that wrote the comment but could not record it locally, for instance. Staying quiet there would leave `session next` believing nothing is attached.
 
@@ -202,6 +231,22 @@ kaneo task ls --human      # a table through a pipe
 ```
 
 Data goes to stdout and progress goes to stderr, so piping into `jq` is always safe.
+
+`--jq <expression>` narrows the JSON to what a caller wants, so reading one field is one command instead of a pipe into `jq`:
+
+```bash
+kaneo task create "fix the parser" --jq .number   # 4
+kaneo task get 1 --jq .status                    # to-do
+```
+
+jq runs inside the binary, so nothing has to be installed. Output follows `gh --jq` to a pipe: each value ends with a newline, strings print raw and everything else as compact JSON. `--jq` implies `--json` and wins over `--human`.
+
+When something fails, stdout stays empty and the exit code is 1:
+
+- an expression jq cannot compile is refused before any request is made
+- an expression that fails on the payload reports jq's message on stderr, followed by a line saying the command had already run — `task create … --jq` that exits 1 this way has still created the task, so do not retry it blindly
+- a failing command reports its error on stderr only; the `{"error": ...}` object `--json` prints is left out
+- `api-check` is the exception: its report is its output, so a failed check still prints what the expression makes of the report
 
 ## Develop
 

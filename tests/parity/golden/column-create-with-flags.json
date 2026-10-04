@@ -1,0 +1,77 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "create",
+        "外部回答",
+        "待ち",
+        "--final",
+        "--icon",
+        "Clock",
+        "--color",
+        "#f00",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0010\",\n  \"slug\": \"外部回答-待ち\",\n  \"name\": \"外部回答 待ち\",\n  \"position\": 3,\n  \"isFinal\": true,\n  \"icon\": \"Clock\",\n  \"color\": \"#f00\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "rename",
+        "外部回答-待ち",
+        "Waiting",
+        "on",
+        "review",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0010\",\n  \"slug\": \"外部回答-待ち\",\n  \"name\": \"Waiting on review\",\n  \"position\": 3,\n  \"isFinal\": true,\n  \"icon\": \"Clock\",\n  \"color\": \"#f00\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "to-do        To Do\nin-progress  In Progress\ndone         Done  (final)\n外部回答-待ち      Waiting on review  (final)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/column/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "外部回答 待ち",
+        "isFinal": true,
+        "icon": "Clock",
+        "color": "#f00"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/column/col0010",
+      "query": "",
+      "body": {
+        "name": "Waiting on review"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -11,12 +11,14 @@ import {
 } from "./args";
 import { deadlineFor, type App } from "./app";
 import { resolveFromEnvironment, type Flags as ResolvedFlags } from "../config/resolve";
-import { isTTY, resolveMode, Writer } from "../output/output";
+import { isTTY, resolveMode, sanitizeControl, Writer } from "../output/output";
+import { loadFilter, JqFailure, type Filter } from "../output/jq";
 import { configureClient } from "../api/http";
 import { contextCommand } from "./context";
 import { whoamiCommand } from "./whoami";
 import { workspaceCommand } from "./workspace";
 import { projectCommand } from "./project";
+import { columnCommand } from "./column";
 import { taskCommand } from "./task";
 import { boardCommand } from "./board";
 import { sessionCommand } from "./session";
@@ -41,10 +43,15 @@ const GLOBAL_FLAGS: Flag[] = [
     usage: "API key; prefer KANEO_API_KEY, since a flag is visible in the process list",
     defaultValue: "",
   },
-  { name: "workspace", shorthand: "w", type: "string", usage: "workspace id (env KANEO_WORKSPACE)", defaultValue: "" },
-  { name: "project", shorthand: "p", type: "string", usage: "project id (env KANEO_PROJECT)", defaultValue: "" },
+  // Both of these take an id, a slug or a name: the value is used as an id first,
+  // so the ordinary path costs no extra request, and it is looked up across the
+  // workspaces the key can see only when the server does not know it.
+  { name: "workspace", shorthand: "w", type: "string", usage: "workspace id, slug or name (env KANEO_WORKSPACE)", defaultValue: "" },
+  { name: "project", shorthand: "p", type: "string", usage: "project id, slug or name (env KANEO_PROJECT)", defaultValue: "" },
   { name: "json", type: "bool", usage: "force JSON output", defaultValue: "false" },
   { name: "human", type: "bool", usage: "force human-readable output, even through a pipe", defaultValue: "false" },
+  // jq runs inside the binary, so reading one field needs nothing installed.
+  { name: "jq", type: "string", usage: "filter JSON output with a jq expression (implies --json)", defaultValue: "" },
   { name: "timeout", type: "duration", usage: "per-request timeout", defaultValue: DEFAULT_TIMEOUT },
 ];
 
@@ -83,6 +90,7 @@ const rootCommand = (): { root: Command<App> } => {
     whoamiCommand,
     workspaceCommand,
     projectCommand,
+    columnCommand,
     taskCommand,
     boardCommand,
     sessionCommand,
@@ -98,12 +106,25 @@ const rootCommand = (): { root: Command<App> } => {
   return { root };
 };
 
+// An expression that cannot be compiled is refused before the command runs, so
+// a typo costs no request. An empty --jq is no expression at all: the output is
+// what it would have been without the flag.
+const maybeFilter = async (expression: string): Promise<Filter | undefined> =>
+  expression === "" ? undefined : loadFilter(expression);
+
 const env = (name: string): string => process.env[name] ?? "";
 const noColor = (): boolean => env("NO_COLOR") !== "";
 const stdoutIsTTY = (): boolean => isTTY(1);
 
-const writerFor = (json: boolean, human: boolean): Writer =>
-  new Writer(resolveMode(json, human, stdoutIsTTY(), noColor()));
+// A filter decides what the reader of stdout gets to see of the payload, so it
+// implies JSON: --human cannot bring the table back, since there would be
+// nothing left to filter.
+const writerFor = (filter: Filter | undefined, json: boolean, human: boolean): Writer =>
+  new Writer(
+    filter === undefined ? resolveMode(json, human, stdoutIsTTY(), noColor()) : resolveMode(true, false, stdoutIsTTY(), noColor()),
+    filter,
+    stdoutIsTTY(),
+  );
 
 // Whether the raw arguments asked for a mode. A failure during parsing happens
 // before there is a writer, and a script running with --json has to be able to
@@ -113,6 +134,19 @@ const askedFor = (argv: string[], name: string): boolean => {
   for (const arg of argv) {
     if (arg === name) return true;
     if (arg === "--") return false;
+  }
+  return false;
+};
+
+// Whether the raw arguments carry a --jq expression, for a failure that comes
+// before the filter is loaded: its caller reads stdout as the answer, so the
+// error must not land there either. An empty expression is no filter at all.
+const askedForJq = (argv: string[]): boolean => {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--") return false;
+    if (arg === "--jq") return (argv[i + 1] ?? "") !== "";
+    if (arg.startsWith("--jq=")) return arg !== "--jq=";
   }
   return false;
 };
@@ -127,10 +161,12 @@ export const run = async (argv: string[]): Promise<number> => {
 
   try {
     // An unknown command is reported before any flag is judged, so a typo is
-    // corrected rather than argued with. Only the root refuses one: a group
-    // given a word it does not know prints its own help instead.
-    if (command.children !== undefined && command.args === undefined && chain.length === 1 && found.words.length > 0) {
-      throw unknownCommand(root, chain.map((c) => c.name).join(" "), found.words[0]!);
+    // corrected rather than argued with. Every group refuses one the way the
+    // root does, under its own path: a command that only groups others has
+    // nothing to do with a word it does not know, and answering with its help
+    // instead would exit 0 on a mistake.
+    if (command.children !== undefined && command.run === undefined && found.words.length > 0) {
+      throw unknownCommand(command, chain.map((c) => c.name).join(" "), found.words[0]!);
     }
 
     const parsed = readFlags(parsingFlags(chain), rest, command);
@@ -152,7 +188,11 @@ export const run = async (argv: string[]): Promise<number> => {
     }
     command.args?.(parsed.args);
 
-    out = writerFor(parsed.flags.json === true, parsed.flags.human === true);
+    // The filter goes in before the settings are resolved, so that an expression
+    // which cannot be compiled is refused without a request being made to find
+    // out.
+    const filter = await maybeFilter(String(parsed.flags.jq ?? ""));
+    out = writerFor(filter, parsed.flags.json === true, parsed.flags.human === true);
     // A flag is keyed by the name it was declared with, so a dashed flag only
     // answers to that dashed spelling. Asking for it in any other case misses
     // without complaining and yields "", which reads as "the user did not pass
@@ -170,7 +210,7 @@ export const run = async (argv: string[]): Promise<number> => {
     // share one budget, so a slow server cannot use up the time each was given
     // and still have some left for the one that matters.
     const { deadline, deadlineAt } = deadlineFor(timeout);
-    const app: App = { cfg, global, out, deadline, deadlineAt };
+    const app: App = { cfg, flags, global, out, deadline, deadlineAt };
     configureClient({ baseUrl: cfg.apiUrl, apiKey: cfg.apiKey, timeoutMs: timeout, deadline });
 
     await command.run({
@@ -182,9 +222,17 @@ export const run = async (argv: string[]): Promise<number> => {
     });
     return 0;
   } catch (e) {
-    const writer =
-      out ?? writerFor(askedFor(argv, "--json"), askedFor(argv, "--human"));
-    writer.error(e instanceof Error ? e.message : String(e));
+    const message = e instanceof Error ? e.message : String(e);
+    // A failure of the expression is not the command's: there is no payload to
+    // report it with, and the filter cannot be run over the object that says so.
+    // A failure before the filter is loaded is reported the way the Writer would
+    // with one.
+    if (e instanceof JqFailure || (out === undefined && askedForJq(argv))) {
+      writeSync(2, `Error: ${sanitizeControl(message)}\n`);
+      return 1;
+    }
+    const writer = out ?? writerFor(undefined, askedFor(argv, "--json"), askedFor(argv, "--human"));
+    writer.error(message);
     return 1;
   }
 };

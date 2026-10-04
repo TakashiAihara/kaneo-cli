@@ -1,0 +1,71 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "rename",
+        "col0002",
+        "Doing",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0002\",\n  \"slug\": \"in-progress\",\n  \"name\": \"Doing\",\n  \"position\": 1,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "reorder",
+        "col0001",
+        "done",
+        "Doing",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "to-do        To Do\ndone         Done  (final)\nin-progress  Doing\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/column/col0002",
+      "query": "",
+      "body": {
+        "name": "Doing"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/column/reorder/proj-alpha",
+      "query": "",
+      "body": {
+        "columns": [
+          {
+            "id": "col0001",
+            "position": 0
+          },
+          {
+            "id": "col0003",
+            "position": 1
+          },
+          {
+            "id": "col0002",
+            "position": 2
+          }
+        ]
+      }
+    }
+  ],
+  "files": {}
+}

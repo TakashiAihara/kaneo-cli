@@ -38,7 +38,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"rule0004\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\",\n  \"isActive\": true,\n  \"emailEnabled\": true,\n  \"ntfyEnabled\": false,\n  \"gotifyEnabled\": false,\n  \"webhookEnabled\": false,\n  \"projectMode\": \"selected\",\n  \"selectedProjectIds\": [\n    \"proj-alpha\"\n  ],\n  \"createdAt\": \"2026-01-02T00:00:04.000Z\",\n  \"updatedAt\": \"2026-01-02T00:00:04.000Z\"\n}\n",
+      "stdout": "{\n  \"id\": \"rule0004\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\",\n  \"isActive\": true,\n  \"emailEnabled\": true,\n  \"ntfyEnabled\": false,\n  \"gotifyEnabled\": false,\n  \"webhookEnabled\": false,\n  \"projectMode\": \"selected\",\n  \"selectedProjectIds\": [\n    \"proj-alpha\"\n  ],\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
       "stderr": ""
     },
     {

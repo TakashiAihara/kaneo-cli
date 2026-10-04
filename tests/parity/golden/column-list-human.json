@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "list",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "to-do        To Do\nin-progress  In Progress\ndone         Done  (final)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,137 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "create",
+        "Planned",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/column/proj-alpha: 409: Column slug \\\"planned\\\" is reserved for virtual task statuses\"\n}\n",
+      "stderr": "Error: POST /api/column/proj-alpha: 409: Column slug \"planned\" is reserved for virtual task statuses\n"
+    },
+    {
+      "args": [
+        "column",
+        "create",
+        "!!!",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/column/proj-alpha: 400: Column name must contain at least one alphanumeric character\"\n}\n",
+      "stderr": "Error: POST /api/column/proj-alpha: 400: Column name must contain at least one alphanumeric character\n"
+    },
+    {
+      "args": [
+        "column",
+        "create",
+        "To Do",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/column/proj-alpha: 409: Column with slug \\\"to-do\\\" already exists in this project\"\n}\n",
+      "stderr": "Error: POST /api/column/proj-alpha: 409: Column with slug \"to-do\" already exists in this project\n"
+    },
+    {
+      "args": [
+        "column",
+        "create",
+        " ",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"a column name cannot be blank\"\n}\n",
+      "stderr": "Error: a column name cannot be blank\n"
+    },
+    {
+      "args": [
+        "column",
+        "rename",
+        "to-do",
+        " ",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"a column name cannot be blank\"\n}\n",
+      "stderr": "Error: a column name cannot be blank\n"
+    },
+    {
+      "args": [
+        "column",
+        "rename",
+        "in-progress",
+        "To Do",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0002\",\n  \"slug\": \"in-progress\",\n  \"name\": \"To Do\",\n  \"position\": 1,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "rename",
+        "To Do",
+        "x",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"2 columns are named \\\"To Do\\\"; name one by its slug (to-do, in-progress)\"\n}\n",
+      "stderr": "Error: 2 columns are named \"To Do\"; name one by its slug (to-do, in-progress)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/column/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Planned",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/column/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "!!!",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/column/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "To Do",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/column/col0002",
+      "query": "",
+      "body": {
+        "name": "To Do"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import type { Marker, State } from "./marker";
-import { compact } from "../output/json";
+import { compact, type Json } from "../output/json";
 
 // Which task the current session took, kept so that closing it later does not
 // need the task named again.
@@ -18,10 +18,13 @@ export type Attachment = {
   //
   // Each is left out when unknown, as in an attachment written before these
   // existed: absent, never "". A failed lookup leaves out only what it would
-  // have filled. All four are a snapshot at attach time: names go stale on
-  // rename, and the ids on moving the task to another project.
+  // have filled. All five are a snapshot at attach time: names go stale on
+  // rename, and the ids on moving the task to another project. The slug is what
+  // the task reference people write is made of, so a reader can print
+  // "<slug>#<number>" rather than only an id.
   projectId?: string;
   projectName?: string;
+  projectSlug?: string;
   workspaceId?: string;
   workspaceName?: string;
 };
@@ -128,6 +131,113 @@ export const load = (store: Store, sessionId: string): Attachment | undefined =>
 export const clear = (store: Store, sessionId: string): void => {
   if (!validSessionId(sessionId)) return;
   for (const dir of [store.dir, ...store.legacyDirs]) rmSync(at(dir, sessionId), { force: true });
+};
+
+const historyAt = (dir: string, sessionId: string): string => join(dir, `${sessionId}.history.jsonl`);
+
+// The board an attachment names, in the order it is written and only as far as it
+// was known: a field left out says "not known then", which a reader can act on,
+// where "" would say the board had no name.
+const boardFields = (attachment: Attachment): Record<string, Json | undefined> => ({
+  projectId: attachment.projectId,
+  projectName: attachment.projectName,
+  projectSlug: attachment.projectSlug,
+  workspaceId: attachment.workspaceId,
+  workspaceName: attachment.workspaceName,
+});
+
+// One line of the history: what the session did, to which task, and on which
+// board. The board is copied from the attachment rather than looked up again, so
+// a line is a record of what was known at the moment rather than what a later
+// rename would call it.
+const historyLine = (event: "attach" | "close", attachment: Attachment, at: string): Json => ({
+  event,
+  at,
+  taskId: attachment.taskId,
+  number: attachment.number,
+  title: attachment.title,
+  ...boardFields(attachment),
+});
+
+// Appends one event to a session's history and keeps the lines already there.
+//
+// A session is attached and closed more than once, and a retro running after the
+// last close has to be able to see that it ever held anything. Close leaves this
+// file alone, because the attachment stays the record of what is held *now* —
+// other tools read it that way and have to keep seeing nothing after a close —
+// and this is the record of what was.
+export const appendHistory = (
+  store: Store,
+  sessionId: string,
+  event: "attach" | "close",
+  attachment: Attachment,
+  at: Date,
+): void => {
+  if (sessionId === "") throw new Error("no session id");
+  if (!validSessionId(sessionId)) throw new Error(BAD_ID);
+  mkdirSync(store.dir, { recursive: true, mode: 0o700 });
+  // Not written aside and renamed as the attachment is: that would rewrite the
+  // whole file per event. A line cut short by a crash is skipped by the reader,
+  // and starting on a fresh line keeps this event from being glued onto it.
+  const file = historyAt(store.dir, sessionId);
+  const line = `${compact(historyLine(event, attachment, at.toISOString()))}\n`;
+  appendFileSync(file, endsCut(file) ? `\n${line}` : line, { mode: 0o600 });
+};
+
+// Whether the file's last line has no newline, as a crash mid-write leaves it.
+const endsCut = (file: string): boolean => {
+  let fd: number;
+  try {
+    fd = openSync(file, "r");
+  } catch {
+    return false;
+  }
+  try {
+    const size = fstatSync(fd).size;
+    if (size === 0) return false;
+    const last = Buffer.alloc(1);
+    readSync(fd, last, 0, 1, size - 1);
+    return last[0] !== 0x0a;
+  } finally {
+    closeSync(fd);
+  }
+};
+
+// A session's attach history, oldest first: the file is only ever appended to,
+// so what is in it is in the order it happened.
+//
+// A line that cannot be read is counted rather than thrown: the history is what
+// is left of an attachment once it is closed, and refusing to show what was read
+// because one line is damaged would hide the rest of it. A file that is not there
+// at all is not a failure either, since most sessions never attach.
+export const readHistory = (store: Store, sessionId: string): { entries: Json[]; skipped: number } => {
+  const none = { entries: [], skipped: 0 };
+  if (!validSessionId(sessionId)) return none;
+  let text: string;
+  try {
+    text = readFileSync(historyAt(store.dir, sessionId), "utf8");
+  } catch {
+    return none;
+  }
+  const entries: Json[] = [];
+  let skipped = 0;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    // The trailing newline leaves one empty piece, which is not a damaged line.
+    if (line === "") continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      skipped++;
+      continue;
+    }
+    // Valid JSON that is not an object ("null", "3") is as unreadable as a
+    // broken line: a reader indexes every entry by its fields.
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) entries.push(parsed as Json);
+    else skipped++;
+  }
+  return { entries, skipped };
 };
 
 // Builds a marker for the current process: its session, host, working directory

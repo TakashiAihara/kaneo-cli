@@ -17,6 +17,11 @@
       "method": "GET",
       "path": "/task/task-a2",
       "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a2",
+      "query": ""
     }
   ],
   "files": {}

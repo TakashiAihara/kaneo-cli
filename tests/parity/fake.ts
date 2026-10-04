@@ -21,7 +21,9 @@ export type Seed = {
     description?: string | null;
     userId?: string | null;
   }[];
-  comments?: { taskId: string; content: string }[];
+  // A comment with a userId of its own was written by someone else, so only
+  // the server's author check stands between it and a delete.
+  comments?: { taskId: string; content: string; id?: string; userId?: string }[];
   // Users the server knows, so assign has a name to report.
   users?: { id: string; name: string }[];
   // The key's own notifications, oldest first.
@@ -36,6 +38,10 @@ const DEFAULT_COLUMNS = [
   { slug: "in-progress", name: "In Progress" },
   { slug: "done", name: "Done", isFinal: true },
 ];
+
+// The columns a project starts with, as the server's own shape so the routes
+// below can hand them straight to their schemas.
+type SeedColumn = z.input<typeof M.Column>;
 
 export type FakeOptions = {
   pageSize?: number;
@@ -56,9 +62,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const now = () => new Date(T0 + 1000 * clock++).toISOString();
   let seq = 0;
   const id = (prefix: string) => `${prefix}${String(++seq).padStart(4, "0")}`;
+  // Columns are numbered apart from the rest, because every project starts with
+  // its own set: sharing the counter above would move the id a comment or a
+  // relation is given later, which is what the recorded outputs name.
+  let columnSeq = 0;
+  const columnId = () => `col${String(++columnSeq).padStart(4, "0")}`;
 
-  const columns = seed.columns ?? DEFAULT_COLUMNS;
-  const firstColumn = columns[0]!.slug;
+  const seeded = seed.columns ?? DEFAULT_COLUMNS;
+  const firstColumn = seeded[0]!.slug;
   const users = new Map((seed.users ?? []).map((u) => [u.id, u.name]));
   const workspaces = seed.workspaces.map((w) => ({ ...w }));
   const projects = seed.projects.map((p, i) => ({
@@ -75,6 +86,48 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     position: i,
     lastTaskNumber: 0,
   }));
+  // Every project gets the seeded columns as records of its own, which is what
+  // makes a column created in one of them show up on that board and nowhere else.
+  // They take the seed's own moment rather than a tick of the clock: a tick here
+  // would move every task's timestamp in the seed, and with them every recorded
+  // output.
+  const seededAt = new Date(T0).toISOString();
+  const columns: SeedColumn[] = [];
+  for (const project of projects) {
+    for (const [at, column] of seeded.entries()) {
+      columns.push({
+        id: columnId(),
+        projectId: project.id,
+        name: column.name,
+        slug: column.slug,
+        position: at,
+        icon: null,
+        color: null,
+        isFinal: !!column.isFinal,
+        createdAt: seededAt,
+        updatedAt: seededAt,
+      });
+    }
+  }
+  const columnsOf = (projectId: string): SeedColumn[] =>
+    columns.filter((c) => c.projectId === projectId).sort((a, b) => a.position - b.position);
+  const addColumn = (projectId: string, wanted: z.input<typeof M.CreateColumnBody>): SeedColumn => {
+    const at = now();
+    const column: SeedColumn = {
+      id: columnId(),
+      projectId,
+      name: wanted.name,
+      slug: slugOf(wanted.name),
+      position: Math.max(-1, ...columnsOf(projectId).map((c) => c.position)) + 1,
+      icon: wanted.icon ?? null,
+      color: wanted.color ?? null,
+      isFinal: wanted.isFinal ?? false,
+      createdAt: at,
+      updatedAt: at,
+    };
+    columns.push(column);
+    return column;
+  };
   const tasks: z.input<typeof M.Task>[] = [];
   const addTask = (projectId: string, t: Partial<z.input<typeof M.Task>> & { title: string }, taskId?: string) => {
     const project = projects.find((p) => p.id === projectId)!;
@@ -99,13 +152,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   for (const t of seed.tasks) addTask(t.projectId, t, t.id);
 
   const comments: z.input<typeof M.Comment>[] = [];
-  const addComment = (taskId: string, content: string) => {
+  const addComment = (taskId: string, content: string, commentId = id("cmt"), userId = "user-self") => {
     const at = now();
-    const c = { id: id("cmt"), taskId, userId: "user-self", content, createdAt: at, updatedAt: at, user: { name: "Self", image: null } };
+    const c = { id: commentId, taskId, userId, content, createdAt: at, updatedAt: at, user: { name: userId === "user-self" ? "Self" : (seed.users?.find((u) => u.id === userId)?.name ?? userId), image: null } };
     comments.push(c);
     return c;
   };
-  for (const c of seed.comments ?? []) addComment(c.taskId, c.content);
+  for (const c of seed.comments ?? []) addComment(c.taskId, c.content, c.id, c.userId);
 
   const relations: z.input<typeof M.TaskRelation>[] = [];
   const requests: Recorded[] = [];
@@ -211,7 +264,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           id: t.id,
           title: t.title,
           status: t.status,
-          isCompleted: !!columns.find((c) => c.slug === t.status)?.isFinal,
+          isCompleted: !!columnsOf(t.projectId).find((c) => c.slug === t.status)?.isFinal,
           priority: t.priority,
           number: t.number,
           projectId: t.projectId,
@@ -235,6 +288,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/auth\/organization\/update$/, M.UpdateOrganizationBody],
       ["POST", /^\/project$/, M.CreateProjectBody],
       ["PUT", /^\/project\/[^/]+$/, M.UpdateProjectBody],
+      ["POST", /^\/column\/[^/]+$/, M.CreateColumnBody],
+      ["PUT", /^\/column\/[^/]+$/, M.UpdateColumnBody],
+      ["PUT", /^\/column\/reorder\/[^/]+$/, M.ReorderColumnsBody],
       ["POST", /^\/task\/[^/]+$/, M.CreateTaskBody],
       ["PUT", /^\/task\/status\/[^/]+$/, M.UpdateTaskStatusBody],
       ["PUT", /^\/task\/priority\/[^/]+$/, M.UpdateTaskPriorityBody],
@@ -271,6 +327,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (req.method === "GET" && path === "/project") {
       const ws = url.searchParams.get("workspaceId");
+      // A workspace the key has no access to and one that does not exist are the
+      // same answer, which is what made --workspace <name> read as a permission
+      // problem rather than as an unknown value.
+      if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
       const all = url.searchParams.get("includeArchived") === "true";
       const list = projects
         .filter((x) => x.workspaceId === ws && (all || !x.archivedAt))
@@ -291,7 +351,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if ((p = m(/^\/project\/([^/]+)(\/(archive|unarchive))?$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj) return fail(404, "Project not found");
+      // Checked by the server's workspace middleware before the route runs, as on
+      // the task routes below.
+      if (!proj) return fail(400, "Workspace ID could not be determined");
       if (req.method === "GET" && !p[2]) return ok(M.Project, proj);
       if (req.method === "PUT" && !p[2]) {
         Object.assign(proj, body);
@@ -301,9 +363,54 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "PUT" && p[3] === "unarchive") return ok(M.Project, Object.assign(proj, { archivedAt: null }));
     }
 
-    if (req.method === "GET" && (p = m(/^\/task\/tasks\/([^/]+)$/))) {
+    if ((p = m(/^\/column\/reorder\/([^/]+)$/)) && req.method === "PUT") {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       if (!proj) return fail(404, "Project not found");
+      const mine = new Map(columnsOf(proj.id).map((c) => [c.id, c]));
+      const wanted = (body as any)?.columns ?? [];
+      const off = wanted.filter((c: any) => !mine.has(c.id));
+      if (off.length > 0) return fail(400, `Column not in this project: ${off.map((c: any) => c.id).join(", ")}`);
+      for (const c of wanted) mine.get(c.id)!.position = c.position;
+      return ok(z.array(M.Column), columnsOf(proj.id));
+    }
+    if ((p = m(/^\/column\/([^/]+)$/))) {
+      const key = decodeURIComponent(p![1]);
+      if (req.method === "GET" || req.method === "POST") {
+        if (!projects.some((x) => x.id === key)) return fail(404, "Project not found");
+        if (req.method === "GET") return ok(z.array(M.Column), columnsOf(key));
+        const wanted = (body ?? {}) as z.input<typeof M.CreateColumnBody>;
+        // The slug comes from the name, and one this project already holds is
+        // refused rather than given a second column of the same name.
+        const slug = slugOf(wanted.name);
+        if (slug === "") return fail(400, "Column name must contain at least one alphanumeric character");
+        if (VIRTUAL_STATUSES.includes(slug)) return fail(409, `Column slug "${slug}" is reserved for virtual task statuses`);
+        if (columnsOf(key).some((c) => c.slug === slug)) return fail(409, `Column with slug "${slug}" already exists in this project`);
+        return ok(M.Column, addColumn(key, wanted));
+      }
+      const column = columns.find((c) => c.id === key);
+      if (!column) return fail(404, "Column not found");
+      // A field left out of the update keeps its value, which is what icon and
+      // color take null for: clearing one is asking for it.
+      if (req.method === "PUT") {
+        Object.assign(column, body);
+        column.updatedAt = now();
+        return ok(M.Column, column);
+      }
+      if (req.method === "DELETE") {
+        if (tasks.some((t) => t.projectId === column.projectId && t.status === column.slug)) {
+          return fail(409, "Cannot delete column that contains tasks. Move or delete tasks first.");
+        }
+        columns.splice(columns.indexOf(column), 1);
+        return ok(M.Column, column);
+      }
+    }
+
+    if (req.method === "GET" && (p = m(/^\/task\/tasks\/([^/]+)$/))) {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      // The real server reads the path segment as a project id, finds no such
+      // project and falls back to guessing a workspace from the key, which it
+      // cannot: 400 with that complaint rather than a 404.
+      if (!proj) return fail(400, "Workspace ID could not be determined");
       const mine = tasks.filter((t) => t.projectId === proj.id);
       const size = opts.pageSize ?? 50;
       const page = Number(url.searchParams.get("page") ?? 1);
@@ -312,7 +419,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       return ok(M.BoardResponse, {
         data: {
           ...head,
-          columns: columns.map((c, i) => ({ id: c.slug, slug: c.slug, name: c.name, icon: null, isFinal: !!c.isFinal, position: i, tasks: slice.filter((t) => t.status === c.slug).map(boardTask) })),
+          columns: columnsOf(proj.id).map((c) => ({ id: c.slug, slug: c.slug, name: c.name, icon: c.icon, isFinal: c.isFinal, position: c.position, tasks: slice.filter((t) => t.status === c.slug).map(boardTask) })),
           archivedTasks: [],
           plannedTasks: [],
         },
@@ -321,7 +428,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "POST" && (p = m(/^\/task\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj) return fail(404, "Project not found");
+      if (!proj) return fail(400, "Workspace ID could not be determined");
       return ok(M.Task, addTask(proj.id, body as any));
     }
     if ((p = m(/^\/task\/(status|priority|assignee|move)\/([^/]+)$/)) && req.method === "PUT") {
@@ -354,6 +461,18 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         tasks.splice(i, 1);
         return ok(M.Task, t);
       }
+    }
+
+    if (req.method === "DELETE" && (p = m(/^\/comment\/([^/]+)$/))) {
+      // Upstream resolves the comment's workspace first and only then looks
+      // for it among the caller's own comments.
+      const i = comments.findIndex((c) => c.id === decodeURIComponent(p![1]));
+      if (i < 0) return fail(400, "Workspace ID could not be determined");
+      if (comments[i]!.userId !== "user-self") return fail(404, "Comment not found or you are not the author");
+      const { user: _, ...c } = comments[i]!;
+      const reply = ok(M.Activity, { ...c, type: "comment", externalUserName: null, externalUserAvatar: null, externalSource: null, externalUrl: null });
+      comments.splice(i, 1);
+      return reply;
     }
 
     if ((p = m(/^\/comment\/([^/]+)$/))) {
@@ -513,15 +632,35 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   };
 }
 
+// The slug the server derives from a column's name, which is what a task's
+// status has to be set to in order to land in the column. Copied from toSlug in
+// usekaneo/kaneo v2.29.2 apps/api/src/column/controllers/create-column.ts, so a
+// name outside ASCII gets the slug the server gives it.
+const slugOf = (name: string): string => {
+  const slug = name
+    .normalize("NFKC")
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  return /[\p{L}\p{N}]/u.test(slug) ? slug : "";
+};
+
+// Statuses the server takes without a column, so no column may take their slug.
+const VIRTUAL_STATUSES = ["planned", "archived"];
+
 // What a server older than the document leaves out, applied to any response.
 const LEGACY_DROPPED = new Set(["backgroundVersion", "pagination", "labels", "externalLinks", "subtaskCounts", "assigneeImage", "lastTaskNumber"]);
+// What it sends as null. The relation summaries are nullable in the document,
+// so the id fallback is exercised here.
+const LEGACY_NULLED = new Set(["user", "sourceTask", "targetTask"]);
 function legacy(body: unknown): unknown {
   if (Array.isArray(body)) return body.map(legacy);
   if (!body || typeof body !== "object") return body;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) {
     if (LEGACY_DROPPED.has(k)) continue;
-    out[k] = k === "user" ? null : legacy(v);
+    out[k] = LEGACY_NULLED.has(k) ? null : legacy(v);
   }
   return out;
 }

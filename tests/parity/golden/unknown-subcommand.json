@@ -1,0 +1,42 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "frob"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown command \\\"frob\\\" for \\\"kaneo task\\\"\"\n}\n",
+      "stderr": "Error: unknown command \"frob\" for \"kaneo task\"\n"
+    },
+    {
+      "args": [
+        "comment",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown command \\\"nope\\\" for \\\"kaneo comment\\\"\"\n}\n",
+      "stderr": "Error: unknown command \"nope\" for \"kaneo comment\"\n"
+    },
+    {
+      "args": [
+        "session",
+        "x"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown command \\\"x\\\" for \\\"kaneo session\\\"\"\n}\n",
+      "stderr": "Error: unknown command \"x\" for \"kaneo session\"\n"
+    },
+    {
+      "args": [
+        "task"
+      ],
+      "exit": 0,
+      "stdout": "Work with tasks\n\nUsage:\n  kaneo task [command]\n\nAliases:\n  task, t\n\nAvailable Commands:\n  assign      Assign a task, or clear the assignee when no user is given\n  create      Create a task in a project\n  get         Show one task\n  link        Relate two tasks\n  links       List a task's relations\n  list        List the tasks in a project\n  move        Move a task to another project\n  priority    Change a task's priority\n  rm          Delete a task\n  status      Move a task to another column\n  unlink      Remove the link between two tasks\n\nFlags:\n  -h, --help   help for task\n\nGlobal Flags:\n      --api-key string     API key; prefer KANEO_API_KEY, since a flag is visible in the process list\n      --api-url string     Kaneo base URL (env KANEO_API_URL)\n      --human              force human-readable output, even through a pipe\n      --jq string          filter JSON output with a jq expression (implies --json)\n      --json               force JSON output\n  -p, --project string     project id, slug or name (env KANEO_PROJECT)\n      --timeout duration   per-request timeout (default 10s)\n  -w, --workspace string   workspace id, slug or name (env KANEO_WORKSPACE)\n\nUse \"kaneo task [command] --help\" for more information about a command.\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

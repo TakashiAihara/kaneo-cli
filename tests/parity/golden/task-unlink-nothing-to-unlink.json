@@ -1,0 +1,34 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "unlink",
+        "1",
+        "2",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no relation between #1 and #2\"\n}\n",
+      "stderr": "Error: no relation between #1 and #2\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

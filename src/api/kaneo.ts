@@ -4,13 +4,18 @@ import {
   archiveProject,
   clearAllNotifications,
   createNotification as postNotification,
+  createColumn as postColumn,
   createProject as postProject,
   createTask as postTask,
   createTaskComment,
   createTaskRelation,
   deleteNotificationPreferenceWorkspaceRule,
+  deleteColumn as removeColumn,
   deleteTask as removeTask,
   getNotificationPreferences as readNotificationPreferences,
+  deleteTaskComment,
+  deleteTaskRelation as removeRelation,
+  getColumns as readColumns,
   getProject as readProject,
   getTask as readTask,
   getTaskComments,
@@ -22,8 +27,10 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
   moveTask as putTaskMove,
+  reorderColumns as putColumns,
   unarchiveProject,
   updateNotificationPreferences as putNotificationPreferences,
+  updateColumn as putColumn,
   updateOrganization,
   updateProject as putProject,
   upsertNotificationPreferenceWorkspaceRule,
@@ -34,12 +41,14 @@ import {
 import type {
   BoardTask,
   CreateNotificationBody,
+  Column as GenColumn,
   CreateTaskBody,
   Notification as GenNotification,
   NotificationPreferences as GenNotificationPreferences,
   CreateTaskRelationBody,
   Organization,
   ProjectListItem,
+  RelatedTask,
   TaskLabel,
   Task as GenTask,
   TaskRelation as GenRelation,
@@ -372,6 +381,83 @@ export const updateProject = async (
 const quoted = (value: string | boolean): string =>
   typeof value === "string" ? JSON.stringify(value) : JSON.stringify(String(value));
 
+// A lane on a project's board.
+//
+// A column's slug is what every task in it stores as its status, so a task's
+// status and a column are the same string. The id is a separate opaque string on
+// the column routes, which is why a column is named by either.
+//
+// icon and color are nullable rather than empty: a column may carry neither, and
+// the server says so with null.
+export type Column = {
+  id: string;
+  slug: string;
+  name: string;
+  position: number;
+  isFinal: boolean;
+  icon: string | null;
+  color: string | null;
+};
+
+// Every route that returns a column agrees on these, so they are read once.
+const column = (c: GenColumn): Column => ({
+  id: c.id ?? "",
+  slug: c.slug ?? "",
+  name: c.name ?? "",
+  position: c.position ?? 0,
+  isFinal: c.isFinal ?? false,
+  icon: c.icon ?? null,
+  color: c.color ?? null,
+});
+
+// A project's columns, in board order.
+export const listColumns = async (projectId: string): Promise<Column[]> =>
+  zeroList(await call(readColumns(pathParam(projectId)))).map(column);
+
+// The payload for creating a column. An icon and a color are left out of the body
+// when there are none: the route takes a string or nothing at all, never null,
+// and a column without either is what the board shows by default.
+export type NewColumn = { name: string; icon: string; color: string; isFinal: boolean };
+
+// Adds a column to the end of the board. The server derives the slug from the
+// name, so it is not sent and the reply's slug is the one to report back.
+export const createColumn = async (projectId: string, wanted: NewColumn): Promise<Column> =>
+  column(
+    zeroRecord(
+      await call(
+        postColumn(pathParam(projectId), {
+          name: wanted.name,
+          isFinal: wanted.isFinal,
+          ...(wanted.icon === "" ? {} : { icon: wanted.icon }),
+          ...(wanted.color === "" ? {} : { color: wanted.color }),
+        }),
+      ),
+    ),
+  );
+
+// Writes a new position for every column of a project, so the answer is the
+// whole set rather than the one column that moved.
+export const reorderColumns = async (projectId: string, columnIds: string[]): Promise<Column[]> =>
+  zeroList(
+    await call(
+      putColumns(pathParam(projectId), {
+        columns: columnIds.map((id, position) => ({ id, position })),
+      }),
+    ),
+  ).map(column);
+
+// Renames a column.
+//
+// Only the name is sent. The slug is derived from the name when the column is
+// created and the update route takes no slug at all, so the slug — which is what
+// every task in the column stores as its status — stays as it was.
+export const renameColumn = async (columnId: string, name: string): Promise<Column> =>
+  column(zeroRecord(await call(putColumn(pathParam(columnId), { name }))));
+
+// Deletes a column, which the server allows only while the column holds no tasks.
+export const deleteColumn = async (columnId: string): Promise<Column> =>
+  column(zeroRecord(await call(removeColumn(pathParam(columnId)))));
+
 export type Label = { id: string; name: string; color: string };
 
 // A single work item, as every route that returns one agrees on it.
@@ -406,6 +492,12 @@ export const priorityRank = (priority: string): number => {
 export type Board = {
   projectId: string;
   projectName: string;
+  // The slug is here rather than read again: the listing already carries it, and
+  // a report that names the board a number was not found on needs it. Asking the
+  // project route as well would be a request the caller already paid for.
+  projectSlug: string;
+  // The board route reports a column's id as its slug, so this id is a status,
+  // not the opaque id the column routes take.
   columns: { id: string; name: string; tasks: Task[] }[];
 };
 
@@ -450,7 +542,12 @@ export const getBoard = async (projectId: string): Promise<Board> => {
 
       const data = zeroRecord(response.data);
       if (board === undefined) {
-        board = { projectId: data.id ?? "", projectName: data.name ?? "", columns: [] };
+        board = {
+          projectId: data.id ?? "",
+          projectName: data.name ?? "",
+          projectSlug: data.slug ?? "",
+          columns: [],
+        };
       }
       const target = board;
       for (const column of zeroList(data.columns)) {
@@ -654,13 +751,35 @@ export const addComment = async (taskId: string, content: string, signal?: Abort
   };
 };
 
+// Deletes a comment. An id that does not exist answers 400, since its
+// workspace cannot be found. Someone else's comment answers 404: the server
+// looks only among the caller's own. A key without task:update answers 403.
+export const deleteComment = async (commentId: string): Promise<void> => {
+  await call(deleteTaskComment(pathParam(commentId)));
+};
+
 // The links the server accepts between two tasks.
 export const RELATION_TYPES = ["subtask", "blocks", "related"];
 
+// What the listing says about a task at one end of a link: enough to name it the
+// way the board does. Null when the server sends none, which the document allows;
+// a blank object would read as task #0.
+export type RelationTask = { id: string; number: number | null; title: string; status: string; projectId: string };
+
 // A link between two tasks.
-export type Relation = { id: string; sourceTaskId: string; targetTaskId: string; relationType: string };
+export type Relation = {
+  id: string;
+  sourceTaskId: string;
+  targetTaskId: string;
+  relationType: string;
+  sourceTask: RelationTask | null;
+  targetTask: RelationTask | null;
+};
 
 // Relates two tasks. For a subtask link, source is the parent.
+//
+// The create reply carries neither summary of the two tasks, so both stay null
+// here; a caller holding the two tasks fills them in.
 export const linkTasks = async (
   sourceTaskId: string,
   targetTaskId: string,
@@ -682,13 +801,34 @@ export const linkTasks = async (
 export const listRelations = async (taskId: string): Promise<Relation[]> =>
   zeroList(await call(getTaskRelations(pathParam(taskId)))).map(relation);
 
-// The listing answers with a summary of each linked task as well; the link itself
-// is what this CLI reports.
+// Removes one link and answers with the relation as the server held it, which
+// like a creation reply has no summaries.
+export const deleteRelation = async (relationId: string): Promise<Relation> =>
+  relation(zeroRecord(await call(removeRelation(pathParam(relationId)))));
+
+// The listing answers with a summary of each linked task as well, which is what
+// lets a link be shown by number rather than by id.
 const relation = (r: GenRelation | TaskRelationWithTasks): Relation => ({
   id: r.id ?? "",
   sourceTaskId: r.sourceTaskId ?? "",
   targetTaskId: r.targetTaskId ?? "",
   relationType: r.relationType ?? "",
+  sourceTask: relationTask((r as TaskRelationWithTasks).sourceTask),
+  targetTask: relationTask((r as TaskRelationWithTasks).targetTask),
+});
+
+const relationTask = (t: RelatedTask | null | undefined): RelationTask | null =>
+  t === null || t === undefined
+    ? null
+    : { id: t.id ?? "", number: t.number ?? null, title: t.title ?? "", status: t.status ?? "", projectId: t.projectId ?? "" };
+
+// The summary a relation carries for a task already in hand.
+export const taskSummary = (t: Task): RelationTask => ({
+  id: t.id,
+  number: t.number,
+  title: t.title,
+  status: t.status,
+  projectId: t.projectId,
 });
 
 // A notification for the user the key belongs to. content is null for the ones

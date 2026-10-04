@@ -17,6 +17,7 @@
   },
   "keywords": ["kaneo", "cli", "project-management", "kanban", "tasks"],
   "dependencies": {
+    "jq-wasm": "3.0.0-jq-1.8.2",
     "zod": "4.6.5"
   },
   "devDependencies": {

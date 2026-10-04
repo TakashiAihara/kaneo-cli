@@ -153,8 +153,17 @@ export const SCENARIOS: Scenario[] = [
       ["notification", "prefs", "set", "--email", "--human"],
       ["notification", "prefs", "ws", "set", WS, "--active", "--human"],
       ["notification", "prefs", "ws", "set", "ws-other", "--active=false", "--human"],
-      ["notification", "prefs", "set", "--webhook", "--webhook-url", "https://hook.example", "--human"],
+      ["notification", "prefs", "set", "--webhook", "--webhook-url", "https://example.com/hook", "--human"],
       ["notification", "prefs", "set", "--email=false", "--human"],
+      // The inactive rule kept email, which can no longer deliver.
+      ["notification", "prefs", "ws", "set", "ws-other", "--active", "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--email", "--json"],
+      // A rule with no channel on is not reached; an active one with a channel is,
+      // but only for a channel that was off before.
+      ["notification", "prefs", "ws", "set", "ws-other", "--webhook=false", "--human"],
+      ["notification", "prefs", "set", "--email", "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--email=false", "--human"],
+      ["notification", "prefs", "set", "--email", "--human"],
       ["notification", "prefs", "set", "--gotify-token", "", "--json"],
     ],
   },

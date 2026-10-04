@@ -835,6 +835,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (start !== null && typeof start !== "string") return start;
         const due = b.dueDate === undefined ? null : parsedDate(b.dueDate, "dueDate");
         if (due !== null && typeof due !== "string") return due;
+        if (start !== null && due !== null && Date.parse(start) > Date.parse(due)) {
+          return fail(400, "Start date cannot be after due date. Please adjust the date range.");
+        }
         Object.assign(t, {
           title: b.title,
           status: b.status,

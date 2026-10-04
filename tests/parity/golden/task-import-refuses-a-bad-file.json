@@ -85,8 +85,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"second-bad.json: task 2 has dueDate \\\"someday\\\", which is not a date\"\n}\n",
-      "stderr": "Error: second-bad.json: task 2 has dueDate \"someday\", which is not a date\n"
+      "stdout": "{\n  \"error\": \"second-bad.json: task 2 has dueDate \\\"someday\\\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\"\n}\n",
+      "stderr": "Error: second-bad.json: task 2 has dueDate \"someday\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\n"
     },
     {
       "args": [
@@ -96,8 +96,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"bad-start.json: task 1 has startDate \\\"soon\\\", which is not a date\"\n}\n",
-      "stderr": "Error: bad-start.json: task 1 has startDate \"soon\", which is not a date\n"
+      "stdout": "{\n  \"error\": \"bad-start.json: task 1 has startDate \\\"soon\\\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\"\n}\n",
+      "stderr": "Error: bad-start.json: task 1 has startDate \"soon\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\n"
     },
     {
       "args": [

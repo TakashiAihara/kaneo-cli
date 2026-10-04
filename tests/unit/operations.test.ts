@@ -423,7 +423,7 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["SetTaskPriority", "PUT", "/api/task/priority/a%2Fb", () => api.setTaskPriority(id, "low")],
     ["SetTaskAssignee", "PUT", "/api/task/assignee/a%2Fb", () => api.setTaskAssignee(id, "")],
     ["MoveTask", "PUT", "/api/task/move/a%2Fb", () => api.moveTask(id, "p")],
-    ["SetTaskSchedule", "GET", "/api/task/a%2Fb", () => api.setTaskSchedule(id, { position: 1 })],
+    ["SetStartAndPosition", "GET", "/api/task/a%2Fb", () => api.setStartAndPosition(id, { position: 1 })],
     ["SetTaskDueDate", "PUT", "/api/task/due-date/a%2Fb", () => api.setTaskDueDate(id, "")],
     ["ExportTasks", "GET", "/api/task/export/a%2Fb", () => api.exportProjectTasks(id)],
     ["ImportTasks", "POST", "/api/task/import/a%2Fb", () => api.importProjectTasks(id, [{ title: "t", status: "to-do" }])],
@@ -478,7 +478,7 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
         "ExportTasks",
         "ImportTasks",
         "BulkUpdate",
-        "SetTaskSchedule",
+        "SetStartAndPosition",
       ].includes(name),
     );
     expect(seen[0]).toEqual({ method, path });
@@ -810,8 +810,7 @@ describe("TestReadsMapEveryField", () => {
   });
 });
 
-// What each write puts on the wire.
-describe("TestScheduleSendsTheTaskBack", () => {
+describe("TestStartAndPositionSendTheTaskBack", () => {
   const stored = {
     id: "t1",
     projectId: "p1",
@@ -849,7 +848,7 @@ describe("TestScheduleSendsTheTaskBack", () => {
   // as read; a cleared start date is left out of the body.
   test("position", async () => {
     const seen = server();
-    const after = await api.setTaskSchedule("t1", { position: 7 });
+    const after = await api.setStartAndPosition("t1", { position: 7 });
     expect(seen.map((s) => s.method)).toEqual(["GET", "PUT"]);
     expect(seen[1]!.body).toBe(
       '{"title":"x","description":"body","priority":"high","status":"to-do","projectId":"p1","position":7,"dueDate":"2026-11-01T00:00:00.000Z","userId":"u1"}',
@@ -859,7 +858,7 @@ describe("TestScheduleSendsTheTaskBack", () => {
 
   test("start date", async () => {
     const seen = server();
-    const after = await api.setTaskSchedule("t1", { startDate: "2026-10-20" });
+    const after = await api.setStartAndPosition("t1", { startDate: "2026-10-20" });
     expect(JSON.parse(seen[1]!.body)).toMatchObject({ startDate: "2026-10-20", position: 2 });
     expect(after.startDate).toBe("2026-10-20T00:00:00.000Z");
   });
@@ -870,32 +869,64 @@ describe("TestScheduleSendsTheTaskBack", () => {
     ["an empty read", {}],
     ["another task", { ...stored, id: "t2" }],
     ["no project", { ...stored, projectId: "" }],
-    ["no title", { ...stored, title: "" }],
+    ["no position", { ...stored, position: null }],
   ])("%s writes nothing", async (_, read) => {
     const seen: string[] = [];
     newServer((req) => {
       seen.push(req.method);
       return Response.json(read);
     });
-    expect(String(await failure(api.setTaskSchedule("t1", { position: 7 })))).toContain("before the update got");
+    // The position case asks for a start date only, since a position that is
+    // being set does not need the one read.
+    const changes = read === undefined || (read as { position?: unknown }).position !== null ? { position: 7 } : { startDate: "2026-10-20" };
+    expect(String(await failure(api.setStartAndPosition("t1", changes)))).toContain("before the update got");
     expect(seen).toEqual(["GET"]);
+  });
+
+  // A position being set needs none from the read, so a read without one still
+  // writes.
+  test("no position read, position given", async () => {
+    const seen: string[] = [];
+    newServer(async (req) => {
+      seen.push(req.method);
+      if (req.method === "GET") return Response.json({ ...stored, position: null });
+      return Response.json({ ...stored, ...((await req.json()) as Record<string, unknown>), startDate: null });
+    });
+    expect((await api.setStartAndPosition("t1", { position: 7 })).position).toBe(7);
+    expect(seen).toEqual(["GET", "PUT"]);
+  });
+
+  // Both requests escape the id: the read and the write.
+  test("escapes the id on the write as well", async () => {
+    const seen: string[] = [];
+    newServer(async (req) => {
+      seen.push(`${req.method} ${new URL(req.url).pathname}`);
+      const sent = req.method === "PUT" ? ((await req.json()) as Record<string, unknown>) : {};
+      return Response.json({ ...stored, id: "a/b", ...sent, dueDate: stored.dueDate, startDate: null, userId: "u1" });
+    });
+    await api.setStartAndPosition("a/b", { position: 7 });
+    expect(seen).toEqual(["GET /api/task/a%2Fb", "PUT /api/task/a%2Fb"]);
   });
 
   // A write the server did not echo is refused, field by field.
   test.each([
-    ["position", { position: 7 }, () => ({ position: 2 })],
+    ["position", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, position: 2 })],
+    ["title", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, title: "y" })],
+    ["status", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, status: "done" })],
+    ["priority", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, priority: "no-priority" })],
     ["start date", { startDate: "2026-10-20" }, (s: Record<string, unknown>) => ({ ...s, startDate: "2026-12-01" })],
     ["due date", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, dueDate: null })],
     ["assignee", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, userId: null })],
     ["id", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, id: "t2" })],
   ] as const)("%s not echoed", async (field, changes, echo) => {
     server(echo as (s: Record<string, unknown>) => Record<string, unknown>);
-    const err = String(await failure(api.setTaskSchedule("t1", changes)));
-    expect(err).toContain("/task/t1: server did not echo the update");
+    const err = String(await failure(api.setStartAndPosition("t1", changes)));
+    expect(err).toContain("/task/t1: the reply does not match the update");
     expect(err).toContain(field === "start date" ? "startDate" : field === "due date" ? "dueDate" : field);
   });
 });
 
+// What each write puts on the wire.
 describe("TestWritesSendEveryField", () => {
   // Clearing leaves the field out: the route takes a string or nothing, never
   // null, and the server stores nothing for a missing one.

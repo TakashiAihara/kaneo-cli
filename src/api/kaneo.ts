@@ -1099,8 +1099,8 @@ export const setTaskAssignee = async (taskId: string, userId: string): Promise<v
 };
 
 // What a full update changes that no single-field route can: when a task starts
-// (null clears it) and its order within its column.
-export type ScheduleChanges = { startDate?: string | null; position?: number };
+// (null clears it) and its sort key within its column.
+export type StartAndPosition = { startDate?: string | null; position?: number };
 
 // The largest position the route takes, as the document states it.
 export const MAX_TASK_POSITION = updateTaskBodyPositionMax;
@@ -1114,15 +1114,24 @@ export const MAX_TASK_POSITION = updateTaskBodyPositionMax;
 // the description). So the task is read by id and every field not being changed
 // is sent back as read; a change made elsewhere between the read and the write is
 // overwritten, as project update does. The description is sent back whole, which
-// the detail route carries even when the listing leaves it out.
+// the detail route carries even when the listing leaves it out; the server
+// records a description change only when the text differs, so sending it back
+// unchanged writes no activity, though a description that was null is stored as
+// the empty one it reads as.
 //
-// The reply is checked against what was written, field by field, since a write
-// the server did not echo back did not happen.
-export const setTaskSchedule = async (taskId: string, changes: ScheduleChanges): Promise<Task> => {
-  const before = await getTask(taskId);
-  if (before.id !== taskId || before.projectId === "" || before.title === "") {
+// The reply is checked against what was written, field by field. A reply that
+// does not match is reported rather than taken as done; the write may still have
+// landed.
+export const setStartAndPosition = async (taskId: string, changes: StartAndPosition): Promise<Task> => {
+  const read = zeroRecord(await readTask(pathParam(taskId)));
+  const before = task(read, { assigneeId: read.assigneeId, assigneeName: read.assigneeName, labels: null });
+  // Every field of this read is written back. A read that is empty or names
+  // another task would blank or move the wrong one, and a position the reply
+  // left out reads as 0, a real position, so writing it back would move the
+  // task to the top of its column with nothing to show it.
+  if (before.id !== taskId || before.projectId === "" || (changes.position === undefined && typeof read.position !== "number")) {
     throw new Error(
-      `reading task ${taskId} before the update got id ${quoted(before.id)}, project ${quoted(before.projectId)}, title ${quoted(before.title)}; not writing`,
+      `reading task ${taskId} before the update got id ${quoted(before.id)}, project ${quoted(before.projectId)}, position ${String(read.position)}; not writing`,
     );
   }
   const startDate = changes.startDate === undefined ? before.startDate : changes.startDate;
@@ -1149,7 +1158,18 @@ export const setTaskSchedule = async (taskId: string, changes: ScheduleChanges):
   if (after.position !== position) off.push(`position ${after.position}, want ${position}`);
   if (!sameInstant(after.dueDate, before.dueDate)) off.push(`dueDate ${quoted(String(after.dueDate))}, want ${quoted(String(before.dueDate))}`);
   if (after.assigneeId !== before.assigneeId) off.push(`assignee ${quoted(String(after.assigneeId))}, want ${quoted(String(before.assigneeId))}`);
-  if (off.length > 0) throw new Error(`/task/${taskId}: server did not echo the update: ${off.join("; ")}`);
+  // What was sent back unchanged has to come back unchanged too: a server that
+  // replaced a value it did not take (a priority outside its list, a status
+  // without a column) would otherwise change it under a command that never named
+  // it.
+  for (const [name, got, sent] of [
+    ["title", after.title, before.title],
+    ["status", after.status, before.status],
+    ["priority", after.priority, before.priority],
+  ] as const) {
+    if (got !== sent) off.push(`${name} ${quoted(got)}, want ${quoted(sent)}`);
+  }
+  if (off.length > 0) throw new Error(`/task/${taskId}: the reply does not match the update: ${off.join("; ")}`);
   return after;
 };
 

@@ -1,0 +1,104 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--start-date",
+        "2026-10-20T09:00+09:00",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"description\": \"multi\\nline\",\n  \"status\": \"to-do\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": \"<TIME>Z\",\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n  \"labels\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "due",
+        "1",
+        "2026-10-21T09:00:00+09:00",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"dueDate\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "--due",
+        "2026-10-22",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"operation\": \"updateDueDate\",\n  \"value\": \"<TIME>Z\",\n  \"taskIds\": [\n    \"task-a1\"\n  ],\n  \"updatedCount\": 1\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/task-a1",
+      "query": "",
+      "body": {
+        "title": "Write the parser",
+        "description": "multi\nline",
+        "priority": "high",
+        "status": "to-do",
+        "projectId": "proj-alpha",
+        "position": 0,
+        "startDate": "<TIME>Z"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/due-date/task-a1",
+      "query": "",
+      "body": {
+        "dueDate": "<TIME>Z"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/task/bulk",
+      "query": "",
+      "body": {
+        "taskIds": [
+          "task-a1"
+        ],
+        "operation": "updateDueDate",
+        "value": "<TIME>Z"
+      }
+    }
+  ],
+  "files": {}
+}

@@ -24,7 +24,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"operation\": \"updateDueDate\",\n  \"value\": \"2026-12-01\",\n  \"taskIds\": [\n    \"task-a1\"\n  ],\n  \"updatedCount\": 1\n}\n",
+      "stdout": "{\n  \"operation\": \"updateDueDate\",\n  \"value\": \"<TIME>Z\",\n  \"taskIds\": [\n    \"task-a1\"\n  ],\n  \"updatedCount\": 1\n}\n",
       "stderr": ""
     },
     {
@@ -101,7 +101,7 @@
           "task-a1"
         ],
         "operation": "updateDueDate",
-        "value": "2026-12-01"
+        "value": "<TIME>Z"
       }
     },
     {

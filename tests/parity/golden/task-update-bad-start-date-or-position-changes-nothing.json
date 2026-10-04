@@ -12,8 +12,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"--start-date \\\"soon\\\" is not a date\"\n}\n",
-      "stderr": "Error: --start-date \"soon\" is not a date\n"
+      "stdout": "{\n  \"error\": \"--start-date \\\"soon\\\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\"\n}\n",
+      "stderr": "Error: --start-date \"soon\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\n"
     },
     {
       "args": [

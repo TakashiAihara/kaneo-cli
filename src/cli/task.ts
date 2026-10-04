@@ -23,7 +23,8 @@ import {
   setTaskAssignee,
   setTaskDescription,
   setTaskDueDate,
-  setTaskSchedule,
+  setStartAndPosition,
+  checkTimestamp,
   MAX_TASK_POSITION,
   setTaskPriority,
   setTaskStatus,
@@ -189,7 +190,7 @@ export const taskCommand = {
         {
           name: "position",
           type: "string" as const,
-          usage: "order within its column, from 0",
+          usage: "sort key within its column, lower first; other tasks keep theirs",
           defaultValue: "",
         },
       ],
@@ -225,13 +226,21 @@ export const taskCommand = {
 
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
+        // The server refuses a start after the due date, and the full update that
+        // writes the start comes last, so that refusal would arrive after the
+        // other fields of this command had landed.
+        if (startDate && task.dueDate !== null && Date.parse(startDate) > Date.parse(task.dueDate)) {
+          throw new Error(`--start-date ${startDate} is after #${task.number}'s due date ${task.dueDate}`);
+        }
 
-        // Each field is written by its own endpoint rather than by PUT
-        // /task/{id}, which requires title, priority, status, projectId and
+        // Each field that has its own endpoint is written by it rather than by
+        // PUT /task/{id}, which requires title, priority, status, projectId and
         // position: sending them means reading the task first and writing those
         // values back, and a change made elsewhere in between would be
         // overwritten. The per-field endpoints also keep the activity row the
-        // server writes for the field that changed.
+        // server writes for the field that changed. A start date and a position
+        // have no endpoint of their own, so only they go through the full update
+        // and take that risk.
         const wrote: string[] = [];
         const landed = () => `${names(wrote)} ${wrote.length === 1 ? "was" : "were"} updated`;
         const write = async (field: string, put: () => Promise<void>): Promise<void> => {
@@ -255,7 +264,7 @@ export const taskCommand = {
         if (startDate !== undefined || position !== undefined) {
           const fields = [...(startDate === undefined ? [] : ["start date"]), ...(position === undefined ? [] : ["position"])];
           await write(names(fields), async () => {
-            await setTaskSchedule(task.id, {
+            await setStartAndPosition(task.id, {
               ...(startDate === undefined ? {} : { startDate }),
               ...(position === undefined ? {} : { position }),
             });
@@ -293,18 +302,6 @@ export const taskCommand = {
               field === "description"
                 ? `description reads back differently from the one that was sent (${after.description.length} characters read, ${sent.length} sent)`
                 : `${field} reads back as ${JSON.stringify(after[field])}, not ${JSON.stringify(sent)}`
-            }`,
-          );
-        }
-        const startOff =
-          startDate !== undefined &&
-          (startDate === null ? after.startDate !== null : after.startDate === null || Date.parse(after.startDate) !== Date.parse(startDate));
-        if (startOff || (position !== undefined && after.position !== position)) {
-          throw new Error(
-            `${landed()}, but task #${after.number} ${
-              startOff
-                ? `start date reads back as ${JSON.stringify(after.startDate)}, not ${JSON.stringify(startDate)}`
-                : `position reads back as ${after.position}, not ${position}`
             }`,
           );
         }
@@ -366,17 +363,18 @@ export const taskCommand = {
       short: "Set a task's due date, or clear it when no date is given",
       long:
         "Set a task's due date, or clear it when no date is given.\n\n" +
-        "The date is anything the server reads as one, such as 2026-10-31 or\n" +
-        "2026-10-31T09:00:00+09:00. A bare date is midnight UTC.",
+        "The date is a calendar date (2026-10-31, read as midnight UTC) or a date and\n" +
+        "time with an offset (2026-10-31T09:00+09:00).",
       args: rangeArgs(1, 2),
       run: async ({ args, app }: { args: string[]; app: App }) => {
         // An empty date is refused rather than read as "clear": `task due 1 "$DATE"`
         // with DATE unset would otherwise wipe the date and exit 0.
-        const date = args[1]?.trim();
-        if (date === "") throw new Error("the date is empty; leave it out to clear the due date");
+        const given = args[1]?.trim();
+        if (given === "") throw new Error("the date is empty; leave it out to clear the due date");
+        const date = given === undefined ? "" : instant(given, "the due date");
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
-        const updated = await setTaskDueDate(task.id, date ?? "");
+        const updated = await setTaskDueDate(task.id, date);
         app.out.human(
           updated.dueDate === null ? `#${task.number} no due date` : `#${task.number} due ${updated.dueDate}`,
         );
@@ -840,15 +838,30 @@ const wantedStatus = (status: string): string => {
   return status;
 };
 
-// A start date, or null to clear it. A blank value clears, as `-d ""` clears a
-// description; one Date cannot read is refused before the first write, so a typo
-// does not land the other fields of the same command without it. The server
-// parses it the same way, so what passes here is what it stores.
-const wantedStartDate = (given: string): string | null => {
-  const date = given.trim();
-  if (date === "") return null;
-  if (Number.isNaN(Date.parse(date))) throw new Error(`--start-date ${JSON.stringify(given)} is not a date`);
-  return date;
+// A start date, or null to clear it. Only an empty value clears, as `-d ""`
+// clears a description; one that is not a date, spaces included, is refused
+// before the first write, so a typo does not land the other fields of the same
+// command without it.
+const wantedStartDate = (given: string): string | null => (given === "" ? null : instant(given, "--start-date"));
+
+// A date as the ISO instant it names: a calendar date alone (midnight UTC), or a
+// date and time with an offset, as the time commands take one.
+//
+// Anything else is refused rather than handed to the server's Date: a time
+// without an offset would be read in the server's zone, a bare year or month
+// name would be read as January 1st or this year, and an impossible date such
+// as 2026-02-30 would roll over to March. Each of those stores another instant
+// than the one typed, and compares equal to it afterwards.
+const instant = (given: string, label: string): string => {
+  const full = /^\d{4}-\d{2}-\d{2}$/.test(given) ? `${given}T00:00:00Z` : given;
+  try {
+    checkTimestamp(label, full);
+  } catch {
+    throw new Error(
+      `${label} ${JSON.stringify(given)} is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)`,
+    );
+  }
+  return new Date(full).toISOString();
 };
 
 // A position as the route takes it: a whole number from 0 up to the largest the
@@ -952,7 +965,7 @@ const bulkChange = (flags: FlagValues, changed: ReadonlySet<string>): [string, B
   if (text("priority") !== "") given.push(["--priority", "updatePriority", text("priority")]);
   if (text("assign") !== "") given.push(["--assign", "updateAssignee", text("assign")]);
   if (flags.unassign === true) given.push(["--unassign", "updateAssignee", null]);
-  if (text("due") !== "") given.push(["--due", "updateDueDate", text("due")]);
+  if (text("due") !== "") given.push(["--due", "updateDueDate", instant(text("due"), "--due")]);
   if (flags["clear-due"] === true) given.push(["--clear-due", "updateDueDate", null]);
   if (text("add-label") !== "") given.push(["--add-label", "addLabel", text("add-label")]);
   if (text("remove-label") !== "") given.push(["--remove-label", "removeLabel", text("remove-label")]);
@@ -1041,10 +1054,11 @@ const importedTasks = (text: string, source: string): { tasks: ImportedTask[]; l
       const value = nullable(name);
       if (value === undefined) continue;
       // The server turns the string into a Date without checking it, so an
-      // unparsable one fails that task with an error that names neither the
-      // field nor the value.
-      if (name !== "userId" && value !== null && value !== "" && Number.isNaN(Date.parse(value))) {
-        throw new Error(`${source}: task ${at + 1} has ${name} ${JSON.stringify(value)}, which is not a date`);
+      // unparsable one would fail that task with an error that names neither
+      // the field nor the value. A date is sent as the instant it was read as.
+      if (name !== "userId" && value !== null && value !== "") {
+        out[name] = instant(value, `${source}: task ${at + 1} has ${name}`);
+        continue;
       }
       out[name] = value;
     }

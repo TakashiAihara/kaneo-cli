@@ -3,14 +3,14 @@
     {
       "args": [
         "task",
-        "get",
-        "99",
+        "ls",
+        "--all",
         "--jq",
-        ".number"
+        ".[] | .description"
       ],
-      "exit": 1,
-      "stdout": "{\n  \"error\": \"no task #99 in this project\"\n}\n",
-      "stderr": "Error: no task #99 in this project\n"
+      "exit": 0,
+      "stdout": "multi\nline\n\n\n",
+      "stderr": ""
     }
   ],
   "requests": [

@@ -4,13 +4,13 @@
       "args": [
         "task",
         "get",
-        "1",
+        "99",
         "--jq",
-        ".title | tonumber"
+        ".number"
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: --jq: jq: error: string (\"Write the parser\") cannot be parsed as a number\nthe command itself succeeded; only the --jq expression failed\n"
+      "stderr": "Error: no task #99 in this project\n"
     }
   ],
   "requests": [

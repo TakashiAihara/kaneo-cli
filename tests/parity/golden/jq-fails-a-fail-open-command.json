@@ -1,0 +1,44 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "1",
+        "--jq",
+        ".nope | tonumber"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --jq: jq: error: null (null) cannot be parsed as a number\nthe command itself succeeded; only the --jq expression failed\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+      }
+    }
+  ],
+  "files": {
+    ".config/kaneo/sessions/sess-test.json": "{\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}"
+  }
+}

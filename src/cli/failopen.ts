@@ -1,5 +1,6 @@
 import { debug } from "./app";
 import type { Flag, RunContext } from "./args";
+import { JqFailure } from "../output/jq";
 
 // A failure that must be reported even by a fail-open command.
 //
@@ -32,6 +33,9 @@ export const failOpen =
       // staying quiet would leave the caller believing a half-done operation
       // succeeded.
       if (e instanceof HardError) throw e;
+      // A --jq expression that failed is the caller's mistake, not an outage, and
+      // it fails only after the command has already done its work.
+      if (e instanceof JqFailure) throw e;
       debug(e instanceof Error ? e.message : String(e));
     }
   };

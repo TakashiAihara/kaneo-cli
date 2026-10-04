@@ -103,8 +103,8 @@ const rootCommand = (): { root: Command<App> } => {
 };
 
 // An expression that cannot be compiled is refused before the command runs, so
-// a typo costs no request. An empty --jq is no expression at all, which is what
-// makes it safe to hand it the value of a variable that may be unset.
+// a typo costs no request. An empty --jq is no expression at all: the output is
+// what it would have been without the flag.
 const maybeFilter = async (expression: string): Promise<Filter | undefined> =>
   expression === "" ? undefined : loadFilter(expression);
 

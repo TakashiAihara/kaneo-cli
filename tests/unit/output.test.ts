@@ -26,14 +26,14 @@ const run = (json: boolean, body: string) => {
 
 // A --jq filter is compiled before the Writer is built, so the child loads it the
 // way the root does rather than being handed one.
-const runJq = (expression: string, body: string) => {
+const runJq = (expression: string, body: string, terminal = false) => {
   const p = Bun.spawnSync(
     [
       "bun",
       "-e",
-      `import { Writer } from ${JSON.stringify(OUTPUT)}; import { loadFilter } from ${JSON.stringify(JQ)}; const w = new Writer({ json: true, color: false }, await loadFilter(${JSON.stringify(expression)})); ${body}`,
+      `import { Writer } from ${JSON.stringify(OUTPUT)}; import { loadFilter } from ${JSON.stringify(JQ)}; const w = new Writer({ json: true, color: false }, await loadFilter(${JSON.stringify(expression)}), ${terminal}); ${body}`,
     ],
-    { env: cleanEnv(), stdout: "pipe", stderr: "pipe" },
+    { env: cleanEnv(), stdout: "pipe", stderr: "pipe", timeout: 10_000 },
   );
   return { out: p.stdout.toString(), err: p.stderr.toString(), exit: p.exitCode };
 };
@@ -100,30 +100,67 @@ describe("Writer", () => {
 // The filter a `--jq` asked for: what a command wrote, narrowed to what the
 // caller wants to read.
 describe("Writer with a --jq filter", () => {
-  // -r, as gh does it: what the expression produces is the output, so a number
-  // a script does arithmetic on is not a quoted JSON string.
-  test("TestJQPrintsANumberRaw", () => {
+  test("TestJQPrintsANumber", () => {
     const { out } = runJq(".number", `w.data({ number: 7, title: "Ship it" });`);
     expect(out).toBe("7\n");
   });
 
+  // As gh does it: a string is the answer itself, not a quoted JSON string.
   test("TestJQPrintsAStringWithoutQuotes", () => {
     const { out } = runJq(".title", `w.data({ number: 7, title: "Ship it" });`);
     expect(out).toBe("Ship it\n");
   });
 
-  // Left to jq: the filter's output is passed on as it stands rather than run
-  // through the JSON encoder again, which would re-indent or re-escape it.
-  test("TestJQPrintsAnObjectAsJqPrintsIt", () => {
-    const { out } = runJq(".", `w.data({ title: "Ship it" });`);
-    expect(out).toBe('{\n  "title": "Ship it"\n}\n');
+  // What a raw string holds is the value, including what sits at its ends, and
+  // an empty string is still a line where an empty result is not.
+  test.each([
+    ["  Ship it  ", "  Ship it  \n"],
+    ["", "\n"],
+    ["\n", "\n\n"],
+  ])("TestJQKeepsTheWholeString(%j)", (title, want) => {
+    const { out } = runJq(".title", `w.data({ title: ${JSON.stringify(title)} });`);
+    expect(out).toBe(want);
   });
+
+  // Compact, one value to a line, as gh prints it to a pipe.
+  test("TestJQPrintsAnObjectCompact", () => {
+    const { out } = runJq(".", `w.data({ title: "Ship it", tags: ["a"] });`);
+    expect(out).toBe('{"title":"Ship it","tags":["a"]}\n');
+  });
+
 
   // An expression that prints nothing leaves nothing: a line terminator on its
   // own would be output the caller never asked for.
   test("TestJQPrintsNothingForAnEmptyExpression", () => {
-    const { out } = runJq("empty", `w.data({ number: 7, title: "Ship it" });`);
+    const { out, err, exit } = runJq("empty", `w.data({ number: 7, title: "Ship it" });`);
+    expect(exit).toBe(0);
+    expect(err).toBe("");
     expect(out).toBe("");
+  });
+
+  // The early check compiles without running, so an expression that would never
+  // finish on null, or that halts on it on purpose, is accepted and only runs
+  // over the real payload.
+  test.each([
+    ["until(.number != null; .) | .number"],
+    ["if . == null then halt_error(3) else .number end"],
+  ])("TestJQDoesNotRunTheExpressionToCheckIt(%j)", (expression) => {
+    const { out, err, exit } = runJq(expression, `w.data({ number: 7 });`);
+    expect(exit).toBe(0);
+    expect(err).toBe("");
+    expect(out).toBe("7\n");
+  });
+
+  // A picked-out string is raw, so on a terminal its control characters are
+  // neutralised the way human() does it; a pipe gets the bytes.
+  test("TestJQSanitizesOnATerminal", () => {
+    const { out } = runJq(".title", `w.data({ title: "a\\x1b[2Jb" });`, true);
+    expect(out).toBe("a�[2Jb\n");
+  });
+
+  test("TestJQKeepsControlCharactersForAPipe", () => {
+    const { out } = runJq(".title", `w.data({ title: "a\\x1b[2Jb" });`);
+    expect(out).toBe("a\x1b[2Jb\n");
   });
 
   // One line each, so several of them end one line apart rather than running
@@ -143,13 +180,13 @@ describe("Writer with a --jq filter", () => {
     expect(err).toContain('cannot be parsed as a number');
   });
 
-  // jq cannot be asked whether an expression compiles, but it refuses to compile
-  // one before it reads an input, so an input of null tells a broken expression
-  // from one that merely disliked the value.
+  // Refused while the filter loads, before the command has written anything: the
+  // body never runs.
   test("TestJQRefusesAnExpressionItCannotCompile", () => {
-    const { out, err, exit } = runJq(".[", `w.data({ number: 7 });`);
+    const { out, err, exit } = runJq(".[", `process.stderr.write("body ran"); w.data({ number: 7 });`);
     expect(exit).not.toBe(0);
     expect(out).toBe("");
+    expect(err).not.toContain("body ran");
     expect(err).toContain("--jq: jq: error");
     expect(err).toContain("compile error");
   });

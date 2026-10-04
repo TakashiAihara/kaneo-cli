@@ -96,6 +96,24 @@ export const SCENARIOS: Scenario[] = [
   { name: "task rm needs --yes", steps: [["task", "rm", "1", "--human"], ["task", "rm", "1", "--yes", "--json"], ["task", "ls", "--all", "--json"]] },
   { name: "task link and links", steps: [["task", "link", "1", "2", "--json"], ["task", "link", "1", "3", "--type", "blocks", "--human"], ["task", "links", "1", "--json"], ["task", "links", "1", "--human"]] },
 
+  // --jq, the one flag every command carries: what a caller pipes a field into
+  // python3 instead, and what must not cost a jq the reader has to install.
+  {
+    name: "jq picks a field",
+    steps: [
+      ["task", "create", "Piped", "--jq", ".number"],
+      ["task", "get", "1", "--jq", ".status", "--human"],
+      ["task", "get", "1", "--jq", "empty"],
+    ],
+  },
+  { name: "jq over a list", steps: [["task", "ls", "--all", "--jq", ".[] | \"\\(.number) \\(.title)\""]] },
+  // Nothing is asked of the server: the expression cannot compile, which is known
+  // before the command would have asked anything.
+  { name: "jq with a bad expression", steps: [["task", "ls", "--jq", ".[", "--json"]] },
+  { name: "jq runtime error", steps: [["task", "get", "1", "--jq", ".title | tonumber"]] },
+  { name: "jq does not filter errors", steps: [["task", "get", "99", "--jq", ".number"]] },
+  { name: "jq empty means no filter", steps: [["task", "get", "1", "--jq", "", "--json"]] },
+
   ...both("comment list", ["comment", "list", "1"]),
   { name: "comment add", steps: [["comment", "add", "1", "hello", "world", "--json"], ["comment", "ls", "1", "--human"]] },
   {

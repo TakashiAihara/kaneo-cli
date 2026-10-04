@@ -7,16 +7,35 @@ import { resolveMode, sanitizeControl } from "../../src/output/output";
 // reads what reached the two streams.
 
 const OUTPUT = join(import.meta.dir, "../../src/output/output");
+const JQ = join(import.meta.dir, "../../src/output/jq");
 
-const run = (json: boolean, body: string) => {
+const cleanEnv = () => {
   const env = { ...process.env };
   for (const key of ["KANEO_API_KEY", "KANEO_API_URL", "KANEO_SESSION_ID", "CLAUDE_CODE_SESSION_ID"]) delete env[key];
+  return env;
+};
+
+const run = (json: boolean, body: string) => {
   const p = Bun.spawnSync(
     ["bun", "-e", `import { Writer } from ${JSON.stringify(OUTPUT)}; const w = new Writer({ json: ${json}, color: false }); ${body}`],
-    { env, stdout: "pipe", stderr: "pipe" },
+    { env: cleanEnv(), stdout: "pipe", stderr: "pipe" },
   );
   if (p.exitCode !== 0) throw new Error(`child failed: ${p.stderr.toString()}`);
   return { out: p.stdout.toString(), err: p.stderr.toString() };
+};
+
+// A --jq filter is compiled before the Writer is built, so the child loads it the
+// way the root does rather than being handed one.
+const runJq = (expression: string, body: string) => {
+  const p = Bun.spawnSync(
+    [
+      "bun",
+      "-e",
+      `import { Writer } from ${JSON.stringify(OUTPUT)}; import { loadFilter } from ${JSON.stringify(JQ)}; const w = new Writer({ json: true, color: false }, await loadFilter(${JSON.stringify(expression)})); ${body}`,
+    ],
+    { env: cleanEnv(), stdout: "pipe", stderr: "pipe" },
+  );
+  return { out: p.stdout.toString(), err: p.stderr.toString(), exit: p.exitCode };
 };
 
 describe("resolveMode", () => {
@@ -75,6 +94,64 @@ describe("Writer", () => {
   test("TestErrorOutputStripsControlCharacters", () => {
     const { err } = run(false, `w.error("boom\\x1b[2Jcleared");`);
     expect(err).not.toContain("\x1b");
+  });
+});
+
+// The filter a `--jq` asked for: what a command wrote, narrowed to what the
+// caller wants to read.
+describe("Writer with a --jq filter", () => {
+  // -r, as gh does it: what the expression produces is the output, so a number
+  // a script does arithmetic on is not a quoted JSON string.
+  test("TestJQPrintsANumberRaw", () => {
+    const { out } = runJq(".number", `w.data({ number: 7, title: "Ship it" });`);
+    expect(out).toBe("7\n");
+  });
+
+  test("TestJQPrintsAStringWithoutQuotes", () => {
+    const { out } = runJq(".title", `w.data({ number: 7, title: "Ship it" });`);
+    expect(out).toBe("Ship it\n");
+  });
+
+  // Left to jq: the filter's output is passed on as it stands rather than run
+  // through the JSON encoder again, which would re-indent or re-escape it.
+  test("TestJQPrintsAnObjectAsJqPrintsIt", () => {
+    const { out } = runJq(".", `w.data({ title: "Ship it" });`);
+    expect(out).toBe('{\n  "title": "Ship it"\n}\n');
+  });
+
+  // An expression that prints nothing leaves nothing: a line terminator on its
+  // own would be output the caller never asked for.
+  test("TestJQPrintsNothingForAnEmptyExpression", () => {
+    const { out } = runJq("empty", `w.data({ number: 7, title: "Ship it" });`);
+    expect(out).toBe("");
+  });
+
+  // One line each, so several of them end one line apart rather than running
+  // together the way an unterminated stream does.
+  test("TestJQTerminatesEveryLineOfItsOutput", () => {
+    const { out } = runJq(".[]", `w.data([1, 2, 3]);`);
+    expect(out).toBe("1\n2\n3\n");
+  });
+
+  // The value decides whether the expression fails, so this cannot be known
+  // before the command runs; the words on stderr are jq's own.
+  test("TestJQReportsARuntimeError", () => {
+    const { out, err, exit } = runJq(".title | tonumber", `w.data({ title: "Ship it" });`);
+    expect(exit).not.toBe(0);
+    expect(out).toBe("");
+    expect(err).toContain("--jq: jq: error");
+    expect(err).toContain('cannot be parsed as a number');
+  });
+
+  // jq cannot be asked whether an expression compiles, but it refuses to compile
+  // one before it reads an input, so an input of null tells a broken expression
+  // from one that merely disliked the value.
+  test("TestJQRefusesAnExpressionItCannotCompile", () => {
+    const { out, err, exit } = runJq(".[", `w.data({ number: 7 });`);
+    expect(exit).not.toBe(0);
+    expect(out).toBe("");
+    expect(err).toContain("--jq: jq: error");
+    expect(err).toContain("compile error");
   });
 });
 

@@ -209,6 +209,15 @@ kaneo task ls --human      # a table through a pipe
 
 Data goes to stdout and progress goes to stderr, so piping into `jq` is always safe.
 
+`--jq <expression>` narrows the JSON to what a caller wants, so reading one field is one command instead of a pipe into `jq`:
+
+```bash
+kaneo task create "fix the parser" --jq .number   # 4
+kaneo task get 1 --jq .status                    # to-do
+```
+
+jq runs inside the binary, so nothing has to be installed. Strings print raw, the way `gh --jq` prints them, and an expression that fails exits non-zero with jq's own complaint on stderr.
+
 ## Develop
 
 ```bash

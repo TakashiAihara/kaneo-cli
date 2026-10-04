@@ -11,7 +11,8 @@ import {
 } from "./args";
 import { deadlineFor, type App } from "./app";
 import { resolveFromEnvironment, type Flags as ResolvedFlags } from "../config/resolve";
-import { isTTY, resolveMode, Writer } from "../output/output";
+import { isTTY, resolveMode, sanitizeControl, Writer } from "../output/output";
+import { loadFilter, JqFailure, type Filter } from "../output/jq";
 import { configureClient } from "../api/http";
 import { contextCommand } from "./context";
 import { whoamiCommand } from "./whoami";
@@ -47,6 +48,8 @@ const GLOBAL_FLAGS: Flag[] = [
   { name: "project", shorthand: "p", type: "string", usage: "project id, slug or name (env KANEO_PROJECT)", defaultValue: "" },
   { name: "json", type: "bool", usage: "force JSON output", defaultValue: "false" },
   { name: "human", type: "bool", usage: "force human-readable output, even through a pipe", defaultValue: "false" },
+  // jq runs inside the binary, so reading one field needs nothing installed.
+  { name: "jq", type: "string", usage: "filter JSON output with a jq expression (implies --json)", defaultValue: "" },
   { name: "timeout", type: "duration", usage: "per-request timeout", defaultValue: DEFAULT_TIMEOUT },
 ];
 
@@ -99,12 +102,24 @@ const rootCommand = (): { root: Command<App> } => {
   return { root };
 };
 
+// An expression that cannot be compiled is refused before the command runs, so
+// a typo costs no request. An empty --jq is no expression at all, which is what
+// makes it safe to hand it the value of a variable that may be unset.
+const maybeFilter = async (expression: string): Promise<Filter | undefined> =>
+  expression === "" ? undefined : loadFilter(expression);
+
 const env = (name: string): string => process.env[name] ?? "";
 const noColor = (): boolean => env("NO_COLOR") !== "";
 const stdoutIsTTY = (): boolean => isTTY(1);
 
-const writerFor = (json: boolean, human: boolean): Writer =>
-  new Writer(resolveMode(json, human, stdoutIsTTY(), noColor()));
+// A filter decides what the reader of stdout gets to see of the payload, so it
+// implies JSON: --human cannot bring the table back, since there would be
+// nothing left to filter.
+const writerFor = (filter: Filter | undefined, json: boolean, human: boolean): Writer =>
+  new Writer(
+    filter === undefined ? resolveMode(json, human, stdoutIsTTY(), noColor()) : resolveMode(true, false, stdoutIsTTY(), noColor()),
+    filter,
+  );
 
 // Whether the raw arguments asked for a mode. A failure during parsing happens
 // before there is a writer, and a script running with --json has to be able to
@@ -153,7 +168,11 @@ export const run = async (argv: string[]): Promise<number> => {
     }
     command.args?.(parsed.args);
 
-    out = writerFor(parsed.flags.json === true, parsed.flags.human === true);
+    // The filter goes in before the settings are resolved, so that an expression
+    // which cannot be compiled is refused without a request being made to find
+    // out.
+    const filter = await maybeFilter(String(parsed.flags.jq ?? ""));
+    out = writerFor(filter, parsed.flags.json === true, parsed.flags.human === true);
     // A flag is keyed by the name it was declared with, so a dashed flag only
     // answers to that dashed spelling. Asking for it in any other case misses
     // without complaining and yields "", which reads as "the user did not pass
@@ -183,8 +202,13 @@ export const run = async (argv: string[]): Promise<number> => {
     });
     return 0;
   } catch (e) {
-    const writer =
-      out ?? writerFor(askedFor(argv, "--json"), askedFor(argv, "--human"));
+    // A failure of the expression is not the command's: there is no payload to
+    // report it with, and the filter cannot be run over the object that says so.
+    if (e instanceof JqFailure) {
+      writeSync(2, `Error: ${sanitizeControl(e.message)}\n`);
+      return 1;
+    }
+    const writer = out ?? writerFor(undefined, askedFor(argv, "--json"), askedFor(argv, "--human"));
     writer.error(e instanceof Error ? e.message : String(e));
     return 1;
   }

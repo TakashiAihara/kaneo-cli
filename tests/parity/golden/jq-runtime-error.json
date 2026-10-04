@@ -1,0 +1,24 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--jq",
+        ".title | tonumber"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --jq: jq: error (at /dev/stdin:16): string (\"Write the parser\") cannot be parsed as a number\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

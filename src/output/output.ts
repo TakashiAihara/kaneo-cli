@@ -1,5 +1,6 @@
 import { fstatSync, writeSync } from "node:fs";
 import { line, type Json } from "./json";
+import type { Filter } from "./jq";
 
 // How one invocation reaches the user.
 //
@@ -49,10 +50,21 @@ export const sanitizeControl = (text: string): string => {
 };
 
 export class Writer {
-  constructor(readonly mode: Mode) {}
+  // The filter, where `--jq` asked for one. It is not part of the mode: the
+  // mode decides what a command is allowed to write, and the filter decides
+  // what a reader of stdout gets to see of it.
+  constructor(
+    readonly mode: Mode,
+    readonly filter?: Filter,
+  ) {}
 
-  // The payload of a command. In JSON mode it is the only thing on stdout.
+  // The payload of a command. In JSON mode it is the only thing on stdout, and
+  // with a filter it is what the filter makes of it.
   data(value: Json): void {
+    if (this.filter !== undefined) {
+      writeSync(1, this.filter(line(value)));
+      return;
+    }
     if (!this.mode.json) return;
     writeSync(1, line(value));
   }
@@ -78,8 +90,12 @@ export class Writer {
   // A failure. stderr always gets the readable form; JSON mode also puts a
   // machine-readable object on stdout, so a script sees it without having to
   // read stderr as well.
+  //
+  // The filter is not applied to that object. A caller asked for one field of a
+  // payload and there is no payload, so anything the filter made of the failure
+  // would be a value nobody asked for where the answer should have been.
   error(message: string): void {
     writeSync(2, `Error: ${sanitizeControl(message)}\n`);
-    if (this.mode.json) this.data({ error: message });
+    if (this.mode.json) writeSync(1, line({ error: message }));
   }
 }

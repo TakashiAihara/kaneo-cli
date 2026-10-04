@@ -1,5 +1,6 @@
-import { apiKey, type App } from "./app";
-import { listWorkspaces, renameWorkspace, type Workspace } from "../api/kaneo";
+import { apiKey, workspace, type App } from "./app";
+import { listMembers, listWorkspaces, renameWorkspace } from "../api/kaneo";
+import { resolveWorkspace } from "./lookup";
 import type { Json } from "../output/json";
 
 const noArgs = (path: string) => (args: string[]) => {
@@ -22,6 +23,21 @@ export const workspaceCommand = {
         const workspaces = await listWorkspaces();
         for (const workspace of workspaces) app.out.human(`${workspace.id}  ${workspace.name}`);
         app.out.data(workspaces as Json);
+      },
+    },
+    {
+      name: "members",
+      short: "List the resolved workspace's members and their roles",
+      args: noArgs("kaneo workspace members"),
+      run: async ({ app }: { app: App }) => {
+        apiKey(app);
+        const members = await listMembers(await resolveWorkspace(app, workspace(app)));
+        const idWidth = members.reduce((at, m) => Math.max(at, m.id.length), 0);
+        const roleWidth = members.reduce((at, m) => Math.max(at, m.role.length), 0);
+        for (const m of members) {
+          app.out.human(`${m.id.padEnd(idWidth)}  ${m.role.padEnd(roleWidth)}  ${m.name} <${m.email}>`);
+        }
+        app.out.data(members as Json);
       },
     },
     {

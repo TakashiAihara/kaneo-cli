@@ -8,7 +8,7 @@ Terms used across this codebase, the CLI's own output, and the Kaneo API. Where 
 
 The top-level container. Owns members, roles and labels; contains projects.
 
-The server models it as a [better-auth](https://better-auth.com) *organization*, which is why it is listed at `/auth/organization/list` rather than under `/workspace`. A single `/workspace/{id}/members` route exists, but everything else about a workspace lives under `/auth/organization/*`.
+The server models it as a [better-auth](https://better-auth.com) *organization*, which is why it is listed at `/auth/organization/list` rather than under `/workspace`. A single `/workspace/{id}/members` route exists (`kaneo workspace members`), but everything else about a workspace lives under `/auth/organization/*`. `GET /invitation/{id}` answers any signed-in caller about any invitation id (`kaneo invitation get`); sending, accepting and canceling an invitation are better-auth organization routes. `GET /invitation/pending` is not used: it reads the user's email from a login session, so an API-key request always gets an empty list.
 
 Data does not cross workspaces. A project cannot be moved between them, and a task cannot be related to one in another.
 

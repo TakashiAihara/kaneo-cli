@@ -1,0 +1,27 @@
+{
+  "steps": [
+    {
+      "args": [
+        "search",
+        "first",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"first\",\n  \"totalCount\": 2,\n  \"results\": [\n    {\n      \"id\": \"task-b1\",\n      \"type\": \"task\",\n      \"title\": \"Beta first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-beta\",\n      \"projectName\": \"Beta\",\n      \"projectSlug\": \"BET\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:07.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"priority\": \"urgent\",\n      \"status\": \"to-do\"\n    },\n    {\n      \"id\": \"cmt0001\",\n      \"type\": \"comment\",\n      \"title\": \"Comment on Write the parser\",\n      \"description\": null,\n      \"content\": \"first comment\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"\",\n      \"createdAt\": \"2026-01-01T00:00:08.000Z\",\n      \"relevanceScore\": 1,\n      \"taskNumber\": 1,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=first&workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

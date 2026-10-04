@@ -28,11 +28,20 @@ export type Seed = {
   users?: { id: string; name: string }[];
   // The key's own notifications, oldest first.
   notifications?: { type: string; title?: string | null; content?: string | null; isRead?: boolean | null; eventData?: unknown }[];
+  // Every workspace's members, as the members route lists them.
+  members?: { id: string; name: string; email: string; role: string }[];
+  // Invitations the detail route can be asked about.
+  invitations?: { id: string; workspaceId: string; inviterName: string; expiresAt: string; status?: string }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
 
 const T0 = Date.parse("2026-01-01T00:00:00.000Z");
+// The address every seeded invitation is sent to, and the moment the fake judges
+// expiry at: later on the seed's day, so a seeded expiry can sit on either side
+// of it and still be a 2026-01-01 time the goldens record rather than mask.
+const INVITEE = "ada@example.com";
+const INVITATIONS_JUDGED_AT = T0 + 12 * 3600 * 1000;
 const DEFAULT_COLUMNS = [
   { slug: "to-do", name: "To Do" },
   { slug: "in-progress", name: "In Progress" },
@@ -386,6 +395,78 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (!w) return fail(404, "Organization not found");
       Object.assign(w, (body as any).data);
       return ok(M.Organization, w);
+    }
+
+    if (req.method === "GET" && (p = m(/^\/workspace\/([^/]+)\/members$/))) {
+      const ws = decodeURIComponent(p[1]);
+      if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
+      return ok(z.array(M.WorkspaceMember), (seed.members ?? []).map((u) => ({ ...u, image: null })));
+    }
+
+    // Expiry is judged at a fixed moment, so the outcome does not depend on when
+    // the suite runs. The answers are v2.29.2's getInvitationDetails: an accepted
+    // or canceled invitation has its details withheld but says which it was.
+    if (req.method === "GET" && (p = m(/^\/invitation\/([^/]+)$/))) {
+      const found = (seed.invitations ?? []).find((i) => i.id === decodeURIComponent(p![1]));
+      if (!found) return ok(M.InvitationDetails, { valid: false, error: "Invitation not found" });
+      const status = found.status ?? "pending";
+      if (status === "accepted") return ok(M.InvitationDetails, { valid: false, error: "This invitation has already been accepted" });
+      if (status === "canceled") return ok(M.InvitationDetails, { valid: false, error: "This invitation has been canceled" });
+      const expired = Date.parse(found.expiresAt) < INVITATIONS_JUDGED_AT;
+      const details = {
+        id: found.id,
+        email: INVITEE,
+        workspaceName: workspaces.find((w) => w.id === found.workspaceId)?.name ?? "",
+        inviterName: found.inviterName,
+        expiresAt: found.expiresAt,
+        status,
+        expired,
+      };
+      if (expired) return ok(M.InvitationDetails, { valid: false, invitation: details, error: "This invitation has expired" });
+      return ok(M.InvitationDetails, { valid: true, invitation: details });
+    }
+
+    if (req.method === "GET" && path === "/search") {
+      const ws = url.searchParams.get("workspaceId") ?? "";
+      if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
+      const type = url.searchParams.get("type") ?? "all";
+      // The server's validation hook reports the first issue as "<field>: <message>".
+      const typed = z.enum(["all", "tasks", "projects", "workspaces", "comments", "activities"]).safeParse(type);
+      if (!typed.success) return fail(400, `type: ${typed.error.issues[0]!.message}`);
+      const q = (url.searchParams.get("q") ?? "").toLowerCase();
+      const only = url.searchParams.get("projectId");
+      const hit = (...texts: (string | null | undefined)[]) => texts.some((t) => (t ?? "").toLowerCase().includes(q));
+      // As in v2.29.2, each type's query is limited on its own, totalCount is the
+      // sum of what they returned, and projects are not narrowed by projectId.
+      const limit = Number(url.searchParams.get("limit") ?? "20");
+      const capped = <T>(list: T[]) => list.slice(0, limit);
+      const inWorkspace = projects.filter((x) => x.workspaceId === ws);
+      const inScope = inWorkspace.filter((x) => only === null || x.id === only);
+      const where = (x: (typeof projects)[number]) => ({ projectId: x.id, projectName: x.name, projectSlug: x.slug, workspaceId: ws, workspaceName: workspaces.find((w) => w.id === ws)!.name });
+      type Hit = z.input<typeof M.SearchResult>;
+      const found: Hit[] = [];
+      const taskHits: Hit[] = [];
+      const commentHits: Hit[] = [];
+      for (const x of inWorkspace) {
+        if ((type === "all" || type === "projects") && hit(x.name, x.slug)) {
+          found.push({ id: x.id, type: "project", title: x.name, createdAt: x.createdAt, relevanceScore: 3, ...where(x) });
+        }
+      }
+      for (const x of inScope) {
+        for (const t of tasks.filter((t) => t.projectId === x.id)) {
+          if ((type === "all" || type === "tasks") && hit(t.title, t.description)) {
+            taskHits.push({ id: t.id, type: "task", title: t.title, ...(t.description ? { description: t.description } : {}), createdAt: t.createdAt, relevanceScore: 2, taskNumber: t.number ?? undefined, priority: t.priority, status: t.status, ...where(x) });
+          }
+          for (const c of comments.filter((c) => c.taskId === t.id)) {
+            if ((type === "all" || type === "comments" || type === "activities") && hit(c.content)) {
+              commentHits.push({ id: c.id, type: "comment", title: `Comment on ${t.title}`, content: c.content, createdAt: c.createdAt, relevanceScore: 1, taskNumber: t.number ?? undefined, userId: c.userId, userName: users.get(c.userId) ?? "", ...where(x) });
+            }
+          }
+        }
+      }
+      const ranked = (list: Hit[]) => list.sort((a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt));
+      const results = ranked([...capped(ranked(found)), ...capped(ranked(taskHits)), ...capped(ranked(commentHits))]);
+      return ok(M.SearchResponse, { results: capped(results), totalCount: results.length, searchQuery: url.searchParams.get("q") ?? "" });
     }
 
     if (req.method === "GET" && path === "/project") {

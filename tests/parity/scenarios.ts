@@ -42,6 +42,20 @@ const N1 = "ntf0001";
 const N2 = "ntf0002";
 const N3 = "ntf0003";
 
+const MEMBERS: Seed["members"] = [
+  { id: "user-self", name: "Self", email: "self@example.com", role: "owner" },
+  { id: "user-1", name: "Ada", email: "ada@example.com", role: "reviewer" },
+];
+
+const INVITATIONS: Seed["invitations"] = [
+  { id: "inv-open", workspaceId: "ws-other", inviterName: "Grace", expiresAt: "2026-01-01T13:00:00.000Z" },
+  { id: "inv-expired", workspaceId: "ws-other", inviterName: "Grace", expiresAt: "2026-01-01T01:00:00.000Z" },
+  { id: "inv-accepted", workspaceId: WS, inviterName: "Grace", expiresAt: "2026-01-01T13:00:00.000Z", status: "accepted" },
+  { id: "inv-canceled", workspaceId: WS, inviterName: "Grace", expiresAt: "2026-01-01T13:00:00.000Z", status: "canceled" },
+  // Expires at the very moment the fake judges at, which still counts as open.
+  { id: "inv-boundary", workspaceId: WS, inviterName: "Grace", expiresAt: "2026-01-01T12:00:00.000Z" },
+];
+
 export type Scenario = {
   name: string;
   // Each step is one CLI invocation. Global context (-w / -p) is passed in
@@ -135,6 +149,14 @@ export const SCENARIOS: Scenario[] = [
   { name: "column by id and name", steps: [["column", "rename", "col0002", "Doing", "--json"], ["column", "reorder", "col0001", "done", "Doing", "--human"]] },
   { name: "column create with flags", steps: [["column", "create", "外部回答", "待ち", "--final", "--icon", "Clock", "--color", "#f00", "--json"], ["column", "rename", "外部回答-待ち", "Waiting", "on", "review", "--json"], ["column", "ls", "--human"]] },
   { name: "column names refused", steps: [["column", "create", "Planned", "--json"], ["column", "create", "!!!", "--json"], ["column", "create", "To Do", "--json"], ["column", "create", " ", "--json"], ["column", "rename", "to-do", " ", "--json"], ["column", "rename", "in-progress", "To Do", "--json"], ["column", "rename", "To Do", "x", "--json"]] },
+
+  ...both("search", ["search", "first"]),
+  { name: "search narrowed", steps: [["search", "first", "--in-project", "--json"], ["search", "first", "-p", "BET", "--human"], ["search", "first", "--in-project", "-p", "nope", "--human"], ["search", "a", "--in-project", "--type", "projects", "--human"], ["search", "e", "--type", "tasks", "--limit", "1", "--json"], ["search", "e", "--limit", "50", "--human"], ["search", "beta", "--type", "projects", "--human"], ["search", "e", "--limit", "2", "--human"], ["search", "x", "--type", "bogus", "--json"], ["search", " ", "--json"]] },
+  { name: "search at the server's limit", seed: { tasks: Array.from({ length: 50 }, (_, i) => ({ id: `task-m${i}`, projectId: P1, title: `match ${i}` })) }, steps: [["search", "match", "--type", "tasks", "--limit", "50", "--human"]] },
+  { name: "search and members need a workspace", env: { KANEO_WORKSPACE: "" }, steps: [["search", "first", "--json"], ["workspace", "members", "--json"]] },
+  ...both("workspace members", ["workspace", "members"]).map((s) => ({ ...s, seed: { members: MEMBERS } })),
+  { name: "workspace members by name", seed: { members: MEMBERS }, env: { KANEO_WORKSPACE: "Other" }, steps: [["workspace", "members", "--human"]] },
+  { name: "invitation get", seed: { invitations: INVITATIONS }, steps: [["invitation", "get", "inv-open", "--json"], ["invitation", "get", "inv-open", "--human"], ["invitation", "get", "inv-expired", "--json"], ["invitation", "get", "inv-expired", "--human"], ["invitation", "get", "inv-accepted", "--json"], ["invitation", "get", "inv-canceled", "--human"], ["invitation", "get", "inv-boundary", "--human"], ["invitation", "get", "nope", "--human"]] },
 
   ...both("task list", ["task", "list"]),
   ...both("task list all", ["task", "ls", "--all"]),

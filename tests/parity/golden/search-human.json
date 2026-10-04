@@ -1,0 +1,27 @@
+{
+  "steps": [
+    {
+      "args": [
+        "search",
+        "first",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "task     BET#1  Beta first  (to-do)\ncomment  ALP#1  Comment on Write the parser\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=first&workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

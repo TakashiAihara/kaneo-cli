@@ -1,0 +1,27 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workspace",
+        "members",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "user-self  owner     Self <self@example.com>\nuser-1     reviewer  Ada <ada@example.com>\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

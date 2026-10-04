@@ -74,13 +74,37 @@ const zeroRecord = <T>(reply: T | undefined): T => reply ?? ({} as T);
 //
 // Go decoded these fields into a time.Time, so a field it could not parse failed
 // the decode there rather than becoming a timestamp nobody can act on, and this
-// fails the call with the field and the value for the same reason.
-const isoTime = (field: string, value: string | null | undefined): string => {
-  const at = Date.parse(value ?? "");
-  if (!Number.isNaN(at)) return new Date(at).toISOString();
+// fails the call with the field and the value for the same reason. What it could
+// parse is RFC 3339 and nothing looser: Date.parse also takes a bare year, a date
+// alone, or a time with no offset, which it reads in the local zone, so the same
+// reply would name a different instant on another machine. The value is cut in
+// the message, since the reply decides how long it is.
+const isoTime = (field: string, value: unknown): string => {
   if (value === null || value === undefined) return ZERO_TIME;
-  throw new Error(`${field} ${JSON.stringify(value)} is not a timestamp`);
+  const at = typeof value === "string" && isRfc3339(value) ? Date.parse(value) : Number.NaN;
+  if (!Number.isNaN(at)) return new Date(at).toISOString();
+  const shown = JSON.stringify(value) ?? String(value);
+  throw new Error(
+    `${field} ${shown.length > VALUE_LIMIT ? `${shown.slice(0, VALUE_LIMIT)}...` : shown} is not a timestamp`,
+  );
 };
+
+// The layout Go's time.Time reads from JSON, time.RFC3339 with any fraction of
+// a second: upper-case T and Z, and an offset that is always written. Each field
+// is held to its range as Go holds it, because Date.parse carries a 30 February
+// over into March instead of refusing it.
+const isRfc3339 = (value: string): boolean => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/.exec(value);
+  if (!m) return false;
+  const [year, month, day, hour, minute, second, offHour = 0, offMinute = 0] = m.slice(1).map((n) => Number(n ?? 0));
+  const leap = year! % 4 === 0 && (year! % 100 !== 0 || year! % 400 === 0);
+  const daysInMonth = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month! - 1] ?? 0;
+  return (
+    month! >= 1 && month! <= 12 && day! >= 1 && day! <= daysInMonth &&
+    hour! <= 23 && minute! <= 59 && second! <= 59 && offHour <= 23 && offMinute <= 59
+  );
+};
+const VALUE_LIMIT = 200;
 
 // The instant Go's zero time.Time holds, which is what a reply that carried no
 // timestamp, or a null one, decoded to.
@@ -89,7 +113,7 @@ const ZERO_TIME = "0001-01-01T00:00:00.000Z";
 // The same, for a field that is a timestamp or nothing at all. An absent one
 // stays absent rather than becoming an empty string, because a task with no due
 // date and a task due at the epoch are not the same fact.
-const isoTimePtr = (field: string, value: string | null | undefined): string | null =>
+const isoTimePtr = (field: string, value: unknown): string | null =>
   value === null || value === undefined ? null : isoTime(field, value);
 
 // A value the document types as a closed list, handed to the server unchanged so

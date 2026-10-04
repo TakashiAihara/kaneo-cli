@@ -61,10 +61,32 @@ describe("a createdAt in a reply", () => {
   test.each([
     ["", "empty"],
     ["abc", "not a date at all"],
+    ["2026", "a bare year"],
+    ["2026-09-30", "a date alone"],
+    ["2026-09-30T00:00:00", "a time with no offset, which Date.parse reads in the local zone"],
+    ["2026-09-30 00:00:00Z", "a space for the T"],
+    ["2026-09-30t00:00:00z", "lower-case t and z"],
+    ["2026-02-30T00:00:00Z", "a day the month does not have"],
+    ["2026-09-30T24:00:00Z", "an hour past 23"],
+    [2026, "a number"],
   ])("that is %p (%s) fails the read, naming the field", async (createdAt) => {
     answers(taskReply({ createdAt }));
     const e = (await failure(api.getTask("t1"))) as Error;
     expect(e.message).toBe(`createdAt ${JSON.stringify(createdAt)} is not a timestamp`);
+  });
+
+  test.each([
+    ["2026-09-30T00:00:00.123456789Z", "2026-09-30T00:00:00.123Z"],
+    ["2028-02-29T00:00:00Z", "2028-02-29T00:00:00.000Z"],
+  ])("that is %p, which Go reads, reads as %p", async (createdAt, want) => {
+    answers(taskReply({ createdAt }));
+    expect((await api.getTask("t1")).createdAt).toBe(want);
+  });
+
+  test("that is longer than a message should carry is cut", async () => {
+    answers(taskReply({ createdAt: "x".repeat(500) }));
+    const e = (await failure(api.getTask("t1"))) as Error;
+    expect(e.message).toBe(`createdAt "${"x".repeat(199)}... is not a timestamp`);
   });
 
   test.each([
@@ -90,5 +112,31 @@ describe("a dueDate, which may be absent", () => {
     answers(taskReply({ dueDate: "next tuesday" }));
     const e = (await failure(api.getTask("t1"))) as Error;
     expect(e.message).toBe('dueDate "next tuesday" is not a timestamp');
+  });
+});
+
+// Each field names itself, so a failure says which of a reply's times was unusable.
+describe("the other times a reply carries", () => {
+  test("a startDate that is not a date names startDate", async () => {
+    answers(taskReply({ startDate: "soon" }));
+    const e = (await failure(api.getTask("t1"))) as Error;
+    expect(e.message).toBe('startDate "soon" is not a timestamp');
+  });
+
+  test("a project's archivedAt that is not a date names archivedAt", async () => {
+    answers(JSON.stringify({ id: "p1", name: "x", slug: "x", workspaceId: "w1", archivedAt: "soon" }));
+    const e = (await failure(api.getProject("p1"))) as Error;
+    expect(e.message).toBe('archivedAt "soon" is not a timestamp');
+  });
+
+  test("a project with no archivedAt is not archived rather than archived at the zero time", async () => {
+    answers(JSON.stringify({ id: "p1", name: "x", slug: "x", workspaceId: "w1" }));
+    expect((await api.getProject("p1")).archivedAt).toBe(null);
+  });
+
+  test("a comment's createdAt that is not a date names createdAt", async () => {
+    answers(JSON.stringify([{ id: "c1", content: "x", userId: "u1", createdAt: "soon" }]));
+    const e = (await failure(api.listComments("t1"))) as Error;
+    expect(e.message).toBe('createdAt "soon" is not a timestamp');
   });
 });

@@ -197,7 +197,7 @@ describe("redirects", () => {
     configureClient({ baseUrl: url, apiKey: "test-key" });
     const e = (await failure(kaneoFetch("/project", { method: "GET" }))) as Error;
     expect(hops).toBe(10);
-    expect(e.message).toContain("stopped after 10 redirects");
+    expect(e.message).toBe(`GET /api/project: Get ${JSON.stringify(`${url}/api/project`)}: stopped after 10 redirects`);
   });
 
   // As Go's client does: 301, 302 and 303 turn any method but GET and HEAD
@@ -232,16 +232,42 @@ describe("redirects", () => {
   // than passing for the empty reply only a hand-issued call's path would call it.
   test.each([
     [301, "PUT", "/task/status/t1", '{"status":"done"}', "UpdateTaskStatusResponse"],
+    [302, "PUT", "/task/status/t1", '{"status":"done"}', "UpdateTaskStatusResponse"],
     [303, "POST", "/task-relation", '{"relationType":"blocks"}', "CreateTaskRelationResponse"],
   ])("a %p answered to a %p does not read its reply as the empty one", async (status, method, path, body, wantType) => {
     const server = serve(() => new Response("  \n", { headers: { "content-type": "application/json" } }));
-    const origin = serve(() => new Response(null, { status, headers: { location: `${server}/api${path}` } }));
+    // Sent to another route, so a failure that named the route it was redirected
+    // to, or an operation looked up by it, would read differently.
+    const origin = serve(() => new Response(null, { status, headers: { location: `${server}/api/elsewhere` } }));
     configureClient({ baseUrl: origin, apiKey: "test-key" });
     const e = (await failure(
       kaneoFetch(path, { method, headers: { "Content-Type": "application/json" }, body }),
     )) as Error;
     expect(e.message).toContain(`target-type=${wantType}`);
-    expect(e.message.startsWith(`${method} /api${path}: error decoding response`)).toBe(true);
+    expect(e.message).toStartWith(`${method} /api${path}: error decoding response`);
+  });
+});
+
+// A failure after a redirect names the call that was made, as Go's send did:
+// the method and route it was called with, whatever hop it was the answer to.
+describe("failures after a redirect", () => {
+  test("a status from the redirected hop names the call", async () => {
+    const server = serve(() => new Response("gone", { status: 404 }));
+    const origin = serve(() => new Response(null, { status: 303, headers: { location: `${server}/api/elsewhere` } }));
+    configureClient({ baseUrl: origin });
+    const e = (await failure(kaneoFetch("/task-relation", { method: "POST", body: "{}" }))) as KaneoApiError;
+    expect(e).toBeInstanceOf(KaneoApiError);
+    expect([e.method, e.path]).toEqual(["POST", "/api/task-relation"]);
+    expect(e.message).toBe("POST /api/task-relation: 404: gone");
+  });
+
+  test("a hop that cannot be reached names the call, and the URL it dialled after it", async () => {
+    const origin = serve(() => new Response(null, { status: 303, headers: { location: "http://127.0.0.1:9/api/elsewhere" } }));
+    configureClient({ baseUrl: origin });
+    const e = (await failure(kaneoFetch("/task-relation", { method: "POST", body: "{}" }))) as Error;
+    expect(e.message).toBe(
+      'POST /api/task-relation: Get "http://127.0.0.1:9/api/elsewhere": dial tcp 127.0.0.1:9: connect: connection refused',
+    );
   });
 });
 
@@ -347,7 +373,19 @@ describe("responses", () => {
     const url = serve(() => new Response("\uFEFF{}", { headers: { "content-type": "application/json" } }));
     configureClient({ baseUrl: url, apiKey: "test-key" });
     const e = (await failure(kaneoFetch("/project/p1", { method: "GET" }))) as Error;
-    expect(e.message).toContain("GET /api/project/p1: error decoding response");
+    expect(e.message).toContain(
+      "GET /api/project/p1: error decoding response: status=200, content-type=application/json, content-length=5,",
+    );
+  });
+
+  // The document api-check reads is trimmed the way Go trimmed it, which leaves
+  // a byte order mark alone, so a reply holding only the mark is not the empty
+  // document that JavaScript's trim() would make of it.
+  test("a document holding only a byte order mark fails to decode", async () => {
+    const url = serve(() => new Response("﻿\n", { headers: { "content-type": "application/json" } }));
+    configureClient({ baseUrl: url });
+    const e = (await failure(kaneoFetch("/openapi", { method: "GET" }))) as Error;
+    expect(e.message).toMatch(/^GET \/api\/openapi: decode response: /);
   });
 
   test("a body that matches the schema is returned", async () => {
@@ -377,5 +415,15 @@ describe("responses", () => {
     const lines = await captureStderr(() => kaneoFetch("/project/p1", { method: "GET", schema }));
     expect(lines.join("\n")).toContain("GET /project/p1");
     expect(lines.join("\n")).toContain("backgroundVersion");
+  });
+
+  test("under debug, a mismatch after a 303 names the method the call was made with", async () => {
+    const server = serve(() => Response.json({ id: "p1" }));
+    const origin = serve(() => new Response(null, { status: 303, headers: { location: `${server}/api/elsewhere` } }));
+    configureClient({ baseUrl: origin, debug: true });
+    const lines = await captureStderr(() =>
+      kaneoFetch("/project/p1", { method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}", schema }),
+    );
+    expect(lines.join("\n")).toContain("kaneo: PUT /project/p1: response does not match the schema");
   });
 });

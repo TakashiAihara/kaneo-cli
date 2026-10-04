@@ -102,9 +102,8 @@ export class InsecureCredentialError extends Error {
   }
 }
 
-// A failed API call. The message names the request so it can be pasted into
-// curl as it is, and the fields are there so a command can say more than the
-// message does.
+// A failed API call. The message names the request the way Go's URL.Path did,
+// and the fields are there so a command can say more than the message does.
 export class KaneoApiError extends Error {
   constructor(
     public readonly method: string,
@@ -150,11 +149,10 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   let method = (request.method ?? "GET").toUpperCase();
   let body = request.body ?? null;
   let target = new URL(settings.baseUrl + url);
-  // The route every failure this call reports names: the request as the server
-  // is asked for it, /api in front of it and the query left out, which is what
-  // Go reported off the request's URL.Path. It is the path that can be put into
-  // curl as it is, and it is taken before any redirect, so a redirect cannot
-  // move the request a failure is reported against.
+  // The route every failure this call reports names: /api in front of it, the
+  // query left out and escapes read back, which is what Go's send reported off
+  // the request's URL.Path. It is taken before any redirect, as Go's was, so a
+  // failure names the call that was made rather than the hop that failed.
   const served = servedPath(target);
   let headers = new Headers(request.headers);
   headers.set("Accept", "application/json");
@@ -173,24 +171,28 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   const cap = AbortSignal.timeout(settings.timeoutMs);
   const signal = AbortSignal.any([settings.deadline, request.signal, cap].filter(isSignal));
 
-  // The method the call was made with, before any redirect rewrote it. A failure
-  // names it with the route taken before the redirect too, so the pair is a
-  // request that was actually made. The operation a reply is read into is the
-  // one the call was made for, so a
-  // redirect that turned the write into a read cannot have a reply the generated
-  // client would have refused taken for the empty one a hand-issued call's path
-  // is.
+  // The method the call was made with, before a 301, 302 or 303 rewrote it into
+  // a GET. Failures name it together with served, the pair Go's send reported.
+  // The operation is looked up by it as well, so a write turned into a GET is
+  // still read as that write's reply, and a whitespace-only one fails to decode
+  // as it does without the redirect.
   const called = method;
 
   let response: Response;
   for (let hop = 0; ; hop++) {
-    if (hop >= MAX_REDIRECTS) throw new Error(`stopped after ${MAX_REDIRECTS} redirects`);
+    // Go's http.Client reports this as it reports a request that got no answer,
+    // naming the hop it refused to follow, and send prefixes the call as it does
+    // for any other failure.
+    if (hop >= MAX_REDIRECTS) {
+      const stopped = new Error(`stopped after ${MAX_REDIRECTS} redirects`);
+      throw new Error(`${called} ${served}: ${urlError(method, target, stopped)}`, { cause: stopped });
+    }
     try {
       // Followed by hand: only the transport knows whether the next hop may
       // still carry the key, and fetch decides that on its own.
       response = await fetch(target, { method, headers, body, signal, redirect: "manual" });
     } catch (e) {
-      throw new Error(`${method} ${servedPath(target)}: ${urlError(method, target, e)}`, { cause: e });
+      throw new Error(`${called} ${served}: ${urlError(method, target, e)}`, { cause: e });
     }
     const next = redirectTarget(response, target);
     if (!next) break;
@@ -227,7 +229,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   const text = new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes);
   // Trimmed, because that is what the Go build's Error.Body holds and a server
   // may write its envelope with either of the request's line endings around it.
-  const trimmed = text.trim();
+  const trimmed = goTrimSpace(text);
 
   // A non-2xx status and a 2xx carrying success:false are both failures: the
   // server reports validation problems the second way, so the status alone is
@@ -271,13 +273,20 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     // back as it was sent and the mismatch is only worth mentioning when
     // somebody asked to see it.
     if (!checked.success && settings.debug) {
-      reportMismatch(method, path, checked.error);
+      reportMismatch(called, path, checked.error);
     }
   }
   return decoded as T;
 };
 
 const reason = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+// What Go's strings.TrimSpace removes: Unicode's White_Space. That is what
+// JavaScript's trim() removes except for two characters: it also counts the byte
+// order mark, which would turn a reply holding nothing else into the empty one
+// where Go read it as a body that failed to decode, and it leaves NEL (U+0085).
+const goTrimSpace = (text: string): string =>
+  text.replace(/^(?:[^\S﻿]|\u0085)+|(?:[^\S﻿]|\u0085)+$/g, "");
 
 const isSignal = (signal: AbortSignal | null | undefined): signal is AbortSignal =>
   signal !== undefined && signal !== null;
@@ -333,9 +342,9 @@ const goDecodeReason = (why: string): string =>
 
 // The path a request was made on, as the server saw it: /api included,
 // percent-escapes read back and the query left out. That is the Go build's
-// URL.Path, so every failure this transport reports names the route it was made
-// on and that route can be put into curl to try it by hand, and a call that never
-// got an answer is reported this way as well.
+// URL.Path, so an escaped id reads as the id that was asked for; it is not a
+// spelling to paste into curl, where the escapes would have to be put back. A
+// call that never got an answer names the URL it dialled in the reason after it.
 const servedPath = (target: URL): string => {
   try {
     return decodeURIComponent(target.pathname);

@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { startFake, type Recorded } from "./fake";
 import { P1, SEED, WS, type Scenario } from "./scenarios";
 
@@ -66,7 +66,10 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
       // <URL> in a scenario's arguments stands for the fake's address, which
       // is only known once it is listening.
       const argv = args.map((a) => a.replaceAll("<URL>", fake.url));
-      const p = Bun.spawn([...bin, ...argv], { cwd, env, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+      // Each step runs in the scenario's own cwd, so a binary given by a path
+      // relative to where the suite started is resolved from there first.
+      const exe = bin[0]!.includes("/") ? resolve(bin[0]!) : bin[0]!;
+      const p = Bun.spawn([exe, ...bin.slice(1), ...argv], { cwd, env, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
       const [stdout, stderr, exit] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
       steps.push({ args, exit, stdout: normalize(stdout), stderr: normalize(stderr) });
     }
@@ -103,9 +106,8 @@ export const THIS_BUILD = [process.execPath, new URL("../../src/index.ts", impor
 
 // Whether two results are the same under parity.test.ts's comparison: every
 // step's arguments, exit code and output, every request and every file.
-// Bun.deepEquals, like the suite's toEqual, does not look at the order of an
-// object's keys, so a request body that differs only in key order is the same.
+// Bun.deepEquals without its strict flag is what the suite's toEqual does: the
+// order of an object's keys does not count, so a request body that differs only
+// in key order is the same.
 export const sameResult = (want: ScenarioResult, got: ScenarioResult): boolean =>
-  Bun.deepEquals(want.steps, got.steps, true) &&
-  Bun.deepEquals(want.requests, got.requests, true) &&
-  Bun.deepEquals(want.files, got.files, true);
+  Bun.deepEquals(want.steps, got.steps) && Bun.deepEquals(want.requests, got.requests) && Bun.deepEquals(want.files, got.files);

@@ -26,8 +26,8 @@ export function slug(name: string) {
 const USAGE = "usage: bun scripts/record-golden.ts [--bin <kaneo binary>]";
 
 // The binary to record from, or undefined for this source tree. Anything but
-// the two forms is refused: a typo read as a binary would rewrite every golden
-// from a program that does not exist.
+// the two forms is refused, so a typo or --help says what the script takes
+// rather than failing to start a binary by that name on the first scenario.
 const binaryFrom = (args: string[]): string | undefined => {
   if (args.length === 0) return undefined;
   if (args.length === 2 && args[0] === "--bin" && args[1] !== "") return args[1];

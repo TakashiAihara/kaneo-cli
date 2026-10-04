@@ -5,7 +5,7 @@ import { runScenario, THIS_BUILD, type ScenarioResult } from "./run";
 import { SCENARIOS } from "./scenarios";
 
 // This build against tests/parity/golden/: recorded from the Go build when it
-// was retired, and recorded again from this tree for each intended change since
+// was retired, and from this tree for scenarios added and changes intended since
 // (scripts/record-golden.ts). Compared field by field so a failure names the
 // step and the stream that differ, rather than one opaque diff of everything.
 // KANEO_PARITY_BIN points the suite at another build, such as the last release,
@@ -20,7 +20,7 @@ test("every golden has a scenario", () => {
   expect(orphans).toEqual([]);
 });
 
-describe("parity with the Go build", () => {
+describe("parity with the recorded goldens", () => {
   for (const s of SCENARIOS) {
     test(s.name, async () => {
       const want: ScenarioResult = JSON.parse(readFileSync(new URL(`golden/${slug(s.name)}.json`, import.meta.url), "utf8"));

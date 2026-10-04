@@ -1,5 +1,5 @@
 import { OPERATIONS, type Operation } from "./registry";
-import { kaneoFetch, KaneoApiError } from "./http";
+import { kaneoFetch } from "./http";
 import type { Json } from "../output/json";
 import {
   archiveProject,
@@ -53,30 +53,11 @@ import type {
 //
 // Requests and response shapes come from the generated client, so a call that
 // drifts from what the server documents fails to build rather than at the
-// server. This module keeps what the document cannot say: where the key may be
-// sent, how a failure is reported, and the CLI's own view of workspaces,
-// projects and tasks.
-
-// A call through the generated client, with a failure reported the way the Go
-// build reported it: naming the path the request was made on, /api included, so
-// the message can be pasted into curl as it is. The transport quotes the path
-// the generated client wrote, which is the endpoint without that prefix.
-//
-// The quoted path is also decoded and stripped of its query, because that is what
-// Go reported: it read the failure off the request's URL.Path, which holds the
-// route as the server saw it. An id that had to be escaped reads back as the id
-// that was asked for rather than as its percent-encoding.
-const call = async <T>(pending: Promise<T>): Promise<T> => {
-  try {
-    return await pending;
-  } catch (e) {
-    if (e instanceof KaneoApiError) {
-      const [route] = e.path.split("?");
-      throw new KaneoApiError(e.method, served(route!), e.statusCode, e.messages, e.body);
-    }
-    throw e;
-  }
-};
+// server. This module keeps what the document cannot say: the CLI's own view of
+// workspaces, projects and tasks, and what a reply that leaves a field out, or
+// puts something unusable in one, means. The failures themselves are the
+// transport's to report, so a message names the request the same way whichever
+// call it came from.
 
 // A 2xx reply with no body is the zero value of the type the document declares,
 // which is what Go's generated client handed back for one: a freshly allocated
@@ -86,48 +67,30 @@ const call = async <T>(pending: Promise<T>): Promise<T> => {
 const zeroList = <T>(reply: T[] | undefined): T[] => reply ?? [];
 const zeroRecord = <T>(reply: T | undefined): T => reply ?? ({} as T);
 
-// The route a request was made on, with /api in front of it and without the
-// encoding the endpoint was written with.
-//
-// The check is on the whole segment rather than on the spelling: /apix is a
-// path of its own, and prefixing it with /api would name a route nobody called.
-const served = (path: string): string => {
-  const route = decoded(path);
-  return route === "/api" || route.startsWith("/api/") ? route : `/api${route}`;
-};
-
-// A percent-encoded path as the server saw it, read back as the route it names.
-// A sequence that is not valid encoding is left alone: a path this build did not
-// encode must not be turned into a different one by trying.
-const decoded = (path: string): string => {
-  try {
-    return decodeURIComponent(path);
-  } catch {
-    return path;
-  }
-};
-
 // The server writes timestamps the way JavaScript's toISOString does — UTC,
 // milliseconds — so a time read and printed again comes out as the server sent
 // it. A timestamp written any other way is shown as the same instant in that
-// form, and one the reply left out is the Go build's zero time rather than an
-// empty string, because that is what its zero time.Time formatted as and a task
-// with no createdAt is a fact the report has to be able to show.
-const isoTime = (value: string | null | undefined): string => {
+// form.
+//
+// Go decoded these fields into a time.Time, so a field it could not parse failed
+// the decode there rather than becoming a timestamp nobody can act on, and this
+// fails the call with the field and the value for the same reason.
+const isoTime = (field: string, value: string | null | undefined): string => {
   const at = Date.parse(value ?? "");
   if (!Number.isNaN(at)) return new Date(at).toISOString();
-  return value === null || value === undefined || value === "" ? ZERO_TIME : value;
+  if (value === null || value === undefined) return ZERO_TIME;
+  throw new Error(`${field} ${JSON.stringify(value)} is not a timestamp`);
 };
 
 // The instant Go's zero time.Time holds, which is what a reply that carried no
-// timestamp decoded to.
+// timestamp, or a null one, decoded to.
 const ZERO_TIME = "0001-01-01T00:00:00.000Z";
 
 // The same, for a field that is a timestamp or nothing at all. An absent one
 // stays absent rather than becoming an empty string, because a task with no due
 // date and a task due at the epoch are not the same fact.
-const isoTimePtr = (value: string | null | undefined): string | null =>
-  value === null || value === undefined ? null : isoTime(value);
+const isoTimePtr = (field: string, value: string | null | undefined): string | null =>
+  value === null || value === undefined ? null : isoTime(field, value);
 
 // A value the document types as a closed list, handed to the server unchanged so
 // it can answer 400 for one it does not accept. That message names the field and
@@ -169,9 +132,7 @@ export type Workspace = { id: string; name: string; slug: string };
 // and no key at all, so it has no discriminating power and must not be used to
 // check credentials.
 export const listWorkspaces = async (signal?: AbortSignal): Promise<Workspace[]> =>
-  zeroList(await call(listOrganization({ ...(signal === undefined ? {} : { signal }) }))).map((org) =>
-    workspace(org),
-  );
+  zeroList(await listOrganization({ ...(signal === undefined ? {} : { signal }) })).map((org) => workspace(org));
 
 const workspace = (org: Organization): Workspace => ({
   id: org.id ?? "",
@@ -190,7 +151,7 @@ export const renameWorkspace = async (workspaceId: string, name: string): Promis
   const wanted = name.trim();
   if (wanted === "") throw new Error("workspace name is empty");
   const renamed = workspace(
-    zeroRecord(await call(updateOrganization({ organizationId: workspaceId, data: { name: wanted } }))),
+    zeroRecord(await updateOrganization({ organizationId: workspaceId, data: { name: wanted } })),
   );
   if (renamed.id !== workspaceId || renamed.name !== wanted) {
     throw new Error(
@@ -227,9 +188,7 @@ export const archived = (project: Project): boolean => project.archivedAt !== nu
 // url.Values, which sorts. A query string is part of what a server sees, so the
 // two requests have to be the same request.
 export const listProjectsIn = async (workspaceId: string, includeArchived: boolean): Promise<Project[]> =>
-  zeroList(await call(listProjects({ ...(includeArchived ? { includeArchived: "true" } : {}), workspaceId }))).map(
-    project,
-  );
+  zeroList(await listProjects({ ...(includeArchived ? { includeArchived: "true" } : {}), workspaceId })).map(project);
 
 // What every route that returns a project agrees on. The listing adds rollup
 // statistics and the detail route adds timestamps; neither is part of what this
@@ -247,7 +206,7 @@ const project = (item: ProjectFields): Project => ({
   description: item.description ?? "",
   workspaceId: item.workspaceId ?? "",
   isPublic: item.isPublic ?? false,
-  archivedAt: isoTimePtr(item.archivedAt),
+  archivedAt: isoTimePtr("archivedAt", item.archivedAt),
 });
 
 // Fetches one project by id.
@@ -257,7 +216,7 @@ const project = (item: ProjectFields): Project => ({
 // applies the command's own deadline as well, and a signal here only ever cuts
 // this one request short.
 export const getProject = async (projectId: string, signal?: AbortSignal): Promise<Project> =>
-  project(zeroRecord(await call(readProject(pathParam(projectId), { ...(signal === undefined ? {} : { signal }) }))));
+  project(zeroRecord(await readProject(pathParam(projectId), { ...(signal === undefined ? {} : { signal }) })));
 
 // The payload for creating a project. description is not sent: the server's
 // create route takes no description, so it is only here to be set by an update
@@ -269,14 +228,12 @@ export type NewProject = { name: string; workspaceId: string; icon: string; slug
 export const createProject = async (wanted: NewProject): Promise<Project> =>
   project(
     zeroRecord(
-      await call(
-        postProject({
-          name: wanted.name,
-          workspaceId: wanted.workspaceId,
-          icon: wanted.icon === "" ? "Layers" : wanted.icon,
-          slug: wanted.slug,
-        }),
-      ),
+      await postProject({
+        name: wanted.name,
+        workspaceId: wanted.workspaceId,
+        icon: wanted.icon === "" ? "Layers" : wanted.icon,
+        slug: wanted.slug,
+      }),
     ),
   );
 
@@ -287,7 +244,7 @@ export const createProject = async (wanted: NewProject): Promise<Project> =>
 // showing it. Nothing is deleted, so the change is reversible.
 export const setProjectArchived = async (projectId: string, archived: boolean): Promise<void> => {
   const id = pathParam(projectId);
-  await call(archived ? archiveProject(id) : unarchiveProject(id));
+  await (archived ? archiveProject(id) : unarchiveProject(id));
 };
 
 // The fields to change. A field left out is written back as it was read, so
@@ -337,15 +294,13 @@ export const updateProject = async (
 
   const after = project(
     zeroRecord(
-      await call(
-        putProject(pathParam(projectId), {
-          name: want.name ?? before.name,
-          icon: want.icon ?? before.icon,
-          slug: want.slug ?? before.slug,
-          description: want.description ?? before.description,
-          isPublic: before.isPublic,
-        }),
-      ),
+      await putProject(pathParam(projectId), {
+        name: want.name ?? before.name,
+        icon: want.icon ?? before.icon,
+        slug: want.slug ?? before.slug,
+        description: want.description ?? before.description,
+        isPublic: before.isPublic,
+      }),
     ),
   );
 
@@ -521,12 +476,10 @@ export const getBoard = async (projectId: string): Promise<Board> => {
   for (let page = 1, pages = 1; page <= pages; page++) {
     for (let related = 1, relatedPages = 1; related <= relatedPages; related++) {
       const response = zeroRecord(
-        await call(
-          listTasks(pathParam(projectId), {
-            ...(page > 1 ? { page } : {}),
-            ...(related > 1 ? { relatedPage: related } : {}),
-          }),
-        ),
+        await listTasks(pathParam(projectId), {
+          ...(page > 1 ? { page } : {}),
+          ...(related > 1 ? { relatedPage: related } : {}),
+        }),
       );
       pages = response.pagination?.totalPages ?? 0;
       relatedPages = response.pagination?.relatedTotalPages ?? 0;
@@ -624,9 +577,9 @@ const task = (from: TaskFields, extra: Pick<Task, "assigneeId" | "assigneeName" 
   projectId: from.projectId ?? "",
   assigneeId: extra.assigneeId ?? null,
   assigneeName: extra.assigneeName ?? null,
-  startDate: isoTimePtr(from.startDate),
-  dueDate: isoTimePtr(from.dueDate),
-  createdAt: isoTime(from.createdAt),
+  startDate: isoTimePtr("startDate", from.startDate),
+  dueDate: isoTimePtr("dueDate", from.dueDate),
+  createdAt: isoTime("createdAt", from.createdAt),
   labels: extra.labels,
 });
 
@@ -638,7 +591,7 @@ const toTask = (t: BoardTask): Task =>
 // Fetches one task by id, with its assignee's name resolved. Labels are not part
 // of the reply, so they read as null.
 export const getTask = async (taskId: string): Promise<Task> => {
-  const t = zeroRecord(await call(readTask(pathParam(taskId))));
+  const t = zeroRecord(await readTask(pathParam(taskId)));
   return task(t, { assigneeId: t.assigneeId, assigneeName: t.assigneeName, labels: null });
 };
 
@@ -660,16 +613,14 @@ export type NewTask = {
 // userId, resolves no name and carries no labels.
 export const createTask = async (projectId: string, wanted: NewTask): Promise<Task> => {
   const created = zeroRecord(
-    await call(
-      postTask(pathParam(projectId), {
-        title: wanted.title,
-        description: wanted.description,
-        ...(wanted.dueDate === "" ? {} : { dueDate: wanted.dueDate }),
-        priority: unchecked<CreateTaskBody["priority"]>(wanted.priority === "" ? "medium" : wanted.priority),
-        status: wanted.status === "" ? "to-do" : wanted.status,
-        ...(wanted.assigneeId === "" ? {} : { userId: wanted.assigneeId }),
-      }),
-    ),
+    await postTask(pathParam(projectId), {
+      title: wanted.title,
+      description: wanted.description,
+      ...(wanted.dueDate === "" ? {} : { dueDate: wanted.dueDate }),
+      priority: unchecked<CreateTaskBody["priority"]>(wanted.priority === "" ? "medium" : wanted.priority),
+      status: wanted.status === "" ? "to-do" : wanted.status,
+      ...(wanted.assigneeId === "" ? {} : { userId: wanted.assigneeId }),
+    }),
   );
   return task(created, { assigneeId: created.userId, assigneeName: null, labels: null });
 };
@@ -679,24 +630,24 @@ export const createTask = async (projectId: string, wanted: NewTask): Promise<Ta
 // The dedicated endpoint is used rather than PUT /task/{id}, which requires
 // every field and answers 400 when used for a partial update.
 export const setTaskStatus = async (taskId: string, status: string): Promise<void> => {
-  await call(updateTaskStatus(pathParam(taskId), { status }));
+  await updateTaskStatus(pathParam(taskId), { status });
 };
 
 export const setTaskPriority = async (taskId: string, priority: string): Promise<void> => {
-  await call(updateTaskPriority(pathParam(taskId), { priority: unchecked<UpdateTaskPriorityBody["priority"]>(priority) }));
+  await updateTaskPriority(pathParam(taskId), { priority: unchecked<UpdateTaskPriorityBody["priority"]>(priority) });
 };
 
 // Assigns a task to a user, or clears the assignee when userId is empty.
 export const setTaskAssignee = async (taskId: string, userId: string): Promise<void> => {
-  await call(updateTaskAssignee(pathParam(taskId), { userId: userId === "" ? null : userId }));
+  await updateTaskAssignee(pathParam(taskId), { userId: userId === "" ? null : userId });
 };
 
 export const moveTask = async (taskId: string, projectId: string): Promise<void> => {
-  await call(putTaskMove(pathParam(taskId), { destinationProjectId: projectId }));
+  await putTaskMove(pathParam(taskId), { destinationProjectId: projectId });
 };
 
 export const deleteTask = async (taskId: string): Promise<void> => {
-  await call(removeTask(pathParam(taskId)));
+  await removeTask(pathParam(taskId));
 };
 
 // A comment on a task. It is also where the session's metadata lives, since a
@@ -716,12 +667,12 @@ export type Comment = {
 // null one, has not answered who wrote it rather than answered that nobody did,
 // and the name reads as empty.
 export const listComments = async (taskId: string): Promise<Comment[]> =>
-  zeroList(await call(getTaskComments(pathParam(taskId)))).map((c) => ({
+  zeroList(await getTaskComments(pathParam(taskId))).map((c) => ({
     id: c.id ?? "",
     content: c.content ?? "",
     userId: c.userId ?? "",
     userName: c.user?.name ?? "",
-    createdAt: isoTime(c.createdAt),
+    createdAt: isoTime("createdAt", c.createdAt),
   }));
 
 // Posts a comment on a task. The server answers with the stored activity row,
@@ -729,16 +680,14 @@ export const listComments = async (taskId: string): Promise<Comment[]> =>
 // one reads the listing back.
 export const addComment = async (taskId: string, content: string, signal?: AbortSignal): Promise<Comment> => {
   const a = zeroRecord(
-    await call(
-      createTaskComment(pathParam(taskId), { content }, { ...(signal === undefined ? {} : { signal }) }),
-    ),
+    await createTaskComment(pathParam(taskId), { content }, { ...(signal === undefined ? {} : { signal }) }),
   );
   return {
     id: a.id ?? "",
     content: a.content ?? "",
     userId: a.userId ?? "",
     userName: "",
-    createdAt: isoTime(a.createdAt),
+    createdAt: isoTime("createdAt", a.createdAt),
   };
 };
 
@@ -837,19 +786,17 @@ export const linkTasks = async (
 ): Promise<Relation> =>
   relation(
     zeroRecord(
-      await call(
-        createTaskRelation({
-          sourceTaskId,
-          targetTaskId,
-          relationType: unchecked<CreateTaskRelationBody["relationType"]>(relationType),
-        }),
-      ),
+      await createTaskRelation({
+        sourceTaskId,
+        targetTaskId,
+        relationType: unchecked<CreateTaskRelationBody["relationType"]>(relationType),
+      }),
     ),
   );
 
 // A task's links, as both endpoints of the link.
 export const listRelations = async (taskId: string): Promise<Relation[]> =>
-  zeroList(await call(getTaskRelations(pathParam(taskId)))).map(relation);
+  zeroList(await getTaskRelations(pathParam(taskId))).map(relation);
 
 // Removes one link and answers with the relation as the server held it, which
 // like a creation reply has no summaries.
@@ -899,7 +846,7 @@ type Document = { paths?: Record<string, Record<string, { operationId?: string }
 // through the transport like every other call so it lands under /api, since the
 // site root answers 200 with the web app's HTML for any path.
 export const checkApi = async (): Promise<CheckResult> => {
-  const document = zeroRecord(await call(kaneoFetch<Document>("/openapi", { method: "GET" })));
+  const document = zeroRecord(await kaneoFetch<Document>("/openapi", { method: "GET" }));
   const seen = new Set<string>();
   const onServer: string[] = [];
   for (const methods of Object.values(document.paths ?? {})) {

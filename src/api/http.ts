@@ -142,14 +142,20 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   if (settings.baseUrl === "") throw new Error("no API URL configured");
 
   const { schema, ...request } = init;
-  // The endpoint as the generated client wrote it, query included. A failure
-  // with a status quotes this, because that is the call that was made; one
-  // without a status quotes the path it was served on, which is servedPath's.
+  // The endpoint as the generated client wrote it, query included: the spelling
+  // the operation is looked up by, since reading it back first would split an id
+  // that needed escaping into two segments of its own.
   const path = url;
 
   let method = (request.method ?? "GET").toUpperCase();
   let body = request.body ?? null;
   let target = new URL(settings.baseUrl + url);
+  // The route every failure this call reports names: the request as the server
+  // is asked for it, /api in front of it and the query left out, which is what
+  // Go reported off the request's URL.Path. It is the path that can be put into
+  // curl as it is, and it is taken before any redirect, so a redirect cannot
+  // move the request a failure is reported against.
+  const served = servedPath(target);
   let headers = new Headers(request.headers);
   headers.set("Accept", "application/json");
   if (settings.apiKey !== "") {
@@ -166,6 +172,15 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // open either.
   const cap = AbortSignal.timeout(settings.timeoutMs);
   const signal = AbortSignal.any([settings.deadline, request.signal, cap].filter(isSignal));
+
+  // The method the call was made with, before any redirect rewrote it. A failure
+  // names it with the route taken before the redirect too, so the pair is a
+  // request that was actually made. The operation a reply is read into is the
+  // one the call was made for, so a
+  // redirect that turned the write into a read cannot have a reply the generated
+  // client would have refused taken for the empty one a hand-issued call's path
+  // is.
+  const called = method;
 
   let response: Response;
   for (let hop = 0; ; hop++) {
@@ -203,9 +218,13 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     // string of the same reply would measure.
     bytes = await response.arrayBuffer();
   } catch (e) {
-    throw new Error(`${method} ${path}: read body: ${reason(e)}`, { cause: e });
+    throw new Error(`${called} ${served}: read body: ${reason(e)}`, { cause: e });
   }
-  const text = new TextDecoder().decode(bytes);
+  // ignoreBOM leaves a byte order mark in the string instead of dropping it. Go
+  // read the first byte of the body as the start of a value, so a reply carrying
+  // one is a reply it could not read, while a mark this dropped leaves a body
+  // that decodes.
+  const text = new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes);
   // Trimmed, because that is what the Go build's Error.Body holds and a server
   // may write its envelope with either of the request's line endings around it.
   const trimmed = text.trim();
@@ -213,7 +232,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // A non-2xx status and a 2xx carrying success:false are both failures: the
   // server reports validation problems the second way, so the status alone is
   // not enough to judge the call.
-  const reported = failure(method, path, response.status, trimmed);
+  const reported = failure(called, served, response.status, trimmed);
   if (reported) throw reported;
 
   // Which of the Go build's two request paths this is, which its two parsers
@@ -221,7 +240,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // named after the operation it was read into, and the one request this CLI
   // issues without the generated client (the server's own document, for
   // api-check) is trimmed first and reported the way Client.Do reported it.
-  const operation = operationAt(method, path);
+  const operation = operationAt(called, path);
 
   // A write that reports 204 has nothing to decode, and the generated types
   // say so by having nothing to return. What counts as empty is the Go build's
@@ -235,12 +254,14 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     decoded = JSON.parse(text);
   } catch (e) {
     const why = goDecodeReason(reason(e));
-    throw new Error(
+    // A reply that could not be read names the request the way a failure the
+    // server reported does, since the two are read in the same place and the
+    // reply alone says nothing about which call produced it.
+    const what =
       operation === undefined
-        ? `${method} ${path}: decode response: ${why}`
-        : decodeFailure(response, bytes.byteLength, operation, why),
-      { cause: e },
-    );
+        ? `decode response: ${why}`
+        : decodeFailure(response, bytes.byteLength, operation, why);
+    throw new Error(`${called} ${served}: ${what}`, { cause: e });
   }
   if (schema) {
     const checked = schema.safeParse(decoded);
@@ -310,10 +331,11 @@ const responseTypeOf = (operation: Operation): string =>
 const goDecodeReason = (why: string): string =>
   why.includes("Unexpected EOF") ? "unexpected end of JSON input" : why;
 
-// The path a request was made on, as the server saw it: /api included, percent-
-// escapes read back and the query left out. A call that never got an answer is
-// reported this way because there is no status to report instead, and the
-// address is what can be put into curl to try it by hand.
+// The path a request was made on, as the server saw it: /api included,
+// percent-escapes read back and the query left out. That is the Go build's
+// URL.Path, so every failure this transport reports names the route it was made
+// on and that route can be put into curl to try it by hand, and a call that never
+// got an answer is reported this way as well.
 const servedPath = (target: URL): string => {
   try {
     return decodeURIComponent(target.pathname);
@@ -358,6 +380,9 @@ const dialReason = (target: URL, code: unknown, e: unknown): string => {
   }
 };
 
+// The endpoint rather than the route it was served on: the schema is the one the
+// generated client asked to be checked against, so the endpoint is what says
+// which schema was missed.
 const reportMismatch = <T>(method: string, path: string, error: ZodError<T>): void => {
   const fields = error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
   console.error(

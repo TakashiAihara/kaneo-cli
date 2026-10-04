@@ -8,8 +8,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskResponse: unexpected end of JSON input\"\n}\n",
-      "stderr": "Error: error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskResponse: unexpected end of JSON input\n"
+      "stdout": "{\n  \"error\": \"POST /api/task/proj-alpha: error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskResponse: unexpected end of JSON input\"\n}\n",
+      "stderr": "Error: POST /api/task/proj-alpha: error decoding response: status=200, content-type=application/json, content-length=3, target-type=CreateTaskResponse: unexpected end of JSON input\n"
     }
   ],
   "requests": [

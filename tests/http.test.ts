@@ -225,9 +225,30 @@ describe("redirects", () => {
     });
     expect(got).toEqual({ method: want, body: wantBody });
   });
+
+  // The rewrite changes what is sent, not what was asked for: the reply is still
+  // read into the operation the call was made for, so a whitespace-only reply to
+  // a redirected write fails to decode as it does without the redirect, rather
+  // than passing for the empty reply only a hand-issued call's path would call it.
+  test.each([
+    [301, "PUT", "/task/status/t1", '{"status":"done"}', "UpdateTaskStatusResponse"],
+    [303, "POST", "/task-relation", '{"relationType":"blocks"}', "CreateTaskRelationResponse"],
+  ])("a %p answered to a %p does not read its reply as the empty one", async (status, method, path, body, wantType) => {
+    const server = serve(() => new Response("  \n", { headers: { "content-type": "application/json" } }));
+    const origin = serve(() => new Response(null, { status, headers: { location: `${server}/api${path}` } }));
+    configureClient({ baseUrl: origin, apiKey: "test-key" });
+    const e = (await failure(
+      kaneoFetch(path, { method, headers: { "Content-Type": "application/json" }, body }),
+    )) as Error;
+    expect(e.message).toContain(`target-type=${wantType}`);
+    expect(e.message.startsWith(`${method} /api${path}: error decoding response`)).toBe(true);
+  });
 });
 
 describe("failures", () => {
+  // Every failure names the request as it was made, /api included and the query
+  // left out, so the path in a message is the one the server was asked for and can
+  // be put into curl as it is.
   test("an HTTP error status becomes a KaneoApiError naming method, path and status", async () => {
     const url = serve(() => new Response("Unauthorized", { status: 401 }));
     configureClient({ baseUrl: url, apiKey: "test-key" });
@@ -235,7 +256,8 @@ describe("failures", () => {
     expect(e).toBeInstanceOf(KaneoApiError);
     expect(e.statusCode).toBe(401);
     expect(e.unauthorized()).toBe(true);
-    expect(e.message).toBe("GET /project: 401: Unauthorized");
+    expect(e.path).toBe("/api/project");
+    expect(e.message).toBe("GET /api/project: 401: Unauthorized");
   });
 
   test.each([
@@ -246,14 +268,14 @@ describe("failures", () => {
     configureClient({ baseUrl: url, apiKey: "test-key" });
     const e = (await failure(kaneoFetch("/project", { method: "GET" }))) as KaneoApiError;
     expect(e.unauthorized()).toBe(want);
-    expect(e.message).toBe(`GET /project: ${status}`);
+    expect(e.message).toBe(`GET /api/project: ${status}`);
   });
 
   test("a long raw body is cut at 200 characters", async () => {
     const url = serve(() => new Response("x".repeat(500), { status: 500 }));
     configureClient({ baseUrl: url, apiKey: "test-key" });
     const e = (await failure(kaneoFetch("/project", { method: "GET" }))) as KaneoApiError;
-    expect(e.message).toBe(`GET /project: 500: ${"x".repeat(200)}...`);
+    expect(e.message).toBe(`GET /api/project: 500: ${"x".repeat(200)}...`);
   });
 
   // The server reports validation problems as a 2xx carrying success:false.
@@ -269,7 +291,7 @@ describe("failures", () => {
     const e = (await failure(kaneoFetch("/project?workspaceId=ws", { method: "GET" }))) as KaneoApiError;
     expect(e).toBeInstanceOf(KaneoApiError);
     expect(e.messages).toEqual(messages);
-    expect(e.message).toBe(`GET /project?workspaceId=ws: 200: ${messages[0]}`);
+    expect(e.message).toBe(`GET /api/project: 200: ${messages[0]}`);
   });
 
   test("success:false without a message is still a failure", async () => {
@@ -282,7 +304,7 @@ describe("failures", () => {
     const url = serve(() => Response.json({ success: false, error: "Task not found" }, { status: 404 }));
     configureClient({ baseUrl: url, apiKey: "test-key" });
     const e = (await failure(kaneoFetch("/task/x", { method: "GET" }))) as KaneoApiError;
-    expect(e.message).toBe("GET /task/x: 404: Task not found");
+    expect(e.message).toBe("GET /api/task/x: 404: Task not found");
   });
 });
 
@@ -293,6 +315,39 @@ describe("responses", () => {
     const url = serve(() => new Response(null, { status: 204 }));
     configureClient({ baseUrl: url, apiKey: "test-key" });
     expect(await kaneoFetch("/task/x", { method: "DELETE" })).toBeUndefined();
+  });
+
+  // The one request this CLI makes without the generated client is the server's
+  // own document, for api-check, and it is the Go build's Client.Do that trimmed
+  // one: whitespace is the empty document rather than a reply that failed to
+  // decode. The half of the rule that is the generated client's is pinned below.
+  test("the document api-check reads is trimmed, so a whitespace reply is the empty one", async () => {
+    const url = serve(() => new Response("  \n", { headers: { "content-type": "application/json" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    expect(await kaneoFetch("/openapi", { method: "GET" })).toBeUndefined();
+  });
+
+  // A reply the generated client read is not trimmed, so whitespace is a reply it
+  // could not decode. It names the request, as a failure the server reported does,
+  // because the reply alone says nothing about which call produced it.
+  test("a reply the generated client read that fails to decode names the request", async () => {
+    const url = serve(() => new Response("  \n", { headers: { "content-type": "application/json" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/project/p1", { method: "GET" }))) as Error;
+    expect(e.message).toBe(
+      "GET /api/project/p1: error decoding response: status=200, content-type=application/json, content-length=3, target-type=GetProjectResponse: unexpected end of JSON input",
+    );
+  });
+
+  // Go read the first byte of a body as the start of a value, so a reply carrying
+  // a byte order mark is one it could not read. A decoder that drops the mark
+  // hands it a body that decodes instead, and the command goes on with a record
+  // of nothing in it.
+  test("a leading byte order mark is kept, so the reply fails to decode", async () => {
+    const url = serve(() => new Response("\uFEFF{}", { headers: { "content-type": "application/json" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/project/p1", { method: "GET" }))) as Error;
+    expect(e.message).toContain("GET /api/project/p1: error decoding response");
   });
 
   test("a body that matches the schema is returned", async () => {

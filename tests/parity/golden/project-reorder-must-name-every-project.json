@@ -1,0 +1,97 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "reorder",
+        "Alpha",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"every project in this workspace that is not archived has to be named exactly once: missing: BET\"\n}\n",
+      "stderr": "Error: every project in this workspace that is not archived has to be named exactly once: missing: BET\n"
+    },
+    {
+      "args": [
+        "project",
+        "reorder",
+        "Alpha",
+        "Alpha",
+        "Beta",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"every project in this workspace that is not archived has to be named exactly once: repeated: Alpha\"\n}\n",
+      "stderr": "Error: every project in this workspace that is not archived has to be named exactly once: repeated: Alpha\n"
+    },
+    {
+      "args": [
+        "project",
+        "reorder",
+        "Alpha",
+        "nope",
+        "Beta",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"every project in this workspace that is not archived has to be named exactly once: unknown: nope\"\n}\n",
+      "stderr": "Error: every project in this workspace that is not archived has to be named exactly once: unknown: nope\n"
+    },
+    {
+      "args": [
+        "project",
+        "reorder",
+        "Alpha",
+        "Beta",
+        "Old",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"every project in this workspace that is not archived has to be named exactly once: archived: Old (it keeps its place)\"\n}\n",
+      "stderr": "Error: every project in this workspace that is not archived has to be named exactly once: archived: Old (it keeps its place)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

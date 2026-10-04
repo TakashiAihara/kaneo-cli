@@ -105,6 +105,11 @@ export const columnCommand = {
       aliases: ["delete"],
       use: "rm <column>",
       short: "Delete a column",
+      long:
+        "Delete a column.\n\n" +
+        "Only an empty column can go: the server refuses one that still holds tasks.\n" +
+        "Deleting one also deletes the workflow rules that send tasks to it, since\n" +
+        "a rule cannot point at a column that is not there.",
       args: exactArgs(1),
       flags: [{ name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" }],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
@@ -140,7 +145,11 @@ export const columnCommand = {
 // columns can share one, and a name that does is refused rather than guessed.
 // All of it is read off the listing rather than by asking the server, so a word
 // that is none of these is a mistake this names rather than one answered by 404.
-const findColumn = (columns: Column[], ref: string): Column | undefined => {
+//
+// Exported because a command outside this file has to name a column the same way
+// this one does — `workflow set` takes one — and a second copy of these rules
+// would be a second answer to the same reference.
+export const findColumn = (columns: Column[], ref: string): Column | undefined => {
   const wanted = ref.trim();
   const exact = columns.find((column) => column.id === wanted || column.slug === wanted);
   if (exact !== undefined) return exact;
@@ -151,7 +160,9 @@ const findColumn = (columns: Column[], ref: string): Column | undefined => {
   return named[0];
 };
 
-const resolveColumn = async (projectId: string, ref: string): Promise<Column> => {
+// The same, refused rather than undefined when nothing matches, so a caller that
+// cannot go on does not have to say what is missing.
+export const resolveColumn = async (projectId: string, ref: string): Promise<Column> => {
   const found = findColumn(await listColumns(projectId), ref);
   if (found !== undefined) return found;
   throw new Error(`no column ${JSON.stringify(ref.trim())} in this project; kaneo column ls lists them`);

@@ -1,0 +1,92 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "create",
+        "Waiting",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0010\",\n  \"slug\": \"waiting\",\n  \"name\": \"Waiting\",\n  \"position\": 3,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "set",
+        "github",
+        "pr_opened",
+        "waiting",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"rule0002\",\n  \"projectId\": \"proj-alpha\",\n  \"integrationType\": \"github\",\n  \"eventType\": \"pr_opened\",\n  \"columnId\": \"col0010\",\n  \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:11.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "rm",
+        "waiting",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0010\",\n  \"slug\": \"waiting\",\n  \"name\": \"Waiting\",\n  \"position\": 3,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/column/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Waiting",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/workflow-rule/proj-alpha",
+      "query": "",
+      "body": {
+        "integrationType": "github",
+        "eventType": "pr_opened",
+        "columnId": "col0010"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/column/col0010",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

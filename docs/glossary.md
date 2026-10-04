@@ -30,6 +30,14 @@ A task the listing answers beside the columns, in `plannedTasks` and `archivedTa
 
 `kaneo` reads both as two columns of their own, appended after the real ones. `task ls` leaves them out unless `--all` or an explicit `--status` asks for them, and `board` shows neither.
 
+### workflow rule
+
+A rule that moves a task to a column when something outside the board happens: the integration that emits the event and the event itself name it, and the column says where the task ends up.
+
+The pair is what a rule is really keyed by: `PUT /workflow-rule/{projectId}` looks for a rule the project already has for the project, integration and event and moves its column, inserting one when it finds none. Nothing enforces that, though — there is no unique index behind the pair, and the find and the insert are not in a transaction — so a project can end up holding two rules for one pair, which is why `workflow rm` names both ids rather than delete one of them. `integrationType` and `eventType` are Kaneo's own event names, not the provider's webhook names: the plugins look a column up with exactly six of them, `branch_push`, `pr_opened`, `pr_merged`, `issue_opened`, `issue_closed` and `issue_reopened`, over the integrations `github`, `gitea` and `gitlab`. The server stores any pair it is given, so `workflow set` warns on stderr about one outside those.
+
+`kaneo workflow` reads and changes them: `ls`, `set`, `rm`. `ls` and `set` are against the resolved project; `rm` takes either the pair, which it looks for in the resolved project, or a rule's id — what `DELETE /workflow-rule/{id}` takes — and deletes the rule wherever it is. The two write routes answer with the stored row, which names the column by id only; the listing adds `columnName` and `columnSlug`, which are null only if the join behind them finds no column — the cascade on `workflow_rule.column_id` rules that out, since deleting a column deletes the rules pointing at it.
+
 ### task
 
 A work item. Has a `number`, unique within its project and stable, which is what a person reads off the board. Its `id` is an opaque string, which is what the API takes.
@@ -76,6 +84,14 @@ A link between two tasks: `subtask`, `blocks` or `related`. Relations cannot cro
 The type carries the direction, so the same link reads as two different words depending on which end it is read from. `task links` and `task get` word it from the task being shown: `blocks` / `blocked by`, `parent of` / `subtask of` (a subtask link's source is the parent), and `related`, which has no direction.
 
 The listing answers with a summary of each task at either end, so a link is shown by number and title. Where a summary or its number is null, which the server's document allows, the task's id is shown instead.
+
+### external link
+
+A link from a task to something outside the board. Two kinds share one list: a link somebody added by hand, and one an integration brought in when it saw an event on a resource it tracks.
+
+The integration is the one thing that tells them apart: `integrationId` and the nested `integration` are set only for the second kind, so the second kind is what has one and a manual link has none. `resourceType` says what the link points at rather than where it came from — `url` for a manual link, and e.g. `issue`, `pull_request` or `branch` for one a provider brought in — and the list is open-ended, being whatever the integration wrote. `externalId` is the provider's identifier, or the URL itself for a manual link, so a manual link identifies itself by where it points. `title` is nullable on either kind and may be empty.
+
+`kaneo task external-links` (`xlinks`) lists a task's, marking each integration's with the integration it came through. It is the only read of these this CLI wires: adding a link ([#208](https://github.com/TakashiAihara/kaneo-cli/issues/208)) and deleting one ([#210](https://github.com/TakashiAihara/kaneo-cli/issues/210)) are tracked as issues.
 
 ## This CLI's concepts
 

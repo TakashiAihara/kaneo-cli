@@ -24,14 +24,17 @@ import {
   deleteNotificationPreferenceWorkspaceRule,
   deleteColumn as removeColumn,
   createTimeEntry,
+  deleteProject as removeProject,
   deleteTask as removeTask,
   getNotificationPreferences as readNotificationPreferences,
   deleteTaskComment,
   deleteTaskRelation as removeRelation,
+  deleteWorkflowRule as removeRule,
   getColumns as readColumns,
   getInvitationDetails,
   getWorkspaceMembers,
   globalSearch,
+  getExternalLinksByTask as readExternalLinks,
   getProject as readProject,
   getTask as readTask,
   getTaskComments,
@@ -39,6 +42,7 @@ import {
   listNotifications as getNotifications,
   getTaskTimeEntries,
   getTimeEntry,
+  getWorkflowRules as readRules,
   listOrganization,
   listProjects,
   listTasks,
@@ -46,6 +50,7 @@ import {
   markNotificationAsRead,
   moveTask as putTaskMove,
   reorderColumns as putColumns,
+  reorderProjects as putProjects,
   unarchiveProject,
   updateNotificationPreferences as putNotificationPreferences,
   updateColumn as putColumn,
@@ -58,6 +63,7 @@ import {
   updateTaskStatus,
   updateTaskTitle,
   updateTimeEntry,
+  upsertWorkflowRule as putRule,
 } from "./gen/kaneo";
 import type {
   Board as GenBoard,
@@ -71,6 +77,7 @@ import type {
   Activity as GenActivity,
   GlobalSearchParams,
   Label as GenLabel,
+  ExternalLink as GenExternalLink,
   Organization,
   ProjectListItem,
   RelatedTask,
@@ -82,6 +89,8 @@ import type {
   TimeEntry as GenTimeEntry,
   UpdateTaskPriorityBody,
   UpsertNotificationPreferenceWorkspaceRuleBody,
+  WorkflowRule as GenWorkflowRule,
+  WorkflowRuleRow as GenWorkflowRuleRow,
 } from "./gen/model";
 
 // What this CLI makes of a Kaneo server.
@@ -430,6 +439,28 @@ export const setProjectArchived = async (projectId: string, archived: boolean): 
   await (archived ? archiveProject(id) : unarchiveProject(id));
 };
 
+// Deletes a project, and answers with it as it was just before it went.
+//
+// That is the only reading of it there will ever be: the reply is not a listing
+// anything could be read back from, so a report has to be built from what this
+// returns.
+export const deleteProject = async (projectId: string): Promise<Project> =>
+  project(zeroRecord(await removeProject(pathParam(projectId))));
+
+// Writes a new order for a workspace's projects, so the answer is the whole
+// workspace rather than the one project that moved.
+//
+// The positions say an order and nothing else: a project left out of the payload
+// keeps the rank it had, and the ones named fill the slots around it. Naming a
+// subset therefore rearranges those slots rather than moving them somewhere, so
+// a caller that means "first" has to send every project. An archived project
+// keeps whatever rank it holds there too: the server takes its id in the payload
+// like any other, so leaving one out is this client's rule and not the server's.
+export const reorderProjects = async (workspaceId: string, projectIds: string[]): Promise<Project[]> =>
+  zeroList(
+    await putProjects({ projects: projectIds.map((id, position) => ({ id, position })) }, { workspaceId }),
+  ).map(project);
+
 // The fields to change. A field left out is written back as it was read, so
 // passing an empty string is what clears a description.
 export type ProjectChanges = {
@@ -584,6 +615,87 @@ export const renameColumn = async (columnId: string, name: string): Promise<Colu
 // Deletes a column, which the server allows only while the column holds no tasks.
 export const deleteColumn = async (columnId: string): Promise<Column> =>
   column(zeroRecord(await removeColumn(pathParam(columnId))));
+
+// A rule that moves a task to a column when an integration event fires.
+//
+// The integration and the event are what a rule is named by in practice: that
+// pair is enough to find one and says which rule it is, and the id is only what
+// the delete route takes. They are Kaneo's own event names rather than the
+// provider's webhook names — the ones its plugins fire, listed in cli/workflow.ts
+// so a pair outside them can be warned about.
+//
+// Nothing on the server keeps one rule to a pair: the upsert looks for one and
+// inserts if it finds none, and no unique index stands behind it, so a project
+// can hold two rules for the same pair.
+//
+// columnName and columnSlug are the listing's convenience for the column the
+// rule points at. They are null if the join behind them finds no column, which
+// the cascade rules out: workflow_rule.column_id is not nullable and is deleted
+// with its column, so a rule cannot outlive one.
+export type WorkflowRule = {
+  id: string;
+  projectId: string;
+  integrationType: string;
+  eventType: string;
+  columnId: string;
+  columnName: string | null;
+  columnSlug: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const rule = (r: GenWorkflowRule): WorkflowRule => ({
+  id: r.id ?? "",
+  projectId: r.projectId ?? "",
+  integrationType: r.integrationType ?? "",
+  eventType: r.eventType ?? "",
+  columnId: r.columnId ?? "",
+  columnName: r.columnName ?? null,
+  columnSlug: r.columnSlug ?? null,
+  createdAt: isoTime("createdAt", r.createdAt),
+  updatedAt: isoTime("updatedAt", r.updatedAt),
+});
+
+// A project's workflow rules.
+export const listWorkflowRules = async (projectId: string): Promise<WorkflowRule[]> =>
+  zeroList(await readRules(pathParam(projectId))).map(rule);
+
+// A rule as the two writes answer it: the stored row, which names the column by
+// id alone. The caller of a write already knows the column it asked for, and the
+// listing's two extra fields would cost a request to fill in.
+export type WorkflowRuleRow = {
+  id: string;
+  projectId: string;
+  integrationType: string;
+  eventType: string;
+  columnId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const ruleRow = (r: GenWorkflowRuleRow): WorkflowRuleRow => ({
+  id: r.id ?? "",
+  projectId: r.projectId ?? "",
+  integrationType: r.integrationType ?? "",
+  eventType: r.eventType ?? "",
+  columnId: r.columnId ?? "",
+  createdAt: isoTime("createdAt", r.createdAt),
+  updatedAt: isoTime("updatedAt", r.updatedAt),
+});
+
+// Points an integration event at a column, inserting the rule when the project
+// has none for that pair and moving the column of the one it finds. That find
+// and insert is the whole of the server's upsert, so a rule set twice in a moment
+// can leave two rows for one pair.
+export type WorkflowRuleTarget = { integrationType: string; eventType: string; columnId: string };
+
+export const setWorkflowRule = async (projectId: string, wanted: WorkflowRuleTarget): Promise<WorkflowRuleRow> =>
+  ruleRow(zeroRecord(await putRule(pathParam(projectId), { ...wanted })));
+
+// Deletes a rule, and answers with the rule that was removed, since after this
+// there is nowhere left to read it from.
+export const deleteWorkflowRule = async (ruleId: string): Promise<WorkflowRuleRow> =>
+  ruleRow(zeroRecord(await removeRule(pathParam(ruleId))));
 
 export type Label = { id: string; name: string; color: string };
 
@@ -1526,6 +1638,45 @@ export const attachLabel = async (labelId: string, taskId: string): Promise<Labe
 // workspace label's: the server answers 400 for a label on no task.
 export const detachLabel = async (copyId: string): Promise<LabelRecord> =>
   labelRecord(zeroRecord(await detachLabelFromTask(pathParam(copyId))));
+
+// A link from a task to something outside the board.
+//
+// The integration is the one thing that tells a link somebody added by hand from
+// one an integration brought in: integrationType is null for the former, since
+// there is no integration behind it. resourceType says what the link points at
+// rather than where it came from — `url` for a manual link, and e.g. `issue`,
+// `pull_request` or `branch` for one a provider brought in — and it is
+// open-ended, being whatever the integration wrote, so nothing here enumerates
+// it. The integration's own row is left out: the type is what a reader can act
+// on, and the id would name a record this CLI never reads.
+export type ExternalLink = {
+  id: string;
+  taskId: string;
+  resourceType: string;
+  externalId: string;
+  url: string;
+  title: string | null;
+  integrationType: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const externalLink = (l: GenExternalLink): ExternalLink => ({
+  id: l.id ?? "",
+  taskId: l.taskId ?? "",
+  resourceType: l.resourceType ?? "",
+  externalId: l.externalId ?? "",
+  url: l.url ?? "",
+  title: l.title ?? null,
+  integrationType: l.integration?.type ?? null,
+  createdAt: isoTime("createdAt", l.createdAt),
+  updatedAt: isoTime("updatedAt", l.updatedAt),
+});
+
+// The links a task holds, both the ones an integration brought in and the ones
+// added by hand.
+export const listExternalLinks = async (taskId: string): Promise<ExternalLink[]> =>
+  zeroList(await readExternalLinks(pathParam(taskId))).map(externalLink);
 
 export type CheckResult = {
   serverOperations: number;

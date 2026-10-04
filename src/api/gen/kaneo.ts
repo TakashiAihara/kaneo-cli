@@ -15,6 +15,7 @@ import {
   Column,
   Comment,
   CreateNotification200,
+  ExternalLink,
   InvitationDetails,
   Label,
   MoveTaskResult,
@@ -31,6 +32,8 @@ import {
   TaskWithAssignee,
   TimeEntry,
   TimeEntryWithUser,
+  WorkflowRule,
+  WorkflowRuleRow,
   WorkspaceMember
 } from './model';
 import type {
@@ -50,6 +53,8 @@ import type {
   MoveTaskBody,
   PendingLabelDeletion,
   ReorderColumnsBody,
+  ReorderProjectsBody,
+  ReorderProjectsParams,
   UpdateColumnBody,
   UpdateLabelBody,
   UpdateNotificationPreferencesBody,
@@ -62,7 +67,8 @@ import type {
   UpdateTaskStatusBody,
   UpdateTaskTitleBody,
   UpdateTimeEntryBody,
-  UpsertNotificationPreferenceWorkspaceRuleBody
+  UpsertNotificationPreferenceWorkspaceRuleBody,
+  UpsertWorkflowRuleBody
 } from './model';
 
 import { kaneoFetch } from '../http';
@@ -267,6 +273,80 @@ return kaneoFetch<Project>(getUpdateProjectUrl(id),
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateProjectBody),
     schema: Project
+  }
+);}
+
+
+
+export const getDeleteProjectUrl = (id: string,) => {
+
+
+
+
+  return `/project/${id}`
+}
+
+/**
+ * Permanently delete a project and everything in it. Archive it instead to keep the data.
+ * @summary Delete project
+ */
+export const deleteProject = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Project> => {
+
+  return kaneoFetch<Project>(getDeleteProjectUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: Project
+  }
+);}
+
+
+
+export const getReorderProjectsUrl = (params: ReorderProjectsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/project/reorder?${stringifiedParams}` : `/project/reorder`
+}
+
+/**
+ * Set the sidebar order of a workspace's projects. The given positions express relative order only -- the workspace is renumbered to 0..n-1.
+ * @summary Reorder projects
+ */
+export const reorderProjects = async (reorderProjectsBody: ReorderProjectsBody,
+    params: ReorderProjectsParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<Project[]> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Project[]>(getReorderProjectsUrl(params),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reorderProjectsBody),
+    schema: zod.array(Project)
   }
 );}
 
@@ -1854,6 +1934,125 @@ export const deleteTaskRelation = async (id: string, options?: Parameters<typeof
 
     ,
     schema: TaskRelation
+  }
+);}
+
+
+
+export const getGetExternalLinksByTaskUrl = (taskId: string,) => {
+
+
+
+
+  return `/external-link/task/${taskId}`
+}
+
+/**
+ * Get manually added resource links and links from connected integrations, such as GitHub or Gitea issues.
+ * @summary Get task external links
+ */
+export const getExternalLinksByTask = async (taskId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<ExternalLink[]> => {
+
+  return kaneoFetch<ExternalLink[]>(getGetExternalLinksByTaskUrl(taskId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(ExternalLink)
+  }
+);}
+
+
+
+export const getGetWorkflowRulesUrl = (projectId: string,) => {
+
+
+
+
+  return `/workflow-rule/${projectId}`
+}
+
+/**
+ * Get every workflow rule for a project. A rule moves a task to a column when an integration event fires.
+ * @summary Get workflow rules
+ */
+export const getWorkflowRules = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<WorkflowRule[]> => {
+
+  return kaneoFetch<WorkflowRule[]>(getGetWorkflowRulesUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(WorkflowRule)
+  }
+);}
+
+
+
+export const getUpsertWorkflowRuleUrl = (projectId: string,) => {
+
+
+
+
+  return `/workflow-rule/${projectId}`
+}
+
+/**
+ * Create a workflow rule, or update the target column of the existing rule for the same integration and event.
+ * @summary Upsert workflow rule
+ */
+export const upsertWorkflowRule = async (projectId: string,
+    upsertWorkflowRuleBody: UpsertWorkflowRuleBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<WorkflowRuleRow> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<WorkflowRuleRow>(getUpsertWorkflowRuleUrl(projectId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(upsertWorkflowRuleBody),
+    schema: WorkflowRuleRow
+  }
+);}
+
+
+
+export const getDeleteWorkflowRuleUrl = (id: string,) => {
+
+
+
+
+  return `/workflow-rule/${id}`
+}
+
+/**
+ * Delete a workflow rule. Returns the rule that was removed.
+ * @summary Delete workflow rule
+ */
+export const deleteWorkflowRule = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<WorkflowRuleRow> => {
+
+  return kaneoFetch<WorkflowRuleRow>(getDeleteWorkflowRuleUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: WorkflowRuleRow
   }
 );}
 

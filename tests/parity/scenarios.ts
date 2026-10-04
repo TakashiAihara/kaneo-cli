@@ -139,6 +139,24 @@ export const SCENARIOS: Scenario[] = [
     steps: [["project", "update", "proj-noslug", "--name", "Has a name now", "--json"]],
   },
   { name: "project archive and unarchive", steps: [["project", "archive", P2, "--json"], ["project", "ls", "--human"], ["project", "unarchive", P2, "--human"], ["project", "ls", "--json"]] },
+  { name: "project rm needs --yes", steps: [["project", "rm", P2, "--human"], ["project", "rm", "Beta", "--yes", "--json"], ["project", "ls", "--human"], ["project", "ls", "--archived", "--human"], ["task", "ls", "-p", P2, "--json"], ["project", "rm", "OLD", "--yes", "--human"]] },
+  { name: "project rm unknown", steps: [["project", "rm", "nope", "--yes", "--json"]] },
+  { name: "project reorder", steps: [["project", "reorder", "Beta", "ALP", "--human"], ["project", "ls", "--archived", "--json"], ["project", "reorder", P1, P2, "--json"], ["project", "reorder", "bet", "alp", "--json"]] },
+  { name: "project reorder must name every project", steps: [["project", "reorder", "Alpha", "--json"], ["project", "reorder", "Alpha", "Alpha", "Beta", "--json"], ["project", "reorder", "Alpha", "nope", "Beta", "--json"], ["project", "reorder", "Alpha", "Beta", "Old", "--json"]] },
+  // The archived project between two active ones, so the ranks it holds are the
+  // ones the request has to fill around: it keeps its place and the other two
+  // swap.
+  {
+    name: "project reorder around an archived project",
+    seed: {
+      projects: [
+        { id: P1, workspaceId: WS, name: "Alpha", slug: "ALP" },
+        { id: "proj-old", workspaceId: WS, name: "Old", slug: "OLD", archived: true },
+        { id: P2, workspaceId: WS, name: "Beta", slug: "BET" },
+      ],
+    },
+    steps: [["project", "reorder", "Beta", "Alpha", "--human"], ["project", "ls", "--archived", "--json"]],
+  },
 
   ...both("column list", ["column", "list"]),
   { name: "column create and reorder", steps: [["column", "create", "Waiting", "--json"], ["column", "reorder", "to-do", "waiting", "in-progress", "done", "--human"], ["column", "ls", "--json"], ["task", "status", "1", "waiting", "--json"], ["board", "--human"]] },
@@ -146,6 +164,28 @@ export const SCENARIOS: Scenario[] = [
   { name: "column rename", steps: [["column", "rename", "in-progress", "Doing", "--json"], ["column", "ls", "--human"]] },
   { name: "column rm needs --yes", steps: [["column", "rm", "done", "--human"], ["column", "rm", "done", "--yes", "--json"], ["column", "create", "Waiting", "--json"], ["column", "rm", "waiting", "--yes", "--json"], ["column", "ls", "--json"]] },
   { name: "column unknown", steps: [["column", "rename", "nope", "x", "--json"]] },
+  // A rule cannot outlive its column, so the delete takes the rules pointing at
+  // it: done holds a task and would be refused, hence a column of this one's own.
+  { name: "column rm takes its workflow rules with it", steps: [["column", "create", "Waiting", "--json"], ["workflow", "set", "github", "pr_opened", "waiting", "--json"], ["column", "rm", "waiting", "--yes", "--json"], ["workflow", "ls", "--json"]] },
+
+  { name: "workflow list", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }] }, steps: [["workflow", "ls", "--json"], ["workflow", "ls", "--human"]] },
+  { name: "workflow list empty", steps: [["workflow", "ls", "--json"], ["workflow", "ls", "--human"]] },
+  { name: "workflow set and rm", steps: [["workflow", "set", "github", "pr_opened", "in-progress", "--json"], ["workflow", "set", "github", "pr_opened", "Done", "--human"], ["workflow", "set", "gitea", "issue_closed", "col0003", "--json"], ["workflow", "ls", "--human"], ["workflow", "rm", "github", "pr_opened", "--json"], ["workflow", "ls", "--json"]] },
+  // A pair no plugin of the shipped ones fires is stored all the same, and said so
+  // on stderr rather than left as a rule that moves nothing.
+  { name: "workflow set a pair nothing fires", steps: [["workflow", "set", "github", "pull_request.opened", "done", "--human"], ["workflow", "set", "gerrit", "pr_opened", "done", "--human"], ["workflow", "ls", "--human"]] },
+  { name: "workflow rm by id", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }] }, steps: [["workflow", "ls", "--json"], ["workflow", "rm", "rule0002", "--human"], ["workflow", "ls", "--json"]] },
+  { name: "workflow rm by pair matches the event", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }, { projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "in-progress" }] }, steps: [["workflow", "rm", "github", "pr_opened", "--human"], ["workflow", "ls", "--human"]] },
+  // Every integration fires the same six events, so a pair's integration is what
+  // tells two rules apart.
+  { name: "workflow rm by pair matches the integration", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "in-progress" }, { projectId: P1, integrationType: "gitea", eventType: "pr_opened", columnSlug: "done" }] }, steps: [["workflow", "rm", "gitea", "pr_opened", "--human"], ["workflow", "ls", "--human"]] },
+  // Nothing on the server keeps a pair to one rule, so a project can hold two, and
+  // deleting one of them would leave the other live: both are named instead.
+  { name: "workflow rm refuses a pair it finds twice", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "in-progress" }, { projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "done" }] }, steps: [["workflow", "rm", "github", "pr_opened", "--json"], ["workflow", "ls", "--human"]] },
+  { name: "project reorder prefers an active project over an archived namesake", seed: { projects: [{ id: P1, workspaceId: WS, name: "Alpha", slug: "ALP" }, { id: P2, workspaceId: WS, name: "Beta", slug: "BET" }, { id: "proj-gone", workspaceId: WS, name: "Beta", slug: "beta", archived: true }] }, steps: [["project", "reorder", "Beta", "Alpha", "--human"], ["project", "reorder", "alpha", "bet", "--human"]] },
+  { name: "workflow rm by id needs no project", env: { KANEO_PROJECT: "" }, seed: { workflowRules: [{ projectId: P2, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }] }, steps: [["workflow", "rm", "rule0002", "--human"], ["workflow", "ls", "--json"]] },
+  { name: "workflow rm by id reports other failures as they are", whitespaceOn: "^DELETE /workflow-rule/", steps: [["workflow", "rm", "rule0002", "--json"]] },
+  { name: "workflow refused", steps: [["workflow", "set", "github", "pr_opened", "nope", "--json"], ["workflow", "set", "github", "pr_opened", "--json"], ["workflow", "set", "", "pr_opened", "done", "--json"], ["workflow", "set", "github", "", "done", "--json"], ["workflow", "rm", "github", "pr_opened", "--json"], ["workflow", "rm", "rule9999", "--json"], ["workflow", "rm", " ", "--json"], ["column", "create", "Waiting", "on", "review", "--json"], ["workflow", "set", "github", "pr_opened", "Waiting", "on", "review", "--human"]] },
   { name: "column by id and name", steps: [["column", "rename", "col0002", "Doing", "--json"], ["column", "reorder", "col0001", "done", "Doing", "--human"]] },
   { name: "column create with flags", steps: [["column", "create", "外部回答", "待ち", "--final", "--icon", "Clock", "--color", "#f00", "--json"], ["column", "rename", "外部回答-待ち", "Waiting", "on", "review", "--json"], ["column", "ls", "--human"]] },
   { name: "column names refused", steps: [["column", "create", "Planned", "--json"], ["column", "create", "!!!", "--json"], ["column", "create", "To Do", "--json"], ["column", "create", " ", "--json"], ["column", "rename", "to-do", " ", "--json"], ["column", "rename", "in-progress", "To Do", "--json"], ["column", "rename", "To Do", "x", "--json"]] },
@@ -242,6 +282,7 @@ export const SCENARIOS: Scenario[] = [
   { name: "task unlink one task number", steps: [["task", "unlink", "1", "--json"], ["task", "unlink", "#1", "--json"]] },
   { name: "task unlink ambiguous", steps: [["task", "link", "1", "2", "--type", "related", "--json"], ["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "unlink", "1", "2", "--json"], ["task", "unlink", "1", "2", "--type", "blocks", "--human"], ["task", "links", "1", "--human"]] },
   { name: "task unlink nothing to unlink", steps: [["task", "unlink", "1", "2", "--json"]] },
+  { name: "task external-links", seed: { externalLinks: [{ taskId: "task-a1", url: "https://example.com/spec", title: "Spec" }, { taskId: "task-a1", url: "https://github.com/o/r/pull/7", title: null, resourceType: "pull_request", externalId: "7", integration: { id: "int-1", type: "github" } }] }, steps: [["task", "external-links", "1", "--json"], ["task", "external-links", "1", "--human"], ["task", "external-links", "2", "--json"], ["task", "external-links", "2", "--human"], ["task", "external-links", "99", "--json"]] },
 
   // --jq, the one flag every command carries: what a caller pipes a field into
   // python3 instead, and what must not cost a jq the reader has to install.

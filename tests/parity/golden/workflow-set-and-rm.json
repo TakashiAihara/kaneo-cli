@@ -1,0 +1,143 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workflow",
+        "set",
+        "github",
+        "pr_opened",
+        "in-progress",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"rule0002\",\n  \"projectId\": \"proj-alpha\",\n  \"integrationType\": \"github\",\n  \"eventType\": \"pr_opened\",\n  \"columnId\": \"col0002\",\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:10.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "set",
+        "github",
+        "pr_opened",
+        "Done",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "github pr_opened -> done\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "set",
+        "gitea",
+        "issue_closed",
+        "col0003",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"rule0003\",\n  \"projectId\": \"proj-alpha\",\n  \"integrationType\": \"gitea\",\n  \"eventType\": \"issue_closed\",\n  \"columnId\": \"col0003\",\n  \"createdAt\": \"2026-01-01T00:00:12.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:12.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "github pr_opened -> done  (rule0002)\ngitea issue_closed -> done  (rule0003)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "rm",
+        "github",
+        "pr_opened",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"rule0002\",\n  \"projectId\": \"proj-alpha\",\n  \"integrationType\": \"github\",\n  \"eventType\": \"pr_opened\",\n  \"columnId\": \"col0003\",\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:11.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"rule0003\",\n    \"projectId\": \"proj-alpha\",\n    \"integrationType\": \"gitea\",\n    \"eventType\": \"issue_closed\",\n    \"columnId\": \"col0003\",\n    \"columnName\": \"Done\",\n    \"columnSlug\": \"done\",\n    \"createdAt\": \"2026-01-01T00:00:12.000Z\",\n    \"updatedAt\": \"2026-01-01T00:00:12.000Z\"\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/workflow-rule/proj-alpha",
+      "query": "",
+      "body": {
+        "integrationType": "github",
+        "eventType": "pr_opened",
+        "columnId": "col0002"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/workflow-rule/proj-alpha",
+      "query": "",
+      "body": {
+        "integrationType": "github",
+        "eventType": "pr_opened",
+        "columnId": "col0003"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/workflow-rule/proj-alpha",
+      "query": "",
+      "body": {
+        "integrationType": "gitea",
+        "eventType": "issue_closed",
+        "columnId": "col0003"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/workflow-rule/rule0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,33 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workflow",
+        "rm",
+        "rule0002",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "deleted workflow rule github pr_merged from proj-beta\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "ls",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no project: pass --project, set KANEO_PROJECT, or add one to .kaneo.json\"\n}\n",
+      "stderr": "Error: no project: pass --project, set KANEO_PROJECT, or add one to .kaneo.json\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "DELETE",
+      "path": "/workflow-rule/rule0002",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

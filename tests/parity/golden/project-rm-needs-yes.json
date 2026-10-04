@@ -1,0 +1,180 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "rm",
+        "proj-beta",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to delete project Beta [BET] (proj-beta) without --yes; kaneo project archive proj-beta keeps it\n"
+    },
+    {
+      "args": [
+        "project",
+        "rm",
+        "Beta",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"proj-beta\",\n  \"name\": \"Beta\",\n  \"slug\": \"BET\",\n  \"icon\": \"Layout\",\n  \"description\": \"\",\n  \"workspaceId\": \"ws-main\",\n  \"isPublic\": false,\n  \"archivedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "ls",
+        "--archived",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha\nproj-old  Old  (archived)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "-p",
+        "proj-beta",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/task/tasks/proj-beta: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-beta\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/task/tasks/proj-beta: 400: Workspace ID could not be determined: no project has the id, slug or name \"proj-beta\" (kaneo project find <text> searches names and slugs)\n"
+    },
+    {
+      "args": [
+        "project",
+        "rm",
+        "OLD",
+        "--yes",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "deleted proj-old  Old\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/Beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/OLD",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/project/proj-old",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

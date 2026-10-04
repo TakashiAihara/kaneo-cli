@@ -120,7 +120,10 @@ const projectsNamed = (all: ProjectIn[], value: string): ProjectIn[] =>
 const workspacesNamed = (all: Workspace[], value: string): Workspace[] =>
   firstMatch(all, value, (w) => w.id, [(w) => w.slug, (w) => w.name]);
 
-const firstMatch = <T>(all: T[], value: string, id: (item: T) => string, keys: ((item: T) => string)[]): T[] => {
+// Exported because a command outside this file matches the same reference the
+// same way — `project reorder` names a project rather than being handed one —
+// and a second copy of these rules would be a second answer to the same word.
+export const firstMatch = <T>(all: T[], value: string, id: (item: T) => string, keys: ((item: T) => string)[]): T[] => {
   const byId = all.filter((item) => id(item) === value);
   if (byId.length > 0) return byId;
   const lower = value.toLowerCase();

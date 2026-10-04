@@ -1,0 +1,44 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workflow",
+        "rm",
+        "github",
+        "pr_opened",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "deleted workflow rule github pr_opened\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "github pr_merged -> done  (rule0002)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/workflow-rule/rule0003",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

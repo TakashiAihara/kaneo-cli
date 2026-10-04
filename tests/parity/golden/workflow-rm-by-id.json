@@ -1,0 +1,53 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workflow",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"rule0002\",\n    \"projectId\": \"proj-alpha\",\n    \"integrationType\": \"github\",\n    \"eventType\": \"pr_merged\",\n    \"columnId\": \"col0003\",\n    \"columnName\": \"Done\",\n    \"columnSlug\": \"done\",\n    \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n    \"updatedAt\": \"2026-01-01T00:00:10.000Z\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "rm",
+        "rule0002",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "deleted workflow rule github pr_merged from proj-alpha\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/workflow-rule/rule0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -47,6 +47,11 @@ const taskReply = (extra = "") =>
 
 const columnReply = `{"id":"c1","projectId":"p1","name":"Waiting","slug":"waiting","position":3,"icon":null,"color":null,"isFinal":false,"createdAt":"${TIME}","updatedAt":"${TIME}"}`;
 
+// The stored rule a write answers with, with the two fields only the listing
+// adds left for the caller to append.
+const ruleRow = (extra = "") =>
+  `{"id":"rule1","projectId":"p1","integrationType":"github","eventType":"pr_opened","columnId":"c1","createdAt":"${TIME}","updatedAt":"${TIME}"${extra}}`;
+
 const emptyNewTask: api.NewTask = { title: "", description: "", priority: "", status: "", dueDate: "", assigneeId: "" };
 const newTask = (t: Partial<api.NewTask>): api.NewTask => ({ ...emptyNewTask, ...t });
 
@@ -406,6 +411,12 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["ReorderColumns", "PUT", "/api/column/reorder/a%2Fb", () => api.reorderColumns(id, [id])],
     ["RenameColumn", "PUT", "/api/column/a%2Fb", () => api.renameColumn(id, "n")],
     ["DeleteColumn", "DELETE", "/api/column/a%2Fb", () => api.deleteColumn(id)],
+    ["DeleteProject", "DELETE", "/api/project/a%2Fb", () => api.deleteProject(id)],
+    ["ReorderProjects", "PUT", "/api/project/reorder", () => api.reorderProjects(id, [id])],
+    ["ListWorkflowRules", "GET", "/api/workflow-rule/a%2Fb", () => api.listWorkflowRules(id)],
+    ["SetWorkflowRule", "PUT", "/api/workflow-rule/a%2Fb", () => api.setWorkflowRule(id, { integrationType: "i", eventType: "e", columnId: "c" })],
+    ["DeleteWorkflowRule", "DELETE", "/api/workflow-rule/a%2Fb", () => api.deleteWorkflowRule(id)],
+    ["ListExternalLinks", "GET", "/api/external-link/task/a%2Fb", () => api.listExternalLinks(id)],
     ["GetBoard", "GET", "/api/task/tasks/a%2Fb", () => api.getBoard(id)],
     ["GetTask", "GET", "/api/task/a%2Fb", () => api.getTask(id)],
     ["SetTaskStatus", "PUT", "/api/task/status/a%2Fb", () => api.setTaskStatus(id, "x")],
@@ -708,6 +719,78 @@ describe("TestReadsMapEveryField", () => {
     expect(seen.body).toBe('{"content":"hi"}');
     expect([got.id, got.content, got.userId]).toEqual(["c1", "hi", "u1"]);
   });
+
+  test("workflow rule", async () => {
+    recorder(`[${ruleRow(',"columnName":"In Progress","columnSlug":"in-progress"')}]`);
+    expect(await api.listWorkflowRules("p1")).toEqual([
+      {
+        id: "rule1",
+        projectId: "p1",
+        integrationType: "github",
+        eventType: "pr_opened",
+        columnId: "c1",
+        columnName: "In Progress",
+        columnSlug: "in-progress",
+        createdAt: TIME,
+        updatedAt: TIME,
+      },
+    ]);
+  });
+
+  test("workflow rule without a column found", async () => {
+    recorder(`[${ruleRow(",\"columnName\":null,\"columnSlug\":null")}]`);
+    const got = await api.listWorkflowRules("p1");
+    expect([got[0]!.columnName, got[0]!.columnSlug, got[0]!.columnId]).toEqual([null, null, "c1"]);
+  });
+
+  test("workflow rule row", async () => {
+    const seen = recorder(ruleRow());
+    const got = await api.setWorkflowRule("p1", { integrationType: "github", eventType: "pr_opened", columnId: "c1" });
+    expect([seen.method, seen.path]).toEqual(["PUT", "/api/workflow-rule/p1"]);
+    expect(seen.body).toBe('{"integrationType":"github","eventType":"pr_opened","columnId":"c1"}');
+    expect(got).toEqual({
+      id: "rule1",
+      projectId: "p1",
+      integrationType: "github",
+      eventType: "pr_opened",
+      columnId: "c1",
+      createdAt: TIME,
+      updatedAt: TIME,
+    });
+  });
+
+  // The integration is what tells a link added by hand from one an integration
+  // brought in, and its type is read off the nested row.
+  test("external links", async () => {
+    recorder(
+      `[{"id":"l1","taskId":"t1","integrationId":"int-1","resourceType":"pull_request","externalId":"7","url":"https://example.com/pull/7","title":null,"metadata":null,"createdAt":"${TIME}","updatedAt":"${TIME}","integration":{"id":"int-1","type":"github"}},` +
+        `{"id":"l2","taskId":"t1","integrationId":null,"resourceType":"url","externalId":"https://example.com/spec","url":"https://example.com/spec","title":"Spec","metadata":null,"createdAt":"${TIME}","updatedAt":"${TIME}","integration":null}]`,
+    );
+    expect(await api.listExternalLinks("t1")).toEqual([
+      {
+        id: "l1",
+        taskId: "t1",
+        resourceType: "pull_request",
+        externalId: "7",
+        url: "https://example.com/pull/7",
+        title: null,
+        integrationType: "github",
+        createdAt: TIME,
+        updatedAt: TIME,
+      },
+      {
+        id: "l2",
+        taskId: "t1",
+        resourceType: "url",
+        externalId: "https://example.com/spec",
+        url: "https://example.com/spec",
+        title: "Spec",
+        integrationType: null,
+        createdAt: TIME,
+        updatedAt: TIME,
+      },
+    ]);
+  });
 });
 
 // What each write puts on the wire.
@@ -908,4 +991,17 @@ describe("time entries", () => {
     await failure(api.updateTimeEntryById("e1", { endTime: "" }));
     expect(seen).toEqual([]);
   });
+});
+
+// The workspace travels in the query and the order in the body; positions are
+// the list's own order, which is all the server reads them as.
+test("TestReorderProjectsSendsTheWorkspaceAndTheOrder", async () => {
+  const seen: { query: string; body: unknown }[] = [];
+  newServer(async (req) => {
+    const url = new URL(req.url);
+    seen.push({ query: url.search, body: await req.json() });
+    return Response.json([]);
+  });
+  await api.reorderProjects("w/1", ["p2", "p1"]);
+  expect(seen).toEqual([{ query: "?workspaceId=w%2F1", body: { projects: [{ id: "p2", position: 0 }, { id: "p1", position: 1 }] } }]);
 });

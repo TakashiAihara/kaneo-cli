@@ -21,6 +21,7 @@ import { projectCommand } from "./project";
 import { columnCommand } from "./column";
 import { invitationCommand } from "./invitation";
 import { searchCommand } from "./search";
+import { workflowCommand } from "./workflow";
 import { taskCommand } from "./task";
 import { boardCommand } from "./board";
 import { sessionCommand } from "./session";
@@ -98,6 +99,7 @@ const rootCommand = (): { root: Command<App> } => {
     columnCommand,
     searchCommand,
     invitationCommand,
+    workflowCommand,
     taskCommand,
     boardCommand,
     sessionCommand,

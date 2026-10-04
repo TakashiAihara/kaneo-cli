@@ -25,7 +25,7 @@ export type Seed = {
   // Users the server knows, so assign has a name to report.
   users?: { id: string; name: string }[];
   // The key's own notifications, oldest first.
-  notifications?: { type: string; title?: string | null; content?: string | null; isRead?: boolean }[];
+  notifications?: { type: string; title?: string | null; content?: string | null; isRead?: boolean | null; eventData?: unknown }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
@@ -112,24 +112,27 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
   // Notifications number and date themselves apart from everything else, so
   // seeding them leaves the ids and times the other scenarios record alone.
+  // Workspace rules draw on the same counter.
   let nseq = 0;
   let nclock = 0;
   const nid = (prefix: string) => `${prefix}${String(++nseq).padStart(4, "0")}`;
   const nnow = () => new Date(T0 + 86_400_000 + 1000 * nclock++).toISOString();
   let notifications: z.input<typeof M.Notification>[] = [];
-  const addNotification = (n: { type: string; title?: string | null; content?: string | null; isRead?: boolean; resourceId?: string | null; resourceType?: string | null }) => {
+  const addNotification = (n: { type: string; title?: string | null; content?: string | null; isRead?: boolean | null; eventData?: unknown; resourceId?: string | null; resourceType?: string | null }) => {
     const at = nnow();
-    const row = { id: nid("ntf"), userId: "user-self", title: n.title ?? null, content: n.content ?? null, type: n.type, eventData: null, isRead: n.isRead ?? false, resourceId: n.resourceId ?? null, resourceType: n.resourceType ?? null, createdAt: at, updatedAt: at };
+    const row = { id: nid("ntf"), userId: "user-self", title: n.title ?? null, content: n.content ?? null, type: n.type, eventData: n.eventData ?? null, isRead: n.isRead === undefined ? false : n.isRead, resourceId: n.resourceId ?? null, resourceType: n.resourceType ?? null, createdAt: at, updatedAt: at };
     notifications.push(row);
     return row;
   };
   for (const n of seed.notifications ?? []) addNotification(n);
 
+  // Preferences as v2.29.2 keeps them: its defaults, its masking, and the
+  // checks and carry-overs of notification-preferences/service.ts.
   const prefsAt = nnow();
   const secrets: Record<string, string | null> = { ntfyToken: null, gotifyToken: null, webhookSecret: null };
   const settings = {
     emailAddress: "self@example.com" as string | null,
-    emailEnabled: true,
+    emailEnabled: false,
     ntfyEnabled: false,
     ntfyServerUrl: null as string | null,
     ntfyTopic: null as string | null,
@@ -141,10 +144,17 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     taskCommentEnabled: true,
     taskStatusChangeEnabled: true,
     dueDateReminderEnabled: true,
-    dueDateReminderLeadTimeMinutes: 60,
+    dueDateReminderLeadTimeMinutes: 1440,
   };
   const rules: z.input<typeof M.NotificationPreferenceWorkspaceRule>[] = [];
-  const masked = (s: string | null) => (s ? `****${s.slice(-4)}` : null);
+  const masked = (s: string | null) => (!s ? null : s.length > 8 ? `${s.slice(0, 4)}…${s.slice(-4)}` : "••••");
+  // Whether each channel can deliver at all, which is what a rule may turn on.
+  const usable = () => ({
+    emailEnabled: settings.emailEnabled && !!settings.emailAddress,
+    ntfyEnabled: settings.ntfyEnabled && !!settings.ntfyServerUrl && !!settings.ntfyTopic,
+    gotifyEnabled: settings.gotifyEnabled && !!settings.gotifyServerUrl && !!secrets.gotifyToken,
+    webhookEnabled: settings.webhookEnabled && !!settings.webhookUrl,
+  });
   const preferences = (): z.input<typeof M.NotificationPreferences> => ({
     ...settings,
     ntfyConfigured: !!(settings.ntfyServerUrl && settings.ntfyTopic),
@@ -163,9 +173,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   // The categories a user can turn off; a notification of a muted one is not stored.
   const CATEGORY: Record<string, keyof typeof settings> = {
     task_assignee_changed: "taskAssignmentEnabled",
+    task_created: "taskAssignmentEnabled",
     task_comment: "taskCommentEnabled",
+    task_mention: "taskCommentEnabled",
     task_status_changed: "taskStatusChangeEnabled",
     due_date_reminder: "dueDateReminderEnabled",
+    task_overdue: "dueDateReminderEnabled",
   };
 
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
@@ -372,12 +385,16 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
 
     if (req.method === "GET" && path === "/notification") {
-      return ok(z.array(M.Notification), [...notifications].reverse());
+      return ok(z.array(M.Notification), [...notifications].reverse().slice(0, 50));
     }
     if (req.method === "POST" && path === "/notification") {
       const b = body as any;
+      const reachable =
+        (b.relatedEntityId === undefined && b.relatedEntityType === undefined) ||
+        (b.relatedEntityType === "task" && tasks.some((t) => t.id === b.relatedEntityId)) ||
+        (b.relatedEntityType === "workspace" && workspaces.some((w) => w.id === b.relatedEntityId));
       const category = CATEGORY[b.type];
-      if (category && !settings[category]) return Response.json(null);
+      if (!reachable || (category && settings[category] === false)) return Response.json(null);
       return ok(M.Notification, addNotification({ type: b.type, title: b.title, content: b.message, resourceId: b.relatedEntityId, resourceType: b.relatedEntityType }));
     }
     if (req.method === "PATCH" && path === "/notification/read-all") {
@@ -396,9 +413,22 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "GET" && path === "/notification-preferences") return ok(M.NotificationPreferences, preferences());
     if (req.method === "PUT" && path === "/notification-preferences") {
+      const before = usable();
       for (const [k, v] of Object.entries(body as object)) {
-        if (k in secrets) secrets[k] = v as string | null;
-        else (settings as any)[k] = v;
+        if (k in secrets) secrets[k] = v === null || v === "" ? null : (v as string);
+        // A null address keeps the stored one: the server reads `input ?? existing`.
+        else if (v !== null) (settings as any)[k] = v;
+      }
+      // A channel that can no longer deliver is turned off in every rule; one
+      // that has just become able to is turned on in the active rules that
+      // have some channel on.
+      const after = usable();
+      for (const rule of rules) {
+        const live = rule.isActive && (rule.emailEnabled || rule.ntfyEnabled || rule.gotifyEnabled || rule.webhookEnabled);
+        for (const channel of Object.keys(after) as (keyof typeof after)[]) {
+          if (!after[channel]) rule[channel] = false;
+          else if (!before[channel] && live) rule[channel] = true;
+        }
       }
       return ok(M.NotificationPreferences, preferences());
     }
@@ -407,8 +437,20 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (!ws) return new Response("No access to the workspace", { status: 403 });
       const i = rules.findIndex((r) => r.workspaceId === ws.id);
       if (req.method === "PUT") {
+        const b = body as any;
+        if (b.projectMode === "selected") {
+          const ids: string[] = b.selectedProjectIds ?? [];
+          if (ids.length === 0) return new Response("Select at least one project", { status: 400 });
+          if (ids.some((pid) => !projects.some((x) => x.id === pid && x.workspaceId === ws.id))) {
+            return new Response("Selected projects must belong to the workspace", { status: 400 });
+          }
+        }
+        const can = usable();
+        for (const [channel, name] of [["emailEnabled", "email"], ["ntfyEnabled", "ntfy"], ["webhookEnabled", "webhook"], ["gotifyEnabled", "Gotify"]] as const) {
+          if (b[channel] && !can[channel]) return new Response(`Enable ${name} notifications globally before using them here`, { status: 400 });
+        }
         const at = nnow();
-        const rule = { id: i < 0 ? nid("rule") : rules[i]!.id, workspaceId: ws.id, workspaceName: ws.name, selectedProjectIds: [], ...(body as any), createdAt: i < 0 ? at : rules[i]!.createdAt, updatedAt: at } as z.input<typeof M.NotificationPreferenceWorkspaceRule>;
+        const rule = { id: i < 0 ? nid("rule") : rules[i]!.id, workspaceId: ws.id, workspaceName: ws.name, ...b, selectedProjectIds: b.projectMode === "selected" ? b.selectedProjectIds : [], createdAt: i < 0 ? at : rules[i]!.createdAt, updatedAt: at } as z.input<typeof M.NotificationPreferenceWorkspaceRule>;
         if (i < 0) rules.push(rule);
         else rules[i] = rule;
         return ok(M.NotificationPreferences, preferences());

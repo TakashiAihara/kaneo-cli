@@ -12,13 +12,13 @@
         "kaneo",
         "--ntfy-token",
         "tk_abcdef123456",
-        "--email=false",
+        "--email",
         "--reminder-lead",
         "2h",
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"emailAddress\": \"self@example.com\",\n  \"emailEnabled\": false,\n  \"ntfyEnabled\": true,\n  \"ntfyConfigured\": true,\n  \"ntfyServerUrl\": \"https://ntfy.example\",\n  \"ntfyTopic\": \"kaneo\",\n  \"ntfyTokenConfigured\": true,\n  \"maskedNtfyToken\": \"****3456\",\n  \"gotifyEnabled\": false,\n  \"gotifyConfigured\": false,\n  \"gotifyServerUrl\": null,\n  \"gotifyTokenConfigured\": false,\n  \"maskedGotifyToken\": null,\n  \"webhookEnabled\": false,\n  \"webhookConfigured\": false,\n  \"webhookUrl\": null,\n  \"webhookSecretConfigured\": false,\n  \"maskedWebhookSecret\": null,\n  \"taskAssignmentEnabled\": true,\n  \"taskCommentEnabled\": true,\n  \"taskStatusChangeEnabled\": true,\n  \"dueDateReminderEnabled\": true,\n  \"dueDateReminderLeadTimeMinutes\": 120,\n  \"workspaces\": [],\n  \"createdAt\": \"2026-01-02T00:00:02.000Z\",\n  \"updatedAt\": \"2026-01-02T00:00:02.000Z\"\n}\n",
+      "stdout": "{\n  \"emailAddress\": \"self@example.com\",\n  \"emailEnabled\": true,\n  \"ntfyEnabled\": true,\n  \"ntfyConfigured\": true,\n  \"ntfyServerUrl\": \"https://ntfy.example\",\n  \"ntfyTopic\": \"kaneo\",\n  \"ntfyTokenConfigured\": true,\n  \"maskedNtfyToken\": \"tk_a…3456\",\n  \"gotifyEnabled\": false,\n  \"gotifyConfigured\": false,\n  \"gotifyServerUrl\": null,\n  \"gotifyTokenConfigured\": false,\n  \"maskedGotifyToken\": null,\n  \"webhookEnabled\": false,\n  \"webhookConfigured\": false,\n  \"webhookUrl\": null,\n  \"webhookSecretConfigured\": false,\n  \"maskedWebhookSecret\": null,\n  \"taskAssignmentEnabled\": true,\n  \"taskCommentEnabled\": true,\n  \"taskStatusChangeEnabled\": true,\n  \"dueDateReminderEnabled\": true,\n  \"dueDateReminderLeadTimeMinutes\": 120,\n  \"workspaces\": [],\n  \"createdAt\": \"2026-01-02T00:00:03.000Z\",\n  \"updatedAt\": \"2026-01-02T00:00:03.000Z\"\n}\n",
       "stderr": ""
     },
     {
@@ -31,8 +31,21 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "email               off  self@example.com\nntfy                on   https://ntfy.example  kaneo\ngotify              off\nwebhook             off\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   120m before\n",
+      "stdout": "email               on   self@example.com\nntfy                on   https://ntfy.example  kaneo\ngotify              off\nwebhook             off\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   120m before\n",
       "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy-server",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--ntfy-server cannot be cleared; the server keeps the stored value\"\n}\n",
+      "stderr": "Error: --ntfy-server cannot be cleared; the server keeps the stored value\n"
     },
     {
       "args": [
@@ -78,7 +91,7 @@
       "path": "/notification-preferences",
       "query": "",
       "body": {
-        "emailEnabled": false,
+        "emailEnabled": true,
         "ntfyEnabled": true,
         "ntfyServerUrl": "https://ntfy.example",
         "ntfyTopic": "kaneo",

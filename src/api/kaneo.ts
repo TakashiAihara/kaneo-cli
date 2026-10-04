@@ -720,7 +720,8 @@ const notification = (n: GenNotification): Notification => ({
   createdAt: isoTime(n.createdAt),
 });
 
-// Every notification, read and unread, in the order the server keeps them.
+// The newest 50 notifications, read and unread, newest first: the server caps
+// the listing there and takes no page.
 export const listNotifications = async (): Promise<Notification[]> =>
   zeroList(await call(getNotifications())).map(notification);
 
@@ -744,8 +745,9 @@ export type NewNotification = {
 };
 
 // Raises a notification for the key's own user. The server answers null when
-// that user has turned the category off, which is not a failure: the request
-// was accepted and nothing was stored.
+// that user has turned the category off, or cannot reach the task or workspace
+// it points at; neither is a failure: the request was accepted and nothing was
+// stored.
 export const createNotification = async (wanted: NewNotification): Promise<Notification | null> => {
   const body: CreateNotificationBody = { type: wanted.type };
   if (wanted.title !== "") body.title = wanted.title;
@@ -765,7 +767,8 @@ export type WorkspaceRule = UpsertNotificationPreferenceWorkspaceRuleBody;
 export const getNotificationPreferences = async (): Promise<NotificationPreferences> =>
   zeroRecord(await call(readNotificationPreferences()));
 
-// Only the fields in changes are sent, and the server leaves the rest alone.
+// Only the fields in changes are sent. The server leaves the other settings
+// alone, but carries a channel switch into the workspace rules.
 export const updateNotificationPreferences = async (
   changes: NotificationPreferenceChanges,
 ): Promise<NotificationPreferences> => zeroRecord(await call(putNotificationPreferences(changes)));

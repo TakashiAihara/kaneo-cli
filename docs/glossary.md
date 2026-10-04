@@ -40,6 +40,18 @@ A note on a task. Also the only place a client can store structured data of its 
 
 A tag, scoped to a workspace rather than a project.
 
+### notification
+
+A message to one user, raised by the server from task and workspace events or posted through `POST /notification`. One raised from an event carries no text of its own, only a `type` and `eventData`. The listing returns the newest 50 and takes no page.
+
+### channel
+
+A way a notification leaves the app: email, ntfy, gotify or a webhook. Switched on globally in the notification preferences; the API calls the switches `emailEnabled`, `ntfyEnabled` and so on.
+
+### workspace rule
+
+The per-workspace part of the notification preferences: whether the workspace is notified at all (`isActive`), which channels, and for which projects. A workspace without a rule is sent nothing outside the app on v2.29.2, although the document says it follows the global settings. The server replaces a rule whole, and turning a channel off globally turns it off in every rule.
+
 ### relation
 
 A link between two tasks: `subtask`, `blocks` or `related`. For a subtask link the source is the parent. Relations cannot cross workspaces.

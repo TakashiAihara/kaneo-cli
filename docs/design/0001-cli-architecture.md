@@ -11,8 +11,6 @@ A general-purpose command-line interface for [Kaneo](https://github.com/usekaneo
 
 Scope: task CRUD, project/workspace management, comments/activity, search/labels/time entries. Out of scope for now: notification settings (no API coverage), integrations (GitHub/Slack/Discord/Telegram/Gitea), instance deployment (that is `usekaneo/drim`).
 
-2026-10-04: notification settings are no longer out of scope. The v2.29.2 document covers notifications and their preferences, and `kaneo notification` calls them.
-
 ## Decisions
 
 ### Runtime and libraries

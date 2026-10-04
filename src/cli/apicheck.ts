@@ -1,6 +1,6 @@
 import type { App } from "./app";
 import { checkApi } from "../api/kaneo";
-import type { Operation } from "../api/registry";
+import { OPERATIONS, type Operation } from "../api/registry";
 import type { Json } from "../output/json";
 
 // Compares what this client calls against what the server offers.
@@ -49,7 +49,7 @@ export const apiCheckCommand = {
   },
 };
 
-const pad = (operation: Operation): string => operation.id.padEnd(22);
+const pad = (operation: Operation): string => operation.id.padEnd(Math.max(...OPERATIONS.map((o) => o.id.length)) + 1);
 
 // The registry entries carry no json tags, so the report prints their field
 // names as they are declared rather than in lower case.

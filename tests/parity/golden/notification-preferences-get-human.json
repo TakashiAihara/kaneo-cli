@@ -8,7 +8,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "email               on   self@example.com\nntfy                off\ngotify              off\nwebhook             off\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   60m before\n",
+      "stdout": "email               off  self@example.com\nntfy                off\ngotify              off\nwebhook             off\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   1440m before\n",
       "stderr": ""
     }
   ],

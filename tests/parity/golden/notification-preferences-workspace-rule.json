@@ -10,23 +10,20 @@
         "--webhook",
         "--json"
       ],
-      "exit": 0,
-      "stdout": "{\n  \"id\": \"rule0003\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\",\n  \"isActive\": true,\n  \"emailEnabled\": true,\n  \"ntfyEnabled\": false,\n  \"gotifyEnabled\": false,\n  \"webhookEnabled\": true,\n  \"projectMode\": \"all\",\n  \"selectedProjectIds\": [],\n  \"createdAt\": \"2026-01-02T00:00:03.000Z\",\n  \"updatedAt\": \"2026-01-02T00:00:03.000Z\"\n}\n",
-      "stderr": ""
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/notification-preferences/workspaces/ws-main: 400: Enable webhook notifications globally before using them here\"\n}\n",
+      "stderr": "Error: PUT /api/notification-preferences/workspaces/ws-main: 400: Enable webhook notifications globally before using them here\n"
     },
     {
       "args": [
         "notification",
         "prefs",
-        "ws",
         "set",
-        "ws-main",
-        "--projects",
-        "proj-alpha,proj-beta",
+        "--email",
         "--human"
       ],
       "exit": 0,
-      "stdout": "workspace ws-main  Main  active  channels: email,webhook  projects: proj-alpha,proj-beta\n",
+      "stdout": "email               on   self@example.com\nntfy                off\ngotify              off\nwebhook             off\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   1440m before\n",
       "stderr": ""
     },
     {
@@ -37,12 +34,55 @@
         "set",
         "ws-main",
         "--projects",
-        "",
+        "proj-alpha",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"rule0004\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\",\n  \"isActive\": true,\n  \"emailEnabled\": true,\n  \"ntfyEnabled\": false,\n  \"gotifyEnabled\": false,\n  \"webhookEnabled\": false,\n  \"projectMode\": \"selected\",\n  \"selectedProjectIds\": [\n    \"proj-alpha\"\n  ],\n  \"createdAt\": \"2026-01-02T00:00:04.000Z\",\n  \"updatedAt\": \"2026-01-02T00:00:04.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "ws",
+        "set",
+        "ws-main",
+        "--email=false",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace ws-main  Main  active  channels: none  projects: proj-alpha\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "ws",
+        "set",
+        "ws-main",
+        "--email",
         "--active=false",
         "--human"
       ],
       "exit": 0,
-      "stdout": "workspace ws-main  Main  inactive  channels: email,webhook  projects: all\n",
+      "stdout": "workspace ws-main  Main  inactive  channels: email  projects: proj-alpha\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "ws",
+        "set",
+        "ws-main",
+        "--projects",
+        "proj-alpha, proj-beta",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace ws-main  Main  inactive  channels: email  projects: proj-alpha,proj-beta\n",
       "stderr": ""
     },
     {
@@ -62,11 +102,43 @@
       "args": [
         "notification",
         "prefs",
-        "get",
+        "ws",
+        "set",
+        "ws-main",
+        "--projects",
+        "proj-nowhere",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/notification-preferences/workspaces/ws-main: 400: Selected projects must belong to the workspace\n"
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "ws",
+        "set",
+        "ws-main",
+        "--active",
+        "--projects",
+        "",
         "--human"
       ],
       "exit": 0,
-      "stdout": "email               on   self@example.com\nntfy                off\ngotify              off\nwebhook             off\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   60m before\nworkspace ws-main  Main  inactive  channels: email,webhook  projects: all\n",
+      "stdout": "workspace ws-main  Main  active  channels: email  projects: all\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--email=false",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "email               off  self@example.com\nntfy                off\ngotify              off\nwebhook             off\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   1440m before\nworkspace ws-main  Main  active  channels: none  projects: all\n",
       "stderr": ""
     },
     {
@@ -76,12 +148,25 @@
         "ws",
         "set",
         "ws-nobody",
-        "--email",
+        "--active=false",
         "--json"
       ],
       "exit": 1,
       "stdout": "{\n  \"error\": \"PUT /api/notification-preferences/workspaces/ws-nobody: 403: No access to the workspace\"\n}\n",
       "stderr": "Error: PUT /api/notification-preferences/workspaces/ws-nobody: 403: No access to the workspace\n"
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "ws",
+        "rm",
+        "a/b?#c",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"DELETE /api/notification-preferences/workspaces/a/b?#c: 403: No access to the workspace\"\n}\n",
+      "stderr": "Error: DELETE /api/notification-preferences/workspaces/a/b?#c: 403: No access to the workspace\n"
     },
     {
       "args": [
@@ -122,12 +207,20 @@
       "query": "",
       "body": {
         "isActive": true,
-        "emailEnabled": true,
+        "emailEnabled": false,
         "ntfyEnabled": false,
         "gotifyEnabled": false,
         "webhookEnabled": true,
         "projectMode": "all",
         "selectedProjectIds": []
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "emailEnabled": true
       }
     },
     {
@@ -144,7 +237,70 @@
         "emailEnabled": true,
         "ntfyEnabled": false,
         "gotifyEnabled": false,
-        "webhookEnabled": true,
+        "webhookEnabled": false,
+        "projectMode": "selected",
+        "selectedProjectIds": [
+          "proj-alpha"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notification-preferences",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences/workspaces/ws-main",
+      "query": "",
+      "body": {
+        "isActive": true,
+        "emailEnabled": false,
+        "ntfyEnabled": false,
+        "gotifyEnabled": false,
+        "webhookEnabled": false,
+        "projectMode": "selected",
+        "selectedProjectIds": [
+          "proj-alpha"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notification-preferences",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences/workspaces/ws-main",
+      "query": "",
+      "body": {
+        "isActive": false,
+        "emailEnabled": true,
+        "ntfyEnabled": false,
+        "gotifyEnabled": false,
+        "webhookEnabled": false,
+        "projectMode": "selected",
+        "selectedProjectIds": [
+          "proj-alpha"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notification-preferences",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences/workspaces/ws-main",
+      "query": "",
+      "body": {
+        "isActive": false,
+        "emailEnabled": true,
+        "ntfyEnabled": false,
+        "gotifyEnabled": false,
+        "webhookEnabled": false,
         "projectMode": "selected",
         "selectedProjectIds": [
           "proj-alpha",
@@ -166,15 +322,39 @@
         "emailEnabled": true,
         "ntfyEnabled": false,
         "gotifyEnabled": false,
-        "webhookEnabled": true,
-        "projectMode": "all",
-        "selectedProjectIds": []
+        "webhookEnabled": false,
+        "projectMode": "selected",
+        "selectedProjectIds": [
+          "proj-nowhere"
+        ]
       }
     },
     {
       "method": "GET",
       "path": "/notification-preferences",
       "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences/workspaces/ws-main",
+      "query": "",
+      "body": {
+        "isActive": true,
+        "emailEnabled": true,
+        "ntfyEnabled": false,
+        "gotifyEnabled": false,
+        "webhookEnabled": false,
+        "projectMode": "all",
+        "selectedProjectIds": []
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "emailEnabled": false
+      }
     },
     {
       "method": "GET",
@@ -186,14 +366,19 @@
       "path": "/notification-preferences/workspaces/ws-nobody",
       "query": "",
       "body": {
-        "isActive": true,
-        "emailEnabled": true,
+        "isActive": false,
+        "emailEnabled": false,
         "ntfyEnabled": false,
         "gotifyEnabled": false,
         "webhookEnabled": false,
         "projectMode": "all",
         "selectedProjectIds": []
       }
+    },
+    {
+      "method": "DELETE",
+      "path": "/notification-preferences/workspaces/a%2Fb%3F%23c",
+      "query": ""
     },
     {
       "method": "DELETE",

@@ -18,11 +18,13 @@ import { exactArgs, minimumArgs, noArgs, type FlagValues, type RunContext } from
 import type { Json } from "../output/json";
 
 // A generated notification has no text of its own, only a type and the event
-// it came from, so the type is always shown and the text only when there is one.
-const notificationLine = (n: Notification): string =>
-  [n.id, n.createdAt, n.isRead ? "read  " : "unread", n.type, [n.title, n.content].filter((t) => t).join(": ")]
-    .join("  ")
-    .trimEnd();
+// it came from, so the type is always shown, and the task the event is about
+// stands in for the text when there is none.
+const notificationLine = (n: Notification): string => {
+  const taskTitle = (n.eventData as { taskTitle?: unknown } | null)?.taskTitle;
+  const text = [n.title, n.content].filter((t) => t).join(": ") || (typeof taskTitle === "string" ? taskTitle : "");
+  return [n.id, n.createdAt, n.isRead ? "read  " : "unread", n.type, text].join("  ").trimEnd();
+};
 
 const onOff = (enabled: boolean): string => (enabled ? "on " : "off");
 
@@ -69,8 +71,11 @@ const SWITCHES = [
   ["due-date-reminder", "dueDateReminderEnabled", "remind before a due date"],
 ] as const;
 
-// The delivery settings that take text. An empty value clears the setting,
-// which for a token or secret is the only way to remove it.
+// The delivery settings that take text. Only a secret can be cleared: the
+// server keeps the stored address when it is sent null (v2.29.2 reads it as
+// `input ?? existing`), so an empty address is refused here rather than
+// reported as done.
+const CLEARABLE = new Set(["ntfy-token", "gotify-token", "webhook-secret"]);
 const SETTINGS = [
   ["ntfy-server", "ntfyServerUrl", "ntfy server URL"],
   ["ntfy-topic", "ntfyTopic", "ntfy topic"],
@@ -87,6 +92,7 @@ const preferenceChanges = (flags: FlagValues, changed: ReadonlySet<string>): Not
   for (const [flag, field] of SETTINGS) {
     if (!changed.has(flag)) continue;
     const value = String(flags[flag] ?? "");
+    if (value === "" && !CLEARABLE.has(flag)) throw new Error(`--${flag} cannot be cleared; the server keeps the stored value`);
     changes[field] = value === "" ? null : value;
   }
   if (changed.has("reminder-lead")) {
@@ -107,9 +113,14 @@ const RULE_SWITCHES = [
 ] as const;
 
 // The server replaces a rule whole, so a flag left out would otherwise reset
-// that field. The rule is built from what the workspace gets today — its own
-// rule, or the global channels it falls back to — with only the flags passed
-// changed on top.
+// that field. The rule is built from the workspace's own rule, with only the
+// flags passed changed on top; it is read and written in two requests, so a
+// change made elsewhere in between is overwritten.
+//
+// A workspace without a rule gets nothing outside the app (v2.29.2 delivers
+// only under an active rule, whatever the document says), so creating one is
+// how delivery is turned on there: it starts active, with the channels that
+// are on globally, since the server refuses a channel that is off globally.
 const ruleFor = (
   prefs: NotificationPreferences,
   workspaceId: string,
@@ -125,7 +136,7 @@ const ruleFor = (
         gotifyEnabled: current.gotifyEnabled,
         webhookEnabled: current.webhookEnabled,
         projectMode: current.projectMode,
-        selectedProjectIds: current.selectedProjectIds,
+        selectedProjectIds: current.selectedProjectIds ?? [],
       }
     : {
         isActive: true,
@@ -179,8 +190,11 @@ const preferencesCommand = {
       long:
         "Change the global delivery settings; only what is passed changes.\n\n" +
         "A switch is turned off with =false (--email=false). An empty value clears a\n" +
-        "setting (--webhook-secret ''). A token or secret given as a flag is visible in\n" +
-        "the process list.",
+        "token or secret (--webhook-secret ''); a server URL or topic cannot be cleared.\n" +
+        "A token or secret given as a flag is visible in the process list.\n\n" +
+        "The server carries a channel switch into the workspace rules: turning one off\n" +
+        "turns it off in every rule, and turning one on turns it on in the active rules\n" +
+        "that have a channel on.",
       args: noArgs("kaneo notification preferences set"),
       flags: [
         ...SWITCHES.map(([flag, , usage]) => boolFlag(flag, usage)),
@@ -211,7 +225,9 @@ const preferencesCommand = {
           short: "Create or change a workspace's rule; only what is passed changes",
           long:
             "Create or change a workspace's rule; only what is passed changes.\n\n" +
-            "A workspace without a rule starts from the global channels. --projects takes\n" +
+            "A workspace without a rule is sent nothing outside the app, so setting one turns\n" +
+            "delivery on for it: the new rule is active and starts from the channels that are\n" +
+            "on globally. A channel must be on globally to be turned on here. --projects takes\n" +
             "comma-separated project ids; an empty value means every project.",
           args: exactArgs(1),
           flags: [
@@ -236,13 +252,13 @@ const preferencesCommand = {
           name: "rm",
           aliases: ["delete"],
           use: "rm <workspace-id>",
-          short: "Remove a workspace's rule so it follows the global settings",
+          short: "Remove a workspace's rule; it is then sent nothing outside the app",
           args: exactArgs(1),
           run: async ({ args, app }: RunContext<App>) => {
             apiKey(app);
             const workspaceId = args[0]!;
             await removeWorkspaceRule(workspaceId);
-            app.out.human(`removed the rule for ${workspaceId}; it follows the global settings`);
+            app.out.human(`removed the rule for ${workspaceId}; it is sent nothing outside the app until a rule is set`);
             app.out.data({ workspaceId });
           },
         },
@@ -261,6 +277,10 @@ export const notificationCommand = {
       aliases: ["ls"],
       short: "List your notifications",
       args: noArgs("kaneo notification list"),
+      long:
+        "List your notifications.\n\n" +
+        "The server answers with the newest 50 only, so an unread notification older\n" +
+        "than those is not listed, --unread included.",
       flags: [boolFlag("unread", "only unread notifications")],
       run: async ({ flags, app }: RunContext<App>) => {
         apiKey(app);
@@ -287,10 +307,16 @@ export const notificationCommand = {
         if (args.length === 0) throw new Error("pass notification ids, or --all");
         const read: Notification[] = [];
         for (const id of args) {
-          const n = await markNotificationRead(id);
-          app.out.human(`read ${n.id}`);
-          read.push(n);
+          try {
+            read.push(await markNotificationRead(id));
+          } catch (e) {
+            // The ones before it are read on the server already, which a caller
+            // reading only the failure would otherwise not know.
+            if (read.length === 0) throw e;
+            throw new Error(`${(e as Error).message} (already marked read: ${read.map((n) => n.id).join(", ")})`);
+          }
         }
+        for (const n of read) app.out.human(`read ${n.id}`);
         app.out.data(read as Json);
       },
     },
@@ -315,7 +341,9 @@ export const notificationCommand = {
       long:
         "Send yourself a notification.\n\n" +
         "Several words are one message. The server stores nothing when the type is\n" +
-        "turned off in your preferences; that is reported, and is not a failure.",
+        "turned off in your preferences, or when the task or workspace it points at is\n" +
+        "not one you can reach; that is reported, and is not a failure. One that points\n" +
+        "at a task or workspace is also delivered through your channels.",
       args: minimumArgs(1),
       flags: [
         { name: "type", type: "string" as const, usage: "notification type", defaultValue: "info" },
@@ -325,14 +353,26 @@ export const notificationCommand = {
       ],
       run: async ({ args, flags, app }: RunContext<App>) => {
         apiKey(app);
+        const resourceType = String(flags["resource-type"] ?? "");
+        const resourceId = String(flags["resource-id"] ?? "");
+        if (resourceType !== "" && resourceType !== "task" && resourceType !== "workspace") {
+          throw new Error(`--resource-type must be task or workspace, not ${JSON.stringify(resourceType)}`);
+        }
+        if ((resourceType === "") !== (resourceId === "")) {
+          throw new Error("--resource-type and --resource-id go together");
+        }
         const created = await createNotification({
           type: String(flags.type ?? ""),
           title: String(flags.title ?? ""),
           message: args.join(" "),
-          resourceType: String(flags["resource-type"] ?? ""),
-          resourceId: String(flags["resource-id"] ?? ""),
+          resourceType,
+          resourceId,
         });
-        app.out.human(created === null ? "not stored: this notification type is turned off" : `created ${created.id}`);
+        app.out.human(
+          created === null
+            ? "not stored: the type is turned off, or what it points at is not reachable"
+            : `created ${created.id}`,
+        );
         app.out.data(created as Json);
       },
     },

@@ -26,11 +26,17 @@ permissions:
 # Automatic runs are one at a time, so two cannot read the same highest tag and
 # both claim the next one. A newer main push replacing a pending one is fine.
 # A group holds one pending run and a newer one replaces it, so only a run that
-# will release joins the automatic group: a run for a failed ci (its jobs are
-# skipped) gets a group of its own, or it could push out a pending run that was
-# going to release. A named tag gets its own group for the same reason.
+# will release joins the automatic group, judged by the same conditions as the
+# tag job below. Any other ci run (failed, cancelled or skipped, or a pull
+# request, a fork's main included) gets a group of its own, or its skipped jobs
+# could push out a pending run that was going to release. A named tag gets its
+# own group, so a main push never replaces a pending hand-cut release.
+#
+# A hand-pushed tag and an automatic run for the same commit can still run side
+# by side: both then release the same tag from the same commit, and the second
+# replaces the first's assets with identical ones.
 concurrency:
-  group: release-${{ github.event_name == 'workflow_run' && (github.event.workflow_run.conclusion == 'success' && 'auto' || github.run_id) || github.event.inputs.tag || github.ref_name }}
+  group: release-${{ github.event_name == 'workflow_run' && (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository && 'auto' || github.run_id) || github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -49,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.event.inputs.tag || github.ref }}
+          ref: ${{ github.event.workflow_run.head_sha || (github.event.inputs.tag && format('refs/tags/{0}', github.event.inputs.tag)) || github.ref }}
           # Every tag, to count the next one from, and origin/main, to see
           # whether it moved on.
           fetch-depth: 0
@@ -82,16 +88,18 @@ jobs:
           # does not apply, and a failed rev-parse would compare an empty string,
           # read as "main moved on" and skip the release while showing green.
           main="$(git rev-parse origin/main)"
-          head="$(git rev-parse HEAD)"
-          if [ "$main" != "$head" ]; then
+          built="$(git rev-parse HEAD)"
+          if [ "$main" != "$built" ]; then
             echo "main has moved past this commit; not releasing it"
             exit 0
           fi
           # A re-run for the same commit reuses its tag rather than cutting another.
-          # Assigned on its own line: set -e does not see a failure inside a
-          # substitution embedded in echo's argument, which would output an
-          # empty tag, skip the release and still show green.
-          tag="$(git tag --points-at HEAD --list 'v*' | head -n 1)"
+          # Assigned on its own line, and without a pipe: set -e sees neither a
+          # failure inside a substitution embedded in echo's argument nor one
+          # before the last command of a pipe, and either would output an empty
+          # tag, skip the release and still show green.
+          tags="$(git tag --points-at HEAD --list 'v*')"
+          tag="${tags%%[[:space:]]*}"
           if [ -z "$tag" ]; then
             tag="$(bun scripts/next-tag.ts)"
           fi
@@ -114,7 +122,7 @@ jobs:
       # the release. A missing tag fails here, so nothing is released for it.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.event.inputs.tag || github.ref }}
+          ref: ${{ github.event.workflow_run.head_sha || (github.event.inputs.tag && format('refs/tags/{0}', github.event.inputs.tag)) || github.ref }}
           fetch-depth: 0
           # The release is published through the API with GITHUB_TOKEN and
           # nothing is pushed over git, so the checkout needs no stored
@@ -134,10 +142,20 @@ jobs:
           TAG: ${{ needs.tag.outputs.tag }}
         run: |
           set -eu
-          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            sha="$(git rev-parse HEAD)"
-            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$sha"
-            git tag "$TAG" "$sha"
+          built="$(git rev-parse HEAD)"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            # A tag on another commit means someone pushed that name first.
+            # Releasing it would ship binaries that do not match the tag, and
+            # gh release create --verify-tag checks only that the tag exists.
+            tagged="$(git rev-parse "refs/tags/$TAG^{commit}")"
+            if [ "$tagged" != "$built" ]; then
+              echo "::error::$TAG points at $tagged, not the built $built; not releasing it"
+              exit 1
+            fi
+          else
+            # Fails if the name was pushed meanwhile, rather than moving it.
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$built"
+            git tag "$TAG" "$built"
           fi
 
       - run: bun install --frozen-lockfile
@@ -157,16 +175,9 @@ jobs:
           TAG: ${{ needs.tag.outputs.tag }}
         run: |
           set -eu
+          # The tag was checked against the built commit when it was created
+          # or found, so a re-run here is for the same commit.
           if gh release view "$TAG" >/dev/null 2>&1; then
-            # Only a re-run for the commit the tag names replaces the assets. A
-            # tag on another commit means someone pushed that name first, and
-            # overwriting would ship binaries that do not match the tag.
-            head="$(git rev-parse HEAD)"
-            tagged="$(git rev-parse "refs/tags/$TAG^{commit}")"
-            if [ "$tagged" != "$head" ]; then
-              echo "::error::$TAG points at $tagged, not the built $head; not replacing its assets"
-              exit 1
-            fi
             gh release upload "$TAG" dist/*.tar.gz dist/checksums.txt --clobber
           else
             gh release create "$TAG" dist/*.tar.gz dist/checksums.txt --verify-tag --generate-notes --latest

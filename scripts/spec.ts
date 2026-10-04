@@ -13,28 +13,32 @@ import { SPEC_VERSION, SPEC_PATH } from "../openapi/spec";
 const arg = process.argv[2];
 const check = arg === "--check";
 const next = check ? SPEC_VERSION : arg;
-if (!next || !/^\d+\.\d+\.\d+$/.test(next)) {
+if (process.argv.length !== 3 || !next || !/^\d+\.\d+\.\d+$/.test(next)) {
   console.error("usage: bun run spec <version>   (for example 2.30.0)\n       bun run spec --check");
   process.exit(2);
 }
 const url = `https://raw.githubusercontent.com/usekaneo/kaneo/v${next}/apps/docs/openapi.json`;
-const res = await fetch(url);
+// CI runs this unattended; a stalled connection should fail, not hang the job.
+const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
 if (!res.ok) {
   console.error(`${url}: ${res.status}`);
   process.exit(1);
 }
-const body = await res.text();
+const body = Buffer.from(await res.arrayBuffer());
 
 if (check) {
-  if (readFileSync(SPEC_PATH, "utf8") !== body) {
-    console.error(`${SPEC_PATH} differs from ${url}; re-pin with: bun run spec ${next}`);
+  if (!readFileSync(SPEC_PATH).equals(body)) {
+    console.error(
+      `${SPEC_PATH} differs from ${url}. The pinned file is the release's document unchanged; ` +
+        `corrections go in openapi/transformer.ts. Restore it with: bun run spec ${next}`,
+    );
     process.exit(1);
   }
   console.log(`pinned spec matches v${next}`);
   process.exit(0);
 }
 
-JSON.parse(body);
+JSON.parse(body.toString("utf8"));
 
 const specTs = new URL("../openapi/spec.ts", import.meta.url).pathname;
 // Only the file name carries the version; the directories above it may hold

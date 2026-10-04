@@ -70,6 +70,8 @@ Not every layer answers every setting:
 
 `kaneo context` prints the resolved values and names the layer each one came from.
 
+`kaneo context --repo owner/name` answers for another repository instead of the one the current directory's remote names, so the maps can be read before a checkout exists; a remote URL is taken as well, and the `.kaneo.json` layer is left out, since that file belongs to the directory `--repo` says is not the point.
+
 ### `.kaneo.json`
 
 ```json

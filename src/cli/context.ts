@@ -1,3 +1,6 @@
+import { parseRepo } from "../config/repo";
+import { resolveForRepo, type Resolved } from "../config/resolve";
+import type { RunContext } from "./args";
 import type { App } from "./app";
 
 // What the resolution chain settled on, and which layer supplied each value.
@@ -23,6 +26,19 @@ type Report = {
 const or = (value: string, fallback: string): string => (value === "" ? fallback : value);
 const omitted = (value: string): string | undefined => (value === "" ? undefined : value);
 
+// The chain as it is run for the repository a caller named rather than the one
+// this directory's remote names. Only context takes --repo, so no other command
+// resolves differently.
+//
+// A value that names no repository is refused rather than read as an empty one:
+// an empty repo falls through to the weaker layers without saying so, and the
+// maps --repo exists to answer would then be the only ones left asking.
+const forRepo = (value: string, app: App): Resolved => {
+  const repo = parseRepo(value);
+  if (repo === "") throw new Error(`--repo wants owner/name, got ${JSON.stringify(value)}`);
+  return resolveForRepo(app.flags, app.global, repo);
+};
+
 export const contextCommand = {
   name: "context",
   short: "Show the resolved settings and where each value came from",
@@ -32,8 +48,16 @@ export const contextCommand = {
       throw new Error(`unknown command ${JSON.stringify(first)} for "kaneo context"`);
     }
   },
-  run: ({ app }: { app: App }) => {
-    const cfg = app.cfg;
+  flags: [
+    {
+      name: "repo",
+      type: "string" as const,
+      usage: "resolve for this repository (owner/name or a remote) instead of the working copy's remote",
+      defaultValue: "",
+    },
+  ],
+  run: ({ changed, flags, app }: RunContext<App>) => {
+    const cfg = changed.has("repo") ? forRepo(String(flags.repo ?? ""), app) : app.cfg;
     const origin = {
       api_key: cfg.origin.api_key ?? "unset",
       api_url: cfg.origin.api_url ?? "unset",

@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "args": [
+        "context",
+        "--repo",
+        "just-a-name",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--repo wants owner/name, got \\\"just-a-name\\\"\"\n}\n",
+      "stderr": "Error: --repo wants owner/name, got \"just-a-name\"\n"
+    },
+    {
+      "args": [
+        "context",
+        "--repo",
+        "a/b/c",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--repo wants owner/name, got \\\"a/b/c\\\"\"\n}\n",
+      "stderr": "Error: --repo wants owner/name, got \"a/b/c\"\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

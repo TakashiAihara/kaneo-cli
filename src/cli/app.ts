@@ -1,6 +1,6 @@
 import { writeSync } from "node:fs";
 import type { GlobalConfig } from "../config/global";
-import type { Resolved } from "../config/resolve";
+import type { Flags, Resolved } from "../config/resolve";
 import type { Writer } from "../output/output";
 
 // Everything a command needs, built once before the command runs and read by
@@ -8,6 +8,10 @@ import type { Writer } from "../output/output";
 // module the generated client imports and has no other way to be told.
 export type App = {
   cfg: Resolved;
+  // What cfg was resolved from, so a command that runs the chain again over
+  // another repository starts from the same flags instead of reading them again
+  // and getting its own answer.
+  flags: Flags;
   global: GlobalConfig;
   out: Writer;
   // The one budget every request of this command shares, as the Go build's

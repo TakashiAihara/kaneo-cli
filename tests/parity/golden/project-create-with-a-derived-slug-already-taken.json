@@ -1,0 +1,78 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "create",
+        "Alphabet",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"the slug ALP derived from the name is used by project proj-alpha (Alpha): pass --slug\"\n}\n",
+      "stderr": "Error: the slug ALP derived from the name is used by project proj-alpha (Alpha): pass --slug\n"
+    },
+    {
+      "args": [
+        "project",
+        "create",
+        "Old Lake Docs",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"the slug OLD derived from the name is used by project proj-old (Old): pass --slug\"\n}\n",
+      "stderr": "Error: the slug OLD derived from the name is used by project proj-old (Old): pass --slug\n"
+    },
+    {
+      "args": [
+        "project",
+        "create",
+        "Alphabet",
+        "--slug",
+        "ALP2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"proj0002\",\n  \"name\": \"Alphabet\",\n  \"slug\": \"ALP2\",\n  \"icon\": \"Layers\",\n  \"description\": \"\",\n  \"workspaceId\": \"ws-main\",\n  \"isPublic\": false,\n  \"archivedAt\": null\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Alphabet",
+        "workspaceId": "ws-main",
+        "icon": "Layers",
+        "slug": "ALP2"
+      }
+    }
+  ],
+  "files": {}
+}

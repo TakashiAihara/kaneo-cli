@@ -1,0 +1,39 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "create",
+        "Gamma Ray!",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created proj0002  Gamma Ray!\n  task identifiers start with GR\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Gamma Ray!",
+        "workspaceId": "ws-main",
+        "icon": "Layers",
+        "slug": "GR"
+      }
+    }
+  ],
+  "files": {}
+}

@@ -1,19 +1,20 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
-import { runScenario, sameResult, type ScenarioResult } from "../tests/parity/run";
+import { runScenario, sameResult, THIS_BUILD, type ScenarioResult } from "../tests/parity/run";
 import { SCENARIOS } from "../tests/parity/scenarios";
 
 // Records what a build does for every parity scenario into tests/parity/golden/.
 //
-//   bun scripts/record-golden.ts <kaneo binary>   every golden, from that binary
-//   bun scripts/record-golden.ts                  only the goldens this source tree
-//                                                 no longer matches, and new ones
+//   bun scripts/record-golden.ts               only the goldens this source tree
+//                                              no longer matches, and new ones
+//   bun scripts/record-golden.ts --bin <kaneo> every golden, from that binary
 //
 // The goldens were first recorded from the last Go build; that is the contract
 // the TS build was held to. A change that means to alter output records the
 // affected goldens again from this tree. Recording from source rather than
-// through a wrapper script matters: the scenarios that empty PATH would not find
-// `bun` from a wrapper, and their goldens would record that failure instead.
+// through a wrapper script matters: the scenarios that set PATH to a directory
+// that does not exist would not find `bun` from a wrapper, and their goldens
+// would record that failure instead.
 // Only differing goldens are rewritten, because a golden that already matches
 // under the suite's own comparison (request bodies compared as values, so key
 // order is free) would otherwise churn for nothing.
@@ -22,7 +23,17 @@ export function slug(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-const THIS_BUILD = [process.execPath, new URL("../src/index.ts", import.meta.url).pathname];
+const USAGE = "usage: bun scripts/record-golden.ts [--bin <kaneo binary>]";
+
+// The binary to record from, or undefined for this source tree. Anything but
+// the two forms is refused: a typo read as a binary would rewrite every golden
+// from a program that does not exist.
+const binaryFrom = (args: string[]): string | undefined => {
+  if (args.length === 0) return undefined;
+  if (args.length === 2 && args[0] === "--bin" && args[1] !== "") return args[1];
+  console.error(USAGE);
+  process.exit(2);
+};
 
 async function record(bin: string | undefined) {
   // Two names that slug alike would share one golden, the later overwriting
@@ -65,4 +76,4 @@ async function record(bin: string | undefined) {
   console.log(`${written} written`);
 }
 
-if (import.meta.main) await record(process.argv[2]);
+if (import.meta.main) await record(binaryFrom(process.argv.slice(2)));

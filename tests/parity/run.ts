@@ -97,10 +97,15 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
   }
 }
 
-// Whether two results are the same under the suite's comparison: every step's
-// output and exit code byte for byte, and requests and files as values, so the
-// key order of a request body is not part of the contract.
+// This source tree as the suite runs it: src/index.ts under the bun running the
+// suite, so a scenario that sets PATH to nowhere still starts.
+export const THIS_BUILD = [process.execPath, new URL("../../src/index.ts", import.meta.url).pathname];
+
+// Whether two results are the same under parity.test.ts's comparison: every
+// step's arguments, exit code and output, every request and every file.
+// Bun.deepEquals, like the suite's toEqual, does not look at the order of an
+// object's keys, so a request body that differs only in key order is the same.
 export const sameResult = (want: ScenarioResult, got: ScenarioResult): boolean =>
   Bun.deepEquals(want.steps, got.steps, true) &&
-  Bun.deepEquals(want.requests, got.requests) &&
+  Bun.deepEquals(want.requests, got.requests, true) &&
   Bun.deepEquals(want.files, got.files, true);

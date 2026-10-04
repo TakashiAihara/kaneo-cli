@@ -1,17 +1,24 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { slug } from "../../scripts/record-golden";
-import { runScenario, type ScenarioResult } from "./run";
+import { runScenario, THIS_BUILD, type ScenarioResult } from "./run";
 import { SCENARIOS } from "./scenarios";
 
-// This build against what the Go build did (tests/parity/golden/, recorded by
-// scripts/record-golden.ts). Compared field by field so a failure names the
+// This build against tests/parity/golden/: recorded from the Go build when it
+// was retired, and recorded again from this tree for each intended change since
+// (scripts/record-golden.ts). Compared field by field so a failure names the
 // step and the stream that differ, rather than one opaque diff of everything.
-// KANEO_PARITY_BIN points the suite at another build; run it with the Go
-// reference to show the goldens are deterministic before trusting a failure.
-const CLI = process.env.KANEO_PARITY_BIN
-  ? [process.env.KANEO_PARITY_BIN]
-  : [process.execPath, new URL("../../src/index.ts", import.meta.url).pathname];
+// KANEO_PARITY_BIN points the suite at another build, such as the last release,
+// to see which goldens an unreleased change moved.
+const CLI = process.env.KANEO_PARITY_BIN ? [process.env.KANEO_PARITY_BIN] : THIS_BUILD;
+
+// A golden whose scenario was renamed or removed is never compared, so it would
+// sit in the tree looking like coverage.
+test("every golden has a scenario", () => {
+  const recorded = new Set(SCENARIOS.map((s) => `${slug(s.name)}.json`));
+  const orphans = readdirSync(new URL("golden/", import.meta.url)).filter((name) => !recorded.has(name));
+  expect(orphans).toEqual([]);
+});
 
 describe("parity with the Go build", () => {
   for (const s of SCENARIOS) {

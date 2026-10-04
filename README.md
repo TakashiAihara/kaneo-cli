@@ -215,7 +215,12 @@ bun run parity:record              # rewrites only the goldens this tree no long
 git diff --stat tests/parity/golden/
 ```
 
-Without an argument it runs `src/index.ts` with the same `bun`, so the scenarios that empty `PATH` still start, and it leaves alone every golden the suite already accepts (request bodies are compared as JSON values, so key order is not part of the contract). Given a binary (`bun run parity:record <kaneo>`), it rewrites every golden from that binary instead. It lists goldens that no scenario records any more, and refuses to write a golden that still holds the recording machine's host name, since the goldens are published.
+- it runs `src/index.ts` with the same `bun`, so the scenarios that point `PATH` at nothing still start
+- it leaves alone every golden the suite already accepts; request bodies are compared as JSON values, so key order is not part of the contract
+- it refuses to write a golden that still holds the recording machine's host name, since the goldens are published
+- `bun run parity:record --bin <kaneo>` rewrites every golden from that binary instead
+- `KANEO_PARITY_BIN=<kaneo> bun test tests/parity` runs the suite against another build, such as the last release, to see what an unreleased change moved
+- the suite fails on a golden that no scenario records
 
 Every push to `main` that passes CI is released as the next release candidate (`v0.2.0` → `v0.2.1-rc.1` → `v0.2.1-rc.2`), so the latest release and `install.sh` follow the newest commit on `main` that passed CI. A final version is cut by pushing its tag by hand, or by running the release workflow with that tag.
 

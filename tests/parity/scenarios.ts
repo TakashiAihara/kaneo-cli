@@ -1,10 +1,12 @@
 import type { Seed } from "./fake";
 
-// The behaviour the Go build had when it was retired, as command sequences run
-// against tests/parity/fake.ts. scripts/record-golden.ts runs them through the
-// Go reference binary and writes tests/parity/golden/; tests/parity/parity.test.ts
-// runs them through this build and compares. Each scenario starts from a fresh
-// fake seeded with SEED, a fresh HOME, and a cwd outside any repository.
+// The CLI's observable behaviour, as command sequences run against
+// tests/parity/fake.ts. The goldens in tests/parity/golden/ were recorded from
+// the Go build when it was retired and are recorded again from this tree by
+// scripts/record-golden.ts when a change means to alter them;
+// tests/parity/parity.test.ts runs these through this build and compares. Each
+// scenario starts from a fresh fake seeded with SEED, a fresh HOME, and a cwd
+// outside any repository.
 
 export const WS = "ws-main";
 export const P1 = "proj-alpha";

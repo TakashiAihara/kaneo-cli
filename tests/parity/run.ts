@@ -96,3 +96,11 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     rmSync(home, { recursive: true, force: true });
   }
 }
+
+// Whether two results are the same under the suite's comparison: every step's
+// output and exit code byte for byte, and requests and files as values, so the
+// key order of a request body is not part of the contract.
+export const sameResult = (want: ScenarioResult, got: ScenarioResult): boolean =>
+  Bun.deepEquals(want.steps, got.steps, true) &&
+  Bun.deepEquals(want.requests, got.requests) &&
+  Bun.deepEquals(want.files, got.files, true);

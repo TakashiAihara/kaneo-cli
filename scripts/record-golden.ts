@@ -1,21 +1,30 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
-import { runScenario } from "../tests/parity/run";
+import { runScenario, sameResult, type ScenarioResult } from "../tests/parity/run";
 import { SCENARIOS } from "../tests/parity/scenarios";
 
-// Records what the Go reference build does for every parity scenario. Run once
-// against the last Go release; the output is the contract the TS build is held
-// to. Usage: bun scripts/record-golden.ts <path to the Go kaneo binary>
+// Records what a build does for every parity scenario into tests/parity/golden/.
+//
+//   bun scripts/record-golden.ts <kaneo binary>   every golden, from that binary
+//   bun scripts/record-golden.ts                  only the goldens this source tree
+//                                                 no longer matches, and new ones
+//
+// The goldens were first recorded from the last Go build; that is the contract
+// the TS build was held to. A change that means to alter output records the
+// affected goldens again from this tree. Recording from source rather than
+// through a wrapper script matters: the scenarios that empty PATH would not find
+// `bun` from a wrapper, and their goldens would record that failure instead.
+// Only differing goldens are rewritten, because a golden that already matches
+// under the suite's own comparison (request bodies compared as values, so key
+// order is free) would otherwise churn for nothing.
 
 export function slug(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+const THIS_BUILD = [process.execPath, new URL("../src/index.ts", import.meta.url).pathname];
+
 async function record(bin: string | undefined) {
-  if (!bin) {
-    console.error("usage: bun scripts/record-golden.ts <go-kaneo-binary>");
-    process.exit(2);
-  }
   // Two names that slug alike would share one golden, the later overwriting
   // the earlier without a word.
   const slugs = SCENARIOS.map((s) => slug(s.name));
@@ -26,20 +35,34 @@ async function record(bin: string | undefined) {
   }
   const dir = new URL("../tests/parity/golden/", import.meta.url).pathname;
   mkdirSync(dir, { recursive: true });
+  const host = hostname();
+  let written = 0;
   for (const s of SCENARIOS) {
-    const result = await runScenario([bin], s);
+    const file = `${dir}${slug(s.name)}.json`;
+    const result = await runScenario(bin === undefined ? THIS_BUILD : [bin], s);
+    if (bin === undefined && existsSync(file)) {
+      const want: ScenarioResult = JSON.parse(readFileSync(file, "utf8"));
+      if (sameResult(want, result)) continue;
+    }
     const text = JSON.stringify(result, null, 2) + "\n";
     // The goldens are published with the repository. The recording machine's
     // name surviving normalisation means a new place prints it; stop rather
     // than publish it, and extend the normalisation in tests/parity/run.ts.
-    const host = hostname();
     if (new RegExp(`(^|[^A-Za-z0-9-])${host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Za-z0-9-]|$)`).test(text)) {
       console.error(`${s.name}: the output still holds this machine's name (${host}); not written`);
       process.exit(2);
     }
-    writeFileSync(`${dir}${slug(s.name)}.json`, text);
+    writeFileSync(file, text);
+    written++;
     console.log(`${result.steps.map((x) => x.exit).join(",").padEnd(12)} ${s.name}`);
   }
+  // A golden whose scenario was renamed or removed is never compared again, so
+  // it would sit there looking like coverage.
+  const known = new Set(slugs.map((s) => `${s}.json`));
+  for (const name of readdirSync(dir).sort()) {
+    if (!known.has(name)) console.error(`no scenario records ${name}; delete it if the scenario is gone`);
+  }
+  console.log(`${written} written`);
 }
 
 if (import.meta.main) await record(process.argv[2]);

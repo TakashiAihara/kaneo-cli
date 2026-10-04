@@ -5,7 +5,14 @@ import { OPERATIONS, type Operation } from "./registry";
 // kaneoFetch, so the key is checked, attached and reported on the same way for
 // every operation, and every response is checked against the schema the
 // generator passes in. Behaviour is pinned by tests/http.test.ts.
-export type KaneoInit<T> = RequestInit & { schema?: ZodType<T> };
+// The schema is not tied to T: it only decides whether a mismatch is reported,
+// and the generated client passes none for an operation answering two
+// different 2xx bodies (deleteLabel's 200 and 202), while still typing the
+// options it forwards as this function's own. orval 8.39's fetch client passes
+// a schema only when the success type is a single schema (hasSchema in
+// @orval/fetch), with no setting to change that. REMOVE WHEN it passes one for
+// a union: then the schema can be tied to T again.
+export type KaneoInit<T = unknown> = RequestInit & { schema?: ZodType<T> | ZodType };
 
 type ClientConfig = {
   baseUrl: string;

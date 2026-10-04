@@ -7,6 +7,7 @@
  */
 
 export * from './activity.zod';
+export * from './attachLabelToTaskBody.zod';
 export * from './board.zod';
 export * from './boardColumn.zod';
 export * from './boardPagination.zod';
@@ -18,15 +19,18 @@ export * from './commentAuthor.zod';
 export * from './createActivity400Two.zod';
 export * from './createActivityBody.zod';
 export * from './createColumnBody.zod';
+export * from './createLabelBody.zod';
 export * from './createProjectBody.zod';
 export * from './createTaskBody.zod';
 export * from './createTaskCommentBody.zod';
 export * from './createTaskRelationBody.zod';
+export * from './label.zod';
 export * from './listProjectsParams.zod';
 export * from './listTasksParams.zod';
 export * from './moveTaskBody.zod';
 export * from './moveTaskResult.zod';
 export * from './organization.zod';
+export * from './pendingLabelDeletion.zod';
 export * from './project.zod';
 export * from './projectListItem.zod';
 export * from './projectStatistics.zod';
@@ -39,6 +43,7 @@ export * from './taskRelation.zod';
 export * from './taskRelationWithTasks.zod';
 export * from './taskWithAssignee.zod';
 export * from './updateColumnBody.zod';
+export * from './updateLabelBody.zod';
 export * from './updateOrganizationBody.zod';
 export * from './updateProjectBody.zod';
 export * from './updateTaskAssigneeBody.zod';

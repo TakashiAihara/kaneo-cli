@@ -1,5 +1,5 @@
 import { OPERATIONS, type Operation } from "./registry";
-import { kaneoFetch } from "./http";
+import { kaneoFetch, KaneoApiError } from "./http";
 import type { Json } from "../output/json";
 import {
   archiveProject,
@@ -7,6 +7,14 @@ import {
   createActivity,
   getActivities,
   updateTaskComment,
+  attachLabelToTask,
+  createLabel as postLabel,
+  deleteLabel as removeLabel,
+  detachLabelFromTask,
+  getLabel as readLabel,
+  getTaskLabels,
+  getWorkspaceLabels,
+  updateLabel as putLabel,
   createProject as postProject,
   createTask as postTask,
   createTaskComment,
@@ -39,6 +47,7 @@ import type {
   CreateTaskBody,
   CreateTaskRelationBody,
   Activity as GenActivity,
+  Label as GenLabel,
   Organization,
   ProjectListItem,
   RelatedTask,
@@ -847,6 +856,144 @@ export const taskSummary = (t: Task): RelationTask => ({
   status: t.status,
   projectId: t.projectId,
 });
+
+// A label as the label routes return it. The server keeps two kinds of row
+// under one table: a workspace label (taskId null), which is what the web app
+// offers to pick from, and a copy of it on each task it is attached to, with
+// the same name and its own id. Attaching inserts a copy and detaching deletes
+// one, so the workspace label itself never moves.
+export type LabelRecord = Label & {
+  taskId: string | null;
+  workspaceId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Set once a deletion has started and not yet finished; the server refuses
+  // to attach or change such a label, and the same delete resumes it.
+  deletionStartedAt: string | null;
+};
+
+const labelRecord = (l: GenLabel): LabelRecord => ({
+  id: l.id ?? "",
+  name: l.name ?? "",
+  color: l.color ?? "",
+  taskId: l.taskId ?? null,
+  workspaceId: l.workspaceId ?? null,
+  createdAt: isoTime("createdAt", l.createdAt),
+  updatedAt: isoTime("updatedAt", l.updatedAt),
+  deletionStartedAt: isoTimePtr("deletionStartedAt", l.deletionStartedAt),
+});
+
+// Every label row in a workspace, the task copies included; the caller picks
+// out the workspace labels when that is what it wants.
+export const listWorkspaceLabels = async (workspaceId: string): Promise<LabelRecord[]> =>
+  zeroList(await getWorkspaceLabels(pathParam(workspaceId))).map(labelRecord);
+
+// The copies attached to one task.
+export const listTaskLabels = async (taskId: string): Promise<LabelRecord[]> =>
+  zeroList(await getTaskLabels(pathParam(taskId))).map(labelRecord);
+
+export const getLabel = async (labelId: string): Promise<LabelRecord> =>
+  labelRecord(zeroRecord(await readLabel(pathParam(labelId))));
+
+// Creates a workspace label. The server answers with the existing one when the
+// name is already taken in the workspace rather than failing, so creating is
+// safe to repeat.
+export const createLabel = async (workspaceId: string, name: string, color: string): Promise<LabelRecord> => {
+  const wanted = name.trim();
+  if (wanted === "") throw new Error("label name is empty");
+  if (color.trim() === "") throw new Error("label color is empty");
+  return labelRecord(zeroRecord(await postLabel({ name: wanted, color, workspaceId })));
+};
+
+export type LabelChanges = { name?: string; color?: string };
+
+// Changes a label's name or color and keeps the other. The server's update
+// takes both, so the label is read first and the field not asked for is sent
+// back as read. On a workspace label the server carries the change to every
+// task copy, which is what renaming a label means in the web app as well.
+export const updateLabel = async (
+  labelId: string,
+  changes: LabelChanges,
+): Promise<{ before: LabelRecord; after: LabelRecord }> => {
+  const name = changes.name?.trim();
+  if (name === "") throw new Error("label name is empty");
+  if (changes.color?.trim() === "") throw new Error("label color is empty");
+  const before = await getLabel(labelId);
+  // A read that decoded to nothing would write a blank name back.
+  if (before.id !== labelId || before.name === "") {
+    throw new Error(`reading label ${labelId} before the update got id ${quoted(before.id)}, name ${quoted(before.name)}; not writing`);
+  }
+  const after = labelRecord(
+    zeroRecord(
+      await putLabel(pathParam(labelId), { name: name ?? before.name, color: changes.color ?? before.color }),
+    ),
+  );
+  return { before, after };
+};
+
+// Deletes a label. A workspace label takes its task copies with it, and the
+// server removes those 25 at a time: it answers 202 with pendingDeletion until
+// the last batch, and the same request resumes where the previous one stopped.
+// So the request is repeated until the server says it is done. A server older
+// than the batching answers 200 the first time, which ends the loop at once.
+//
+// 429 means the server's few deletion slots are taken, or another client is
+// deleting this label right now; it asks to retry after a second. That is
+// retried the way the web app does, five times in a row at most, the count
+// starting over after each batch that went through.
+export const deleteLabel = async (labelId: string): Promise<LabelRecord> => {
+  const id = pathParam(labelId);
+  // The last batch's answer: the label as it stood once a batch went through.
+  let last: GenLabel | undefined;
+  let busy = 0;
+  for (;;) {
+    let reply: GenLabel | (GenLabel & { pendingDeletion: true });
+    try {
+      reply = zeroRecord(await removeLabel(id));
+    } catch (e) {
+      const status = e instanceof KaneoApiError ? e.statusCode : 0;
+      if (status === 429 && busy < LABEL_DELETE_BUSY_RETRIES) {
+        busy++;
+        await Bun.sleep(LABEL_DELETE_BUSY_WAIT_MS);
+        continue;
+      }
+      // Another client finished this deletion while this one waited: the
+      // label is gone, which the server reports as an id it cannot place
+      // (400) or, past that check, as not found (404).
+      if (last !== undefined && (status === 400 || status === 404)) return labelRecord(last);
+      // The server starts deleting inside the first request, before it
+      // answers, and keeps what it did; the same request resumes from there.
+      // Only a refusal on the first request (a 4xx, which the server gives
+      // before touching the label) means nothing changed.
+      if (last === undefined && status >= 400 && status < 500) throw e;
+      const hint = `; the label may be partly deleted, run \`kaneo label rm ${labelId} --yes\` again to finish`;
+      if (e instanceof Error) {
+        e.message += hint;
+        throw e;
+      }
+      throw new Error(`${String(e)}${hint}`);
+    }
+    if (!("pendingDeletion" in reply && reply.pendingDeletion === true)) return labelRecord(reply);
+    last = reply;
+    busy = 0;
+  }
+};
+
+// The web app's numbers (apps/web/src/fetchers/label/delete-label.ts, v2.29.2);
+// the server's 429 carries Retry-After: 1.
+const LABEL_DELETE_BUSY_RETRIES = 5;
+const LABEL_DELETE_BUSY_WAIT_MS = 1000;
+
+// Attaches a label to a task, which inserts a copy of it on the task and
+// answers with that copy. Attaching a label the task already carries answers
+// with the copy it has.
+export const attachLabel = async (labelId: string, taskId: string): Promise<LabelRecord> =>
+  labelRecord(zeroRecord(await attachLabelToTask(pathParam(labelId), { taskId })));
+
+// Detaches a task copy, which deletes it. The id is the copy's, not the
+// workspace label's: the server answers 400 for a label on no task.
+export const detachLabel = async (copyId: string): Promise<LabelRecord> =>
+  labelRecord(zeroRecord(await detachLabelFromTask(pathParam(copyId))));
 
 export type CheckResult = {
   serverOperations: number;

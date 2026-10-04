@@ -41,4 +41,12 @@ export const OPERATIONS: Operation[] = [
   { id: "updateTaskComment", method: "PUT", path: "/comment/{id}", command: "kaneo comment edit" },
   { id: "getActivities", method: "GET", path: "/activity/{taskId}", command: "kaneo activity ls" },
   { id: "createActivity", method: "POST", path: "/activity/create", command: "kaneo activity add" },
+  { id: "getWorkspaceLabels", method: "GET", path: "/label/workspace/{workspaceId}", command: "kaneo label ls / attach" },
+  { id: "getTaskLabels", method: "GET", path: "/label/task/{taskId}", command: "kaneo label ls <task> / detach" },
+  { id: "getLabel", method: "GET", path: "/label/{id}", command: "kaneo label get / update" },
+  { id: "createLabel", method: "POST", path: "/label", command: "kaneo label create" },
+  { id: "updateLabel", method: "PUT", path: "/label/{id}", command: "kaneo label update" },
+  { id: "deleteLabel", method: "DELETE", path: "/label/{id}", command: "kaneo label rm" },
+  { id: "attachLabelToTask", method: "PUT", path: "/label/{id}/task", command: "kaneo label attach" },
+  { id: "detachLabelFromTask", method: "DELETE", path: "/label/{id}/task", command: "kaneo label detach" },
 ];

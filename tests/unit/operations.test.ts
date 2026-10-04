@@ -331,6 +331,13 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["CreateProject", "POST", "/api/project", () => api.createProject({ name: "n", workspaceId: "w", icon: "", slug: "", description: "" })],
     ["ListProjects", "GET", "/api/project", () => api.listProjectsIn("w", false)],
     ["ListWorkspaces", "GET", "/api/auth/organization/list", () => api.listWorkspaces()],
+    ["ListWorkspaceLabels", "GET", "/api/label/workspace/a%2Fb", () => api.listWorkspaceLabels(id)],
+    ["ListTaskLabels", "GET", "/api/label/task/a%2Fb", () => api.listTaskLabels(id)],
+    ["GetLabel", "GET", "/api/label/a%2Fb", () => api.getLabel(id)],
+    ["CreateLabel", "POST", "/api/label", () => api.createLabel("w", "bug", "red")],
+    ["DeleteLabel", "DELETE", "/api/label/a%2Fb", () => api.deleteLabel(id)],
+    ["AttachLabel", "PUT", "/api/label/a%2Fb/task", () => api.attachLabel(id, "t")],
+    ["DetachLabel", "DELETE", "/api/label/a%2Fb/task", () => api.detachLabel(id)],
   ];
   test.each(calls)("%s", async (name, method, path, call) => {
     const seen: { method: string; path: string }[] = [];
@@ -347,6 +354,157 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     expect(err !== undefined, `${name}: err = ${err}`).toBe(["GetBoard", "EditComment", "AddActivity"].includes(name));
     expect(seen[0]).toEqual({ method, path });
   });
+});
+
+const LABEL = (extra = "") =>
+  `{"id":"l1","name":"bug","color":"red","createdAt":"${TIME}","updatedAt":"${TIME}","taskId":null,"workspaceId":"w1"${extra}}`;
+
+// A workspace label's deletion goes on in batches: the server answers 202 with
+// pendingDeletion until the last one, and the same request has to be repeated
+// until it answers 200, or the label and its remaining task copies stay.
+test("TestDeleteLabelRepeatsUntilTheServerIsDone", async () => {
+  let calls = 0;
+  newServer((req) => {
+    calls++;
+    expect([req.method, new URL(req.url).pathname]).toEqual(["DELETE", "/api/label/l1"]);
+    return calls < 3
+      ? new Response(LABEL(`,"pendingDeletion":true`), { status: 202, headers: { "content-type": "application/json" } })
+      : new Response(LABEL(), { headers: { "content-type": "application/json" } });
+  });
+  const got = await api.deleteLabel("l1");
+  expect(calls).toBe(3);
+  expect(got.id).toBe("l1");
+});
+
+// The server's update replaces name and color together, so a change to one
+// sends the other back as it was read.
+test("TestUpdateLabelKeepsTheFieldNotAsked", async () => {
+  const sent: string[] = [];
+  newServer(async (req) => {
+    if (req.method === "PUT") sent.push(await req.text());
+    return new Response(LABEL(), { headers: { "content-type": "application/json" } });
+  });
+  await api.updateLabel("l1", { color: "green" });
+  await api.updateLabel("l1", { name: "defect" });
+  expect(sent.map((s) => JSON.parse(s))).toEqual([
+    { name: "bug", color: "green" },
+    { name: "defect", color: "red" },
+  ]);
+});
+
+// A busy server (429) is waited out, and the count of retries starts over
+// after a batch that went through: five busy answers, a batch, one more busy
+// answer and the end is a deletion that finishes, not one given up on.
+test("TestDeleteLabelWaitsOutABusyServer", async () => {
+  const replies = [429, 429, 429, 429, 429, 202, 429, 200];
+  let calls = 0;
+  newServer(() => {
+    const status = replies[calls++]!;
+    if (status === 429) return new Response("Label deletion is busy; retry this request", { status, headers: { "Retry-After": "1" } });
+    return new Response(LABEL(status === 202 ? `,"pendingDeletion":true` : ""), { status, headers: { "content-type": "application/json" } });
+  });
+  expect((await api.deleteLabel("l1")).id).toBe("l1");
+  expect(calls).toBe(8);
+}, 15_000);
+
+// Five busy answers in a row are given up on, so a server that stays busy
+// does not hold the command until its deadline.
+test("TestDeleteLabelGivesUpOnAServerThatStaysBusy", async () => {
+  let calls = 0;
+  newServer(() => {
+    calls++;
+    return new Response("busy", { status: 429 });
+  });
+  const err = await failure(api.deleteLabel("l1"));
+  expect(err).toBeInstanceOf(KaneoApiError);
+  expect(calls).toBe(6);
+}, 10_000);
+
+// The server starts deleting inside the first request, so any failure but a
+// refusal (4xx) on the first request may have left the label partly deleted,
+// and says how to finish it. The failure keeps its type, so a caller can
+// still read the status.
+test("TestDeleteLabelSaysAPartialDeletionResumes", async () => {
+  for (const [replies, partly] of [[[202, 500], true], [[500], true], [[403], false]] as const) {
+    let calls = 0;
+    newServer(() => {
+      const status = replies[calls++]!;
+      return status === 202
+        ? new Response(LABEL(`,"pendingDeletion":true`), { status, headers: { "content-type": "application/json" } })
+        : new Response("boom", { status });
+    });
+    const err = await failure(api.deleteLabel("l1"));
+    expect(err).toBeInstanceOf(KaneoApiError);
+    expect((err as KaneoApiError).statusCode).toBe(replies.at(-1)!);
+    expect(String(err).includes("run `kaneo label rm l1 --yes` again")).toBe(partly);
+  }
+});
+
+// Another client can finish the same deletion while this one waits out a
+// busy answer; the label is then gone and the server cannot place its id.
+// That is the deletion done, not a failure.
+test("TestDeleteLabelTakesAGoneLabelAfterABatchAsDone", async () => {
+  for (const gone of [400, 404]) {
+    const replies = [202, gone];
+    let calls = 0;
+    newServer(() => {
+      const status = replies[calls++]!;
+      return status === 202
+        ? new Response(LABEL(`,"pendingDeletion":true`), { status, headers: { "content-type": "application/json" } })
+        : new Response(JSON.stringify({ message: "Workspace ID could not be determined" }), { status });
+    });
+    expect((await api.deleteLabel("l1")).id).toBe("l1");
+    expect(calls).toBe(2);
+  }
+  // Before any batch, the same answer is an unknown label and fails.
+  newServer(() => new Response("unknown", { status: 400 }));
+  expect(await failure(api.deleteLabel("l1"))).toBeInstanceOf(KaneoApiError);
+});
+
+// The PUT goes to the label's own route with its id escaped, like every
+// other call; it is not in the table above because it reads first.
+test("TestUpdateLabelWritesToItsRouteWithTheIDEscaped", async () => {
+  const seen: string[] = [];
+  newServer((req) => {
+    seen.push(`${req.method} ${new URL(req.url).pathname}`);
+    return new Response(LABEL().replace('"id":"l1"', '"id":"a/b"'), { headers: { "content-type": "application/json" } });
+  });
+  await api.updateLabel("a/b", { color: "green" });
+  expect(seen).toEqual(["GET /api/label/a%2Fb", "PUT /api/label/a%2Fb"]);
+});
+
+// A read that answers a different label must not be written over this one.
+test("TestUpdateLabelRefusesAReadOfAnotherLabel", async () => {
+  const methods: string[] = [];
+  newServer((req) => {
+    methods.push(req.method);
+    return new Response(LABEL().replace('"id":"l1"', '"id":"l2"'), { headers: { "content-type": "application/json" } });
+  });
+  expect(String(await failure(api.updateLabel("l1", { color: "green" })))).toContain("not writing");
+  expect(methods).toEqual(["GET"]);
+});
+
+// A blank color would leave a label the web app draws in its fallback grey.
+test("TestLabelColorMustNotBeBlank", async () => {
+  const methods: string[] = [];
+  newServer((req) => {
+    methods.push(req.method);
+    return new Response(LABEL(), { headers: { "content-type": "application/json" } });
+  });
+  expect(String(await failure(api.createLabel("w", "bug", " ")))).toContain("label color is empty");
+  expect(String(await failure(api.updateLabel("l1", { color: "" })))).toContain("label color is empty");
+  expect(methods).toEqual([]);
+});
+
+// A read that came back empty must not be written back as a blank label.
+test("TestUpdateLabelRefusesAnEmptyRead", async () => {
+  const methods: string[] = [];
+  newServer((req) => {
+    methods.push(req.method);
+    return new Response(null, { status: 204 });
+  });
+  expect(String(await failure(api.updateLabel("l1", { color: "green" })))).toContain("not writing");
+  expect(methods).toEqual(["GET"]);
 });
 
 // What each read maps onto the CLI's types, field by field.

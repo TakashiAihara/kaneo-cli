@@ -1,0 +1,384 @@
+{
+  "steps": [
+    {
+      "args": [
+        "label",
+        "create",
+        "x",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created lbl0002  x  (gray)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "create",
+        "x",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "exists lbl0002  x  (gray); use `kaneo label update` to change it\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "create",
+        "lbl0002",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created lbl0003  lbl0002  (gray)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "get",
+        "lbl0002",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "lbl0002  x  (gray)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "attach",
+        "1",
+        "lbl0002",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "labeled #1 x\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "detach",
+        "1",
+        "lbl0002",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "unlabeled #1 x\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "update",
+        "x",
+        "--name",
+        "lbl0002",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: label \"lbl0002\" already exists (lbl0003); pick another name\n"
+    },
+    {
+      "args": [
+        "label",
+        "update",
+        "x",
+        "--name",
+        " lbl0002 ",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: label \"lbl0002\" already exists (lbl0003); pick another name\n"
+    },
+    {
+      "args": [
+        "label",
+        "update",
+        "x",
+        "--name",
+        "x",
+        "--color",
+        "red",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated lbl0002  x  (red)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "create",
+        "y",
+        "--color",
+        "",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: label color is empty\n"
+    },
+    {
+      "args": [
+        "label",
+        "attach",
+        "1",
+        "x",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "labeled #1 x\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "attach",
+        "1",
+        "lbl0003",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "labeled #1 lbl0002\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "detach",
+        "1",
+        "lbl0002",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "unlabeled #1 x\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "ls",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "lbl0006  lbl0002  (gray)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "lbl0002  x  (red)\nlbl0003  lbl0002  (gray)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/label",
+      "query": "",
+      "body": {
+        "name": "x",
+        "color": "gray",
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/label",
+      "query": "",
+      "body": {
+        "name": "x",
+        "color": "gray",
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/label",
+      "query": "",
+      "body": {
+        "name": "lbl0002",
+        "color": "gray",
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/lbl0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/label/lbl0002/task",
+      "query": "",
+      "body": {
+        "taskId": "task-a1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/label/lbl0004/task",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/lbl0002",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/label/lbl0002",
+      "query": "",
+      "body": {
+        "name": "x",
+        "color": "red"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/label/lbl0002/task",
+      "query": "",
+      "body": {
+        "taskId": "task-a1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/label/lbl0003/task",
+      "query": "",
+      "body": {
+        "taskId": "task-a1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/label/lbl0005/task",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

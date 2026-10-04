@@ -14,6 +14,7 @@ import {
   BoardResponse,
   Column,
   Comment,
+  Label,
   MoveTaskResult,
   Organization,
   Project,
@@ -24,8 +25,10 @@ import {
   TaskWithAssignee
 } from './model';
 import type {
+  AttachLabelToTaskBody,
   CreateActivityBody,
   CreateColumnBody,
+  CreateLabelBody,
   CreateProjectBody,
   CreateTaskBody,
   CreateTaskCommentBody,
@@ -33,8 +36,10 @@ import type {
   ListProjectsParams,
   ListTasksParams,
   MoveTaskBody,
+  PendingLabelDeletion,
   ReorderColumnsBody,
   UpdateColumnBody,
+  UpdateLabelBody,
   UpdateOrganizationBody,
   UpdateProjectBody,
   UpdateTaskAssigneeBody,
@@ -964,6 +969,257 @@ export const deleteTaskComment = async (id: string, options?: Parameters<typeof 
 
     ,
     schema: Activity
+  }
+);}
+
+
+
+export const getGetTaskLabelsUrl = (taskId: string,) => {
+
+
+
+
+  return `/label/task/${taskId}`
+}
+
+/**
+ * Get all labels assigned to a specific task
+ * @summary Get task labels
+ */
+export const getTaskLabels = async (taskId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Label[]> => {
+
+  return kaneoFetch<Label[]>(getGetTaskLabelsUrl(taskId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(Label)
+  }
+);}
+
+
+
+export const getGetWorkspaceLabelsUrl = (workspaceId: string,) => {
+
+
+
+
+  return `/label/workspace/${workspaceId}`
+}
+
+/**
+ * Get all labels for a specific workspace
+ * @summary Get workspace labels
+ */
+export const getWorkspaceLabels = async (workspaceId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Label[]> => {
+
+  return kaneoFetch<Label[]>(getGetWorkspaceLabelsUrl(workspaceId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(Label)
+  }
+);}
+
+
+
+export const getCreateLabelUrl = () => {
+
+
+
+
+  return `/label`
+}
+
+/**
+ * Create a new label in a workspace
+ * @summary Create label
+ */
+export const createLabel = async (createLabelBody: CreateLabelBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<Label> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Label>(getCreateLabelUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createLabelBody),
+    schema: Label
+  }
+);}
+
+
+
+export const getGetLabelUrl = (id: string,) => {
+
+
+
+
+  return `/label/${id}`
+}
+
+/**
+ * Get a specific label by ID
+ * @summary Get label
+ */
+export const getLabel = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Label> => {
+
+  return kaneoFetch<Label>(getGetLabelUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: Label
+  }
+);}
+
+
+
+export const getUpdateLabelUrl = (id: string,) => {
+
+
+
+
+  return `/label/${id}`
+}
+
+/**
+ * Update an existing label
+ * @summary Update label
+ */
+export const updateLabel = async (id: string,
+    updateLabelBody: UpdateLabelBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<Label> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Label>(getUpdateLabelUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateLabelBody),
+    schema: Label
+  }
+);}
+
+
+
+export const getDeleteLabelUrl = (id: string,) => {
+
+
+
+
+  return `/label/${id}`
+}
+
+/**
+ * Delete a label by ID. Large workspace cascades remove at most 25 task copies per request. Repeat DELETE with the same ID after HTTP 202 until HTTP 200 completes the operation. The persisted start boundary allows safe resumption after a disconnect. HTTP 429 asks the caller to retry later.
+ * @summary Delete label
+ */
+export const deleteLabel = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Label | PendingLabelDeletion> => {
+
+  return kaneoFetch<Label | PendingLabelDeletion>(getDeleteLabelUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+export const getAttachLabelToTaskUrl = (id: string,) => {
+
+
+
+
+  return `/label/${id}/task`
+}
+
+/**
+ * Attach an existing label to a task
+ * @summary Attach label to task
+ */
+export const attachLabelToTask = async (id: string,
+    attachLabelToTaskBody: AttachLabelToTaskBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<Label> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Label>(getAttachLabelToTaskUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(attachLabelToTaskBody),
+    schema: Label
+  }
+);}
+
+
+
+export const getDetachLabelFromTaskUrl = (id: string,) => {
+
+
+
+
+  return `/label/${id}/task`
+}
+
+/**
+ * Detach a label from its current task
+ * @summary Detach label from task
+ */
+export const detachLabelFromTask = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Label> => {
+
+  return kaneoFetch<Label>(getDetachLabelFromTaskUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: Label
   }
 );}
 

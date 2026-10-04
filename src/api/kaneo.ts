@@ -382,7 +382,7 @@ const column = (c: GenColumn): Column => ({
 
 // A project's columns, in board order.
 export const listColumns = async (projectId: string): Promise<Column[]> =>
-  zeroList(await call(readColumns(pathParam(projectId)))).map(column);
+  zeroList(await readColumns(pathParam(projectId))).map(column);
 
 // The payload for creating a column. An icon and a color are left out of the body
 // when there are none: the route takes a string or nothing at all, never null,
@@ -394,14 +394,12 @@ export type NewColumn = { name: string; icon: string; color: string; isFinal: bo
 export const createColumn = async (projectId: string, wanted: NewColumn): Promise<Column> =>
   column(
     zeroRecord(
-      await call(
-        postColumn(pathParam(projectId), {
-          name: wanted.name,
-          isFinal: wanted.isFinal,
-          ...(wanted.icon === "" ? {} : { icon: wanted.icon }),
-          ...(wanted.color === "" ? {} : { color: wanted.color }),
-        }),
-      ),
+      await postColumn(pathParam(projectId), {
+        name: wanted.name,
+        isFinal: wanted.isFinal,
+        ...(wanted.icon === "" ? {} : { icon: wanted.icon }),
+        ...(wanted.color === "" ? {} : { color: wanted.color }),
+      }),
     ),
   );
 
@@ -409,11 +407,9 @@ export const createColumn = async (projectId: string, wanted: NewColumn): Promis
 // whole set rather than the one column that moved.
 export const reorderColumns = async (projectId: string, columnIds: string[]): Promise<Column[]> =>
   zeroList(
-    await call(
-      putColumns(pathParam(projectId), {
-        columns: columnIds.map((id, position) => ({ id, position })),
-      }),
-    ),
+    await putColumns(pathParam(projectId), {
+      columns: columnIds.map((id, position) => ({ id, position })),
+    }),
   ).map(column);
 
 // Renames a column.
@@ -422,11 +418,11 @@ export const reorderColumns = async (projectId: string, columnIds: string[]): Pr
 // created and the update route takes no slug at all, so the slug — which is what
 // every task in the column stores as its status — stays as it was.
 export const renameColumn = async (columnId: string, name: string): Promise<Column> =>
-  column(zeroRecord(await call(putColumn(pathParam(columnId), { name }))));
+  column(zeroRecord(await putColumn(pathParam(columnId), { name })));
 
 // Deletes a column, which the server allows only while the column holds no tasks.
 export const deleteColumn = async (columnId: string): Promise<Column> =>
-  column(zeroRecord(await call(removeColumn(pathParam(columnId)))));
+  column(zeroRecord(await removeColumn(pathParam(columnId))));
 
 export type Label = { id: string; name: string; color: string };
 
@@ -719,7 +715,7 @@ export const addComment = async (taskId: string, content: string, signal?: Abort
 // workspace cannot be found. Someone else's comment answers 404: the server
 // looks only among the caller's own. A key without task:update answers 403.
 export const deleteComment = async (commentId: string): Promise<void> => {
-  await call(deleteTaskComment(pathParam(commentId)));
+  await deleteTaskComment(pathParam(commentId));
 };
 
 // Rewrites a comment's text. The reply carries no author name, so the comment

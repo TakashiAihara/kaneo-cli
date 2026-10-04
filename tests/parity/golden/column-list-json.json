@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "list",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"col0001\",\n    \"slug\": \"to-do\",\n    \"name\": \"To Do\",\n    \"position\": 0,\n    \"isFinal\": false,\n    \"icon\": null,\n    \"color\": null\n  },\n  {\n    \"id\": \"col0002\",\n    \"slug\": \"in-progress\",\n    \"name\": \"In Progress\",\n    \"position\": 1,\n    \"isFinal\": false,\n    \"icon\": null,\n    \"color\": null\n  },\n  {\n    \"id\": \"col0003\",\n    \"slug\": \"done\",\n    \"name\": \"Done\",\n    \"position\": 2,\n    \"isFinal\": true,\n    \"icon\": null,\n    \"color\": null\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

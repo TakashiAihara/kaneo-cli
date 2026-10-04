@@ -20,7 +20,9 @@ A board, belonging to exactly one workspace. Holds columns, which hold tasks.
 
 ### column
 
-A lane on the board. **A column's id is also the `status` value of every task in it** — there is no separate status vocabulary. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define others, so nothing here treats that list as closed.
+A lane on the board. **A column's slug is also the `status` value of every task in it** — there is no separate status vocabulary. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define others, so nothing here treats that list as closed. Besides the columns, the server takes two statuses that no column holds, `planned` and `archived`.
+
+`kaneo column` reads and changes them: `ls`, `create`, `rename`, `reorder`, `rm`, all against the resolved project. A column is named by its id (the opaque `id` in `kaneo column ls --json`), its slug, or its name when no other column shares it, anywhere one is taken. Its slug is derived from its name when the column is created and the server's update route takes no slug at all, which is why a rename leaves the slug, and every task's status in the column, as it was.
 
 ### task
 
@@ -136,7 +138,8 @@ It covers failures that changed nothing: an unreachable server, a missing key, n
 | a project's `id`, `slug` and `name` | Three names for one board. The API takes the id, so the other two are resolved to it by looking the value up across the workspaces the key can see, and only once the server has said it does not know it — a value that works as an id costs no extra request |
 | workspace and project | A workspace holds projects. `repos` maps a repo to a *project*; the workspace follows from it |
 | reading a board and writing to one | `board` reads, so it can cover several projects at once. Everything else writes, and a write has to name the board it lands on — so a repository mapped to several projects makes those commands ask for `--project` rather than pick |
-| status and column | The same string. A status *is* a column id |
+| status and column | The same string. A status *is* a column slug |
+| column id and column slug | `kaneo column ls --json` shows both. The id is opaque and is what the column routes take; the slug is the status. The board route reports a column's `id` as its slug, so only the column routes show the opaque one |
 | site root and API root | The root serves the web app and answers 200 with HTML for any path. Only `/api/...` is the API, which is why the configured URL is normalised to end in `/api` |
 | `/auth/get-session` and `/auth/organization/list` | The first answers 200 with `null` for a valid key, an invalid key and no key, so it cannot check a credential. The second answers 401 on a bad key |
 | a hosted remote and a local one | git accepts a filesystem path as a remote, and its trailing components look exactly like `owner/repo`. `/home/me/acme/thing` must not resolve to the `acme` workspace, so only SSH and URL remotes are parsed |

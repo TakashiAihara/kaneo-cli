@@ -37,6 +37,10 @@ const DEFAULT_COLUMNS = [
   { slug: "done", name: "Done", isFinal: true },
 ];
 
+// The columns a project starts with, as the server's own shape so the routes
+// below can hand them straight to their schemas.
+type SeedColumn = z.input<typeof M.Column>;
+
 export type FakeOptions = {
   pageSize?: number;
   // Answers the way a server older than the pinned document does: fields the
@@ -56,9 +60,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const now = () => new Date(T0 + 1000 * clock++).toISOString();
   let seq = 0;
   const id = (prefix: string) => `${prefix}${String(++seq).padStart(4, "0")}`;
+  // Columns are numbered apart from the rest, because every project starts with
+  // its own set: sharing the counter above would move the id a comment or a
+  // relation is given later, which is what the recorded outputs name.
+  let columnSeq = 0;
+  const columnId = () => `col${String(++columnSeq).padStart(4, "0")}`;
 
-  const columns = seed.columns ?? DEFAULT_COLUMNS;
-  const firstColumn = columns[0]!.slug;
+  const seeded = seed.columns ?? DEFAULT_COLUMNS;
+  const firstColumn = seeded[0]!.slug;
   const users = new Map((seed.users ?? []).map((u) => [u.id, u.name]));
   const workspaces = seed.workspaces.map((w) => ({ ...w }));
   const projects = seed.projects.map((p, i) => ({
@@ -75,6 +84,48 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     position: i,
     lastTaskNumber: 0,
   }));
+  // Every project gets the seeded columns as records of its own, which is what
+  // makes a column created in one of them show up on that board and nowhere else.
+  // They take the seed's own moment rather than a tick of the clock: a tick here
+  // would move every task's timestamp in the seed, and with them every recorded
+  // output.
+  const seededAt = new Date(T0).toISOString();
+  const columns: SeedColumn[] = [];
+  for (const project of projects) {
+    for (const [at, column] of seeded.entries()) {
+      columns.push({
+        id: columnId(),
+        projectId: project.id,
+        name: column.name,
+        slug: column.slug,
+        position: at,
+        icon: null,
+        color: null,
+        isFinal: !!column.isFinal,
+        createdAt: seededAt,
+        updatedAt: seededAt,
+      });
+    }
+  }
+  const columnsOf = (projectId: string): SeedColumn[] =>
+    columns.filter((c) => c.projectId === projectId).sort((a, b) => a.position - b.position);
+  const addColumn = (projectId: string, wanted: z.input<typeof M.CreateColumnBody>): SeedColumn => {
+    const at = now();
+    const column: SeedColumn = {
+      id: columnId(),
+      projectId,
+      name: wanted.name,
+      slug: slugOf(wanted.name),
+      position: Math.max(-1, ...columnsOf(projectId).map((c) => c.position)) + 1,
+      icon: wanted.icon ?? null,
+      color: wanted.color ?? null,
+      isFinal: wanted.isFinal ?? false,
+      createdAt: at,
+      updatedAt: at,
+    };
+    columns.push(column);
+    return column;
+  };
   const tasks: z.input<typeof M.Task>[] = [];
   const addTask = (projectId: string, t: Partial<z.input<typeof M.Task>> & { title: string }, taskId?: string) => {
     const project = projects.find((p) => p.id === projectId)!;
@@ -140,7 +191,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           id: t.id,
           title: t.title,
           status: t.status,
-          isCompleted: !!columns.find((c) => c.slug === t.status)?.isFinal,
+          isCompleted: !!columnsOf(t.projectId).find((c) => c.slug === t.status)?.isFinal,
           priority: t.priority,
           number: t.number,
           projectId: t.projectId,
@@ -164,6 +215,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/auth\/organization\/update$/, M.UpdateOrganizationBody],
       ["POST", /^\/project$/, M.CreateProjectBody],
       ["PUT", /^\/project\/[^/]+$/, M.UpdateProjectBody],
+      ["POST", /^\/column\/[^/]+$/, M.CreateColumnBody],
+      ["PUT", /^\/column\/[^/]+$/, M.UpdateColumnBody],
+      ["PUT", /^\/column\/reorder\/[^/]+$/, M.ReorderColumnsBody],
       ["POST", /^\/task\/[^/]+$/, M.CreateTaskBody],
       ["PUT", /^\/task\/status\/[^/]+$/, M.UpdateTaskStatusBody],
       ["PUT", /^\/task\/priority\/[^/]+$/, M.UpdateTaskPriorityBody],
@@ -233,6 +287,48 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "PUT" && p[3] === "unarchive") return ok(M.Project, Object.assign(proj, { archivedAt: null }));
     }
 
+    if ((p = m(/^\/column\/reorder\/([^/]+)$/)) && req.method === "PUT") {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!proj) return fail(404, "Project not found");
+      const mine = new Map(columnsOf(proj.id).map((c) => [c.id, c]));
+      const wanted = (body as any)?.columns ?? [];
+      const off = wanted.filter((c: any) => !mine.has(c.id));
+      if (off.length > 0) return fail(400, `Column not in this project: ${off.map((c: any) => c.id).join(", ")}`);
+      for (const c of wanted) mine.get(c.id)!.position = c.position;
+      return ok(z.array(M.Column), columnsOf(proj.id));
+    }
+    if ((p = m(/^\/column\/([^/]+)$/))) {
+      const key = decodeURIComponent(p![1]);
+      if (req.method === "GET" || req.method === "POST") {
+        if (!projects.some((x) => x.id === key)) return fail(404, "Project not found");
+        if (req.method === "GET") return ok(z.array(M.Column), columnsOf(key));
+        const wanted = (body ?? {}) as z.input<typeof M.CreateColumnBody>;
+        // The slug comes from the name, and one this project already holds is
+        // refused rather than given a second column of the same name.
+        const slug = slugOf(wanted.name);
+        if (slug === "") return fail(400, "Column name must contain at least one alphanumeric character");
+        if (VIRTUAL_STATUSES.includes(slug)) return fail(409, `Column slug "${slug}" is reserved for virtual task statuses`);
+        if (columnsOf(key).some((c) => c.slug === slug)) return fail(409, `Column with slug "${slug}" already exists in this project`);
+        return ok(M.Column, addColumn(key, wanted));
+      }
+      const column = columns.find((c) => c.id === key);
+      if (!column) return fail(404, "Column not found");
+      // A field left out of the update keeps its value, which is what icon and
+      // color take null for: clearing one is asking for it.
+      if (req.method === "PUT") {
+        Object.assign(column, body);
+        column.updatedAt = now();
+        return ok(M.Column, column);
+      }
+      if (req.method === "DELETE") {
+        if (tasks.some((t) => t.projectId === column.projectId && t.status === column.slug)) {
+          return fail(409, "Cannot delete column that contains tasks. Move or delete tasks first.");
+        }
+        columns.splice(columns.indexOf(column), 1);
+        return ok(M.Column, column);
+      }
+    }
+
     if (req.method === "GET" && (p = m(/^\/task\/tasks\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       // The real server reads the path segment as a project id, finds no such
@@ -247,7 +343,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       return ok(M.BoardResponse, {
         data: {
           ...head,
-          columns: columns.map((c, i) => ({ id: c.slug, slug: c.slug, name: c.name, icon: null, isFinal: !!c.isFinal, position: i, tasks: slice.filter((t) => t.status === c.slug).map(boardTask) })),
+          columns: columnsOf(proj.id).map((c) => ({ id: c.slug, slug: c.slug, name: c.name, icon: c.icon, isFinal: c.isFinal, position: c.position, tasks: slice.filter((t) => t.status === c.slug).map(boardTask) })),
           archivedTasks: [],
           plannedTasks: [],
         },
@@ -350,6 +446,23 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     stop: () => server.stop(true),
   };
 }
+
+// The slug the server derives from a column's name, which is what a task's
+// status has to be set to in order to land in the column. Copied from toSlug in
+// usekaneo/kaneo v2.29.2 apps/api/src/column/controllers/create-column.ts, so a
+// name outside ASCII gets the slug the server gives it.
+const slugOf = (name: string): string => {
+  const slug = name
+    .normalize("NFKC")
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  return /[\p{L}\p{N}]/u.test(slug) ? slug : "";
+};
+
+// Statuses the server takes without a column, so no column may take their slug.
+const VIRTUAL_STATUSES = ["planned", "archived"];
 
 // What a server older than the document leaves out, applied to any response.
 const LEGACY_DROPPED = new Set(["backgroundVersion", "pagination", "labels", "externalLinks", "subtaskCounts", "assigneeImage", "lastTaskNumber"]);

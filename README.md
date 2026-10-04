@@ -147,12 +147,17 @@ kaneo project ls [-A]           # -A lists every workspace, naming the workspace
 kaneo project find <text>       # substring match on name and slug, across every workspace
 kaneo project get [project-id]
 kaneo project update <project-id> [--name NAME] [--slug SLUG] [-d TEXT] [--icon ICON]   # only what is passed changes
+kaneo column ls                    # the resolved project's columns, in board order
+kaneo column create <name...> [--final] [--icon ICON] [--color COLOR]
+kaneo column rename <column> <new name...>   # the slug, and so every status in it, stays
+kaneo column reorder <column>...   # the new order: every column exactly once, by id, slug or name
+kaneo column rm <column> --yes
 kaneo task ls [--status ...] [--priority ...] [--all]
 kaneo task get <task-id>
 kaneo task status <task-id> <status>
 ```
 
-A status is a column id. The defaults are `to-do`, `in-progress`, `in-review` and `done`.
+A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds.
 
 Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project>#<number>` names a board and a number on it: `kaneo task get kaneo-cli#3` reads the reference written as `kaneo kaneo-cli#3`, which is also what `KANEO_TASK_REF` holds after its `kaneo ` prefix. The project before the `#` is an id, slug or name.
 

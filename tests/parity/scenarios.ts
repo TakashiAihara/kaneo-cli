@@ -148,6 +148,17 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    name: "notification preferences carry into rules",
+    steps: [
+      ["notification", "prefs", "set", "--email", "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--active", "--human"],
+      ["notification", "prefs", "ws", "set", "ws-other", "--active=false", "--human"],
+      ["notification", "prefs", "set", "--webhook", "--webhook-url", "https://hook.example", "--human"],
+      ["notification", "prefs", "set", "--email=false", "--human"],
+      ["notification", "prefs", "set", "--gotify-token", "", "--json"],
+    ],
+  },
+  {
     name: "notification preferences workspace rule",
     steps: [
       ["notification", "prefs", "ws", "set", WS, "--webhook", "--json"],

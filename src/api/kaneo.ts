@@ -768,7 +768,7 @@ export const getNotificationPreferences = async (): Promise<NotificationPreferen
   zeroRecord(await call(readNotificationPreferences()));
 
 // Only the fields in changes are sent. The server leaves the other settings
-// alone, but carries a channel switch into the workspace rules.
+// alone, but carries a channel switch into the active workspace rules.
 export const updateNotificationPreferences = async (
   changes: NotificationPreferenceChanges,
 ): Promise<NotificationPreferences> => zeroRecord(await call(putNotificationPreferences(changes)));

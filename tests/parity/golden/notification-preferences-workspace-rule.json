@@ -111,7 +111,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: PUT /api/notification-preferences/workspaces/ws-main: 400: Selected projects must belong to the workspace\n"
+      "stderr": "Error: PUT /api/notification-preferences/workspaces/ws-main: 400: One or more selected projects are invalid\n"
     },
     {
       "args": [

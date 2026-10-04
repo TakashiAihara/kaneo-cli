@@ -120,7 +120,7 @@ const RULE_SWITCHES = [
 // A workspace without a rule gets nothing outside the app (v2.29.2 delivers
 // only under an active rule, whatever the document says), so creating one is
 // how delivery is turned on there: it starts active, with the channels that
-// are on globally, since the server refuses a channel that is off globally.
+// can deliver globally, since the server refuses any other.
 const ruleFor = (
   prefs: NotificationPreferences,
   workspaceId: string,
@@ -140,10 +140,10 @@ const ruleFor = (
       }
     : {
         isActive: true,
-        emailEnabled: prefs.emailEnabled,
-        ntfyEnabled: prefs.ntfyEnabled,
-        gotifyEnabled: prefs.gotifyEnabled,
-        webhookEnabled: prefs.webhookEnabled,
+        emailEnabled: prefs.emailEnabled && !!prefs.emailAddress,
+        ntfyEnabled: prefs.ntfyEnabled && prefs.ntfyConfigured,
+        gotifyEnabled: prefs.gotifyEnabled && prefs.gotifyConfigured,
+        webhookEnabled: prefs.webhookEnabled && prefs.webhookConfigured,
         projectMode: "all",
         selectedProjectIds: [],
       };
@@ -190,11 +190,12 @@ const preferencesCommand = {
       long:
         "Change the global delivery settings; only what is passed changes.\n\n" +
         "A switch is turned off with =false (--email=false). An empty value clears a\n" +
-        "token or secret (--webhook-secret ''); a server URL or topic cannot be cleared.\n" +
-        "A token or secret given as a flag is visible in the process list.\n\n" +
-        "The server carries a channel switch into the workspace rules: turning one off\n" +
-        "turns it off in every rule, and turning one on turns it on in the active rules\n" +
-        "that have a channel on.",
+        "token or secret (--webhook-secret ''), which the server refuses where the\n" +
+        "channel needs it: gotify always needs its token. A server URL or topic cannot\n" +
+        "be cleared. A token or secret given as a flag is visible in the process list.\n\n" +
+        "The server carries a channel switch into the active workspace rules that have\n" +
+        "a channel on: a channel turned off is turned off there, and one turned on is\n" +
+        "turned on there. Inactive rules keep their channels.",
       args: noArgs("kaneo notification preferences set"),
       flags: [
         ...SWITCHES.map(([flag, , usage]) => boolFlag(flag, usage)),
@@ -226,9 +227,9 @@ const preferencesCommand = {
           long:
             "Create or change a workspace's rule; only what is passed changes.\n\n" +
             "A workspace without a rule is sent nothing outside the app, so setting one turns\n" +
-            "delivery on for it: the new rule is active and starts from the channels that are\n" +
-            "on globally. A channel must be on globally to be turned on here. --projects takes\n" +
-            "comma-separated project ids; an empty value means every project.",
+            "delivery on for it: the new rule is active and starts from the channels that can\n" +
+            "deliver globally. A channel must be on and set up globally to be turned on here.\n" +
+            "--projects takes comma-separated project ids; an empty value means every project.",
           args: exactArgs(1),
           flags: [
             ...RULE_SWITCHES.map(([flag, , usage]) => boolFlag(flag, usage)),
@@ -343,7 +344,8 @@ export const notificationCommand = {
         "Several words are one message. The server stores nothing when the type is\n" +
         "turned off in your preferences, or when the task or workspace it points at is\n" +
         "not one you can reach; that is reported, and is not a failure. One that points\n" +
-        "at a task or workspace is also delivered through your channels.",
+        "at a task or workspace is also delivered through the channels its workspace\n" +
+        "rule has on.",
       args: minimumArgs(1),
       flags: [
         { name: "type", type: "string" as const, usage: "notification type", defaultValue: "info" },

@@ -413,21 +413,51 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "GET" && path === "/notification-preferences") return ok(M.NotificationPreferences, preferences());
     if (req.method === "PUT" && path === "/notification-preferences") {
-      const before = usable();
-      for (const [k, v] of Object.entries(body as object)) {
-        if (k in secrets) secrets[k] = v === null || v === "" ? null : (v as string);
+      const b = body as Record<string, unknown>;
+      // Stored flags before the write: the carry-over below compares with them.
+      const had = { emailEnabled: settings.emailEnabled, ntfyEnabled: settings.ntfyEnabled, gotifyEnabled: settings.gotifyEnabled, webhookEnabled: settings.webhookEnabled };
+      const next = { ...settings };
+      const nextSecrets = { ...secrets };
+      for (const [k, v] of Object.entries(b)) {
+        if (k in nextSecrets) {
+          if (v !== undefined) nextSecrets[k] = v === null || v === "" ? null : (v as string);
+        }
         // A null address keeps the stored one: the server reads `input ?? existing`.
-        else if (v !== null) (settings as any)[k] = v;
+        else if (v !== null) (next as any)[k] = v;
       }
-      // A channel that can no longer deliver is turned off in every rule; one
-      // that has just become able to is turned on in the active rules that
-      // have some channel on.
-      const after = usable();
+      if (next.emailEnabled && !next.emailAddress) return new Response("Email notifications require an account email address", { status: 400 });
+      if ((next.ntfyEnabled || "ntfyServerUrl" in b || "ntfyTopic" in b || "ntfyToken" in b) && (!next.ntfyServerUrl || !next.ntfyTopic)) {
+        return new Response("ntfy requires a server URL and topic", { status: 400 });
+      }
+      if ((next.gotifyEnabled || "gotifyServerUrl" in b || "gotifyToken" in b) && (!next.gotifyServerUrl || !nextSecrets.gotifyToken)) {
+        return new Response("Gotify requires a server URL and app token", { status: 400 });
+      }
+      if ((next.webhookEnabled || "webhookUrl" in b || "webhookSecret" in b) && !next.webhookUrl) {
+        return new Response("Webhook notifications require an endpoint URL", { status: 400 });
+      }
+      Object.assign(settings, next);
+      Object.assign(secrets, nextSecrets);
+
+      // The server carries the switches into the active rules that have some
+      // channel on, and into no other: a channel that cannot deliver is turned
+      // off there, and one switched on just now is turned on there.
+      const off = {
+        emailEnabled: !settings.emailEnabled,
+        ntfyEnabled: !settings.ntfyEnabled || !settings.ntfyServerUrl || !settings.ntfyTopic,
+        gotifyEnabled: !settings.gotifyEnabled || !settings.gotifyServerUrl || !secrets.gotifyToken,
+        webhookEnabled: !settings.webhookEnabled || !settings.webhookUrl,
+      };
+      const on = {
+        emailEnabled: settings.emailEnabled && !had.emailEnabled && !!settings.emailAddress,
+        ntfyEnabled: settings.ntfyEnabled && !had.ntfyEnabled && !off.ntfyEnabled,
+        gotifyEnabled: settings.gotifyEnabled && !had.gotifyEnabled && !off.gotifyEnabled,
+        webhookEnabled: settings.webhookEnabled && !had.webhookEnabled && !off.webhookEnabled,
+      };
       for (const rule of rules) {
-        const live = rule.isActive && (rule.emailEnabled || rule.ntfyEnabled || rule.gotifyEnabled || rule.webhookEnabled);
-        for (const channel of Object.keys(after) as (keyof typeof after)[]) {
-          if (!after[channel]) rule[channel] = false;
-          else if (!before[channel] && live) rule[channel] = true;
+        if (!rule.isActive || !(rule.emailEnabled || rule.ntfyEnabled || rule.gotifyEnabled || rule.webhookEnabled)) continue;
+        for (const channel of Object.keys(off) as (keyof typeof off)[]) {
+          if (off[channel]) rule[channel] = false;
+          else if (on[channel]) rule[channel] = true;
         }
       }
       return ok(M.NotificationPreferences, preferences());
@@ -440,9 +470,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         const b = body as any;
         if (b.projectMode === "selected") {
           const ids: string[] = b.selectedProjectIds ?? [];
-          if (ids.length === 0) return new Response("Select at least one project", { status: 400 });
-          if (ids.some((pid) => !projects.some((x) => x.id === pid && x.workspaceId === ws.id))) {
-            return new Response("Selected projects must belong to the workspace", { status: 400 });
+          if (ids.length === 0) return new Response("Select at least one project for selected project mode", { status: 400 });
+          // Counted as rows found, so a repeated id fails like an unknown one.
+          if (projects.filter((x) => x.workspaceId === ws.id && ids.includes(x.id)).length !== ids.length) {
+            return new Response("One or more selected projects are invalid", { status: 400 });
           }
         }
         const can = usable();

@@ -1,0 +1,157 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--email",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "email               on   self@example.com\nntfy                off\ngotify              off\nwebhook             off\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   1440m before\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "ws",
+        "set",
+        "ws-main",
+        "--active",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace ws-main  Main  active  channels: email  projects: all\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "ws",
+        "set",
+        "ws-other",
+        "--active=false",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace ws-other  Other  inactive  channels: email  projects: all\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--webhook",
+        "--webhook-url",
+        "https://hook.example",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "email               on   self@example.com\nntfy                off\ngotify              off\nwebhook             on   https://hook.example\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   1440m before\nworkspace ws-main  Main  active  channels: email,webhook  projects: all\nworkspace ws-other  Other  inactive  channels: email  projects: all\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--email=false",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "email               off  self@example.com\nntfy                off\ngotify              off\nwebhook             on   https://hook.example\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   1440m before\nworkspace ws-main  Main  active  channels: webhook  projects: all\nworkspace ws-other  Other  inactive  channels: email  projects: all\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--gotify-token",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/notification-preferences: 400: Gotify requires a server URL and app token\"\n}\n",
+      "stderr": "Error: PUT /api/notification-preferences: 400: Gotify requires a server URL and app token\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "emailEnabled": true
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notification-preferences",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences/workspaces/ws-main",
+      "query": "",
+      "body": {
+        "isActive": true,
+        "emailEnabled": true,
+        "ntfyEnabled": false,
+        "gotifyEnabled": false,
+        "webhookEnabled": false,
+        "projectMode": "all",
+        "selectedProjectIds": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notification-preferences",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences/workspaces/ws-other",
+      "query": "",
+      "body": {
+        "isActive": false,
+        "emailEnabled": true,
+        "ntfyEnabled": false,
+        "gotifyEnabled": false,
+        "webhookEnabled": false,
+        "projectMode": "all",
+        "selectedProjectIds": []
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "webhookEnabled": true,
+        "webhookUrl": "https://hook.example"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "emailEnabled": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "gotifyToken": null
+      }
+    }
+  ],
+  "files": {}
+}

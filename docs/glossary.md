@@ -50,7 +50,7 @@ A way a notification leaves the app: email, ntfy, gotify or a webhook. Switched 
 
 ### workspace rule
 
-The per-workspace part of the notification preferences: whether the workspace is notified at all (`isActive`), which channels, and for which projects. A workspace without a rule is sent nothing outside the app on v2.29.2, although the document says it follows the global settings. The server replaces a rule whole, and turning a channel off globally turns it off in every rule.
+The per-workspace part of the notification preferences: whether the workspace is notified at all (`isActive`), which channels, and for which projects. A workspace without a rule is sent nothing outside the app on v2.29.2, although the document says it follows the global settings. The server replaces a rule whole, and carries a global channel switch into the active rules that have a channel on; inactive rules keep their channels.
 
 ### relation
 

@@ -10,11 +10,17 @@ import { P1, SEED, WS } from "../parity/scenarios";
 // here, so every test drives the real CLI (`bun src/index.ts`) against the
 // parity fake behind a small proxy that can fail or observe the marker post.
 //
-// Every hook that sleeps uses a distinct `sleep 29.x`, so a leftover can be
-// counted by its argument and none outlives the 30s bound.
+// Every hook that sleeps uses a distinct `sleep 29.x<run>`, so a leftover can be
+// counted by its argument and none outlives the 30s bound. The run suffix keeps
+// two copies of this file running at once (several checkouts on one host) from
+// counting, or killing, each other's sleepers.
 
 const INDEX = join(import.meta.dir, "../../src/index.ts");
-const SLEEPS = ["29.5", "29.4", "29.3"];
+// The whole pid: two runs share a pid namespace, so no two live at once share
+// it, where a slice of it (pid % 10000) could collide.
+const RUN = String(process.pid);
+const sleepArg = (base: "29.5" | "29.4" | "29.3"): string => `${base}${RUN}`;
+const SLEEPS = [sleepArg("29.5"), sleepArg("29.4"), sleepArg("29.3")];
 
 type Run = { exit: number | null; signal: string | null; stdout: string; stderr: string; ms: number };
 
@@ -29,7 +35,7 @@ const sleepersLeft = (): { pid: number; arg: string }[] => {
   const ps = Bun.spawnSync(["ps", "-eo", "pid=,args="]).stdout.toString();
   return ps
     .split("\n")
-    .map((l) => l.trim().match(/^(\d+)\s+sleep\s+(29\.\d)$/))
+    .map((l) => l.trim().match(/^(\d+)\s+sleep\s+(29\.\d+)$/))
     .filter((m): m is RegExpMatchArray => m !== null && SLEEPS.includes(m[2]!))
     .map((m) => ({ pid: Number(m[1]), arg: m[2]! }));
 };
@@ -169,11 +175,11 @@ describe("hooks", () => {
   // fixed 10s, since it is not configurable.
   test("TestHookTimeoutKillsTheWholeHook", async () => {
     // The subshell is a child of sh, which is what killing sh alone misses.
-    writeConfig({ attach: "(sleep 29.5; touch " + join(home, "late") + "); true" });
+    writeConfig({ attach: `(sleep ${sleepArg("29.5")}; touch ` + join(home, "late") + "); true" });
     const r = await kaneo("session", "attach", "2", "--strict");
     expect(r.exit, r.stderr).toBe(0);
     expect(r.ms, `attach took ${r.ms}ms`).toBeLessThan(15_000);
-    expect(sleepersLeft().filter((s) => s.arg === "29.5"), "the hook's child outlived the timeout").toEqual([]);
+    expect(sleepersLeft().filter((s) => s.arg === sleepArg("29.5")), "the hook's child outlived the timeout").toEqual([]);
     expect(existsSync(join(home, "late"))).toBe(false);
     expect(hooksLog()).toContain("attach hook failed: killed after 10s");
   }, 40_000);
@@ -181,11 +187,21 @@ describe("hooks", () => {
   // A hook that leaves a background process behind still succeeded, and the
   // process is left to finish.
   test("TestHookLeavingABackgroundProcessIsNotAFailure", async () => {
-    writeConfig({ attach: "(sleep 29.4; touch " + join(home, "done") + ") &" });
+    writeConfig({ attach: `(sleep ${sleepArg("29.4")}; touch ` + join(home, "done") + ") &" });
     const r = await kaneo("session", "attach", "2", "--strict");
     expect(r.exit, r.stderr).toBe(0);
     expect(r.ms, `attach waited ${r.ms}ms for the background process`).toBeLessThan(8000);
-    expect(sleepersLeft().filter((s) => s.arg === "29.4"), "the background process was not left to finish").toHaveLength(1);
+    // kaneo may finish before the backgrounded subshell has exec'd sleep, so the
+    // sleeper is waited for rather than looked for once (#51).
+    const left = async (): Promise<number> => {
+      for (let waited = 0; waited < 5000; waited += 100) {
+        const n = sleepersLeft().filter((s) => s.arg === sleepArg("29.4")).length;
+        if (n > 0) return n;
+        await Bun.sleep(100);
+      }
+      return 0;
+    };
+    expect(await left(), "the background process was not left to finish").toBeGreaterThan(0);
     expect(hooksLog()).toBe("");
   }, 40_000);
 
@@ -207,10 +223,10 @@ describe("hooks", () => {
   test("TestHookIsKilledWhenKaneoIsSignalled", async () => {
     // The child is started before the signal, so killing sh alone would leave
     // it running. $PPID is kaneo.
-    writeConfig({ attach: "(sleep 29.3; touch " + join(home, "late") + ") & sleep 0.2; kill -TERM $PPID; wait" });
+    writeConfig({ attach: `(sleep ${sleepArg("29.3")}; touch ` + join(home, "late") + ") & sleep 0.2; kill -TERM $PPID; wait" });
     const r = await kaneo("session", "attach", "2", "--strict");
     expect(r.ms, `attach took ${r.ms}ms`).toBeLessThan(5000);
-    expect(sleepersLeft().filter((s) => s.arg === "29.3"), "the hook outlived the signal").toEqual([]);
+    expect(sleepersLeft().filter((s) => s.arg === sleepArg("29.3")), "the hook outlived the signal").toEqual([]);
     expect(existsSync(join(home, "late"))).toBe(false);
     expect(hooksLog()).toContain("attach hook failed: killed: kaneo received a signal");
   }, 30_000);
@@ -242,14 +258,14 @@ describe("signals around the hook's lifetime", () => {
   // timeout and the capture directory stays. The race was lost about 1 time in
   // 5, so 20 runs.
   test("a hook that signals kaneo at once leaves no process and no capture directory", async () => {
-    writeConfig({ attach: "kill -TERM $PPID; sleep 29.3" });
+    writeConfig({ attach: `kill -TERM $PPID; sleep ${sleepArg("29.3")}` });
     const tmp = join(home, "tmp");
     mkdirSync(tmp);
     for (let run = 1; run <= 20; run++) {
       const p = kaneoWith({ TMPDIR: tmp }, "session", "attach", "1", "--strict");
       await p.exited;
       await Bun.sleep(150);
-      const sleepers = sleepersLeft().filter((s) => s.arg === "29.3").length;
+      const sleepers = sleepersLeft().filter((s) => s.arg === sleepArg("29.3")).length;
       const dirs = readdirSync(tmp).filter((n) => n.startsWith("kaneo-hook-"));
       killSleepers();
       expect({ run, signal: p.signalCode, sleepers, dirs }).toEqual({ run, signal: "SIGTERM", sleepers: 0, dirs: [] });

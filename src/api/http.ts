@@ -102,9 +102,8 @@ export class InsecureCredentialError extends Error {
   }
 }
 
-// A failed API call. The message names the request so it can be pasted into
-// curl as it is, and the fields are there so a command can say more than the
-// message does.
+// A failed API call. The message names the request the way Go's URL.Path did,
+// and the fields are there so a command can say more than the message does.
 export class KaneoApiError extends Error {
   constructor(
     public readonly method: string,
@@ -132,9 +131,10 @@ const describeFailure = (
   body: string,
 ): string => {
   if (messages.length > 0) return `${method} ${path}: ${status}: ${messages.join("; ")}`;
-  const text = body.trim();
-  if (text === "") return `${method} ${path}: ${status}`;
-  const shown = text.length > BODY_LIMIT ? `${text.slice(0, BODY_LIMIT)}...` : text;
+  // The body comes trimmed as Go's TrimSpace trims it; trimming it again here
+  // would drop a byte order mark Go kept in its Error.Body.
+  if (body === "") return `${method} ${path}: ${status}`;
+  const shown = body.length > BODY_LIMIT ? `${body.slice(0, BODY_LIMIT)}...` : body;
   return `${method} ${path}: ${status}: ${shown}`;
 };
 
@@ -142,14 +142,19 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   if (settings.baseUrl === "") throw new Error("no API URL configured");
 
   const { schema, ...request } = init;
-  // The endpoint as the generated client wrote it, query included. A failure
-  // with a status quotes this, because that is the call that was made; one
-  // without a status quotes the path it was served on, which is servedPath's.
+  // The endpoint as the generated client wrote it, query included: the spelling
+  // the operation is looked up by, since reading it back first would split an id
+  // that needed escaping into two segments of its own.
   const path = url;
 
   let method = (request.method ?? "GET").toUpperCase();
   let body = request.body ?? null;
   let target = new URL(settings.baseUrl + url);
+  // The route every failure this call reports names: /api in front of it, the
+  // query left out and escapes read back, which is what Go's send reported off
+  // the request's URL.Path. It is taken before any redirect, as Go's was, so a
+  // failure names the call that was made rather than the hop that failed.
+  const served = servedPath(target);
   let headers = new Headers(request.headers);
   headers.set("Accept", "application/json");
   if (settings.apiKey !== "") {
@@ -167,18 +172,34 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   const cap = AbortSignal.timeout(settings.timeoutMs);
   const signal = AbortSignal.any([settings.deadline, request.signal, cap].filter(isSignal));
 
+  // The method the call was made with, before a 301, 302 or 303 rewrote it into
+  // a GET. Failures name it together with served, the pair Go's send reported.
+  // The operation is looked up by it as well, so a write turned into a GET is
+  // still read as that write's reply, and a whitespace-only one fails to decode
+  // as it does without the redirect.
+  const called = method;
+
   let response: Response;
+  let location = "";
   for (let hop = 0; ; hop++) {
-    if (hop >= MAX_REDIRECTS) throw new Error(`stopped after ${MAX_REDIRECTS} redirects`);
+    // Go's http.Client reports this as it reports a request that got no answer:
+    // the call's method and the Location it refused to follow, as the header
+    // wrote it rather than resolved. send prefixes the call as for any failure.
+    if (hop >= MAX_REDIRECTS) {
+      throw new Error(
+        `${called} ${served}: ${goOp(called)} ${JSON.stringify(location)}: stopped after ${MAX_REDIRECTS} redirects`,
+      );
+    }
     try {
       // Followed by hand: only the transport knows whether the next hop may
       // still carry the key, and fetch decides that on its own.
       response = await fetch(target, { method, headers, body, signal, redirect: "manual" });
     } catch (e) {
-      throw new Error(`${method} ${servedPath(target)}: ${urlError(method, target, e)}`, { cause: e });
+      throw new Error(`${called} ${served}: ${urlError(called, target, e)}`, { cause: e });
     }
     const next = redirectTarget(response, target);
     if (!next) break;
+    location = response.headers.get("location") ?? "";
     // The key stays only where it would still be protected and where it was
     // already meant to go; a hop to an insecure host, or to another one, goes
     // on without it and the server decides.
@@ -203,17 +224,21 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     // string of the same reply would measure.
     bytes = await response.arrayBuffer();
   } catch (e) {
-    throw new Error(`${method} ${path}: read body: ${reason(e)}`, { cause: e });
+    throw new Error(`${called} ${served}: read body: ${reason(e)}`, { cause: e });
   }
-  const text = new TextDecoder().decode(bytes);
-  // Trimmed, because that is what the Go build's Error.Body holds and a server
-  // may write its envelope with either of the request's line endings around it.
-  const trimmed = text.trim();
+  // ignoreBOM leaves a byte order mark in the string instead of dropping it. Go
+  // read the first byte of the body as the start of a value, so a reply carrying
+  // one is a reply it could not read, while a mark this dropped leaves a body
+  // that decodes.
+  const text = new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes);
+  // Trimmed, because that is what the Go build's Error.Body holds and what its
+  // Client.Do asked whether the document held anything of.
+  const trimmed = goTrimSpace(text);
 
   // A non-2xx status and a 2xx carrying success:false are both failures: the
   // server reports validation problems the second way, so the status alone is
   // not enough to judge the call.
-  const reported = failure(method, path, response.status, trimmed);
+  const reported = failure(called, served, response.status, text, trimmed);
   if (reported) throw reported;
 
   // Which of the Go build's two request paths this is, which its two parsers
@@ -221,7 +246,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // named after the operation it was read into, and the one request this CLI
   // issues without the generated client (the server's own document, for
   // api-check) is trimmed first and reported the way Client.Do reported it.
-  const operation = operationAt(method, path);
+  const operation = operationAt(called, path);
 
   // A write that reports 204 has nothing to decode, and the generated types
   // say so by having nothing to return. What counts as empty is the Go build's
@@ -235,12 +260,14 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     decoded = JSON.parse(text);
   } catch (e) {
     const why = goDecodeReason(reason(e));
-    throw new Error(
+    // A reply that could not be read names the request the way a failure the
+    // server reported does, since the two are read in the same place and the
+    // reply alone says nothing about which call produced it.
+    const what =
       operation === undefined
-        ? `${method} ${path}: decode response: ${why}`
-        : decodeFailure(response, bytes.byteLength, operation, why),
-      { cause: e },
-    );
+        ? `decode response: ${why}`
+        : decodeFailure(response, bytes.byteLength, operation, why);
+    throw new Error(`${called} ${served}: ${what}`, { cause: e });
   }
   if (schema) {
     const checked = schema.safeParse(decoded);
@@ -250,13 +277,20 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     // back as it was sent and the mismatch is only worth mentioning when
     // somebody asked to see it.
     if (!checked.success && settings.debug) {
-      reportMismatch(method, path, checked.error);
+      reportMismatch(called, path, checked.error);
     }
   }
   return decoded as T;
 };
 
 const reason = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+// What Go's strings.TrimSpace removes: Unicode's White_Space. That is what
+// JavaScript's trim() removes except for two characters: it also counts the byte
+// order mark, which would turn a reply holding nothing else into the empty one
+// where Go read it as a body that failed to decode, and it leaves NEL (U+0085).
+const goTrimSpace = (text: string): string =>
+  text.replace(/^(?:[^\S\uFEFF]|\u0085)+|(?:[^\S\uFEFF]|\u0085)+$/g, "");
 
 const isSignal = (signal: AbortSignal | null | undefined): signal is AbortSignal =>
   signal !== undefined && signal !== null;
@@ -310,10 +344,11 @@ const responseTypeOf = (operation: Operation): string =>
 const goDecodeReason = (why: string): string =>
   why.includes("Unexpected EOF") ? "unexpected end of JSON input" : why;
 
-// The path a request was made on, as the server saw it: /api included, percent-
-// escapes read back and the query left out. A call that never got an answer is
-// reported this way because there is no status to report instead, and the
-// address is what can be put into curl to try it by hand.
+// The path a request was made on, as the server saw it: /api included,
+// percent-escapes read back and the query left out. That is the Go build's
+// URL.Path, so an escaped id reads as the id that was asked for; it is not a
+// spelling to paste into curl, where the escapes would have to be put back. A
+// call that never got an answer names the URL it dialled in the reason after it.
 const servedPath = (target: URL): string => {
   try {
     return decodeURIComponent(target.pathname);
@@ -333,9 +368,13 @@ const servedPath = (target: URL): string => {
 // for, so both the shape and the reasons are rebuilt here from the error code.
 const urlError = (method: string, target: URL, e: unknown): string => {
   const code = (e as { code?: unknown } | null)?.code;
-  const op = method === "" ? "Get" : method.slice(0, 1) + method.slice(1).toLowerCase();
-  return `${op} ${JSON.stringify(target.href)}: ${dialReason(target, code, e)}`;
+  return `${goOp(method)} ${JSON.stringify(target.href)}: ${dialReason(target, code, e)}`;
 };
+
+// A method as url.Error names it. Go's client takes it from the first request of
+// a redirect chain, so a write turned into a GET by a 303 is still a Post there.
+const goOp = (method: string): string =>
+  method === "" ? "Get" : method.slice(0, 1) + method.slice(1).toLowerCase();
 
 // What went wrong below the request, in the words a Go user would recognise.
 // Anything unrecognised is passed on as it is, since inventing a reason would be
@@ -358,6 +397,9 @@ const dialReason = (target: URL, code: unknown, e: unknown): string => {
   }
 };
 
+// The endpoint rather than the route it was served on: the schema is the one the
+// generated client asked to be checked against, so the endpoint is what says
+// which schema was missed.
 const reportMismatch = <T>(method: string, path: string, error: ZodError<T>): void => {
   const fields = error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
   console.error(
@@ -411,11 +453,22 @@ const downgradeToGet = (status: number, method: string): boolean =>
 // Builds the failure a body reports, or undefined when it reports none. An
 // error status always fails, even without the envelope, because the status is
 // the server's verdict.
-const failure = (method: string, path: string, status: number, text: string): KaneoApiError | undefined => {
-  const envelope = decodeEnvelope(text);
-  if (envelope) return new KaneoApiError(method, path, status, messagesOf(envelope), text);
+//
+// The envelope is read from the body as it came, as Go's decodeErrorEnvelope
+// unmarshalled the raw bytes: JSON allows only space, tab and line breaks
+// around a value, so a body wrapped in anything else TrimSpace removes is not
+// one. The error keeps the trimmed body, which is what Go's Error.Body held.
+const failure = (
+  method: string,
+  path: string,
+  status: number,
+  raw: string,
+  trimmed: string,
+): KaneoApiError | undefined => {
+  const envelope = decodeEnvelope(raw);
+  if (envelope) return new KaneoApiError(method, path, status, messagesOf(envelope), trimmed);
   if (status >= 200 && status < 300) return undefined;
-  return new KaneoApiError(method, path, status, [], text);
+  return new KaneoApiError(method, path, status, [], trimmed);
 };
 
 // The server's failure shape. The payload is read as raw JSON because the shape
@@ -426,7 +479,7 @@ type Envelope = { error?: unknown };
 
 const decodeEnvelope = (text: string): Envelope | undefined => {
   // Spare the parser the plain text and the markup an error status carries.
-  if (!text.startsWith("{")) return undefined;
+  if (!/^[ \t\n\r]*\{/.test(text)) return undefined;
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);

@@ -393,6 +393,10 @@ export const priorityRank = (priority: string): number => {
 export type Board = {
   projectId: string;
   projectName: string;
+  // The slug is here rather than read again: the listing already carries it, and
+  // a report that names the board a number was not found on needs it. Asking the
+  // project route as well would be a request the caller already paid for.
+  projectSlug: string;
   columns: { id: string; name: string; tasks: Task[] }[];
 };
 
@@ -437,7 +441,12 @@ export const getBoard = async (projectId: string): Promise<Board> => {
 
       const data = zeroRecord(response.data);
       if (board === undefined) {
-        board = { projectId: data.id ?? "", projectName: data.name ?? "", columns: [] };
+        board = {
+          projectId: data.id ?? "",
+          projectName: data.name ?? "",
+          projectSlug: data.slug ?? "",
+          columns: [],
+        };
       }
       const target = board;
       for (const column of zeroList(data.columns)) {

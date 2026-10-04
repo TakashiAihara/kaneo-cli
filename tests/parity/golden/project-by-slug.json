@@ -1,0 +1,181 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "-p",
+        "BET",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"task-b1\",\n    \"number\": 1,\n    \"title\": \"Beta first\",\n    \"description\": \"\",\n    \"status\": \"to-do\",\n    \"priority\": \"urgent\",\n    \"position\": 0,\n    \"projectId\": \"proj-beta\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:07.000Z\",\n    \"labels\": []\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "x",
+        "-p",
+        "bet",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created #2 x\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "get",
+        "ALP",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "board",
+        "-p",
+        "BET",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"project\": \"Beta\",\n    \"open\": [\n      {\n        \"id\": \"task-b1\",\n        \"number\": 1,\n        \"title\": \"Beta first\",\n        \"description\": \"\",\n        \"status\": \"to-do\",\n        \"priority\": \"urgent\",\n        \"position\": 0,\n        \"projectId\": \"proj-beta\",\n        \"assigneeId\": null,\n        \"assigneeName\": null,\n        \"startDate\": null,\n        \"dueDate\": null,\n        \"createdAt\": \"2026-01-01T00:00:07.000Z\",\n        \"labels\": []\n      },\n      {\n        \"id\": \"task0002\",\n        \"number\": 2,\n        \"title\": \"x\",\n        \"description\": \"\",\n        \"status\": \"to-do\",\n        \"priority\": \"medium\",\n        \"position\": 1,\n        \"projectId\": \"proj-beta\",\n        \"assigneeId\": null,\n        \"assigneeName\": null,\n        \"startDate\": null,\n        \"dueDate\": null,\n        \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n        \"labels\": []\n      }\n    ],\n    \"doneCount\": 0,\n    \"sessions\": []\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/bet",
+      "query": "",
+      "body": {
+        "title": "x",
+        "description": "",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-beta",
+      "query": "",
+      "body": {
+        "title": "x",
+        "description": "",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-b1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task0002",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

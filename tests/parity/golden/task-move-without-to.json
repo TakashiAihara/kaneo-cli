@@ -8,8 +8,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"no destination: pass --to \\u003cproject-id\\u003e\"\n}\n",
-      "stderr": "Error: no destination: pass --to <project-id>\n"
+      "stdout": "{\n  \"error\": \"no destination: pass --to \\u003cproject\\u003e\"\n}\n",
+      "stderr": "Error: no destination: pass --to <project>\n"
     }
   ],
   "requests": [],

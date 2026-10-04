@@ -75,6 +75,14 @@ Not every layer answers every setting:
 - The `.kaneo.json` layer is left out entirely, including the ones above the current directory. A checkout of the named repository would still apply them, so the answer can differ from what that checkout resolves to.
 - Flags, the environment and the active profile still apply above the maps. `origin.project` is `repo-map` only when `repos` answered.
 
+### Ids, slugs and names
+
+`--project`, `--workspace` and `task move --to` take an id, a slug or a name, matched in that order: an id exactly, a slug or a name exactly before ignoring case. A slug or a name matching exactly one is used; several matches are all listed so the id can pick one.
+
+A project is sent as an id first, so an id costs no extra request; only when the server says it does not know the value is it looked up across every workspace the key can reach (one listing per workspace), which a slug kept in `.kaneo.json` or the repo map pays on every command. A workspace is matched against `workspace ls` before it is sent — one request — because an instance admin's key gets an empty project list, not an error, for a workspace that does not exist. That listing holds only the workspaces the key's user is a member of.
+
+That is what lets the two forms people actually type work: a slug is the prefix of every task reference, and `workspace ls` prints names next to their ids.
+
 ### `.kaneo.json`
 
 ```json
@@ -135,7 +143,8 @@ kaneo context                       # what did the settings resolve to, and from
 kaneo whoami                        # is the key accepted, and what can it reach
 kaneo workspace ls
 kaneo workspace rename <workspace-id> <name>   # name only; slug and description unchanged
-kaneo project ls
+kaneo project ls [-A]           # -A lists every workspace, naming the workspace each project is in
+kaneo project find <text>       # substring match on name and slug, across every workspace
 kaneo project get [project-id]
 kaneo project update <project-id> [--name NAME] [--slug SLUG] [-d TEXT] [--icon ICON]   # only what is passed changes
 kaneo task ls [--status ...] [--priority ...] [--all]
@@ -145,7 +154,7 @@ kaneo task status <task-id> <status>
 
 A status is a column id. The defaults are `to-do`, `in-progress`, `in-review` and `done`.
 
-Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing.
+Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project>#<number>` names a board and a number on it: `kaneo task get kaneo-cli#3` reads the reference written as `kaneo kaneo-cli#3`, which is also what `KANEO_TASK_REF` holds after its `kaneo ` prefix. The project before the `#` is an id, slug or name.
 
 ### Shell completion
 

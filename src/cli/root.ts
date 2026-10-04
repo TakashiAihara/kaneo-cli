@@ -40,8 +40,11 @@ const GLOBAL_FLAGS: Flag[] = [
     usage: "API key; prefer KANEO_API_KEY, since a flag is visible in the process list",
     defaultValue: "",
   },
-  { name: "workspace", shorthand: "w", type: "string", usage: "workspace id (env KANEO_WORKSPACE)", defaultValue: "" },
-  { name: "project", shorthand: "p", type: "string", usage: "project id (env KANEO_PROJECT)", defaultValue: "" },
+  // Both of these take an id, a slug or a name: the value is used as an id first,
+  // so the ordinary path costs no extra request, and it is looked up across the
+  // workspaces the key can see only when the server does not know it.
+  { name: "workspace", shorthand: "w", type: "string", usage: "workspace id, slug or name (env KANEO_WORKSPACE)", defaultValue: "" },
+  { name: "project", shorthand: "p", type: "string", usage: "project id, slug or name (env KANEO_PROJECT)", defaultValue: "" },
   { name: "json", type: "bool", usage: "force JSON output", defaultValue: "false" },
   { name: "human", type: "bool", usage: "force human-readable output, even through a pipe", defaultValue: "false" },
   { name: "timeout", type: "duration", usage: "per-request timeout", defaultValue: DEFAULT_TIMEOUT },

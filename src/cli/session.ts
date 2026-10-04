@@ -1,4 +1,4 @@
-import { apiKey, debug, halfLeft, taskProject, type App } from "./app";
+import { apiKey, debug, halfLeft, type App } from "./app";
 import { addComment, getProject, listWorkspaces, type Task } from "../api/kaneo";
 import { minimumArgs, noArgs, type RunContext } from "./args";
 import { failOpen, hard, strictFlag } from "./failopen";
@@ -46,7 +46,7 @@ export const sessionCommand = {
         apiKey(app);
         // From here on the lookups and the marker post share one budget, the way
         // they shared one context.
-        const task = await resolveTask(taskProject(app), args[0]!);
+        const task = await resolveTask(app, args[0]!);
 
         // Looked up before the marker is posted, so the lookups do not widen the
         // window where the server has a marker and this host has no record.
@@ -92,7 +92,7 @@ export const sessionCommand = {
       ],
       run: failOpen(async ({ args, flags, app }: RunContext<App>) => {
         apiKey(app);
-        const { taskId, number } = await targetTask(taskProject(app), String(flags.task ?? ""));
+        const { taskId, number } = await targetTask(app, String(flags.task ?? ""));
         const step = args.join(" ").trim();
         if (step === "") throw new Error("no next step given");
 
@@ -176,9 +176,9 @@ const describeBoard = async (app: App, task: Task, attachment: Attachment): Prom
 
 // Picks the task a command acts on: the one named explicitly, otherwise the one
 // this session attached to.
-const targetTask = async (projectId: string, ref: string): Promise<{ taskId: string; number: number }> => {
+const targetTask = async (app: App, ref: string): Promise<{ taskId: string; number: number }> => {
   if (ref.trim() !== "") {
-    const named = await resolveTask(projectId, ref);
+    const named = await resolveTask(app, ref);
     return { taskId: named.id, number: named.number };
   }
   const sessionId = requireSessionId();

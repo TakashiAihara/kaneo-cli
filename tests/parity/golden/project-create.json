@@ -28,6 +28,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/project",
       "query": "",
@@ -37,6 +42,11 @@
         "icon": "Layers",
         "slug": "GAM"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
     },
     {
       "method": "GET",

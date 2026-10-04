@@ -197,6 +197,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (req.method === "GET" && path === "/project") {
       const ws = url.searchParams.get("workspaceId");
+      // A workspace the key has no access to and one that does not exist are the
+      // same answer, which is what made --workspace <name> read as a permission
+      // problem rather than as an unknown value.
+      if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
       const all = url.searchParams.get("includeArchived") === "true";
       const list = projects
         .filter((x) => x.workspaceId === ws && (all || !x.archivedAt))
@@ -217,7 +221,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if ((p = m(/^\/project\/([^/]+)(\/(archive|unarchive))?$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj) return fail(404, "Project not found");
+      // Checked by the server's workspace middleware before the route runs, as on
+      // the task routes below.
+      if (!proj) return fail(400, "Workspace ID could not be determined");
       if (req.method === "GET" && !p[2]) return ok(M.Project, proj);
       if (req.method === "PUT" && !p[2]) {
         Object.assign(proj, body);
@@ -229,7 +235,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (req.method === "GET" && (p = m(/^\/task\/tasks\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj) return fail(404, "Project not found");
+      // The real server reads the path segment as a project id, finds no such
+      // project and falls back to guessing a workspace from the key, which it
+      // cannot: 400 with that complaint rather than a 404.
+      if (!proj) return fail(400, "Workspace ID could not be determined");
       const mine = tasks.filter((t) => t.projectId === proj.id);
       const size = opts.pageSize ?? 50;
       const page = Number(url.searchParams.get("page") ?? 1);
@@ -247,7 +256,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "POST" && (p = m(/^\/task\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj) return fail(404, "Project not found");
+      if (!proj) return fail(400, "Workspace ID could not be determined");
       return ok(M.Task, addTask(proj.id, body as any));
     }
     if ((p = m(/^\/task\/(status|priority|assignee|move)\/([^/]+)$/)) && req.method === "PUT") {

@@ -1,0 +1,94 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "unarchive",
+        "OLD",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"archived\": false,\n  \"project\": \"proj-old\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "Beta",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"projectId\": \"proj-beta\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/project/OLD/unarchive",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-old/unarchive",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-a1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "Beta"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-a1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "proj-beta"
+      }
+    }
+  ],
+  "files": {}
+}

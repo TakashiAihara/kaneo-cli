@@ -472,13 +472,14 @@ const failure = (
 };
 
 // The message of a failure sent as plain text. The server sends every
-// HTTPException that way — its access checks, its "not found"s and, from v2.25,
+// HTTPException that way — its access checks, its "not found"s and, from v2.23,
 // its validation failures — so this is the shape most failures arrive in, and a
 // caller deciding on the server's message has to find it in `messages` either
-// way. Only a short single line counts: a page of markup or a stack is a body,
-// not a message, and the report prints it cut short instead.
+// way. Only a short single line of text counts: markup, JSON that is not the
+// envelope (a 500's `{"message": ...}`), a stack or a long body is reported as a
+// body, not matched as a message.
 const plainMessage = (text: string): string[] =>
-  text === "" || text.startsWith("<") || text.includes("\n") || text.length > BODY_LIMIT ? [] : [text];
+  text === "" || /^[<{[]/.test(text) || text.includes("\n") || text.length > BODY_LIMIT ? [] : [text];
 
 // The server's failure shape. The payload is read as raw JSON because the shape
 // it arrives in is the server's choice, not this client's: fixed as an array,

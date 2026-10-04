@@ -107,11 +107,13 @@ test("TestGeneratedCallFailuresKeepTheServerMessage", async () => {
 });
 
 // The server sends an HTTPException as a plain-text body. A short line of it is
-// the message, the way an envelope's would be; markup, several lines or a long
-// body stay a body only.
+// the message, the way an envelope's would be; markup, other JSON, several lines
+// or a long body stay a body only. The first case is the transport's trim.
 test.each([
   ["Workspace ID could not be determined\n", ["Workspace ID could not be determined"]],
   ["<html><body>Bad Gateway</body></html>", []],
+  ['{"message":"Internal Server Error"}', []],
+  ['["x"]', []],
   ["first line\nsecond line", []],
   ["x".repeat(201), []],
   ["x".repeat(200), ["x".repeat(200)]],

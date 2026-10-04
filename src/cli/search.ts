@@ -1,5 +1,5 @@
 import { apiKey, project, workspace, type App } from "./app";
-import { getProject, search, type SearchResult } from "../api/kaneo";
+import { getProject, listWorkspaces, search, type Search, type SearchQuery, type SearchResult } from "../api/kaneo";
 import { minimumArgs, type FlagValues } from "./args";
 import { resolveWorkspace, withProject } from "./lookup";
 
@@ -22,13 +22,16 @@ export const searchCommand = {
     "it to that project.\n\n" +
     "The server narrows only tasks, comments and activities to a project: project\n" +
     "matches still come from the whole workspace, and workspace matches from every\n" +
-    "workspace the key can reach. Activities include comments.",
+    "workspace the key can reach. Activities include comments.\n\n" +
+    "--all-workspaces searches every workspace the key can reach and ranks the\n" +
+    "matches as one list, cut to --limit as a single search would be.",
   // Several words are one query, as a search box takes them.
   args: minimumArgs(1),
   flags: [
     { name: "type", type: "string" as const, usage: "tasks, projects, workspaces, comments or activities (default every type)", defaultValue: "" },
     { name: "limit", type: "string" as const, usage: `most results to return, at most ${MAX_LIMIT} (default ${DEFAULT_LIMIT})`, defaultValue: "" },
     { name: "in-project", type: "bool" as const, usage: "narrow to the resolved project", defaultValue: "false" },
+    { name: "all-workspaces", shorthand: "A", type: "bool" as const, usage: "search every workspace the key can reach", defaultValue: "false" },
   ],
   run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
     apiKey(app);
@@ -39,15 +42,23 @@ export const searchCommand = {
     // turns a slug into the id and fails loudly for a project that does not
     // exist. Its workspace is the one searched, since a project is in exactly one.
     const narrow = flags["in-project"] === true || app.flags.projectId !== "";
-    const inProject = narrow ? await withProject(app, project(app), (id) => getProject(id)) : undefined;
+    const acrossAll = flags["all-workspaces"] === true;
+    if (narrow && acrossAll) throw new Error("--all-workspaces searches every workspace, so it cannot be narrowed to a project");
     const limit = String(flags.limit ?? "");
-    const found = await search({
-      query,
-      workspaceId: inProject?.workspaceId ?? (await resolveWorkspace(app, workspace(app))),
-      projectId: inProject?.id ?? "",
-      type: String(flags.type ?? ""),
-      limit,
-    });
+    const type = String(flags.type ?? "");
+    let found: Search;
+    if (acrossAll) {
+      found = await searchEverywhere({ query, workspaceId: "", projectId: "", type, limit });
+    } else {
+      const inProject = narrow ? await withProject(app, project(app), (id) => getProject(id)) : undefined;
+      found = await search({
+        query,
+        workspaceId: inProject?.workspaceId ?? (await resolveWorkspace(app, workspace(app))),
+        projectId: inProject?.id ?? "",
+        type,
+        limit,
+      });
+    }
 
     const refs = found.results.map(ref);
     const typeWidth = found.results.reduce((at, r) => Math.max(at, r.type.length), 0);
@@ -68,6 +79,26 @@ export const searchCommand = {
     }
     app.out.data(found);
   },
+};
+
+// One search per workspace, merged the way v2.29.2 merges its per-type queries:
+// by relevance, newest first on a tie, then cut to the limit. The server takes
+// workspace matches from every workspace the key can reach whichever one is
+// asked, so the same workspace comes back from every search and is kept once.
+const searchEverywhere = async (wanted: SearchQuery): Promise<Search> => {
+  const seen = new Set<string>();
+  const merged: SearchResult[] = [];
+  for (const w of await listWorkspaces()) {
+    for (const r of (await search({ ...wanted, workspaceId: w.id })).results) {
+      const key = `${r.type} ${r.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(r);
+    }
+  }
+  merged.sort((a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const limit = wanted.limit === "" ? DEFAULT_LIMIT : Number(wanted.limit);
+  return { query: wanted.query, results: merged.slice(0, limit), totalCount: merged.length };
 };
 
 // Where a match lives, written the way a task reference is: <project>#<number>

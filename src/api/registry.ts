@@ -4,7 +4,7 @@
 // from what the client does.
 export type Operation = {
   id: string;
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
   // The CLI surface that needs it, so a missing operation says what breaks.
   command: string;
@@ -32,4 +32,13 @@ export const OPERATIONS: Operation[] = [
   { id: "deleteTaskRelation", method: "DELETE", path: "/task-relation/{id}", command: "kaneo task unlink" },
   { id: "getTaskComments", method: "GET", path: "/comment/{taskId}", command: "kaneo comment ls / board" },
   { id: "createTaskComment", method: "POST", path: "/comment/{taskId}", command: "kaneo comment add / session" },
+  { id: "listNotifications", method: "GET", path: "/notification", command: "kaneo notification ls" },
+  { id: "createNotification", method: "POST", path: "/notification", command: "kaneo notification create" },
+  { id: "markNotificationAsRead", method: "PATCH", path: "/notification/{id}/read", command: "kaneo notification read" },
+  { id: "markAllNotificationsAsRead", method: "PATCH", path: "/notification/read-all", command: "kaneo notification read --all" },
+  { id: "clearAllNotifications", method: "DELETE", path: "/notification/clear-all", command: "kaneo notification clear" },
+  { id: "getNotificationPreferences", method: "GET", path: "/notification-preferences", command: "kaneo notification preferences get / workspace set" },
+  { id: "updateNotificationPreferences", method: "PUT", path: "/notification-preferences", command: "kaneo notification preferences set" },
+  { id: "upsertNotificationPreferenceWorkspaceRule", method: "PUT", path: "/notification-preferences/workspaces/{workspaceId}", command: "kaneo notification preferences workspace set" },
+  { id: "deleteNotificationPreferenceWorkspaceRule", method: "DELETE", path: "/notification-preferences/workspaces/{workspaceId}", command: "kaneo notification preferences workspace rm" },
 ];

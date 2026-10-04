@@ -1,0 +1,137 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "create",
+        "build",
+        "is",
+        "green",
+        "--title",
+        "CI",
+        "--resource-type",
+        "task",
+        "--resource-id",
+        "task-a1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"ntf0003\",\n  \"type\": \"info\",\n  \"title\": \"CI\",\n  \"content\": \"build is green\",\n  \"eventData\": null,\n  \"isRead\": false,\n  \"resourceType\": \"task\",\n  \"resourceId\": \"task-a1\",\n  \"createdAt\": \"2026-01-02T00:00:03.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "create",
+        "plain",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created ntf0004\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "preferences",
+        "set",
+        "--task-comment=false",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"emailAddress\": \"self@example.com\",\n  \"emailEnabled\": true,\n  \"ntfyEnabled\": false,\n  \"ntfyConfigured\": false,\n  \"ntfyServerUrl\": null,\n  \"ntfyTopic\": null,\n  \"ntfyTokenConfigured\": false,\n  \"maskedNtfyToken\": null,\n  \"gotifyEnabled\": false,\n  \"gotifyConfigured\": false,\n  \"gotifyServerUrl\": null,\n  \"gotifyTokenConfigured\": false,\n  \"maskedGotifyToken\": null,\n  \"webhookEnabled\": false,\n  \"webhookConfigured\": false,\n  \"webhookUrl\": null,\n  \"webhookSecretConfigured\": false,\n  \"maskedWebhookSecret\": null,\n  \"taskAssignmentEnabled\": true,\n  \"taskCommentEnabled\": false,\n  \"taskStatusChangeEnabled\": true,\n  \"dueDateReminderEnabled\": true,\n  \"dueDateReminderLeadTimeMinutes\": 60,\n  \"workspaces\": [],\n  \"createdAt\": \"2026-01-02T00:00:02.000Z\",\n  \"updatedAt\": \"2026-01-02T00:00:02.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "create",
+        "muted",
+        "--type",
+        "task_comment",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "not stored: this notification type is turned off\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "create",
+        "muted",
+        "--type",
+        "task_comment",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ntf0004  2026-01-02T00:00:04.000Z  unread  info  plain\nntf0003  2026-01-02T00:00:03.000Z  unread  info  CI: build is green\nntf0002  2026-01-02T00:00:01.000Z  unread  task_status_changed\nntf0001  2026-01-02T00:00:00.000Z  read    info  Welcome: hello there\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/notification",
+      "query": "",
+      "body": {
+        "type": "info",
+        "title": "CI",
+        "message": "build is green",
+        "relatedEntityType": "task",
+        "relatedEntityId": "task-a1"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/notification",
+      "query": "",
+      "body": {
+        "type": "info",
+        "message": "plain"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "taskCommentEnabled": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/notification",
+      "query": "",
+      "body": {
+        "type": "task_comment",
+        "message": "muted"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/notification",
+      "query": "",
+      "body": {
+        "type": "task_comment",
+        "message": "muted"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notification",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -21,6 +21,7 @@ import { taskCommand } from "./task";
 import { boardCommand } from "./board";
 import { sessionCommand } from "./session";
 import { commentCommand } from "./comment";
+import { notificationCommand } from "./notification";
 import { apiCheckCommand } from "./apicheck";
 import { completeCommand, completionCommand } from "./completion";
 
@@ -86,6 +87,7 @@ const rootCommand = (): { root: Command<App> } => {
     boardCommand,
     sessionCommand,
     commentCommand,
+    notificationCommand,
     apiCheckCommand,
     completionCommand,
     helpCommand,

@@ -1,0 +1,39 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "ls",
+        "--unread",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"ntf0002\",\n    \"type\": \"task_status_changed\",\n    \"title\": null,\n    \"content\": null,\n    \"eventData\": null,\n    \"isRead\": false,\n    \"resourceType\": null,\n    \"resourceId\": null,\n    \"createdAt\": \"2026-01-02T00:00:01.000Z\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "ls",
+        "--unread",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ntf0002  2026-01-02T00:00:01.000Z  unread  task_status_changed\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/notification",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/notification",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

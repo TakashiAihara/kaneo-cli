@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "preferences",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"emailAddress\": \"self@example.com\",\n  \"emailEnabled\": true,\n  \"ntfyEnabled\": false,\n  \"ntfyConfigured\": false,\n  \"ntfyServerUrl\": null,\n  \"ntfyTopic\": null,\n  \"ntfyTokenConfigured\": false,\n  \"maskedNtfyToken\": null,\n  \"gotifyEnabled\": false,\n  \"gotifyConfigured\": false,\n  \"gotifyServerUrl\": null,\n  \"gotifyTokenConfigured\": false,\n  \"maskedGotifyToken\": null,\n  \"webhookEnabled\": false,\n  \"webhookConfigured\": false,\n  \"webhookUrl\": null,\n  \"webhookSecretConfigured\": false,\n  \"maskedWebhookSecret\": null,\n  \"taskAssignmentEnabled\": true,\n  \"taskCommentEnabled\": true,\n  \"taskStatusChangeEnabled\": true,\n  \"dueDateReminderEnabled\": true,\n  \"dueDateReminderLeadTimeMinutes\": 60,\n  \"workspaces\": [],\n  \"createdAt\": \"2026-01-02T00:00:02.000Z\",\n  \"updatedAt\": \"2026-01-02T00:00:02.000Z\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/notification-preferences",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,48 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "clear",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to delete every notification without --yes; this cannot be undone\n"
+    },
+    {
+      "args": [
+        "notification",
+        "clear",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"cleared\": true\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "DELETE",
+      "path": "/notification/clear-all",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/notification",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

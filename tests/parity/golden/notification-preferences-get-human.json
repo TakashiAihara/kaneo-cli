@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "preferences",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "email               on   self@example.com\nntfy                off\ngotify              off\nwebhook             off\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   60m before\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/notification-preferences",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

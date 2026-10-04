@@ -24,6 +24,8 @@ export type Seed = {
   comments?: { taskId: string; content: string }[];
   // Users the server knows, so assign has a name to report.
   users?: { id: string; name: string }[];
+  // The key's own notifications, oldest first.
+  notifications?: { type: string; title?: string | null; content?: string | null; isRead?: boolean }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
@@ -108,6 +110,64 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const relations: z.input<typeof M.TaskRelation>[] = [];
   const requests: Recorded[] = [];
 
+  // Notifications number and date themselves apart from everything else, so
+  // seeding them leaves the ids and times the other scenarios record alone.
+  let nseq = 0;
+  let nclock = 0;
+  const nid = (prefix: string) => `${prefix}${String(++nseq).padStart(4, "0")}`;
+  const nnow = () => new Date(T0 + 86_400_000 + 1000 * nclock++).toISOString();
+  let notifications: z.input<typeof M.Notification>[] = [];
+  const addNotification = (n: { type: string; title?: string | null; content?: string | null; isRead?: boolean; resourceId?: string | null; resourceType?: string | null }) => {
+    const at = nnow();
+    const row = { id: nid("ntf"), userId: "user-self", title: n.title ?? null, content: n.content ?? null, type: n.type, eventData: null, isRead: n.isRead ?? false, resourceId: n.resourceId ?? null, resourceType: n.resourceType ?? null, createdAt: at, updatedAt: at };
+    notifications.push(row);
+    return row;
+  };
+  for (const n of seed.notifications ?? []) addNotification(n);
+
+  const prefsAt = nnow();
+  const secrets: Record<string, string | null> = { ntfyToken: null, gotifyToken: null, webhookSecret: null };
+  const settings = {
+    emailAddress: "self@example.com" as string | null,
+    emailEnabled: true,
+    ntfyEnabled: false,
+    ntfyServerUrl: null as string | null,
+    ntfyTopic: null as string | null,
+    gotifyEnabled: false,
+    gotifyServerUrl: null as string | null,
+    webhookEnabled: false,
+    webhookUrl: null as string | null,
+    taskAssignmentEnabled: true,
+    taskCommentEnabled: true,
+    taskStatusChangeEnabled: true,
+    dueDateReminderEnabled: true,
+    dueDateReminderLeadTimeMinutes: 60,
+  };
+  const rules: z.input<typeof M.NotificationPreferenceWorkspaceRule>[] = [];
+  const masked = (s: string | null) => (s ? `****${s.slice(-4)}` : null);
+  const preferences = (): z.input<typeof M.NotificationPreferences> => ({
+    ...settings,
+    ntfyConfigured: !!(settings.ntfyServerUrl && settings.ntfyTopic),
+    ntfyTokenConfigured: !!secrets.ntfyToken,
+    maskedNtfyToken: masked(secrets.ntfyToken!),
+    gotifyConfigured: !!(settings.gotifyServerUrl && secrets.gotifyToken),
+    gotifyTokenConfigured: !!secrets.gotifyToken,
+    maskedGotifyToken: masked(secrets.gotifyToken!),
+    webhookConfigured: !!settings.webhookUrl,
+    webhookSecretConfigured: !!secrets.webhookSecret,
+    maskedWebhookSecret: masked(secrets.webhookSecret!),
+    workspaces: rules,
+    createdAt: prefsAt,
+    updatedAt: prefsAt,
+  });
+  // The categories a user can turn off; a notification of a muted one is not stored.
+  const CATEGORY: Record<string, keyof typeof settings> = {
+    task_assignee_changed: "taskAssignmentEnabled",
+    task_comment: "taskCommentEnabled",
+    task_status_changed: "taskStatusChangeEnabled",
+    due_date_reminder: "dueDateReminderEnabled",
+  };
+
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
@@ -169,6 +229,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["PUT", /^\/task\/move\/[^/]+$/, M.MoveTaskBody],
       ["POST", /^\/task-relation$/, M.CreateTaskRelationBody],
       ["POST", /^\/comment\/[^/]+$/, M.CreateTaskCommentBody],
+      ["POST", /^\/notification$/, M.CreateNotificationBody],
+      ["PUT", /^\/notification-preferences$/, M.UpdateNotificationPreferencesBody],
+      ["PUT", /^\/notification-preferences\/workspaces\/[^/]+$/, M.UpsertNotificationPreferenceWorkspaceRuleBody],
     ];
     for (const [method, re, schema] of BODIES) {
       if (req.method !== method || !re.test(path)) continue;
@@ -305,6 +368,55 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         const i = relations.findIndex((r) => r.id === key);
         if (i < 0) return fail(404, "Relation not found");
         return ok(M.TaskRelation, relations.splice(i, 1)[0]!);
+      }
+    }
+
+    if (req.method === "GET" && path === "/notification") {
+      return ok(z.array(M.Notification), [...notifications].reverse());
+    }
+    if (req.method === "POST" && path === "/notification") {
+      const b = body as any;
+      const category = CATEGORY[b.type];
+      if (category && !settings[category]) return Response.json(null);
+      return ok(M.Notification, addNotification({ type: b.type, title: b.title, content: b.message, resourceId: b.relatedEntityId, resourceType: b.relatedEntityType }));
+    }
+    if (req.method === "PATCH" && path === "/notification/read-all") {
+      for (const n of notifications) n.isRead = true;
+      return ok(M.NotificationBulkResult, { success: true });
+    }
+    if (req.method === "DELETE" && path === "/notification/clear-all") {
+      notifications = [];
+      return ok(M.NotificationBulkResult, { success: true });
+    }
+    if (req.method === "PATCH" && (p = m(/^\/notification\/([^/]+)\/read$/))) {
+      const n = notifications.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!n) return new Response("Notification not found", { status: 404 });
+      n.isRead = true;
+      return ok(M.Notification, n);
+    }
+    if (req.method === "GET" && path === "/notification-preferences") return ok(M.NotificationPreferences, preferences());
+    if (req.method === "PUT" && path === "/notification-preferences") {
+      for (const [k, v] of Object.entries(body as object)) {
+        if (k in secrets) secrets[k] = v as string | null;
+        else (settings as any)[k] = v;
+      }
+      return ok(M.NotificationPreferences, preferences());
+    }
+    if ((p = m(/^\/notification-preferences\/workspaces\/([^/]+)$/))) {
+      const ws = workspaces.find((w) => w.id === decodeURIComponent(p![1]));
+      if (!ws) return new Response("No access to the workspace", { status: 403 });
+      const i = rules.findIndex((r) => r.workspaceId === ws.id);
+      if (req.method === "PUT") {
+        const at = nnow();
+        const rule = { id: i < 0 ? nid("rule") : rules[i]!.id, workspaceId: ws.id, workspaceName: ws.name, selectedProjectIds: [], ...(body as any), createdAt: i < 0 ? at : rules[i]!.createdAt, updatedAt: at } as z.input<typeof M.NotificationPreferenceWorkspaceRule>;
+        if (i < 0) rules.push(rule);
+        else rules[i] = rule;
+        return ok(M.NotificationPreferences, preferences());
+      }
+      if (req.method === "DELETE") {
+        if (i < 0) return new Response("Workspace rule not found", { status: 404 });
+        rules.splice(i, 1);
+        return ok(M.NotificationPreferences, preferences());
       }
     }
 

@@ -1,0 +1,94 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "read",
+        "ntf0002",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"ntf0002\",\n    \"type\": \"task_status_changed\",\n    \"title\": null,\n    \"content\": null,\n    \"eventData\": null,\n    \"isRead\": true,\n    \"resourceType\": null,\n    \"resourceId\": null,\n    \"createdAt\": \"2026-01-02T00:00:01.000Z\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "read",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PATCH /api/notification/nope/read: 404: Notification not found\"\n}\n",
+      "stderr": "Error: PATCH /api/notification/nope/read: 404: Notification not found\n"
+    },
+    {
+      "args": [
+        "notification",
+        "read",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: pass notification ids, or --all\n"
+    },
+    {
+      "args": [
+        "notification",
+        "read",
+        "ntf0001",
+        "--all"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"pass notification ids or --all, not both\"\n}\n",
+      "stderr": "Error: pass notification ids or --all, not both\n"
+    },
+    {
+      "args": [
+        "notification",
+        "read",
+        "--all",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "marked every notification read\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"ntf0002\",\n    \"type\": \"task_status_changed\",\n    \"title\": null,\n    \"content\": null,\n    \"eventData\": null,\n    \"isRead\": true,\n    \"resourceType\": null,\n    \"resourceId\": null,\n    \"createdAt\": \"2026-01-02T00:00:01.000Z\"\n  },\n  {\n    \"id\": \"ntf0001\",\n    \"type\": \"info\",\n    \"title\": \"Welcome\",\n    \"content\": \"hello there\",\n    \"eventData\": null,\n    \"isRead\": true,\n    \"resourceType\": null,\n    \"resourceId\": null,\n    \"createdAt\": \"2026-01-02T00:00:00.000Z\"\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "PATCH",
+      "path": "/notification/ntf0002/read",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/notification/nope/read",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/notification/read-all",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/notification",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

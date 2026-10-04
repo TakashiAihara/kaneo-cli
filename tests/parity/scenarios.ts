@@ -30,7 +30,15 @@ export const SEED: Seed = {
     { id: "task-b1", projectId: P2, title: "Beta first", priority: "urgent" },
   ],
   comments: [{ taskId: "task-a1", content: "first comment" }],
+  notifications: [
+    { type: "info", title: "Welcome", content: "hello there", isRead: true },
+    { type: "task_status_changed" },
+  ],
 };
+
+// The seeded notifications' ids, in the fake's own sequence for them.
+const N1 = "ntf0001";
+const N2 = "ntf0002";
 
 export type Scenario = {
   name: string;
@@ -95,6 +103,49 @@ export const SCENARIOS: Scenario[] = [
 
   ...both("comment list", ["comment", "list", "1"]),
   { name: "comment add", steps: [["comment", "add", "1", "hello", "world", "--json"], ["comment", "ls", "1", "--human"]] },
+
+  ...both("notification list", ["notification", "list"]),
+  { name: "notification list unread", steps: [["notification", "ls", "--unread", "--json"], ["notification", "ls", "--unread", "--human"]] },
+  {
+    name: "notification read",
+    steps: [["notification", "read", N2, "--json"], ["notification", "read", "nope", "--json"], ["notification", "read", "--human"], ["notification", "read", N1, "--all"], ["notification", "read", "--all", "--human"], ["notification", "ls", "--json"]],
+  },
+  { name: "notification clear needs --yes", steps: [["notification", "clear", "--human"], ["notification", "clear", "--yes", "--json"], ["notification", "ls", "--json"]] },
+  {
+    name: "notification create",
+    steps: [
+      ["notification", "create", "build", "is", "green", "--title", "CI", "--resource-type", "task", "--resource-id", "task-a1", "--json"],
+      ["notification", "create", "plain", "--human"],
+      ["notification", "preferences", "set", "--task-comment=false", "--json"],
+      ["notification", "create", "muted", "--type", "task_comment", "--human"],
+      ["notification", "create", "muted", "--type", "task_comment", "--json"],
+      ["notification", "ls", "--human"],
+    ],
+  },
+  ...both("notification preferences get", ["notification", "preferences", "get"]),
+  {
+    name: "notification preferences set",
+    steps: [
+      ["notification", "prefs", "set", "--ntfy", "--ntfy-server", "https://ntfy.example", "--ntfy-topic", "kaneo", "--ntfy-token", "tk_abcdef123456", "--email=false", "--reminder-lead", "2h", "--json"],
+      ["notification", "prefs", "set", "--ntfy-token", "", "--human"],
+      ["notification", "prefs", "set", "--human"],
+      ["notification", "prefs", "set", "--reminder-lead", "90s", "--json"],
+      ["notification", "prefs", "set", "--reminder-lead", "1m", "--json"],
+    ],
+  },
+  {
+    name: "notification preferences workspace rule",
+    steps: [
+      ["notification", "prefs", "ws", "set", WS, "--webhook", "--json"],
+      ["notification", "prefs", "ws", "set", WS, "--projects", `${P1},${P2}`, "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--projects", "", "--active=false", "--human"],
+      ["notification", "prefs", "ws", "set", WS, "--human"],
+      ["notification", "prefs", "get", "--human"],
+      ["notification", "prefs", "ws", "set", "ws-nobody", "--email", "--json"],
+      ["notification", "prefs", "ws", "rm", WS, "--json"],
+      ["notification", "prefs", "ws", "rm", WS, "--human"],
+    ],
+  },
 
   {
     name: "session attach, next, close",

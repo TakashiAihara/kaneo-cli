@@ -1,0 +1,39 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "import",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"total\": 1,\n  \"successful\": 1,\n  \"failed\": 0,\n  \"tasks\": [\n    {\n      \"success\": true,\n      \"id\": \"task0002\",\n      \"number\": 4,\n      \"title\": \"No dates\",\n      \"error\": \"\",\n      \"warnings\": []\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/import/proj-alpha",
+      "query": "",
+      "body": {
+        "tasks": [
+          {
+            "title": "No dates",
+            "status": "to-do",
+            "startDate": null,
+            "dueDate": "",
+            "userId": null
+          }
+        ]
+      }
+    }
+  ],
+  "files": {}
+}

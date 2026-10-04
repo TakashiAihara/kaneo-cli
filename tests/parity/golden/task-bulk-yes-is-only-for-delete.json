@@ -1,0 +1,20 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "--status",
+        "done",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--yes only confirms --delete\"\n}\n",
+      "stderr": "Error: --yes only confirms --delete\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

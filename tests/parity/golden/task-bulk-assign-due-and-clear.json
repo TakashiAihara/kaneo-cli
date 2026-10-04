@@ -1,0 +1,154 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "2",
+        "--assign",
+        "user-1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"operation\": \"updateAssignee\",\n  \"value\": \"user-1\",\n  \"taskIds\": [\n    \"task-a1\",\n    \"task-a2\"\n  ],\n  \"updatedCount\": 2\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "--due",
+        "2026-12-01",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"operation\": \"updateDueDate\",\n  \"value\": \"2026-12-01\",\n  \"taskIds\": [\n    \"task-a1\"\n  ],\n  \"updatedCount\": 1\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "2",
+        "--unassign",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "--unassign: the server changed 2 of the 2 task(s) named (#1 #2)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "--clear-due",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"operation\": \"updateDueDate\",\n  \"value\": null,\n  \"taskIds\": [\n    \"task-a1\"\n  ],\n  \"updatedCount\": 1\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"description\": \"multi\\nline\",\n    \"status\": \"to-do\",\n    \"priority\": \"high\",\n    \"position\": 0,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task-a2\",\n    \"number\": 2,\n    \"title\": \"Ship it\",\n    \"description\": \"\",\n    \"status\": \"in-progress\",\n    \"priority\": \"no-priority\",\n    \"position\": 1,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n    \"labels\": []\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/task/bulk",
+      "query": "",
+      "body": {
+        "taskIds": [
+          "task-a1",
+          "task-a2"
+        ],
+        "operation": "updateAssignee",
+        "value": "user-1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/task/bulk",
+      "query": "",
+      "body": {
+        "taskIds": [
+          "task-a1"
+        ],
+        "operation": "updateDueDate",
+        "value": "2026-12-01"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/task/bulk",
+      "query": "",
+      "body": {
+        "taskIds": [
+          "task-a1",
+          "task-a2"
+        ],
+        "operation": "updateAssignee",
+        "value": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/task/bulk",
+      "query": "",
+      "body": {
+        "taskIds": [
+          "task-a1"
+        ],
+        "operation": "updateDueDate",
+        "value": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

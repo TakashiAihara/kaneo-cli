@@ -172,8 +172,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       description: t.description ?? null,
       status: t.status ?? firstColumn,
       priority: t.priority ?? "no-priority",
-      startDate: null,
-      dueDate: null,
+      startDate: null as string | null,
+      dueDate: null as string | null,
       createdAt: now(),
     };
     tasks.push(task);
@@ -395,6 +395,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["PUT", /^\/task\/move\/[^/]+$/, M.MoveTaskBody],
       ["PUT", /^\/task\/title\/[^/]+$/, M.UpdateTaskTitleBody],
       ["PUT", /^\/task\/description\/[^/]+$/, M.UpdateTaskDescriptionBody],
+      ["PUT", /^\/task\/due-date\/[^/]+$/, M.UpdateTaskDueDateBody],
+      ["PATCH", /^\/task\/bulk$/, M.BulkUpdateTasksBody],
+      ["POST", /^\/task\/import\/[^/]+$/, M.ImportTasksBody],
       ["POST", /^\/task-relation$/, M.CreateTaskRelationBody],
       ["POST", /^\/comment\/[^/]+$/, M.CreateTaskCommentBody],
       ["POST", /^\/notification$/, M.CreateNotificationBody],
@@ -669,6 +672,106 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           plannedTasks: slice.filter((t) => t.status === "planned").map(boardTask),
         },
         pagination: { total: mine.length, page, pageSize: size, totalPages: Math.max(1, Math.ceil(mine.length / size)), relatedPage: 1, relatedPageSize: 100, relatedTotalPages: 1 },
+      });
+    }
+    if (req.method === "PUT" && (p = m(/^\/task\/due-date\/([^/]+)$/))) {
+      const t = tasks.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!t) return fail(404, "Task not found");
+      const given = (body as any)?.dueDate as string | undefined;
+      // An empty string clears, as a missing one does: upstream reads the field
+      // as `dueDate ? parse(dueDate) : null`.
+      if (given) {
+        const at = parsedDate(given, "dueDate");
+        if (typeof at !== "string") return at;
+        t.dueDate = at;
+      } else t.dueDate = null;
+      return ok(M.Task, t);
+    }
+    if (req.method === "PATCH" && path === "/task/bulk") {
+      const b = body as z.input<typeof M.BulkUpdateTasksBody>;
+      const found = tasks.filter((t) => b.taskIds.includes(t.id));
+      if (found.length === 0) return fail(404, "No tasks found");
+      const spaces = new Set(found.map((t) => projects.find((x) => x.id === t.projectId)!.workspaceId));
+      if (spaces.size > 1) return fail(400, "All tasks must belong to the same workspace");
+      const value = b.value ?? null;
+      switch (b.operation) {
+        // One project at a time, checked and then written, with no transaction:
+        // a status the second project lacks is refused after the first one's
+        // tasks have moved, as upstream's bulk-update-tasks.ts does.
+        case "updateStatus":
+          if (!value) return fail(400, "Status value is required");
+          for (const projectId of new Set(found.map((t) => t.projectId))) {
+            if (!columnsOf(projectId).some((c) => c.slug === value) && !VIRTUAL_STATUSES.includes(value)) {
+              return fail(400, `Invalid status "${value}"`);
+            }
+            for (const t of found) if (t.projectId === projectId) t.status = value;
+          }
+          break;
+        case "updatePriority":
+          if (!value) return fail(400, "Priority value is required");
+          for (const t of found) t.priority = value;
+          break;
+        case "updateAssignee": {
+          const assignee = value?.trim() || null;
+          if (assignee && !users.has(assignee)) return fail(403, "Assignee is not a member of this workspace");
+          for (const t of found) t.userId = assignee;
+          break;
+        }
+        case "delete":
+          for (const t of found) tasks.splice(tasks.indexOf(t), 1);
+          break;
+        case "updateDueDate": {
+          const at = value ? parsedDate(value, "date value") : null;
+          if (at !== null && typeof at !== "string") return at;
+          for (const t of found) t.dueDate = at;
+          break;
+        }
+        // The fake keeps no labels, so every label id is one the server would not
+        // find.
+        default:
+          return fail(404, "Label not found");
+      }
+      return ok(M.BulkTaskResult, { success: true, updatedCount: found.length });
+    }
+    if (req.method === "GET" && (p = m(/^\/task\/export\/([^/]+)$/))) {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!proj) return fail(400, "Workspace ID could not be determined");
+      return ok(M.TaskExport, {
+        project: { name: proj.name, slug: proj.slug, description: proj.description, exportedAt: now() },
+        tasks: tasks
+          .filter((t) => t.projectId === proj.id)
+          .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+          .map((t) => ({ title: t.title, description: t.description || "", status: t.status, priority: t.priority || "low", dueDate: t.dueDate ?? null, startDate: t.startDate ?? null, userId: t.userId || null, labels: [] })),
+      });
+    }
+    if (req.method === "POST" && (p = m(/^\/task\/import\/([^/]+)$/))) {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!proj) return fail(400, "Workspace ID could not be determined");
+      const results = ((body as any).tasks as z.input<typeof M.ImportTasksBody>["tasks"]).map((wanted) => {
+        const assignee = wanted.userId?.trim() || null;
+        if (assignee && !users.has(assignee)) return { success: false, error: "Assignee is not a member of this workspace", task: wanted };
+        const warnings: string[] = [];
+        let status = wanted.status;
+        if (!columnsOf(proj.id).some((c) => c.slug === status) && !VIRTUAL_STATUSES.includes(status)) {
+          warnings.push(`Unknown status "${status}" mapped to "planned"`);
+          status = "planned";
+        }
+        let priority = wanted.priority || "low";
+        if (!["no-priority", "low", "medium", "high", "urgent"].includes(priority)) {
+          warnings.push(`Unknown priority "${priority}" mapped to "no-priority"`);
+          priority = "no-priority";
+        }
+        // The server builds a Date from each without checking it, so one that
+        // does not parse fails that task alone.
+        const bad = [wanted.dueDate, wanted.startDate].find((d) => d && Number.isNaN(Date.parse(d)));
+        if (bad) return { success: false, error: "Invalid time value", task: wanted };
+        const created = addTask(proj.id, { title: wanted.title, description: wanted.description || "", status, priority, userId: assignee });
+        created.dueDate = wanted.dueDate ? new Date(wanted.dueDate).toISOString() : null;
+        created.startDate = wanted.startDate ? new Date(wanted.startDate).toISOString() : null;
+        return { success: true, task: created, ...(warnings.length > 0 && { warnings }) };
+      });
+      return ok(M.TaskImportResult, {
+        results: { total: results.length, successful: results.filter((r) => r.success).length, failed: results.filter((r) => !r.success).length, tasks: results },
       });
     }
     if (req.method === "POST" && (p = m(/^\/task\/([^/]+)$/))) {
@@ -1082,3 +1185,13 @@ function legacy(body: unknown): unknown {
   }
   return out;
 }
+
+// A date as the server parses one: anything Date reads, stored as an ISO instant.
+// A failure is the server's 400, with its message.
+const parsedDate = (given: string, field: string): string | Response => {
+  const at = new Date(given);
+  if (given.trim() === "" || Number.isNaN(at.getTime())) {
+    return Response.json({ success: false, error: `Invalid ${field} "${given}"` }, { status: 400 });
+  }
+  return at.toISOString();
+};

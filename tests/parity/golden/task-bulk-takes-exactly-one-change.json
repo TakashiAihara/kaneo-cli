@@ -1,0 +1,45 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"pass exactly one of --status, --priority, --assign, --unassign, --due, --clear-due, --add-label, --remove-label, --delete; none was given\"\n}\n",
+      "stderr": "Error: pass exactly one of --status, --priority, --assign, --unassign, --due, --clear-due, --add-label, --remove-label, --delete; none was given\n"
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "--status",
+        "done",
+        "--priority",
+        "low",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"pass exactly one of --status, --priority, --assign, --unassign, --due, --clear-due, --add-label, --remove-label, --delete; got --status, --priority\"\n}\n",
+      "stderr": "Error: pass exactly one of --status, --priority, --assign, --unassign, --due, --clear-due, --add-label, --remove-label, --delete; got --status, --priority\n"
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "--priority",
+        "soon",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown priority \\\"soon\\\"; use one of: urgent, high, medium, low, no-priority\"\n}\n",
+      "stderr": "Error: unknown priority \"soon\"; use one of: urgent, high, medium, low, no-priority\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

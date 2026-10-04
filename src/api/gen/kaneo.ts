@@ -12,6 +12,7 @@ import {
 import {
   Activity,
   BoardResponse,
+  BulkTaskResult,
   Column,
   Comment,
   CreateNotification200,
@@ -27,6 +28,8 @@ import {
   ProjectListItem,
   SearchResponse,
   Task,
+  TaskExport,
+  TaskImportResult,
   TaskRelation,
   TaskRelationWithTasks,
   TaskWithAssignee,
@@ -38,6 +41,7 @@ import {
 } from './model';
 import type {
   AttachLabelToTaskBody,
+  BulkUpdateTasksBody,
   CreateActivityBody,
   CreateColumnBody,
   CreateLabelBody,
@@ -48,6 +52,7 @@ import type {
   CreateTaskRelationBody,
   CreateTimeEntryBody,
   GlobalSearchParams,
+  ImportTasksBody,
   ListProjectsParams,
   ListTasksParams,
   MoveTaskBody,
@@ -63,6 +68,7 @@ import type {
   UpdateTaskAssigneeBody,
   UpdateTaskCommentBody,
   UpdateTaskDescriptionBody,
+  UpdateTaskDueDateBody,
   UpdateTaskPriorityBody,
   UpdateTaskStatusBody,
   UpdateTaskTitleBody,
@@ -439,6 +445,46 @@ export const listTasks = async (projectId: string,
 
 
 
+export const getBulkUpdateTasksUrl = () => {
+
+
+
+
+  return `/task/bulk`
+}
+
+/**
+ * Apply one operation to many tasks at once. Every task must be in the same workspace.
+ * @summary Bulk update tasks
+ */
+export const bulkUpdateTasks = async (bulkUpdateTasksBody: BulkUpdateTasksBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<BulkTaskResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<BulkTaskResult>(getBulkUpdateTasksUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(bulkUpdateTasksBody),
+    schema: BulkTaskResult
+  }
+);}
+
+
+
 export const getCreateTaskUrl = (projectId: string,) => {
 
 
@@ -573,6 +619,73 @@ return kaneoFetch<MoveTaskResult>(getMoveTaskUrl(id),
 
 
 
+export const getExportTasksUrl = (projectId: string,) => {
+
+
+
+
+  return `/task/export/${projectId}`
+}
+
+/**
+ * Export a project's tasks, with their labels, as a JSON document.
+ * @summary Export tasks
+ */
+export const exportTasks = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<TaskExport> => {
+
+  return kaneoFetch<TaskExport>(getExportTasksUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: TaskExport
+  }
+);}
+
+
+
+export const getImportTasksUrl = (projectId: string,) => {
+
+
+
+
+  return `/task/import/${projectId}`
+}
+
+/**
+ * Import tasks into a project. Each task is reported individually, so a partial import still returns 200.
+ * @summary Import tasks
+ */
+export const importTasks = async (projectId: string,
+    importTasksBody: ImportTasksBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<TaskImportResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<TaskImportResult>(getImportTasksUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(importTasksBody),
+    schema: TaskImportResult
+  }
+);}
+
+
+
 export const getUpdateTaskStatusUrl = (id: string,) => {
 
 
@@ -690,6 +803,47 @@ return kaneoFetch<Task>(getUpdateTaskAssigneeUrl(id),
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateTaskAssigneeBody),
+    schema: Task
+  }
+);}
+
+
+
+export const getUpdateTaskDueDateUrl = (id: string,) => {
+
+
+
+
+  return `/task/due-date/${id}`
+}
+
+/**
+ * Set or clear a task's due date.
+ * @summary Update task due date
+ */
+export const updateTaskDueDate = async (id: string,
+    updateTaskDueDateBody: UpdateTaskDueDateBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<Task> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Task>(getUpdateTaskDueDateUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateTaskDueDateBody),
     schema: Task
   }
 );}

@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "import",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no API key: set KANEO_API_KEY, or pass --api-key\"\n}\n",
+      "stderr": "Error: no API key: set KANEO_API_KEY, or pass --api-key\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

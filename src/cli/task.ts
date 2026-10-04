@@ -1,12 +1,17 @@
+import { writeSync } from "node:fs";
 import { apiKey, project, taskProject, type App } from "./app";
 import {
+  bulkUpdate,
   createTask,
   deleteRelation,
   deleteTask,
   descriptionDeferred,
+  exportProjectTasks,
   findTaskByNumber,
   getBoard,
   getTask,
+  importProjectTasks,
+  listColumns,
   linkTasks,
   listExternalLinks,
   listRelations,
@@ -17,15 +22,19 @@ import {
   RELATION_TYPES,
   setTaskAssignee,
   setTaskDescription,
+  setTaskDueDate,
   setTaskPriority,
   setTaskStatus,
   taskSummary,
   type ExternalLink,
+  type BulkOperation,
+  type ImportedTask,
   type NewTask,
   type Relation,
   setTaskTitle,
   type Task,
 } from "../api/kaneo";
+import type { Json } from "../output/json";
 import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunContext } from "./args";
 import { readInput, sourceName } from "./input";
 import { withProject } from "./lookup";
@@ -81,6 +90,7 @@ export const taskCommand = {
         app.out.human(`#${task.number}  ${task.title}`);
         app.out.human(`status    ${task.status}`);
         app.out.human(`priority  ${task.priority}`);
+        if (task.dueDate !== null) app.out.human(`due       ${task.dueDate}`);
         if (relations.length > 0) {
           app.out.human("");
           app.out.human("relations");
@@ -306,6 +316,142 @@ export const taskCommand = {
         await setTaskAssignee(task.id, user);
         app.out.human(user === "" ? `#${task.number} unassigned` : `#${task.number} assigned to ${user}`);
         app.out.data({ assigneeId: user, id: task.id, number: task.number });
+      },
+    },
+    {
+      name: "due",
+      use: "due <task> [date]",
+      short: "Set a task's due date, or clear it when no date is given",
+      long:
+        "Set a task's due date, or clear it when no date is given.\n\n" +
+        "The date is anything the server reads as one, such as 2026-10-31 or\n" +
+        "2026-10-31T09:00:00+09:00. A bare date is midnight UTC.",
+      args: rangeArgs(1, 2),
+      run: async ({ args, app }: { args: string[]; app: App }) => {
+        // An empty date is refused rather than read as "clear": `task due 1 "$DATE"`
+        // with DATE unset would otherwise wipe the date and exit 0.
+        const date = args[1]?.trim();
+        if (date === "") throw new Error("the date is empty; leave it out to clear the due date");
+        apiKey(app);
+        const task = await resolveTask(app, args[0]!);
+        const updated = await setTaskDueDate(task.id, date ?? "");
+        app.out.human(
+          updated.dueDate === null ? `#${task.number} no due date` : `#${task.number} due ${updated.dueDate}`,
+        );
+        app.out.data({ id: task.id, number: task.number, dueDate: updated.dueDate });
+      },
+    },
+    {
+      name: "bulk",
+      use: "bulk <task>... <one change flag>",
+      short: "Apply one change to many tasks in one request",
+      long:
+        "Apply one change to many tasks in one request.\n\n" +
+        "Exactly one change flag is taken. Every task has to be in the same workspace.\n" +
+        "The count reported is what the server changed, which can be fewer than the\n" +
+        "tasks named: a label is not added twice, nor removed from a task without it.\n\n" +
+        "A label is named by its id, as kaneo label ls --json shows it.\n\n" +
+        "This goes through the server's bulk route, which differs from the one-task\n" +
+        "commands in two ways: --delete does not remove the tasks' attachments from\n" +
+        "storage, and --due does not reset the reminders already sent for a task.",
+      args: minimumArgs(1),
+      flags: [
+        { name: "status", type: "string" as const, usage: "move every task to this column", defaultValue: "" },
+        { name: "priority", type: "string" as const, usage: `set the priority: ${PRIORITIES.join(", ")}`, defaultValue: "" },
+        { name: "assign", type: "string" as const, usage: "assign every task to this user id", defaultValue: "" },
+        { name: "unassign", type: "bool" as const, usage: "clear every task's assignee", defaultValue: "false" },
+        { name: "due", type: "string" as const, usage: "set the due date", defaultValue: "" },
+        { name: "clear-due", type: "bool" as const, usage: "clear every task's due date", defaultValue: "false" },
+        { name: "add-label", type: "string" as const, usage: "add the label with this id", defaultValue: "" },
+        { name: "remove-label", type: "string" as const, usage: "remove the label with this id", defaultValue: "" },
+        { name: "delete", type: "bool" as const, usage: "delete every task (needs --yes)", defaultValue: "false" },
+        { name: "yes", type: "bool" as const, usage: "confirm --delete", defaultValue: "false" },
+      ],
+      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+        const [flag, operation, value] = bulkChange(flags, changed);
+        if (flags.yes === true && operation !== "delete") throw new Error("--yes only confirms --delete");
+        apiKey(app);
+        // The same task named twice is one task to the server, and counting it
+        // twice would make the report read as a task it skipped.
+        const { tasks: resolved, slugs } = await resolveTasks(app, args);
+        const named = [...new Map(resolved.map((t) => [t.id, t])).values()];
+        // A number is only unique on its board, so tasks from several projects
+        // are named with the project in front, by slug where a board was read.
+        const several = new Set(named.map((t) => t.projectId)).size > 1;
+        const projectName = (id: string) => slugs.get(id) ?? id;
+        const numbers = named.map((t) => `${several ? projectName(t.projectId) : ""}#${t.number}`).join(" ");
+        if (operation === "delete" && flags.yes !== true) {
+          throw new Error(
+            `refusing to delete ${named.length} task(s) (${numbers}) without --yes; this also removes their comments, where session history is kept`,
+          );
+        }
+        if (operation === "updateStatus") await checkStatus(named, value!, projectName);
+        const ids = named.map((t) => t.id);
+        const updated = await bulkUpdate(ids, operation, value);
+        app.out.human(
+          `${flag}${value === null ? "" : ` ${value}`}: the server changed ${updated} of the ${ids.length} task(s) named (${numbers})`,
+        );
+        app.out.data({ operation, value, taskIds: ids, updatedCount: updated });
+      },
+    },
+    {
+      name: "export",
+      short: "Write a project's tasks as JSON, in the form task import reads",
+      long:
+        "Write a project's tasks as JSON, in the form task import reads.\n\n" +
+        "The document is the server's export: the project's name and slug, and each\n" +
+        "task's title, description, status, priority, dates, assignee id and labels.\n" +
+        "It is written to stdout as JSON whatever the output mode, so it can be\n" +
+        "redirected to a file.",
+      args: noArgs("kaneo task export"),
+      run: async ({ app }: { app: App }) => {
+        apiKey(app);
+        const exported = await withProject(app, project(app), (id) => exportProjectTasks(id));
+        // The export is the payload in both modes: a human asking for it wants the
+        // file, and a summary instead would leave nothing to redirect. Only a
+        // terminal gets the text with control characters replaced; a file gets
+        // the document byte for byte, which `--human > file` would otherwise not.
+        if (app.out.mode.json || app.out.filter !== undefined) app.out.data(exported as Json);
+        else if (app.out.terminal) app.out.human(JSON.stringify(exported, null, 2));
+        else writeSync(1, `${JSON.stringify(exported, null, 2)}\n`);
+        app.out.status(`exported ${exported.tasks.length} task(s) from ${exported.project.slug}`);
+      },
+    },
+    {
+      name: "import",
+      use: "import <file>",
+      short: "Create tasks in a project from a JSON file (- reads stdin)",
+      long:
+        "Create tasks in a project from a JSON file (- reads stdin).\n\n" +
+        "The file is what task export writes, or {\"tasks\": [...]}, or a bare array\n" +
+        "of tasks. Each task needs a title and a status; description, priority,\n" +
+        "startDate, dueDate and userId are optional. Labels are not imported: an\n" +
+        "export names them without the ids the server would need.\n\n" +
+        "A status the project has no column for, or a priority outside the fixed\n" +
+        "list, is refused before anything is sent: the server would replace it, and\n" +
+        "a task put in planned shows on no column. A task the server cannot create\n" +
+        "(an assignee outside the workspace) is reported as failed, and the command\n" +
+        "exits non-zero when any task failed. Running the file again creates every\n" +
+        "task again, including the ones that went through.",
+      args: exactArgs(1),
+      run: async ({ args, app }: { args: string[]; app: App }) => {
+        apiKey(app);
+        // The file is read and checked before anything is sent, so a typo in the
+        // path or a broken document creates nothing.
+        const { tasks, labelled } = importedTasks(await readInput(args[0]!), args[0]!);
+        const result = await withProject(app, project(app), async (id) => {
+          checkImport(tasks, await listColumns(id), args[0]!);
+          return importProjectTasks(id, tasks);
+        });
+        if (labelled > 0) app.out.status(`labels on ${labelled} task(s) were not imported`);
+        for (const t of result.tasks) {
+          if (t.success) app.out.human(`created  #${t.number} ${t.title}`);
+          else app.out.human(`failed   ${t.title}: ${t.error}`);
+          for (const warning of t.warnings) app.out.human(`warning  ${t.title}: ${warning}`);
+        }
+        app.out.human(`imported ${result.successful} of ${result.total} task(s)`);
+        app.out.data(result as Json);
+        if (result.failed > 0) throw new Error(`${result.failed} of ${result.total} task(s) were not imported`);
       },
     },
     {
@@ -539,13 +685,13 @@ const relationLine = (relation: Relation, taskId: string): string => {
 //
 // An empty project is not refused here: a reference may be an id, which needs no
 // board, so only a number asks for one.
-export const resolveTask = async (app: App, ref: string): Promise<Task> => {
+export const resolveTask = async (app: App, ref: string, slugs?: Map<string, string>): Promise<Task> => {
   const wanted = ref.trim();
   if (wanted === "") throw new Error("no task given");
 
   const named = namedReference(wanted);
   if (named !== undefined) {
-    return numberOn(app, named.project, named.number, "the reference");
+    return numberOn(app, named.project, named.number, "the reference", slugs);
   }
 
   const number = asNumber(wanted.startsWith("#") ? wanted.slice(1) : wanted);
@@ -555,7 +701,20 @@ export const resolveTask = async (app: App, ref: string): Promise<Task> => {
     throw new Error(`task #${number} needs a project: pass --project or set KANEO_PROJECT`);
   }
   const origin = app.cfg.origin.project ?? "unset";
-  return numberOn(app, projectId, number, origin === "repo-map" ? `the repo map for ${app.cfg.repo}` : origin);
+  return numberOn(app, projectId, number, origin === "repo-map" ? `the repo map for ${app.cfg.repo}` : origin, slugs);
+};
+
+// Several references at once. All are resolved before the caller writes
+// anything, so one that does not resolve leaves every task as it was.
+//
+// The slugs of the boards read on the way come back too, so a report can name a
+// project the way a reference does. A task named by id read no board, and its
+// project has no slug here.
+const resolveTasks = async (app: App, refs: string[]): Promise<{ tasks: Task[]; slugs: Map<string, string> }> => {
+  const slugs = new Map<string, string>();
+  const tasks: Task[] = [];
+  for (const ref of refs) tasks.push(await resolveTask(app, ref, slugs));
+  return { tasks, slugs };
 };
 
 // `<project>#<number>`: the project named before the hash, and a number on it.
@@ -576,8 +735,18 @@ const namedReference = (wanted: string): { project: string; number: number } | u
 // The failure names the project it looked in and the layer that named it,
 // because "no task #12" on its own cannot be acted on: the reader has to know
 // which board to look somewhere else on.
-const numberOn = async (app: App, value: string, number: number, origin: string): Promise<Task> => {
+//
+// slugs, when given, collects the slug of the board read, so a caller naming
+// several projects can name them the way a reference does.
+const numberOn = async (
+  app: App,
+  value: string,
+  number: number,
+  origin: string,
+  slugs?: Map<string, string>,
+): Promise<Task> => {
   const { board, task: found } = await withProject(app, value, (id) => findTaskByNumber(id, number));
+  slugs?.set(board.projectId, board.projectSlug);
   if (found === undefined) {
     // --project only steers a bare number; a reference names its board itself.
     const hint = origin === "the reference" ? "check the number" : "pass --project to look elsewhere";
@@ -700,3 +869,137 @@ const externalLinkLine = (link: ExternalLink): string =>
   `${link.url}${link.title ? `  ${link.title}` : ""}${
     link.integrationType === null ? "" : `  (${link.integrationType} ${link.resourceType})`
   }`;
+
+// The one change a bulk run makes, as the server's operation and value.
+//
+// Exactly one is taken: the server applies one operation per request, and
+// picking one of several would silently drop the rest.
+const bulkChange = (flags: FlagValues, changed: ReadonlySet<string>): [string, BulkOperation, string | null] => {
+  // A value flag passed as "" is a mistake, not an absent flag: reading it as
+  // absent would report "none was given" about a flag the caller did give.
+  for (const name of ["status", "priority", "assign", "due", "add-label", "remove-label"]) {
+    if (changed.has(name) && String(flags[name] ?? "").trim() === "") throw new Error(`--${name} is empty`);
+  }
+  const text = (name: string) => String(flags[name] ?? "").trim();
+  const given: [string, BulkOperation, string | null][] = [];
+  if (text("status") !== "") given.push(["--status", "updateStatus", text("status")]);
+  if (text("priority") !== "") given.push(["--priority", "updatePriority", text("priority")]);
+  if (text("assign") !== "") given.push(["--assign", "updateAssignee", text("assign")]);
+  if (flags.unassign === true) given.push(["--unassign", "updateAssignee", null]);
+  if (text("due") !== "") given.push(["--due", "updateDueDate", text("due")]);
+  if (flags["clear-due"] === true) given.push(["--clear-due", "updateDueDate", null]);
+  if (text("add-label") !== "") given.push(["--add-label", "addLabel", text("add-label")]);
+  if (text("remove-label") !== "") given.push(["--remove-label", "removeLabel", text("remove-label")]);
+  if (flags.delete === true) given.push(["--delete", "delete", null]);
+  if (given.length !== 1) {
+    const named = given.length === 0 ? "none was given" : `got ${given.map(([flag]) => flag).join(", ")}`;
+    throw new Error(
+      `pass exactly one of --status, --priority, --assign, --unassign, --due, --clear-due, --add-label, --remove-label, --delete; ${named}`,
+    );
+  }
+  const [flag, operation, value] = given[0]!;
+  // Refused here for the reason task priority refuses it: the list is fixed.
+  if (operation === "updatePriority" && priorityRank(value!) === PRIORITIES.length) {
+    throw new Error(`unknown priority ${JSON.stringify(value)}; use one of: ${PRIORITIES.join(", ")}`);
+  }
+  return [flag, operation, value];
+};
+
+// Statuses the server takes without a column holding them.
+const VIRTUAL_STATUSES = ["planned", "archived"];
+
+// Refuses a status that one of the tasks' projects has no column for, before
+// anything is sent.
+//
+// The server checks and writes one project at a time without a transaction, so a
+// status missing from the second project is refused only after the first
+// project's tasks have moved, and the 400 reads as if nothing changed.
+const checkStatus = async (tasks: Task[], status: string, projectName: (id: string) => string): Promise<void> => {
+  const projects = new Set(tasks.map((t) => t.projectId));
+  // One project is checked and written in one step, so the server's own 400
+  // comes before any write.
+  if (projects.size < 2 || VIRTUAL_STATUSES.includes(status)) return;
+  for (const projectId of projects) {
+    const columns = await listColumns(projectId);
+    if (!columns.some((c) => c.slug === status)) {
+      const numbers = tasks.filter((t) => t.projectId === projectId).map((t) => `#${t.number}`).join(" ");
+      throw new Error(
+        `project ${projectName(projectId)} (${numbers}) has no column ${JSON.stringify(status)}; its columns are ${columns.map((c) => c.slug).join(", ")}`,
+      );
+    }
+  }
+};
+
+// The tasks a document holds, in the body the import route takes.
+//
+// An export carries labels and nothing the route takes for them, so only the
+// fields the route reads are sent, as written: a title or status is checked for
+// being blank but not trimmed. Title and status are checked here because the
+// server's answer for a missing one names an array index, not the task.
+const importedTasks = (text: string, source: string): { tasks: ImportedTask[]; labelled: number } => {
+  let doc: unknown;
+  try {
+    doc = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`${source}: not JSON: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const list = Array.isArray(doc) ? doc : (doc as { tasks?: unknown } | null)?.tasks;
+  if (!Array.isArray(list)) throw new Error(`${source}: expected a task export, {"tasks": [...]} or an array of tasks`);
+  if (list.length === 0) throw new Error(`${source}: no tasks to import`);
+  // An export carries labels the route has no field for; they are counted so the
+  // command can say they were left behind.
+  const labelled = list.filter((t) => Array.isArray(t?.labels) && t.labels.length > 0).length;
+  const tasks = list.map((raw, at) => {
+    const t = (raw ?? {}) as Record<string, unknown>;
+    // A field of the wrong type is refused rather than dropped: a dropped
+    // priority or date would create the task without it and say nothing.
+    for (const name of ["title", "status", "description", "priority", "startDate", "dueDate", "userId"]) {
+      const value = t[name];
+      const nullable = name === "startDate" || name === "dueDate" || name === "userId";
+      if (value !== undefined && typeof value !== "string" && !(nullable && value === null)) {
+        throw new Error(`${source}: task ${at + 1} has ${name} ${JSON.stringify(value)}, which is not ${nullable ? "a string or null" : "a string"}`);
+      }
+    }
+    const field = (name: string): string | undefined => (typeof t[name] === "string" ? (t[name] as string) : undefined);
+    const nullable = (name: string): string | null | undefined => (t[name] === null ? null : field(name));
+    const title = field("title");
+    const status = field("status");
+    if (title === undefined || title.trim() === "") throw new Error(`${source}: task ${at + 1} has no title`);
+    if (status === undefined || status.trim() === "") throw new Error(`${source}: task ${at + 1} has no status`);
+    const out: ImportedTask = { title, status };
+    for (const name of ["description", "priority"] as const) {
+      const value = field(name);
+      if (value !== undefined) out[name] = value;
+    }
+    for (const name of ["startDate", "dueDate", "userId"] as const) {
+      const value = nullable(name);
+      if (value === undefined) continue;
+      // The server turns the string into a Date without checking it, so an
+      // unparsable one fails that task with an error that names neither the
+      // field nor the value.
+      if (name !== "userId" && value !== null && value !== "" && Number.isNaN(Date.parse(value))) {
+        throw new Error(`${source}: task ${at + 1} has ${name} ${JSON.stringify(value)}, which is not a date`);
+      }
+      out[name] = value;
+    }
+    return out;
+  });
+  return { tasks, labelled };
+};
+
+// Refuses what the server would quietly replace: a status this project has no
+// column for (it becomes planned, which no column shows) and a priority outside
+// the fixed list (it becomes no-priority).
+const checkImport = (tasks: ImportedTask[], columns: { slug: string }[], source: string): void => {
+  const slugs = columns.map((c) => c.slug);
+  tasks.forEach((t, at) => {
+    if (!slugs.includes(t.status) && !VIRTUAL_STATUSES.includes(t.status)) {
+      throw new Error(
+        `${source}: task ${at + 1} has status ${JSON.stringify(t.status)}, which this project has no column for; its columns are ${slugs.join(", ")}`,
+      );
+    }
+    if (t.priority !== undefined && t.priority !== "" && priorityRank(t.priority) === PRIORITIES.length) {
+      throw new Error(`${source}: task ${at + 1} has priority ${JSON.stringify(t.priority)}; use one of: ${PRIORITIES.join(", ")}`);
+    }
+  });
+};

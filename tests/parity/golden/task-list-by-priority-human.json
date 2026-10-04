@@ -17,7 +17,7 @@
     {
       "method": "GET",
       "path": "/task/tasks/proj-alpha",
-      "query": ""
+      "query": "?priority=high"
     }
   ],
   "files": {}

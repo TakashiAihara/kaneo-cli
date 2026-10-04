@@ -6,6 +6,8 @@
         "ls",
         "--status",
         "in-progress",
+        "--priority",
+        "no-priority",
         "--json"
       ],
       "exit": 0,
@@ -17,7 +19,7 @@
     {
       "method": "GET",
       "path": "/task/tasks/proj-alpha",
-      "query": "?status=in-progress"
+      "query": "?priority=no-priority&status=in-progress"
     }
   ],
   "files": {}

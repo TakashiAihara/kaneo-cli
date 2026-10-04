@@ -1,0 +1,77 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "1",
+        "--strict",
+        "--timeout",
+        "1s"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"taskId\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"projectId\": \"proj-alpha\",\n  \"projectName\": \"Alpha\",\n  \"projectSlug\": \"ALP\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "board",
+        "--json",
+        "--timeout",
+        "1s"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"project\": \"Alpha\",\n    \"open\": [\n      {\n        \"id\": \"task-a1\",\n        \"number\": 1,\n        \"title\": \"Write the parser\",\n        \"description\": \"multi\\nline\",\n        \"status\": \"to-do\",\n        \"priority\": \"high\",\n        \"position\": 0,\n        \"projectId\": \"proj-alpha\",\n        \"assigneeId\": null,\n        \"assigneeName\": null,\n        \"startDate\": null,\n        \"dueDate\": null,\n        \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n        \"labels\": []\n      },\n      {\n        \"id\": \"task-a2\",\n        \"number\": 2,\n        \"title\": \"Ship it\",\n        \"description\": \"\",\n        \"status\": \"in-progress\",\n        \"priority\": \"no-priority\",\n        \"position\": 1,\n        \"projectId\": \"proj-alpha\",\n        \"assigneeId\": \"user-1\",\n        \"assigneeName\": \"Ada\",\n        \"startDate\": null,\n        \"dueDate\": null,\n        \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n        \"labels\": []\n      }\n    ],\n    \"doneCount\": 1,\n    \"sessions\": [\n      {\n        \"taskNumber\": 1,\n        \"taskTitle\": \"Write the parser\",\n        \"sessionId\": \"sess-budget\",\n        \"host\": \"<HOST>\",\n        \"branch\": \"\",\n        \"cwd\": \"<HOME>/work\"\n      }\n    ]\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-budget host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    }
+  ],
+  "files": {
+    ".config/kaneo/sessions/sess-budget.history.jsonl": "{\"event\":\"attach\",\"at\":\"<TIME>Z\",\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n",
+    ".config/kaneo/sessions/sess-budget.json": "{\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}"
+  }
+}

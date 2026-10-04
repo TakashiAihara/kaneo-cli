@@ -186,9 +186,13 @@ A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` 
 
 A project's slug is the prefix of its task identifiers. Without `--slug`, `project create` derives it the way the Kaneo web app does: the first three letters of a one-word name, or the initials of the first three words, upper case, in any script (`Alpha Beta Gamma` → `ABG`, `日本語だけ` → `日本語`). A name with no letter or number derives nothing, and a derived slug another project in the workspace already has is refused; both have to be given `--slug`.
 
+A task in no column at all — the server answers `planned` and `archived` tasks beside the columns — is read as a column of its own, and `task ls` leaves those out unless `--all` or an explicit `--status` asks for them. `board` shows neither.
+
 Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project>#<number>` names a board and a number on it: `kaneo task get kaneo-cli#3` reads the reference written as `kaneo kaneo-cli#3`, which is also what `KANEO_TASK_REF` holds after its `kaneo ` prefix. The project before the `#` is an id, slug or name.
 
 `task link` will not guess the type: a link written with one nobody asked for has to be undone before the right one can be written. `task unlink` takes two tasks and removes the one link joining them in either direction, or one relation id from `task links --json`.
+
+`--timeout` bounds one request, not the command: every page of a board gets the whole of it, so a board's size does not decide whether it can be read. Nothing bounds the command as a whole. A timeout of zero or less is not the default and not no timeout: every request fails at once.
 
 ### Shell completion
 

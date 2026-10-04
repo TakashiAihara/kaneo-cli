@@ -49,7 +49,14 @@ Read as one call, a board past 50 tasks would lose the rest without an error. `G
 
 The first request names no page. Releases from 2026-03-22 until v2.26.0 paginate only when `page` or `limit` is given, and then sort on position alone, which ties within a column and so pages unstably; left without them they return the whole board at once, which is what the old client relied on. Later pages are only requested when the server reports more than one, which such a release never does for a plain request.
 
-Not done here: `task list --status` still filters after reading the whole board, and one CLI timeout covers every page of a board. Both are unchanged in kind from before, where the one request carried the whole board.
+Since then (#39, #40, #44, #45 in the Bun build):
+
+- `task list --status` / `--priority` send `status` / `priority` as query parameters, so the server filters before it pages; the CLI still filters the answer, since a server older than that ignores them
+- `--timeout` bounds each request, not the command, so a board of many pages does not split one budget between them
+- a task looked up by number stops paging at the page that holds it, once that page's related pages are read
+- `plannedTasks` and `archivedTasks`, answered beside the columns, are read as two columns of their own
+- a task whose description the listing deferred (`descriptionDeferred`, above 64 KiB) is read back from `GET /task/{id}` by `task get`, the one command that prints a task it resolved; `task ls` and `board` print it as empty (#254)
+- `pagination.total` is compared between the first and the last request; a board whose total moved is read again up to twice, then reported on stderr, and a number lookup that missed on such a board is read again too. Only a change in the number of tasks is seen: a task moved to another position, a delete and a create within one read, or a label added between two related pages leave the total where it was. A status change does not reorder the listing, which is ordered by position
 
 ## Compatibility with older servers
 

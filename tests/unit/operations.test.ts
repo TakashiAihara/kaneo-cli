@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { configureClient, KaneoApiError } from "../../src/api/http";
 import * as api from "../../src/api/kaneo";
 
@@ -208,6 +208,101 @@ test("TestGetBoardMakesOneRequestWhenThereIsOnePage", async () => {
   });
   await api.getBoard("p1");
   expect(calls).toBe(1);
+});
+
+// A number lookup stops at the page holding the task, but only once that page's
+// related pages are read: the task's other labels arrive there.
+test("TestFindTaskByNumberReadsTheRelatedPagesOfItsPage", async () => {
+  const queries: string[] = [];
+  newServer((req) => {
+    const url = new URL(req.url);
+    queries.push(url.search.replace(/^\?/, ""));
+    const related = url.searchParams.get("relatedPage") ?? "";
+    if (url.searchParams.has("page")) return new Response("page 2 is not wanted", { status: 500 });
+    const reply =
+      related === ""
+        ? boardPage(1, 2, 1, 2, columns([boardTask("t1", 1, [label("a")])]))
+        : boardPage(1, 2, 2, 2, columns([boardTask("t1", 1, [label("b")])]));
+    return new Response(reply, { headers: { "content-type": "application/json" } });
+  });
+
+  const t = (await api.findTaskByNumber("p1", 1)).task;
+  expect(queries.join("|")).toBe("|relatedPage=2");
+  expect(t!.labels!.map((l) => l.name)).toEqual(["a", "b"]);
+});
+
+// One task to a page. Each read is a list of pages, each page a task and the
+// total the server reports with it; reads past the last repeat it.
+const pagedBoard = (reads: { task: string; n: number; total: number }[][]) => {
+  let count = 0;
+  newServer((req) => {
+    const page = Number(new URL(req.url).searchParams.get("page") ?? "1");
+    if (page === 1) count++;
+    const read = reads[Math.min(count, reads.length) - 1]!;
+    const at = read[page - 1]!;
+    const body = JSON.parse(boardPage(page, read.length, 1, 1, columns([boardTask(at.task, at.n, [])])));
+    body.pagination.total = at.total;
+    return new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
+  });
+  return () => count;
+};
+
+// A miss on a board whose total moved under the read is read again: a delete
+// before the task pulls it back onto a page the read had already passed.
+test("TestFindTaskByNumberRereadsAMissOnABoardThatMoved", async () => {
+  // t0 is deleted after page 1 is read, so t1 moves onto page 1 and page 2
+  // holds t2: the first read never sees t1.
+  const reads = pagedBoard([
+    [
+      { task: "t0", n: 9, total: 3 },
+      { task: "t2", n: 2, total: 2 },
+    ],
+    [
+      { task: "t1", n: 1, total: 2 },
+      { task: "t2", n: 2, total: 2 },
+    ],
+  ]);
+
+  const t = (await api.findTaskByNumber("p1", 1)).task;
+  expect(reads()).toBe(2);
+  expect(t?.id).toBe("t1");
+});
+
+// A hit is answered as it is, even off a board that moved while it was read.
+test("TestFindTaskByNumberDoesNotRereadAHit", async () => {
+  const reads = pagedBoard([
+    [
+      { task: "t1", n: 1, total: 2 },
+      { task: "t2", n: 2, total: 3 },
+    ],
+  ]);
+
+  const t = (await api.findTaskByNumber("p1", 2)).task;
+  expect(reads()).toBe(1);
+  expect(t?.id).toBe("t2");
+});
+
+// A board that never settles is read three times at most, then the miss stands.
+test("TestFindTaskByNumberStopsRereadingAMovingBoard", async () => {
+  const reads = pagedBoard([
+    [
+      { task: "t1", n: 1, total: 2 },
+      { task: "t2", n: 2, total: 3 },
+    ],
+  ]);
+
+  const stderr = spyOn(console, "error").mockImplementation(() => {});
+  let lines: string[];
+  try {
+    expect((await api.findTaskByNumber("p1", 7)).task).toBeUndefined();
+    lines = stderr.mock.calls.map((c) => String(c[0]));
+  } finally {
+    stderr.mockRestore();
+  }
+  expect(reads()).toBe(3);
+  expect(lines).toEqual([
+    "kaneo: the board of project p1 changed while it was read; the listing may be incomplete",
+  ]);
 });
 
 // archivedAt is a timestamp string, and it is printed back as the server sent it.

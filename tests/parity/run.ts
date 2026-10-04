@@ -14,7 +14,19 @@ export type ScenarioResult = { steps: StepResult[]; requests: Recorded[]; files:
 // fake's port, the temp HOME, the machine's host name) are replaced with
 // placeholders.
 export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioResult> {
-  const fake = startFake({ ...SEED, ...s.seed }, { pageSize: s.pageSize, legacy: s.legacy, delayMs: s.delayMs, whitespaceOn: s.whitespaceOn });
+  // A scenario may add tasks to the seed rather than replace them, so the board
+  // the shared scenarios stand on does not move under them.
+  const layered = { ...SEED, ...s.seed };
+  const seed = s.extraTasks === undefined ? layered : { ...layered, tasks: [...layered.tasks, ...s.extraTasks] };
+  const fake = startFake(seed, {
+    pageSize: s.pageSize,
+    legacy: s.legacy,
+    delayMs: s.delayMs,
+    whitespaceOn: s.whitespaceOn,
+    growOnPage: s.growOnPage,
+    growTimes: s.growTimes,
+    ignoreFilters: s.ignoreFilters,
+  });
   const home = mkdtempSync(join(tmpdir(), "kaneo-parity-"));
   try {
     const cwd = join(home, "work");

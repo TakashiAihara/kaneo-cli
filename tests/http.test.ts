@@ -96,6 +96,27 @@ describe("requests", () => {
     await failure(kaneoFetch("/project", { method: "GET" }));
     expect(Date.now() - started).toBeLessThan(1500);
   });
+
+  // The budget bounds one request, and every request gets the whole of it, so a
+  // board that takes several pages is read at the pace of one that fits in a
+  // page. Zero or less is not the default and not no timeout either: it is a
+  // budget that has already run out, so every request under it fails at once.
+  test.each([
+    ["zero", 0],
+    ["negative", -1_000],
+  ])("fail every request at once when the timeout is %s", async (_name, timeoutMs) => {
+    let reached = 0;
+    const url = serve(() => {
+      reached++;
+      return Response.json([]);
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key", timeoutMs });
+    for (const attempt of [1, 2]) {
+      const e = (await failure(kaneoFetch("/project", { method: "GET" }))) as Error;
+      expect(e.message, `request ${attempt}`).toContain("context deadline exceeded");
+    }
+    expect(reached).toBe(0);
+  });
 });
 
 describe("the key over plain HTTP", () => {

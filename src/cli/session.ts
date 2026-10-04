@@ -1,4 +1,4 @@
-import { apiKey, debug, halfLeft, type App } from "./app";
+import { apiKey, debug, type App } from "./app";
 import { addComment, getProject, listWorkspaces, type Task } from "../api/kaneo";
 import { minimumArgs, noArgs, type RunContext } from "./args";
 import { failOpen, hard, strictFlag } from "./failopen";
@@ -45,14 +45,12 @@ export const sessionCommand = {
       run: failOpen(async ({ args, app }: RunContext<App>) => {
         const sessionId = requireSessionId();
         apiKey(app);
-        // From here on the lookups and the marker post share one budget, the way
-        // they shared one context.
         const task = await resolveTask(app, args[0]!);
 
         // Looked up before the marker is posted, so the lookups do not widen the
         // window where the server has a marker and this host has no record.
         const attachment = attachmentOf(task);
-        const slug = await describeBoard(app, task, attachment);
+        const slug = await describeBoard(task, attachment);
 
         const marker = store.describe(env, cwd(), RUNNING);
         marker.nextStep = args.slice(1).join(" ");
@@ -167,7 +165,7 @@ export const sessionCommand = {
         // record here, so it is looked up as attach does, with the same best
         // effort. After the marker: the lookups only fill the history line, and
         // spending the time budget on them first could time out the close itself.
-        if (!holds) await describeBoard(app, task!, closed);
+        if (!holds) await describeBoard(task!, closed);
         try {
           // History first: a failed append then leaves the attachment in place,
           // where the other order would drop it and leave the history ending in
@@ -243,11 +241,7 @@ const attachmentOf = (task: Task): Attachment => ({ taskId: task.id, number: tas
 // Best effort: failing the attach over a name a statusline wants would leave the
 // session unattached. A lookup that fails leaves its fields unset, which a reader
 // treats as absent.
-const describeBoard = async (app: App, task: Task, attachment: Attachment): Promise<string> => {
-  // The marker post that follows shares this budget. Slow lookups may spend only
-  // half of what is left, so they cannot starve it.
-  const signal = halfLeft(app);
-
+const describeBoard = async (task: Task, attachment: Attachment): Promise<string> => {
   // Never filled from the cwd's project: that is the wrong answer this field
   // exists to avoid, so an unknown project stays unknown.
   attachment.projectId = task.projectId;
@@ -257,7 +251,7 @@ const describeBoard = async (app: App, task: Task, attachment: Attachment): Prom
   }
   let project;
   try {
-    project = await getProject(attachment.projectId, signal);
+    project = await getProject(attachment.projectId);
   } catch (e) {
     debug(`attach: project ${attachment.projectId} lookup failed: ${(e as Error).message}`);
     return "";
@@ -271,7 +265,7 @@ const describeBoard = async (app: App, task: Task, attachment: Attachment): Prom
 
   let workspaces;
   try {
-    workspaces = await listWorkspaces(signal);
+    workspaces = await listWorkspaces();
   } catch (e) {
     debug(`attach: workspace lookup failed: ${(e as Error).message}`);
     return project.slug;

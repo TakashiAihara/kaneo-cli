@@ -164,6 +164,13 @@ kaneo comment add <task> <text...>
 kaneo comment edit <task> <comment-id> <text...>   # only the author may edit
 kaneo activity ls <task>                            # history: comments and events such as status changes
 kaneo activity add <task> <type> [message...] [--data '{"k":"v"}']   # a history entry only; cannot be removed on its own; Kaneo 2.23.0+
+kaneo label ls [task]                # the workspace's labels, or those on a task
+kaneo label get <label>
+kaneo label create <name> [--color COLOR]
+kaneo label attach <task> <label>    # a label by name or id
+kaneo label detach <task> <label>
+kaneo label update <label> [--name NAME] [--color COLOR]   # tasks carrying it follow
+kaneo label rm <label> --yes         # also removes it from every task
 ```
 
 A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds.

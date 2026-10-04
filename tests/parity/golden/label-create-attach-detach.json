@@ -1,0 +1,346 @@
+{
+  "steps": [
+    {
+      "args": [
+        "label",
+        "create",
+        "bug",
+        "--color",
+        "red",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"lbl0002\",\n  \"name\": \"bug\",\n  \"color\": \"red\",\n  \"taskId\": null,\n  \"workspaceId\": \"ws-main\",\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:10.000Z\",\n  \"deletionStartedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "create",
+        "needs",
+        "review",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created lbl0003  needs review  (gray)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "create",
+        "bug",
+        "--color",
+        "green",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"lbl0002\",\n  \"name\": \"bug\",\n  \"color\": \"red\",\n  \"taskId\": null,\n  \"workspaceId\": \"ws-main\",\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:10.000Z\",\n  \"deletionStartedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "create",
+        "bug",
+        "--color",
+        "green",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "exists lbl0002  bug  (red); use `kaneo label update` to change it\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "lbl0002  bug  (red)\nlbl0003  needs review  (gray)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "attach",
+        "1",
+        "bug",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "labeled #1 bug\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "attach",
+        "2",
+        "needs review",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"lbl0005\",\n  \"name\": \"needs review\",\n  \"color\": \"gray\",\n  \"taskId\": \"task-a2\",\n  \"workspaceId\": \"ws-main\",\n  \"createdAt\": \"2026-01-01T00:00:13.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:13.000Z\",\n  \"deletionStartedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "attach",
+        "1",
+        "nope",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: no label \"nope\" in this workspace; see `kaneo label list`\n"
+    },
+    {
+      "args": [
+        "label",
+        "ls",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"lbl0004\",\n    \"name\": \"bug\",\n    \"color\": \"red\",\n    \"taskId\": \"task-a1\",\n    \"workspaceId\": \"ws-main\",\n    \"createdAt\": \"2026-01-01T00:00:12.000Z\",\n    \"updatedAt\": \"2026-01-01T00:00:12.000Z\",\n    \"deletionStartedAt\": null\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"description\": \"multi\\nline\",\n    \"status\": \"to-do\",\n    \"priority\": \"high\",\n    \"position\": 0,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n    \"labels\": [\n      {\n        \"id\": \"lbl0004\",\n        \"name\": \"bug\",\n        \"color\": \"red\"\n      }\n    ]\n  },\n  {\n    \"id\": \"task-a2\",\n    \"number\": 2,\n    \"title\": \"Ship it\",\n    \"description\": \"\",\n    \"status\": \"in-progress\",\n    \"priority\": \"no-priority\",\n    \"position\": 1,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": \"user-1\",\n    \"assigneeName\": \"Ada\",\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n    \"labels\": [\n      {\n        \"id\": \"lbl0005\",\n        \"name\": \"needs review\",\n        \"color\": \"gray\"\n      }\n    ]\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "detach",
+        "1",
+        "bug",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "unlabeled #1 bug\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "detach",
+        "1",
+        "bug",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no label \\\"bug\\\" on #1; see `kaneo label list 1`\"\n}\n",
+      "stderr": "Error: no label \"bug\" on #1; see `kaneo label list 1`\n"
+    },
+    {
+      "args": [
+        "label",
+        "ls",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"lbl0002\",\n    \"name\": \"bug\",\n    \"color\": \"red\",\n    \"taskId\": null,\n    \"workspaceId\": \"ws-main\",\n    \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n    \"updatedAt\": \"2026-01-01T00:00:10.000Z\",\n    \"deletionStartedAt\": null\n  },\n  {\n    \"id\": \"lbl0003\",\n    \"name\": \"needs review\",\n    \"color\": \"gray\",\n    \"taskId\": null,\n    \"workspaceId\": \"ws-main\",\n    \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n    \"updatedAt\": \"2026-01-01T00:00:11.000Z\",\n    \"deletionStartedAt\": null\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/label",
+      "query": "",
+      "body": {
+        "name": "bug",
+        "color": "red",
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/label",
+      "query": "",
+      "body": {
+        "name": "needs review",
+        "color": "gray",
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/label",
+      "query": "",
+      "body": {
+        "name": "bug",
+        "color": "green",
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/label",
+      "query": "",
+      "body": {
+        "name": "bug",
+        "color": "green",
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/label/lbl0002/task",
+      "query": "",
+      "body": {
+        "taskId": "task-a1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/label/lbl0003/task",
+      "query": "",
+      "body": {
+        "taskId": "task-a2"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/label/lbl0004/task",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

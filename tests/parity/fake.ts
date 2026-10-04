@@ -172,6 +172,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   });
 
   const relations: z.input<typeof M.TaskRelation>[] = [];
+  // One table for both kinds, as the server keeps them: a workspace label has
+  // taskId null, and attaching inserts a copy carrying the task's id.
+  const labels: z.input<typeof M.Label>[] = [];
+  const addLabel = (name: string, color: string, workspaceId: string, taskId: string | null) => {
+    const at = now();
+    const l = { id: id("lbl"), name, color, createdAt: at, updatedAt: at, deletionStartedAt: null, taskId, workspaceId };
+    labels.push(l);
+    return l;
+  };
   const requests: Recorded[] = [];
 
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
@@ -200,7 +209,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     assigneeImage: null,
     projectId: t.projectId,
     subtaskCounts: { completed: 0, total: 0 },
-    labels: [],
+    labels: labels.filter((l) => l.taskId === t.id).map((l) => ({ id: l.id, name: l.name, color: l.color })),
     externalLinks: [],
   });
   const related = (t: (typeof tasks)[number] | undefined) =>
@@ -245,6 +254,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/comment\/[^/]+$/, M.CreateTaskCommentBody],
       ["PUT", /^\/comment\/[^/]+$/, M.UpdateTaskCommentBody],
       ["POST", /^\/activity\/create$/, M.CreateActivityBody],
+      ["POST", /^\/label$/, M.CreateLabelBody],
+      ["PUT", /^\/label\/[^/]+$/, M.UpdateLabelBody],
+      ["PUT", /^\/label\/[^/]+\/task$/, M.AttachLabelToTaskBody],
     ];
     for (const [method, re, schema] of BODIES) {
       if (req.method !== method || !re.test(path)) continue;
@@ -469,6 +481,56 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         const i = relations.findIndex((r) => r.id === key);
         if (i < 0) return fail(404, "Relation not found");
         return ok(M.TaskRelation, relations.splice(i, 1)[0]!);
+      }
+    }
+
+    const workspaceOf = (taskId: string) => projects.find((x) => x.id === tasks.find((t) => t.id === taskId)?.projectId)?.workspaceId;
+    if (req.method === "GET" && (p = m(/^\/label\/workspace\/([^/]+)$/))) {
+      return ok(z.array(M.Label), labels.filter((l) => l.workspaceId === decodeURIComponent(p![1])));
+    }
+    if (req.method === "GET" && (p = m(/^\/label\/task\/([^/]+)$/))) {
+      return ok(z.array(M.Label), labels.filter((l) => l.taskId === decodeURIComponent(p![1])));
+    }
+    if (req.method === "POST" && path === "/label") {
+      const b = body as any;
+      // An existing name answers with the label it names, as the server's
+      // insert-or-nothing does.
+      const have = labels.find((l) => l.workspaceId === b.workspaceId && l.name === b.name && l.taskId === null);
+      return ok(M.Label, have ?? addLabel(b.name, b.color, b.workspaceId, null));
+    }
+    if ((p = m(/^\/label\/([^/]+)(\/task)?$/))) {
+      const l = labels.find((x) => x.id === decodeURIComponent(p![1]));
+      // The server's workspace check runs first and cannot place an unknown id.
+      if (!l) return fail(400, "Workspace ID could not be determined");
+      if (req.method === "GET" && !p[2]) return ok(M.Label, l);
+      if (req.method === "PUT" && !p[2]) {
+        const b = body as any;
+        // A workspace label carries the change to its copies.
+        if (l.taskId === null) for (const c of labels) if (c.taskId !== null && c.workspaceId === l.workspaceId && c.name === l.name) Object.assign(c, { name: b.name, color: b.color });
+        return ok(M.Label, Object.assign(l, { name: b.name, color: b.color, updatedAt: now() }));
+      }
+      if (req.method === "DELETE" && !p[2]) {
+        // The server removes copies 25 at a time and answers 202 until none
+        // are left; one at a time here, so two copies go through the repeat.
+        const copies = l.taskId === null ? labels.filter((c) => c.taskId !== null && c.workspaceId === l.workspaceId && c.name === l.name) : [];
+        if (copies.length > 0) {
+          labels.splice(labels.indexOf(copies[0]!), 1);
+          if (copies.length > 1) return ok(M.PendingLabelDeletion, { ...l, pendingDeletion: true }, 202);
+        }
+        return ok(M.Label, labels.splice(labels.indexOf(l), 1)[0]!);
+      }
+      if (req.method === "PUT" && p[2]) {
+        const taskId = (body as any).taskId;
+        if (workspaceOf(taskId) === undefined) return fail(404, "Task not found");
+        if (workspaceOf(taskId) !== l.workspaceId) return fail(400, "Label and task must belong to the same workspace");
+        if (l.taskId === taskId) return ok(M.Label, l);
+        if (l.taskId !== null) labels.splice(labels.indexOf(l), 1);
+        const have = labels.find((c) => c.taskId === taskId && c.name === l.name);
+        return ok(M.Label, have ?? addLabel(l.name, l.color, l.workspaceId!, taskId));
+      }
+      if (req.method === "DELETE" && p[2]) {
+        if (l.taskId === null) return fail(400, "Label is not assigned to a task");
+        return ok(M.Label, labels.splice(labels.indexOf(l), 1)[0]!);
       }
     }
 

@@ -46,7 +46,10 @@ One entry of a task's history (`GET /activity/{taskId}`): a comment, or an event
 
 ### label
 
-A tag, scoped to a workspace rather than a project.
+A tag, scoped to a workspace rather than a project. The server keeps two kinds of row in one `label` table, and the CLI's words for them are:
+
+- workspace label: `taskId` null. What the web app offers to pick from, and what `kaneo label ls` lists.
+- task copy: a row with the same name and its own id, inserted on a task when the label is attached and deleted when it is detached. Renaming or deleting the workspace label carries over to its copies; a deletion takes the copies that existed when it started, so one attached while it is still running stays. `kaneo label detach` and `DELETE /label/{id}/task` take the copy's id, not the workspace label's.
 
 ### relation
 

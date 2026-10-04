@@ -196,8 +196,8 @@ const preferencesCommand = {
         "topic cannot be cleared. A token or secret given as a flag is visible in the\n" +
         "process list.\n\n" +
         "The server carries a channel switch into the active workspace rules that have\n" +
-        "a channel on: a channel turned off is turned off there, and one turned on is\n" +
-        "turned on there. Inactive rules keep their channels.",
+        "a channel on: a channel turned off is turned off there, and one turned on from\n" +
+        "off is turned on there. Inactive rules keep their channels.",
       args: noArgs("kaneo notification preferences set"),
       flags: [
         ...SWITCHES.map(([flag, , usage]) => boolFlag(flag, usage)),
@@ -231,8 +231,9 @@ const preferencesCommand = {
             "A workspace without a rule is sent nothing outside the app, so setting one turns\n" +
             "delivery on for it: the new rule is active and starts from the channels that can\n" +
             "deliver globally, which may be none. A channel must be on and set up globally to\n" +
-            "be turned on here, and one that no longer is is dropped from the rule. A rule with\n" +
-            "no channel on is not reached when a channel is later turned on globally.\n" +
+            "be turned on here, and a channel that can no longer deliver is dropped from the\n" +
+            "rule. A rule with no channel on is not reached when a channel is later turned on\n" +
+            "globally.\n" +
             "--projects takes comma-separated project ids; an empty value means every project.",
           args: exactArgs(1),
           flags: [
@@ -349,7 +350,8 @@ export const notificationCommand = {
         "turned off in your preferences, or when the task or workspace it points at is\n" +
         "not one you can reach; that is reported, and is not a failure. One that points\n" +
         "at a task or workspace is also delivered through the channels its workspace\n" +
-        "rule has on, when that rule is active and covers the project.",
+        "rule has on, when that rule is active and covers the project; a rule limited to\n" +
+        "some projects is never sent one that points at a workspace.",
       args: minimumArgs(1),
       flags: [
         { name: "type", type: "string" as const, usage: "notification type", defaultValue: "info" },

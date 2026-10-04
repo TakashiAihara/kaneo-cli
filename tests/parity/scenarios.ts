@@ -84,8 +84,27 @@ export const SCENARIOS: Scenario[] = [
   ...both("project get", ["project", "get", P1]),
   ...both("project get from env", ["project", "get"]),
   { name: "project create", steps: [["project", "create", "Gamma", "--slug", "GAM", "-d", "third", "--json"], ["project", "ls", "--human"]] },
+  { name: "project create derives the slug", steps: [["project", "create", "Gamma Ray!", "--human"]] },
+  { name: "project create keeps the description", steps: [["project", "create", "Delta", "--slug", "DEL", "-d", "fourth", "--json"], ["project", "get", "proj0002", "--human"]] },
+  {
+    // The project is made before the description fails, so the error has to
+    // name it and say how to finish.
+    name: "project create whose description cannot be set",
+    whitespaceOn: "^GET /project/",
+    steps: [["project", "create", "Epsilon", "-d", "fifth", "--json"]],
+  },
+  { name: "project create with a derived slug already taken", steps: [["project", "create", "Alphabet", "--json"], ["project", "create", "Old Lake Docs", "--json"], ["project", "create", "Alphabet", "--slug", "ALP2", "--json"]] },
+
+  { name: "project create with an underivable slug", steps: [["project", "create", "!!!", "--json"]] },
   { name: "project update", steps: [["project", "update", P1, "--name", "Alpha 2", "--slug", "AL2", "--json"], ["project", "get", P1, "--human"]] },
   { name: "project update clears description", steps: [["project", "update", P1, "-d", "", "--json"]] },
+  {
+    // The server takes an empty slug, and refusing to write such a project left
+    // no way to rename it.
+    name: "project update with an empty slug",
+    seed: { projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }] },
+    steps: [["project", "update", "proj-noslug", "--name", "Has a name now", "--json"]],
+  },
   { name: "project archive and unarchive", steps: [["project", "archive", P2, "--json"], ["project", "ls", "--human"], ["project", "unarchive", P2, "--human"], ["project", "ls", "--json"]] },
 
   ...both("column list", ["column", "list"]),

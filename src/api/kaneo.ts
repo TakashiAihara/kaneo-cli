@@ -265,10 +265,10 @@ const project = (item: ProjectFields): Project => ({
 export const getProject = async (projectId: string, signal?: AbortSignal): Promise<Project> =>
   project(zeroRecord(await readProject(pathParam(projectId), { ...(signal === undefined ? {} : { signal }) })));
 
-// The payload for creating a project. description is not sent: the server's
-// create route takes no description, so it is only here to be set by an update
-// afterwards.
-export type NewProject = { name: string; workspaceId: string; icon: string; slug: string; description: string };
+// The payload for creating a project. The server's create route carries no
+// description at all, so none is sent: a description a caller asked for is
+// written by an update afterwards.
+export type NewProject = { name: string; workspaceId: string; icon: string; slug: string };
 
 // Creates a project in a workspace. The server requires an icon, so one is
 // supplied when the caller has none.
@@ -331,11 +331,13 @@ export const updateProject = async (
   }
 
   const before = await getProject(projectId);
-  // Every field of this read is written back, so a read that decoded to an empty
-  // project (a null reply, a different shape) would blank the project.
-  if (before.id !== projectId || before.name === "" || before.slug === "") {
+  // Every field of this read is written back, so a read that decoded to nothing
+  // (a null reply, a different shape) would blank the project. An empty slug is
+  // not that: it is a state a project can be in, and writing it back is the only
+  // way such a project can be changed at all.
+  if (before.id !== projectId || before.name === "") {
     throw new Error(
-      `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}, slug ${JSON.stringify(before.slug)}; not writing`,
+      `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}; not writing`,
     );
   }
 

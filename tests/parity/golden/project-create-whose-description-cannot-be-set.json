@@ -1,0 +1,46 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "create",
+        "Epsilon",
+        "-d",
+        "fifth",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"created project proj0002 but could not set its description: GET /api/project/proj0002: error decoding response: status=200, content-type=application/json, content-length=3, target-type=GetProjectResponse: unexpected end of JSON input; set it with `kaneo project update proj0002 -d TEXT`\"\n}\n",
+      "stderr": "Error: created project proj0002 but could not set its description: GET /api/project/proj0002: error decoding response: status=200, content-type=application/json, content-length=3, target-type=GetProjectResponse: unexpected end of JSON input; set it with `kaneo project update proj0002 -d TEXT`\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Epsilon",
+        "workspaceId": "ws-main",
+        "icon": "Layers",
+        "slug": "EPS"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj0002",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

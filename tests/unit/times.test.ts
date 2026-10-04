@@ -70,6 +70,12 @@ describe("a createdAt in a reply", () => {
     ["2026-02-29T00:00:00Z", "29 February in a year that is not a leap year"],
     ["2100-02-29T00:00:00Z", "29 February in a century that is not a leap year"],
     ["2026-09-30T24:00:00Z", "an hour past 23"],
+    ["2026-09-30T00:60:00Z", "a minute past 59, which Date.parse refuses on its own"],
+    ["2026-09-30T00:00:60Z", "a second past 59, which Date.parse refuses on its own"],
+    ["2026-09-00T00:00:00Z", "day 00, which Date.parse refuses on its own"],
+    ["2026-09-30T00:00:00+24:00", "an offset of 24 hours, which Go took and this does not"],
+    ["2026-09-30T00:00:00,5Z", "a comma before the fraction, which Go took and this does not"],
+    ["2026-09-30T0:00:00Z", "a one-digit hour, which Go took and this does not"],
     [2026, "a number"],
   ])("that is %p (%s) fails the read, naming the field", async (createdAt) => {
     answers(taskReply({ createdAt }));
@@ -84,6 +90,13 @@ describe("a createdAt in a reply", () => {
   ])("that is %p, which Go reads, reads as %p", async (createdAt, want) => {
     answers(taskReply({ createdAt }));
     expect((await api.getTask("t1")).createdAt).toBe(want);
+  });
+
+  test("is cut between characters, not inside one", async () => {
+    const smile = String.fromCodePoint(0x1f600);
+    answers(taskReply({ createdAt: "x".repeat(198) + smile.repeat(5) }));
+    const e = (await failure(api.getTask("t1"))) as Error;
+    expect(e.message).toBe(`createdAt "${"x".repeat(198)}${smile}... is not a timestamp`);
   });
 
   test("that is longer than a message should carry is cut", async () => {

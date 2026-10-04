@@ -157,8 +157,10 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
     clearTimeout(deadline);
 
     // Decided on the turn that saw the hook exit, with nothing awaited since, so a
-    // signal is reported as the hook's killer only if its handler ran while the
-    // hook was running. One whose handler runs later is still re-sent below.
+    // signal is reported as the hook's killer only if its handler ran before that
+    // turn. A signal the hook sends just before it exits can land on either side
+    // (about 1 run in 3 reported as killed, 40 runs), which is accepted: either way
+    // it is re-sent below.
     const failure = failureOf(hook, killed);
     if (failure !== undefined) reportHookFailure(event, env, failure, tailOf(log));
   } finally {
@@ -169,13 +171,13 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
     // is not a reason to fail the command, nor to skip re-sending a caught signal.
     try {
       if (output !== undefined) closeSync(output);
-    } catch {
-      // Nothing to do about a descriptor that cannot be closed.
+    } catch (e) {
+      debug(`hook capture: ${(e as Error).message}`);
     }
     try {
       if (captured !== undefined) rmSync(captured, { recursive: true, force: true });
-    } catch {
-      // The temp dir is left for whoever cleans it.
+    } catch (e) {
+      debug(`hook capture: ${(e as Error).message}`);
     }
 
     // The one wait, and the one the report makes necessary: hooks.log is appended
@@ -185,8 +187,9 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
     await nextTurn();
 
     // A signal arriving between that turn and the handlers coming off is queued
-    // for handlers that are gone and is lost; the Go build had no such instant,
-    // and the difference is accepted as too narrow to have been seen.
+    // for handlers that are gone and is lost, so kaneo exits as if it had none.
+    // The Go build had no such instant; the difference is accepted as one that
+    // has not been reproduced.
     raise(caught);
     // Delivery is asynchronous, and without the wait kaneo could print its
     // success line before it dies.

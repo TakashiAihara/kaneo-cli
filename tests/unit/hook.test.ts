@@ -244,12 +244,13 @@ describe("hooks", () => {
 // which got both right by installing its signal handling before starting the
 // hook and keeping it until the very end.
 describe("signals around the hook's lifetime", () => {
-  const kaneoWith = (env: Record<string, string>, ...args: string[]) =>
+  const kaneoWith = (env: Record<string, string>, ...args: string[]) => kaneoTo("pipe" as const, env, ...args);
+  const kaneoTo = <E extends "pipe" | number>(stderr: E, env: Record<string, string>, ...args: string[]) =>
     Bun.spawn(["bun", INDEX, ...args], {
       cwd: home,
       stdin: "ignore",
       stdout: "pipe",
-      stderr: "pipe",
+      stderr,
       env: { PATH: process.env.PATH ?? "", HOME: home, XDG_CONFIG_HOME: config, CLAUDE_CODE_SESSION_ID: "s1", NO_COLOR: "1", ...env },
     });
 
@@ -296,15 +297,17 @@ describe("signals around the hook's lifetime", () => {
       const drain = Bun.spawn(["timeout", "10", "cat", fifo], { stdout: "ignore", stderr: "ignore" });
       await Promise.race([p.exited, Bun.sleep(10_000)]);
       await drain.exited;
-      expect({ run, signal: p.signalCode, exit: p.exitCode }).toEqual({ run, signal: "SIGTERM", exit: null });
+      const ended = { run, signal: p.signalCode, exit: p.exitCode };
+      // A kaneo stuck on the FIFO would outlive the test and its home.
+      if (p.exitCode === null && p.signalCode === null) p.kill("SIGKILL");
+      expect(ended).toEqual({ run, signal: "SIGTERM", exit: null });
     }
   }, 60_000);
 
-  // Only a signal handled while the hook runs is the hook's killer. One that
-  // arrives after it exited, here while the failure is held on the FIFO, must
-  // neither relabel the failure nor kill the group: the hook ended on its own,
-  // and what it left in its group is no longer kaneo's to kill.
-  test("a signal after the hook exited is not reported as its killer and kills nothing", async () => {
+  // A signal that arrives after the hook exited, here while the failure is held
+  // on the FIFO, must not kill the group: the hook ended on its own, and what it
+  // left in its group is no longer kaneo's to kill.
+  test("a signal after the hook exited kills nothing", async () => {
     writeConfig({ attach: `(sleep ${sleepArg("29.2")}) & exit 3` });
     const fifo = join(config, "kaneo", "hooks.log");
     expect(Bun.spawnSync(["mkfifo", fifo]).exitCode).toBe(0);
@@ -322,24 +325,20 @@ describe("signals around the hook's lifetime", () => {
     const drain = Bun.spawn(["timeout", "10", "cat", fifo], { stdout: "pipe", stderr: "ignore" });
     const logged = await new Response(drain.stdout).text();
     await Promise.race([p.exited, Bun.sleep(10_000)]);
+    if (p.exitCode === null && p.signalCode === null) p.kill("SIGKILL");
     expect(p.signalCode).toBe("SIGTERM");
     expect(logged).toContain("attach hook failed: exit status 3");
     expect(sleepersLeft().filter((s) => s.arg === sleepArg("29.2")), "the group was killed after the hook exited").toHaveLength(1);
   }, 30_000);
 
   // hooks.log is where a failure goes when stderr is lost, so a stderr that
-  // cannot be written to must not keep the failure from it.
-  test("a failure is logged when stderr cannot be written to", async () => {
+  // cannot be written to must neither fail the command nor keep the failure
+  // from the log. /dev/full is Linux's always-full device.
+  test.skipIf(!existsSync("/dev/full"))("a failure is logged when stderr cannot be written to", async () => {
     writeConfig({ attach: "exit 3" });
     const full = openSync("/dev/full", "w");
     try {
-      const p = Bun.spawn(["bun", INDEX, "session", "attach", "1", "--strict"], {
-        cwd: home,
-        stdin: "ignore",
-        stdout: "ignore",
-        stderr: full,
-        env: { PATH: process.env.PATH ?? "", HOME: home, XDG_CONFIG_HOME: config, CLAUDE_CODE_SESSION_ID: "s1", NO_COLOR: "1" },
-      });
+      const p = kaneoTo(full, {}, "session", "attach", "1", "--strict");
       expect(await p.exited).toBe(0);
     } finally {
       closeSync(full);

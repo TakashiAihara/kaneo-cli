@@ -30,8 +30,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/project/p/q: 404: Project not found: no project has the id, slug or name \\\"p/q\\\" (kaneo project find \\u003ctext\\u003e searches by name)\"\n}\n",
-      "stderr": "Error: GET /api/project/p/q: 404: Project not found: no project has the id, slug or name \"p/q\" (kaneo project find <text> searches by name)\n"
+      "stdout": "{\n  \"error\": \"GET /api/project/p/q: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"p/q\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/project/p/q: 400: Workspace ID could not be determined: no project has the id, slug or name \"p/q\" (kaneo project find <text> searches names and slugs)\n"
     }
   ],
   "requests": [

@@ -2,33 +2,35 @@
   "steps": [
     {
       "args": [
-        "task",
-        "get",
-        "BET#1",
+        "project",
+        "unarchive",
+        "OLD",
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"task-b1\",\n  \"number\": 1,\n  \"title\": \"Beta first\",\n  \"description\": \"\",\n  \"status\": \"to-do\",\n  \"priority\": \"urgent\",\n  \"position\": 0,\n  \"projectId\": \"proj-beta\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:07.000Z\",\n  \"labels\": []\n}\n",
+      "stdout": "{\n  \"archived\": false,\n  \"project\": \"proj-old\"\n}\n",
       "stderr": ""
     },
     {
       "args": [
-        "comment",
-        "add",
-        "ALP#2",
-        "hi",
-        "--human"
+        "task",
+        "move",
+        "1",
+        "--to",
+        "Beta",
+        "--json"
       ],
       "exit": 0,
-      "stdout": "commented on #2\n",
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"projectId\": \"proj-beta\"\n}\n",
       "stderr": ""
     }
   ],
   "requests": [
     {
-      "method": "GET",
-      "path": "/task/tasks/BET",
-      "query": ""
+      "method": "PUT",
+      "path": "/project/OLD/unarchive",
+      "query": "",
+      "body": null
     },
     {
       "method": "GET",
@@ -46,29 +48,10 @@
       "query": "?includeArchived=true&workspaceId=ws-other"
     },
     {
-      "method": "GET",
-      "path": "/task/tasks/proj-beta",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/task/tasks/ALP",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/auth/organization/list",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-main"
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-other"
+      "method": "PUT",
+      "path": "/project/proj-old/unarchive",
+      "query": "",
+      "body": null
     },
     {
       "method": "GET",
@@ -76,11 +59,34 @@
       "query": ""
     },
     {
-      "method": "POST",
-      "path": "/comment/task-a2",
+      "method": "PUT",
+      "path": "/task/move/task-a1",
       "query": "",
       "body": {
-        "content": "hi"
+        "destinationProjectId": "Beta"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-a1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "proj-beta"
       }
     }
   ],

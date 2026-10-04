@@ -77,7 +77,9 @@ Not every layer answers every setting:
 
 ### Ids, slugs and names
 
-`--project` and `--workspace` take an id, a slug or a name. The value is used as an id first, so the ordinary path costs no extra request; only when the server says it does not know the value is it looked up, across every workspace the key can reach. A slug or a name matching exactly one project is used, several matches are all listed so the id can pick one, and no match is reported against the server's own error.
+`--project`, `--workspace` and `task move --to` take an id, a slug or a name, matched in that order, exact case before ignoring it. A slug or a name matching exactly one is used; several matches are all listed so the id can pick one.
+
+A project is sent as an id first, so an id costs no extra request; only when the server says it does not know the value is it looked up across every workspace the key can reach (one listing per workspace), which a slug kept in `.kaneo.json` or the repo map pays on every command. A workspace is matched against `workspace ls` before it is sent — one request — because an instance admin's key gets an empty project list, not an error, for a workspace that does not exist.
 
 That is what lets the two forms people actually type work: a slug is the prefix of every task reference, and `workspace ls` prints names next to their ids.
 
@@ -152,7 +154,7 @@ kaneo task status <task-id> <status>
 
 A status is a column id. The defaults are `to-do`, `in-progress`, `in-review` and `done`.
 
-Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project-slug>#<number>` names a board and a number on it, which is the form a task reference is written in everywhere else — `kaneo-cli#3` — so a reference copied out of a session or a hook works unchanged.
+Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project>#<number>` names a board and a number on it: `kaneo task get kaneo-cli#3` reads the reference written as `kaneo kaneo-cli#3`, which is also what `KANEO_TASK_REF` holds after its `kaneo ` prefix. The project before the `#` is an id, slug or name.
 
 ### Shell completion
 

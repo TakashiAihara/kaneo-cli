@@ -2,31 +2,20 @@ import { KaneoApiError } from "../api/http";
 import { listProjectsIn, listWorkspaces, type Project, type Workspace } from "../api/kaneo";
 import type { App } from "./app";
 
-// Turning a value somebody typed into the id the API takes.
-//
-// A project and a workspace are written down as ids everywhere this CLI reads
-// them, so an id is tried first and the ordinary path costs no extra request.
-// Only when the server says it does not know the value is it looked up across
-// the workspaces the key can see. That is what lets a slug or a name work
-// wherever an id does, and a slug is what people and agents type: it is the
+// Turning a value somebody typed into the id the API takes, so a slug or a name
+// works wherever an id does. A slug is what people and agents type: it is the
 // prefix of every task reference, as in `kaneo-cli#3`.
 
-// A project with the workspace it lives in. Ids are unique inside a workspace
-// but not across them, so anything that reports a project more than once — a
-// listing across workspaces, an ambiguity, a lookup error — has to say which.
+// A project with the workspace it lives in. Ids are unique across the server, but
+// slugs and names are not — not even inside one workspace — so anything that
+// reports a project found by one of those, or lists more than one workspace, has
+// to say which workspace it is in.
 export type ProjectIn = { project: Project; workspaceName: string };
 
-// Every project the key can reach, each with the workspace it is in.
-//
-// This is the widest request sequence in the CLI — one listing per workspace the
-// key can see — so it takes the command's own deadline rather than leaving each
-// request to be cut short on its own: a lookup that ran out of budget half way
-// through would answer with a project missing from the list, which reads as
-// "there is no such project".
-//
-// Archived projects are left out unless asked for, which is the view every
-// listing takes, and `project find` asks for them because one that has been
-// archived is a project somebody still has to be able to find.
+// Every project the key can reach, each with the workspace it is in: one listing
+// per workspace. Archived projects are left out unless asked for, which is the
+// view every listing takes; a lookup asks for them, since an archived project is
+// one somebody still has to be able to name to unarchive it.
 export const allProjects = async (app: App, includeArchived: boolean): Promise<ProjectIn[]> => {
   const found: ProjectIn[] = [];
   for (const workspace of await listWorkspaces(app.deadline)) {
@@ -37,62 +26,64 @@ export const allProjects = async (app: App, includeArchived: boolean): Promise<P
   return found;
 };
 
-// Runs an operation against the project a value names, resolving it first if the
-// server turns out not to know it.
+// Values already turned into an id in this run, so a command that names the same
+// project twice (`board` reads the project, then its board) looks it up once.
+const resolved = new Map<string, string>();
+
+// Runs an operation against the project a value names, looking the value up only
+// if the server does not know it as an id. The ordinary path, an id, costs no
+// extra request.
 //
-// Only the first request of the operation can be the one retried, because the
-// retry happens when that request fails and the rest of the operation has not
-// run yet — so a write that already landed is never sent twice. `op` therefore
-// takes the id rather than the value: whatever it requests first has to be the
-// request that carries it.
+// The retry is safe because the server refuses an unknown project before it
+// writes anything: every op here either reads first or is a single request whose
+// project the server checks before acting on it.
 export const withProject = async <T>(app: App, value: string, op: (id: string) => Promise<T>): Promise<T> => {
+  const known = resolved.get(value);
+  if (known !== undefined) return op(known);
   try {
-    return await op(value);
+    const result = await op(value);
+    resolved.set(value, value);
+    return result;
   } catch (e) {
     if (!unknownProject(e)) throw e;
-    const found = projectsNamed(await allProjects(app, true), value);
-    if (found.length === 0) throw new Error(`${(e as Error).message}: ${noProject(value)}`);
+    const found = projectsNamed(await lookingUp(e, () => allProjects(app, true)), value);
+    if (found.length === 0) throw new Error(`${e.message}: ${noProject(value)}`);
     if (found.length > 1) throw new Error(severalProjects(value, found));
     const only = found[0]!.project;
     // The value already was this project's id and the request failed anyway, so
-    // there is nothing to retry with and the server's own message is the report.
+    // the server's own answer is the report.
     if (only.id === value) throw e;
+    resolved.set(value, only.id);
     return op(only.id);
   }
 };
 
-// The same for a workspace.
-export const withWorkspace = async <T>(
-  app: App,
-  value: string,
-  op: (id: string) => Promise<T>,
-): Promise<T> => {
-  try {
-    return await op(value);
-  } catch (e) {
-    if (!unknownWorkspace(e)) throw e;
-    const found = workspacesNamed(await listWorkspaces(app.deadline), value);
-    if (found.length === 0) throw new Error(`${(e as Error).message}: ${noWorkspace(value)}`);
-    if (found.length > 1) throw new Error(severalWorkspaces(value, found));
-    const only = found[0]!;
-    if (only.id === value) throw e;
-    return op(only.id);
-  }
-};
-
-// The project a value names, looked up rather than tried as an id.
+// The workspace a value names, matched against the listing before anything is
+// sent with it.
 //
-// A task reference of the form `<slug>#<number>` comes through here: the
-// reference names the project itself, so there is no id-shaped value to try
-// first and the lookup is how the reference is read, not a retry of a failure.
-export const resolveProject = async (app: App, value: string): Promise<ProjectIn> => {
-  const found = projectsNamed(await allProjects(app, true), value);
-  if (found.length === 0) throw new Error(noProject(value));
-  if (found.length > 1) throw new Error(severalProjects(value, found));
-  return found[0]!;
+// A workspace cannot be tried as an id first the way a project is: the project
+// listing answers 403 for one the key cannot reach, but an instance admin's key
+// passes that check and gets 200 with an empty list, which would print as a
+// workspace with no projects in it. The listing costs one small request.
+export const resolveWorkspace = async (app: App, value: string): Promise<string> => {
+  const found = workspacesNamed(await listWorkspaces(app.deadline), value);
+  if (found.length === 0) throw new Error(noWorkspace(value));
+  if (found.length > 1) throw new Error(severalWorkspaces(value, found));
+  return found[0]!.id;
 };
 
-// The complaint the server makes when a value names no project it can place. It
+// A failure inside the lookup is reported next to the answer that started it,
+// rather than in its place: the server's answer is the part that says which
+// request failed.
+const lookingUp = async <T>(cause: KaneoApiError, lookup: () => Promise<T>): Promise<T> => {
+  try {
+    return await lookup();
+  } catch (e) {
+    throw new Error(`${cause.message}; looking it up failed: ${(e as Error).message}`);
+  }
+};
+
+// The complaint the server makes when a path names no project it can place. It
 // is the server's own wording, and docs/glossary.md already records it as the
 // answer to a value sent where an id was expected.
 const NO_PLACE = "Workspace ID could not be determined";
@@ -100,53 +91,44 @@ const NO_PLACE = "Workspace ID could not be determined";
 // Whether a failure says the value named no project, rather than the server
 // refusing the request for some other reason.
 //
-// A 404 on a project route says it on its own. A task route has no 404 for it:
-// it answers 400 with the complaint above, which is also what a 400 means when
-// the server will not accept a body this CLI sent. The status alone cannot tell
-// those apart, and guessing costs three requests on every write the server
-// rejects for its own reasons, so the message is what decides.
+// A project in the path is checked before the route runs, and the server answers
+// 400 with the complaint above when it cannot find it. A 400 is also what the
+// server says about a body it will not accept, so the message decides. A project
+// in a body (`task move`'s destination) is looked up by the route itself, which
+// answers 404 `Project not found`.
 //
-// A 403 is a different answer again — the key cannot reach it — and a lookup
+// A 403 is a different answer — the key cannot reach the project — and a lookup
 // would not change that.
 const unknownProject = (e: unknown): e is KaneoApiError =>
   e instanceof KaneoApiError &&
-  (e.statusCode === 404 || (e.statusCode === 400 && e.messages.includes(NO_PLACE)));
+  ((e.statusCode === 400 && e.messages.includes(NO_PLACE)) ||
+    (e.statusCode === 404 && e.messages.includes("Project not found")));
 
-// The same for a workspace. The project listing answers 403 for one the key has
-// no access to, which is also what an unknown one looks like from here, and is
-// the reason `--workspace <name>` read as a permission problem.
-const unknownWorkspace = (e: unknown): e is KaneoApiError =>
-  e instanceof KaneoApiError &&
-  (e.statusCode === 403 || e.statusCode === 404 || (e.statusCode === 400 && e.messages.includes(NO_PLACE)));
-
-// The projects a value names, by id, then by slug, then by name.
+// The projects a value names, by id, then by slug, then by name, each tried
+// exactly before ignoring case.
 //
-// The three are tried in that order rather than all at once, so a value that is
-// an id and also spells somebody's slug is still read as the id it is.
-const projectsNamed = (all: ProjectIn[], value: string): ProjectIn[] => {
+// The steps are tried in turn rather than all at once, so a value that is an id
+// and also spells somebody's slug is still read as the id it is, and `bet` picks
+// the project whose slug is `bet` over one whose slug is `BET`.
+const projectsNamed = (all: ProjectIn[], value: string): ProjectIn[] =>
+  firstMatch(all, value, [(p) => p.project.id, (p) => p.project.slug, (p) => p.project.name]);
+
+const workspacesNamed = (all: Workspace[], value: string): Workspace[] =>
+  firstMatch(all, value, [(w) => w.id, (w) => w.slug, (w) => w.name]);
+
+const firstMatch = <T>(all: T[], value: string, keys: ((item: T) => string)[]): T[] => {
   const lower = value.toLowerCase();
-  const byId = all.filter((p) => p.project.id === value);
-  if (byId.length > 0) return byId;
-  const bySlug = all.filter((p) => p.project.slug.toLowerCase() === lower);
-  if (bySlug.length > 0) return bySlug;
-  return all.filter((p) => p.project.name.toLowerCase() === lower);
+  for (const key of keys) {
+    const exact = all.filter((item) => key(item) === value);
+    if (exact.length > 0) return exact;
+    const folded = all.filter((item) => key(item).toLowerCase() === lower);
+    if (folded.length > 0) return folded;
+  }
+  return [];
 };
 
-// The same for a workspace.
-const workspacesNamed = (all: Workspace[], value: string): Workspace[] => {
-  const lower = value.toLowerCase();
-  const byId = all.filter((w) => w.id === value);
-  if (byId.length > 0) return byId;
-  const bySlug = all.filter((w) => w.slug.toLowerCase() === lower);
-  if (bySlug.length > 0) return bySlug;
-  return all.filter((w) => w.name.toLowerCase() === lower);
-};
-
-// Both messages keep the server's own wording in front of them: it is the part
-// that says which request failed, and the lookup that follows only says what
-// this CLI could not do with it.
 const noProject = (value: string): string =>
-  `no project has the id, slug or name ${JSON.stringify(value)} (kaneo project find <text> searches by name)`;
+  `no project has the id, slug or name ${JSON.stringify(value)} (kaneo project find <text> searches names and slugs)`;
 
 const noWorkspace = (value: string): string =>
   `no workspace has the id, slug or name ${JSON.stringify(value)} (kaneo workspace ls lists them)`;

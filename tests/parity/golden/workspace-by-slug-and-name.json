@@ -5,11 +5,11 @@
         "project",
         "ls",
         "-w",
-        "other",
+        "third",
         "--json"
       ],
       "exit": 0,
-      "stdout": "[]\n",
+      "stdout": "[\n  {\n    \"id\": \"proj-delta\",\n    \"name\": \"Delta\",\n    \"slug\": \"DEL\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-third\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  }\n]\n",
       "stderr": ""
     },
     {
@@ -17,19 +17,36 @@
         "project",
         "ls",
         "-w",
-        "Main",
+        "third space",
         "--human"
       ],
       "exit": 0,
-      "stdout": "proj-alpha  Alpha\nproj-beta  Beta\n",
+      "stdout": "proj-delta  Delta\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "ls",
+        "-w",
+        "ws-third",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-delta  Delta\n",
       "stderr": ""
     }
   ],
   "requests": [
     {
       "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/project",
-      "query": "?workspaceId=other"
+      "query": "?workspaceId=ws-third"
     },
     {
       "method": "GET",
@@ -39,12 +56,7 @@
     {
       "method": "GET",
       "path": "/project",
-      "query": "?workspaceId=ws-other"
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?workspaceId=Main"
+      "query": "?workspaceId=ws-third"
     },
     {
       "method": "GET",
@@ -54,7 +66,7 @@
     {
       "method": "GET",
       "path": "/project",
-      "query": "?workspaceId=ws-main"
+      "query": "?workspaceId=ws-third"
     }
   ],
   "files": {}

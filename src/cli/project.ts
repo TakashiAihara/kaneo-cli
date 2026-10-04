@@ -10,7 +10,7 @@ import {
   type ProjectChanges,
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
-import { allProjects, withProject, withWorkspace, type ProjectIn } from "./lookup";
+import { allProjects, resolveWorkspace, withProject, type ProjectIn } from "./lookup";
 
 // `archive` and `unarchive` are the same request with the opposite verb, so they
 // are built from one place rather than written out twice.
@@ -30,9 +30,12 @@ const archiveCommand = (verb: "archive" | "unarchive") => {
     run: async ({ args, app }: { args: string[]; app: App }) => {
       apiKey(app);
       const id = args[0] ?? project(app);
-      await withProject(app, id, (projectId) => setProjectArchived(projectId, archived));
+      const projectId = await withProject(app, id, async (projectId) => {
+        await setProjectArchived(projectId, archived);
+        return projectId;
+      });
       app.out.human(`${archived ? "archived" : "unarchived"} ${id}`);
-      app.out.data({ archived, project: id });
+      app.out.data({ archived, project: projectId });
     },
   };
 };
@@ -88,7 +91,7 @@ export const projectCommand = {
         // differs, and it can only be named when the listing covers more than one.
         const found = acrossAll
           ? await allProjects(app, includeArchived)
-          : (await withWorkspace(app, workspace(app), (id) => listProjectsIn(id, includeArchived))).map(
+          : (await listProjectsIn(await resolveWorkspace(app, workspace(app)), includeArchived)).map(
               (project) => ({ project, workspaceName: "" }),
             );
         for (const { project, workspaceName } of found) app.out.human(projectLine(project, workspaceName));
@@ -151,9 +154,7 @@ export const projectCommand = {
           slug: String(flags.slug ?? ""),
           description: String(flags.description ?? ""),
         };
-        const created = await withWorkspace(app, workspace(app), (workspaceId) =>
-          createProject({ ...wanted, workspaceId }),
-        );
+        const created = await createProject({ ...wanted, workspaceId: await resolveWorkspace(app, workspace(app)) });
         app.out.human(`created ${created.id}  ${created.name}`);
         app.out.data(created);
       },

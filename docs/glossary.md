@@ -50,7 +50,7 @@ A link between two tasks: `subtask`, `blocks` or `related`. For a subtask link t
 
 What a task is named by on a command line: a task id, a number with or without a leading `#`, or `<project-slug>#<number>`.
 
-The last form names a board as well as a number, which is why it is the form a task reference is written in everywhere else — `KANEO_TASK_REF` and the `kaneo <project slug>#<number>` a session hook receives. The part before the `#` is resolved as a project by id, slug or name, so a reference copied out of another tool works unchanged.
+The last form names a board as well as a number, which is why it is the form a task reference is written in everywhere else — `KANEO_TASK_REF` and the `kaneo <project slug>#<number>` a session hook receives. The part before the `#` is resolved as a project by id, slug or name; the leading `kaneo ` is not part of what the commands take.
 
 ### operation
 

@@ -52,6 +52,11 @@
     },
     {
       "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/project",
       "query": "?workspaceId=ws-main"
     },
@@ -60,6 +65,11 @@
       "path": "/project/proj-beta/unarchive",
       "query": "",
       "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
     },
     {
       "method": "GET",

@@ -311,13 +311,45 @@ export const SCENARIOS: Scenario[] = [
 
   // The settings take a project's id, a slug or a name, and a value the server
   // does not know is looked up across the workspaces the key can reach.
-  { name: "project by slug", steps: [["task", "ls", "-p", "BET", "--json"], ["task", "create", "x", "-p", "bet", "--human"], ["project", "get", "ALP", "--human"]] },
+  { name: "project by slug", steps: [["task", "ls", "-p", "BET", "--json"], ["task", "create", "x", "-p", "bet", "--human"], ["project", "get", "ALP", "--human"], ["board", "-p", "BET", "--json"]] },
   { name: "project by name", steps: [["task", "ls", "-p", "Beta", "--human"]] },
   { name: "project not found", steps: [["task", "ls", "-p", "nope", "--json"]] },
   { name: "task reference with a slug", steps: [["task", "get", "BET#1", "--json"], ["comment", "add", "ALP#2", "hi", "--human"]] },
-  { name: "workspace by slug and name", steps: [["project", "ls", "-w", "other", "--json"], ["project", "ls", "-w", "Main", "--human"]] },
+  {
+    // A workspace whose name is not its slug, with a project in it, so the
+    // output itself shows which workspace a name or a slug reached.
+    name: "workspace by slug and name",
+    seed: {
+      workspaces: [...SEED.workspaces, { id: "ws-third", name: "Third Space", slug: "third" }],
+      projects: [...SEED.projects, { id: "proj-delta", workspaceId: "ws-third", name: "Delta", slug: "DEL" }],
+    },
+    steps: [
+      ["project", "ls", "-w", "third", "--json"],
+      ["project", "ls", "-w", "third space", "--human"],
+      ["project", "ls", "-w", "ws-third", "--human"],
+    ],
+  },
   { name: "workspace not found", steps: [["project", "ls", "-w", "nope", "--json"]] },
-  { name: "task lookup error names the project", steps: [["task", "get", "99", "--json"]] },
+  { name: "task lookup error names the project", steps: [["task", "get", "99", "--json"], ["task", "get", "#99", "--human"], ["task", "get", "BET#99", "--human"]] },
+  {
+    // Slugs are not unique on the server, so one that two projects carry names
+    // both rather than picking one; an exact-case match still wins over a folded one.
+    name: "a slug two projects carry",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-bet2", workspaceId: "ws-other", name: "Bet Two", slug: "BET" },
+        { id: "proj-lower", workspaceId: "ws-other", name: "Lower", slug: "alp" },
+      ],
+    },
+    steps: [["task", "ls", "-p", "BET", "--json"], ["project", "get", "alp", "--human"]],
+  },
+  {
+    // An archived project is still found by its slug, which is how one gets
+    // unarchived, and the report carries the id the slug resolved to.
+    name: "project by slug in a write",
+    steps: [["project", "unarchive", "OLD", "--json"], ["task", "move", "1", "--to", "Beta", "--json"]],
+  },
   {
     // The same failure with the project named by a .kaneo.json rather than the
     // environment, so the origin the message reports is the other layer's.

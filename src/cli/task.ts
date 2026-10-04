@@ -18,7 +18,7 @@ import {
   type Task,
 } from "../api/kaneo";
 import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues } from "./args";
-import { resolveProject, withProject } from "./lookup";
+import { withProject } from "./lookup";
 
 export const taskCommand = {
   name: "task",
@@ -168,18 +168,21 @@ export const taskCommand = {
     },
     {
       name: "move",
-      use: "move <task> --to <project-id>",
+      use: "move <task> --to <project>",
       short: "Move a task to another project",
       args: exactArgs(1),
-      flags: [{ name: "to", type: "string" as const, usage: "destination project id", defaultValue: "" }],
+      flags: [{ name: "to", type: "string" as const, usage: "destination project id, slug or name", defaultValue: "" }],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         const target = String(flags.to ?? "");
-        if (target === "") throw new Error("no destination: pass --to <project-id>");
+        if (target === "") throw new Error("no destination: pass --to <project>");
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
-        await moveTask(task.id, target);
+        const projectId = await withProject(app, target, async (id) => {
+          await moveTask(task.id, id);
+          return id;
+        });
         app.out.human(`#${task.number} moved to ${target}`);
-        app.out.data({ id: task.id, projectId: target });
+        app.out.data({ id: task.id, projectId });
       },
     },
     {
@@ -255,9 +258,9 @@ export const taskCommand = {
 // Turns a reference into a task.
 //
 // A reference is a task id, a number with or without a leading '#', or a
-// project's id or slug followed by '#' and that number. The last form is how a
-// task reference is written everywhere else — it is what KANEO_TASK_REF holds —
-// so a reference copied out of a session or a hook names its own board.
+// project's id, slug or name followed by '#' and that number. The last form is
+// what follows `kaneo ` in KANEO_TASK_REF and in the references people write
+// (`kaneo kaneo-cli#3`), so one copied from there names its own board.
 //
 // Numbers are what a person reads off the board, so they have to work wherever an
 // id does — and a number is answered from the board rather than fetched as an id,
@@ -272,8 +275,7 @@ export const resolveTask = async (app: App, ref: string): Promise<Task> => {
 
   const named = namedReference(wanted);
   if (named !== undefined) {
-    const board = await resolveProject(app, named.project);
-    return numberOn(app, board.project.id, named.number, "the reference");
+    return numberOn(app, named.project, named.number, "the reference");
   }
 
   const number = asNumber(wanted.startsWith("#") ? wanted.slice(1) : wanted);
@@ -282,7 +284,8 @@ export const resolveTask = async (app: App, ref: string): Promise<Task> => {
   if (projectId === "") {
     throw new Error(`task #${number} needs a project: pass --project or set KANEO_PROJECT`);
   }
-  return numberOn(app, projectId, number, app.cfg.origin.project ?? "unset");
+  const origin = app.cfg.origin.project ?? "unset";
+  return numberOn(app, projectId, number, origin === "repo-map" ? `the repo map for ${app.cfg.repo}` : origin);
 };
 
 // `<project>#<number>`: the project named before the hash, and a number on it.
@@ -306,9 +309,9 @@ const numberOn = async (app: App, value: string, number: number, origin: string)
   const board = await withProject(app, value, (id) => getBoard(id));
   const found = boardTasks(board).find((task) => task.number === number);
   if (found === undefined) {
-    throw new Error(
-      `no task #${number} in project ${board.projectSlug} (${board.projectId}, from ${origin}); pass --project to look elsewhere`,
-    );
+    // --project only steers a bare number; a reference names its board itself.
+    const hint = origin === "the reference" ? "check the number" : "pass --project to look elsewhere";
+    throw new Error(`no task #${number} in project ${board.projectSlug} (${board.projectId}, from ${origin}); ${hint}`);
   }
   // The board listing does not always carry projectId on each task, but a task
   // found here is on this project by definition.

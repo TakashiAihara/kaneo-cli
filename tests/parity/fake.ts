@@ -221,7 +221,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if ((p = m(/^\/project\/([^/]+)(\/(archive|unarchive))?$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj) return fail(404, "Project not found");
+      // Checked by the server's workspace middleware before the route runs, as on
+      // the task routes below.
+      if (!proj) return fail(400, "Workspace ID could not be determined");
       if (req.method === "GET" && !p[2]) return ok(M.Project, proj);
       if (req.method === "PUT" && !p[2]) {
         Object.assign(proj, body);

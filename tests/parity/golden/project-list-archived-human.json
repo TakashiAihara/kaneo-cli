@@ -15,6 +15,11 @@
   "requests": [
     {
       "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-main"
     }

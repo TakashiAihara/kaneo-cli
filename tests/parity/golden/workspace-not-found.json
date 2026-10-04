@@ -9,16 +9,11 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/project: 403: You don't have access to this workspace: no workspace has the id, slug or name \\\"nope\\\" (kaneo workspace ls lists them)\"\n}\n",
-      "stderr": "Error: GET /api/project: 403: You don't have access to this workspace: no workspace has the id, slug or name \"nope\" (kaneo workspace ls lists them)\n"
+      "stdout": "{\n  \"error\": \"no workspace has the id, slug or name \\\"nope\\\" (kaneo workspace ls lists them)\"\n}\n",
+      "stderr": "Error: no workspace has the id, slug or name \"nope\" (kaneo workspace ls lists them)\n"
     }
   ],
   "requests": [
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?workspaceId=nope"
-    },
     {
       "method": "GET",
       "path": "/auth/organization/list",

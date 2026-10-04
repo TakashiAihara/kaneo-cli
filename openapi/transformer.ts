@@ -41,9 +41,15 @@ function correctOrganization(doc: Doc) {
     properties: { id: { type: "string" }, name: { type: "string" }, slug: { type: "string" } },
     required: ["id", "name", "slug"],
   };
-  const json = (op: any) => op.responses["200"].content["application/json"];
-  json(doc.paths["/auth/organization/list"]?.get).schema.items = ref;
-  json(doc.paths["/auth/organization/update"]?.post).schema = ref;
+  const json = (path: string, method: "get" | "post") => {
+    const content = (doc.paths[path] as any)?.[method]?.responses?.["200"]?.content?.["application/json"];
+    // Missing means the document changed shape; say where rather than fail on
+    // whatever property happened to be undefined.
+    if (!content) throw new Error(`openapi/transformer.ts: ${method.toUpperCase()} ${path} has no JSON 200 response; revisit correctOrganization`);
+    return content;
+  };
+  json("/auth/organization/list", "get").schema.items = ref;
+  json("/auth/organization/update", "post").schema = ref;
 }
 
 // The server sends deletionStartedAt as null on every label not being deleted

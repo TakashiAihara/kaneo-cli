@@ -41,6 +41,9 @@ import type { Json } from "../output/json";
 import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunContext } from "./args";
 import { readInput, sourceName } from "./input";
 import { withProject } from "./lookup";
+import { attachTask, currentSessionId } from "../session/attach";
+import { BAD_ID, validSessionId } from "../session/store";
+import { sharedReference, similarOpenTasks } from "./similar";
 
 export const taskCommand = {
   name: "task",
@@ -111,6 +114,13 @@ export const taskCommand = {
       name: "create",
       use: "create <title>",
       short: "Create a task in a project",
+      long:
+        "Create a task in a project.\n\n" +
+        "With --attach this session is attached to the new task as `session attach`\n" +
+        "would do it, which is what keeps the new number from having to be carried by\n" +
+        "hand to the next command. A title naming a reference an open task already\n" +
+        "names refuses the create unless --force is given; a title merely worded like\n" +
+        "one is created, with the tasks it resembles reported on stderr.",
       // Several words are one title: `task create fix the parser` is one task,
       // not three.
       args: minimumArgs(1),
@@ -142,6 +152,24 @@ export const taskCommand = {
         },
         { name: "due-date", type: "string" as const, usage: "due date", defaultValue: "" },
         { name: "assignee", type: "string" as const, usage: "user id to assign", defaultValue: "" },
+        {
+          name: "attach",
+          type: "bool" as const,
+          usage: "attach this session to the new task, as `session attach` would",
+          defaultValue: "false",
+        },
+        {
+          name: "next",
+          type: "string" as const,
+          usage: "first step to record on the new task; needs --attach",
+          defaultValue: "",
+        },
+        {
+          name: "force",
+          type: "bool" as const,
+          usage: "create the task even when an open task names the same reference",
+          defaultValue: "false",
+        },
       ],
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
         apiKey(app);
@@ -153,8 +181,56 @@ export const taskCommand = {
           dueDate: String(flags["due-date"] ?? ""),
           assigneeId: String(flags.assignee ?? ""),
         };
-        const task = await withProject(app, project(app), (id) => createTask(id, wanted));
+        const attach = flags.attach === true;
+        // As typed, the way `session attach` takes its step: the same act has to
+        // record the same text whichever command was reached for it.
+        const next = String(flags.next ?? "");
+        const force = flags.force === true;
+        // Refused before anything is asked of the server: a next step with no
+        // attachment to write it on would be dropped, and a step dropped reads
+        // as one that was recorded. What decides it is the flag having been
+        // passed rather than what it holds, since `--next ""` asks for a step to
+        // be recorded as much as any other value does.
+        if (changed.has("next") && !attach) throw new Error("--next needs --attach");
+        let session = "";
+        if (attach) {
+          // Checked before the create rather than after it, so a create that could
+          // not be attached leaves nothing behind to close by hand.
+          session = currentSessionId();
+          if (session === "") throw new Error("--attach needs a session id: set KANEO_SESSION_ID");
+          // The store refuses the id only after the marker is posted, which is too
+          // late to leave nothing behind.
+          if (!validSessionId(session)) throw new Error(`--attach: ${BAD_ID}`);
+        }
+
+        let open: Task[] = [];
+        const task = await withProject(app, project(app), async (id) => {
+          // Inside the resolution because withProject needs its first request to
+          // carry the project (see withProject in src/cli/lookup.ts), so the board
+          // and the create are written as the one project a slug or a name
+          // resolves to. --force skips the read: the caller has said the duplicate
+          // is wanted.
+          if (!force) {
+            open = projectTasks(await getBoard(id));
+            refuseDuplicate(wanted.title, open);
+          }
+          return createTask(id, wanted);
+        });
+        // After the create, since the warning is about a task that now exists.
+        if (!force) warnSimilar(wanted.title, open);
+        if (attach) {
+          try {
+            await attachTask(app, session, task, next);
+          } catch (e) {
+            // The task exists, so the message names it: a caller told only that
+            // the attach failed would not know what to close or to keep.
+            throw new Error(
+              `created #${task.number} ${task.title} but could not attach this session: ${(e as Error).message}`,
+            );
+          }
+        }
         app.out.human(`created #${task.number} ${task.title}`);
+        if (attach) app.out.human(`attached: #${task.number} ${task.title}`);
         app.out.data(task);
       },
     },
@@ -340,8 +416,10 @@ export const taskCommand = {
         const task = await resolveTask(app, args[0]!);
         const status = args[1]!.trim();
         await setTaskStatus(task.id, status);
-        app.out.human(`#${task.number} -> ${status}`);
-        app.out.data({ id: task.id, number: task.number, status });
+        const after = await taskAfterWrite(task, "status was set");
+        readBack("status", after.status, status);
+        app.out.human(`#${after.number} -> ${after.status}`);
+        app.out.data(after);
       },
     },
     {
@@ -355,8 +433,10 @@ export const taskCommand = {
         const task = await resolveTask(app, args[0]!);
         const priority = knownPriority(args[1]!.trim());
         await setTaskPriority(task.id, priority);
-        app.out.human(`#${task.number} priority ${priority}`);
-        app.out.data({ id: task.id, number: task.number, priority });
+        const after = await taskAfterWrite(task, "priority was set");
+        readBack("priority", after.priority, priority);
+        app.out.human(`#${after.number} priority ${after.priority}`);
+        app.out.data(after);
       },
     },
     {
@@ -369,8 +449,16 @@ export const taskCommand = {
         const task = await resolveTask(app, args[0]!);
         const user = args[1] ?? "";
         await setTaskAssignee(task.id, user);
-        app.out.human(user === "" ? `#${task.number} unassigned` : `#${task.number} assigned to ${user}`);
-        app.out.data({ assigneeId: user, id: task.id, number: task.number });
+        const after = await taskAfterWrite(task, user === "" ? "assignee was cleared" : "assignee was set");
+        readBack("assignee", after.assigneeId, user);
+        // The name the server resolved the id to, which is what a person reads
+        // off the board; the id itself where the server named nobody.
+        app.out.human(
+          after.assigneeId === null
+            ? `#${after.number} unassigned`
+            : `#${after.number} assigned to ${after.assigneeName ?? after.assigneeId}`,
+        );
+        app.out.data(after);
       },
     },
     {
@@ -521,12 +609,19 @@ export const taskCommand = {
         if (target === "") throw new Error("no destination: pass --to <project>");
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
+        // The destination is resolved before the task is read back, so the two are
+        // compared as what the server was given rather than as what was typed.
         const projectId = await withProject(app, target, async (id) => {
           await moveTask(task.id, id);
           return id;
         });
-        app.out.human(`#${task.number} moved to ${target}`);
-        app.out.data({ id: task.id, projectId });
+        const after = await taskAfterWrite(task, "project was set");
+        readBack("project", after.projectId, projectId);
+        // The destination as it was typed: the read-back above has already
+        // confirmed the task sits on the project the value resolved to, so a
+        // reader is shown what they asked for rather than the id behind it.
+        app.out.human(`#${after.number} moved to ${target}`);
+        app.out.data(after);
       },
     },
     {
@@ -687,6 +782,70 @@ export const taskCommand = {
 
 // The relation types, named the way a person reads a choice out loud.
 const typeChoices = `${RELATION_TYPES.slice(0, -1).join(", ")} or ${RELATION_TYPES[RELATION_TYPES.length - 1]!}`;
+
+// Refuses a title that already names open work by the same issue reference.
+//
+// A refusal rather than a warning: the second copy is what nobody wanted, and it
+// leaves a number on the board that then has to be closed by hand. --force is
+// there for the duplicate that is wanted.
+const refuseDuplicate = (title: string, open: Task[]): void => {
+  const shared = sharedReference(title, open);
+  if (shared === undefined) return;
+  throw new Error(
+    `an open task already names ${shared.reference}: ${namedTasks(shared.tasks)}; pass --force to create anyway`,
+  );
+};
+
+// Reports open tasks worded like this one, on stderr so the JSON a script reads on
+// stdout stays a document it can parse.
+//
+// A warning and not a refusal, because alike wording cannot tell a second copy
+// from the next piece of work (see SIMILAR_TITLE in src/cli/similar.ts); the
+// reference check above is what refuses.
+const warnSimilar = (title: string, open: Task[]): void => {
+  const alike = similarOpenTasks(title, open);
+  if (alike.length > 0) console.error(`similar open tasks: ${namedTasks(alike)}`);
+};
+
+// How either message names a task: by number and title, as `task ls` prints them,
+// so the work is recognisable the same way in both.
+const namedTasks = (tasks: Task[]): string => tasks.map((task) => `#${task.number} ${task.title}`).join("; ");
+
+// The task a write left behind, read by id, carrying the labels of the task
+// resolved above: only the board listing has them, and this is shaped as
+// `task get` shapes it, so its JSON is what `task get --json` prints without the
+// relations. wrote is what the report says was written, named as a person reads
+// the field off the board.
+//
+// A read that fails is reported with the write that has already landed, as `task
+// update` words it. Without that a failed read reads as a failed write, and the
+// caller retries a write that landed.
+const taskAfterWrite = async (task: Task, wrote: string): Promise<Task> => {
+  let after: Task;
+  try {
+    after = await getTask(task.id);
+  } catch (e) {
+    throw new Error(
+      `${wrote} on #${task.number} but reading the task back failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+  return { ...after, labels: task.labels };
+};
+
+// The value the server holds after a write, and the failure when it is not the
+// one that was sent.
+//
+// A 200 does not say the value was taken: one that clamps a priority, or
+// resolves the assignee to somebody else, answers the same way. Printing the
+// value that was sent would report a write that did not happen, so what came
+// back is what is printed and a difference fails.
+const readBack = (field: string, read: string | null, sent: string): void => {
+  // A task with nobody on it reads as null, which is what an empty value asks
+  // for, so the two are the same answer rather than a difference.
+  if ((read ?? "") !== sent) {
+    throw new Error(`${field} is ${JSON.stringify(read)} after setting it to ${JSON.stringify(sent)}`);
+  }
+};
 
 // The type --type asked for, or "" when it was not given. Refused rather than
 // guessed, because a type is a word nobody reads back off the board: the wrong

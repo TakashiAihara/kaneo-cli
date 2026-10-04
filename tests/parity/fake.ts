@@ -24,6 +24,8 @@ export type Seed = {
   // A comment with a userId of its own was written by someone else, so only
   // the server's author check stands between it and a delete.
   comments?: { taskId: string; content: string; id?: string; userId?: string }[];
+  // Labels already on a task, for a board that carries one before anything runs.
+  labels?: { taskId: string; name: string; color?: string }[];
   // Users the server knows, so assign has a name to report.
   users?: { id: string; name: string }[];
   // The key's own notifications, oldest first.
@@ -85,6 +87,16 @@ export type FakeOptions = {
   // description with " (altered)" appended, so a client that reads the task
   // back finds something other than what it sent.
   misstoreOn?: string;
+  // Answers a comment listing without the comments whose content matches, which
+  // is how a marker the server accepted but did not keep is exercised.
+  dropCommentsMatching?: string;
+  // Answers a status, priority, assignee or move write with the task as it was,
+  // each in the shape its own route answers in, which is how a write the server
+  // accepted and did not keep is exercised.
+  writesNotKept?: boolean;
+  // Answers a comment post without the comment's id, so a marker that cannot be
+  // looked for in the listing is exercised.
+  commentReplyWithoutId?: boolean;
 };
 
 export function startFake(seed: Seed, opts: FakeOptions = {}) {
@@ -214,6 +226,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     return l;
   };
   const timeEntries: z.input<typeof M.TimeEntry>[] = [];
+  // A label on a task takes the workspace of the project the task is on, as the
+  // attach route does.
+  for (const l of seed.labels ?? []) {
+    const project = projects.find((p) => p.id === tasks.find((t) => t.id === l.taskId)?.projectId);
+    if (project !== undefined) addLabel(l.name, l.color ?? "gray", project.workspaceId, l.taskId);
+  }
   const requests: Recorded[] = [];
   let grew = 0;
 
@@ -784,6 +802,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const t = tasks.find((x) => x.id === decodeURIComponent(p![2]));
       if (!t) return fail(404, "Task not found");
       const b = body as any;
+      // Every route below answers the shape its caller reads, and none of them
+      // stores anything: what the server accepted is not what the task holds.
+      if (opts.writesNotKept) {
+        if (p[1] !== "move") return ok(M.Task, t);
+        if (!b?.destinationProjectId) return fail(400, 'Invalid key: Expected "destinationProjectId" but received undefined');
+        return ok(M.MoveTaskResult, { task: t, sourceProjectId: t.projectId, destinationProjectId: b.destinationProjectId });
+      }
       if (p[1] === "status") {
         // The only write the server judges against the project rather than
         // against a fixed list: a column is the project's own, and the two
@@ -795,7 +820,6 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         }
         t.status = b.status;
       }
-
       if (p[1] === "priority") t.priority = b.priority;
       const altered = misstoring?.test(`${req.method} ${path}`) === true;
       if (p[1] === "title") t.title = altered ? `${b.title} (altered)` : b.title;
@@ -873,8 +897,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if ((p = m(/^\/comment\/([^/]+)$/)) && req.method !== "PUT") {
       const taskId = decodeURIComponent(p[1]);
       if (!tasks.some((t) => t.id === taskId)) return fail(404, "Task not found");
-      if (req.method === "GET") return ok(z.array(M.Comment), comments.filter((c) => c.taskId === taskId));
-      if (req.method === "POST") return ok(M.Comment, addComment(taskId, (body as any).content));
+      if (req.method === "GET") {
+        return ok(z.array(M.Comment), comments.filter((c) => c.taskId === taskId && !(dropped?.test(c.content) ?? false)));
+      }
+      if (req.method === "POST") {
+        const added = addComment(taskId, (body as any).content);
+        // Sent past the schema, which requires the id this reply exists to leave out.
+        if (opts.commentReplyWithoutId) return Response.json({ ...M.Comment.parse(added), id: undefined });
+        return ok(M.Comment, added);
+      }
     }
     // PUT takes the comment's id where GET and POST take the task's, and
     // answers like DELETE for an unknown id and for someone else's comment.
@@ -1168,6 +1199,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   };
 
   const whitespace = opts.whitespaceOn ? new RegExp(opts.whitespaceOn) : undefined;
+  const dropped = opts.dropCommentsMatching ? new RegExp(opts.dropCommentsMatching) : undefined;
   const delayed = async (req: Request) => {
     if (opts.delayMs) await Bun.sleep(opts.delayMs);
     if (whitespace?.test(`${req.method} ${new URL(req.url).pathname.replace(/^\/api/, "")}`)) {

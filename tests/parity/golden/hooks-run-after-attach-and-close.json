@@ -47,12 +47,22 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/comment/task-a2",
       "query": "",
       "body": {
         "content": "<!-- kn:session id=sess-hook host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-hook`."
       }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
     }
   ],
   "files": {

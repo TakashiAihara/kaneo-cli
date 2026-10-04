@@ -101,6 +101,11 @@
     },
     {
       "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/task/tasks/proj-alpha",
       "query": ""
     },
@@ -121,6 +126,11 @@
       "body": {
         "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
     },
     {
       "method": "GET",
@@ -146,12 +156,22 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/comment/task-a2",
       "query": "",
       "body": {
         "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-test`."
       }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
     }
   ],
   "files": {

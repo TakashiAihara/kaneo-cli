@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "create",
+        "x",
+        "--next",
+        "y",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--next needs --attach\"\n}\n",
+      "stderr": "Error: --next needs --attach\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

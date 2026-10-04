@@ -1,0 +1,57 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "create",
+        "Fix ccx#7 crash",
+        "--force",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task0002\",\n  \"number\": 4,\n  \"title\": \"Fix ccx#7 crash\",\n  \"description\": \"\",\n  \"status\": \"to-do\",\n  \"priority\": \"medium\",\n  \"position\": 3,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"labels\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "Follow up ccx #7",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created #5 Follow up ccx #7\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
+      "query": "",
+      "body": {
+        "title": "Fix ccx#7 crash",
+        "description": "",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
+      "query": "",
+      "body": {
+        "title": "Follow up ccx #7",
+        "description": "",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    }
+  ],
+  "files": {}
+}

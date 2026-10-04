@@ -21,7 +21,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"task-a1\",\n  \"projectId\": \"proj-beta\"\n}\n",
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 2,\n  \"title\": \"Write the parser\",\n  \"description\": \"multi\\nline\",\n  \"status\": \"to-do\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-beta\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n  \"labels\": []\n}\n",
       "stderr": ""
     }
   ],
@@ -88,6 +88,11 @@
       "body": {
         "destinationProjectId": "proj-beta"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
     }
   ],
   "files": {}

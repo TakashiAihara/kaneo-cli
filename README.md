@@ -166,6 +166,7 @@ kaneo workflow rm <rule-id>       # or <integration> <event>, instead of the id;
 kaneo task ls [--status ...] [--priority ...] [--all]
 kaneo task get <task-id>                 # also lists the task's relations
 kaneo task create <title> [-d TEXT | --description-file PATH] [flags]
+kaneo task create <title> --attach [--next <step>] [--force]   # attaches this session to the new task; --force creates beside one naming the same reference
 kaneo task update <task> [--title TEXT] [-d TEXT | --description-file PATH] [--status COL] [--priority P] [--start-date DATE] [--position N]   # only what is passed changes; --start-date "" clears
 kaneo task status <task-id> <status>
 kaneo notification ls [--unread]                             # the newest 50, as the server returns
@@ -215,6 +216,10 @@ A task in no column at all — the server answers `planned` and `archived` tasks
 
 Times are ISO 8601 with an offset (`2026-01-02T09:00:00Z`, `2026-01-02T18:00+09:00`); a time without one is refused rather than read in some zone. "Now" is this machine's clock.
 
+`task create` reads the board first and refuses a title that names a reference an open task already names — `ccx#165`, `(ccx #165)` and `TakashiAihara/ccx#165` are one reference, while a bare `#165`, `ccx #165` outside parentheses and two different owners are not — and `--force` creates it anyway. A title merely worded like an open one is created, with the tasks it resembles named on stderr. `--attach` and `--next` are about the attachment rather than the task: `--next` without `--attach` is refused rather than dropped, and a `--attach` with no session id is refused before anything is created.
+
+`task status`, `task priority`, `task assign` and `task move` read the task back after the write and print the state the server holds, rather than the value that was sent; a value that came back different fails the command instead of printing as a write that took.
+
 Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project>#<number>` names a board and a number on it: `kaneo task get kaneo-cli#3` reads the reference written as `kaneo kaneo-cli#3`, which is also what `KANEO_TASK_REF` holds after its `kaneo ` prefix. The project before the `#` is an id, slug or name.
 
 `task link` will not guess the type: a link written with one nobody asked for has to be undone before the right one can be written. `task unlink` takes two tasks and removes the one link joining them in either direction, or one relation id from `task links --json`.
@@ -253,6 +258,8 @@ What a session holds is kept in `~/.config/kaneo/sessions/<session id>.json`, an
 The `session` commands are **fail-open**, `session status` excepted: it makes no request, so there is nothing for fail-open to swallow, and a session id nobody set is worth reporting. An unreachable server, a missing key or an unconfigured project makes the others print nothing and exit 0, so a session-start hook is not broken by any of them. `--strict` turns that off and `KANEO_DEBUG=1` prints the reason that was swallowed. `board` is not: it fails like any other command, so an empty board and one that could not be read look different.
 
 A failure that already changed something elsewhere is reported regardless — `session attach` that wrote the comment but could not record it locally, for instance. Staying quiet there would leave `session next` believing nothing is attached.
+
+Each of attach, next and close posts its marker and then confirms the server kept it, since a marker nobody can read would leave `session next` posting onto a board this session is not on. A marker the server took and did not keep is reported, naming `kaneo comment ls <task>` to look at before retrying — a blind retry posts a second marker. `session close` confirms last, after the attachment is cleared and the history written, so a close whose marker was lost is posted again with `session close --task <N>`; a listing that cannot be read is fail-open for next and close and fails attach.
 
 #### Hooks
 

@@ -36,6 +36,11 @@
       "body": {
         "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
     }
   ],
   "files": {

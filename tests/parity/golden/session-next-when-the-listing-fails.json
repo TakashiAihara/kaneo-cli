@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "next",
+        "--task",
+        "1",
+        "step"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-lost host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->\nstep"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

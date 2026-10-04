@@ -1,25 +1,12 @@
-import { apiKey, debug, type App } from "./app";
-import { addComment, getProject, listWorkspaces, type Task } from "../api/kaneo";
+import { apiKey, type App } from "./app";
 import { minimumArgs, noArgs, type RunContext } from "./args";
 import { failOpen, hard, strictFlag } from "./failopen";
 import { hookEnv, runHook } from "./hook";
 import { resolveTask } from "./task";
-import { CLOSED, format, RUNNING } from "../session/marker";
+import { CLOSED, RUNNING } from "../session/marker";
 import * as store from "../session/store";
-import type { Attachment } from "../session/store";
+import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
-
-const env = (name: string): string => process.env[name] ?? "";
-
-// The directory a marker records. Empty when it cannot be read: a session in a
-// directory that has since been deleted is still worth recording.
-const cwd = (): string => {
-  try {
-    return process.cwd();
-  } catch {
-    return "";
-  }
-};
 
 const requireSessionId = (): string => {
   const id = store.currentId(env);
@@ -46,36 +33,7 @@ export const sessionCommand = {
         const sessionId = requireSessionId();
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
-
-        // Looked up before the marker is posted, so the lookups do not widen the
-        // window where the server has a marker and this host has no record.
-        const attachment = attachmentOf(task);
-        const slug = await describeBoard(task, attachment);
-
-        const marker = store.describe(env, cwd(), RUNNING);
-        marker.nextStep = args.slice(1).join(" ");
-        await addComment(task.id, format(marker));
-        try {
-          store.save(store.sessionStore(), sessionId, attachment);
-        } catch (e) {
-          // The marker is already on the server. Reporting success here would
-          // leave `session next` believing nothing is attached, and a retry
-          // would post a second marker.
-          throw hard(`attached #${task.number} on the server, but could not record it locally: ${(e as Error).message}`);
-        }
-        try {
-          // Appended after the attachment is in place: a history line for an
-          // attachment that was never written would name a session as attached
-          // when nothing reads it as one.
-          store.appendHistory(store.sessionStore(), sessionId, "attach", attachment, new Date());
-        } catch (e) {
-          // The attachment is saved, so `session next` works; what is missing is
-          // the record a check after close relies on, which is worth failing over.
-          throw hard(`attached #${task.number}, but could not add it to the session history: ${(e as Error).message}`);
-        }
-
-        await runHook(app, "attach", hookEnv("attach", sessionId, task.id, task.number, slug));
-
+        const attachment = await attachTask(app, sessionId, task, args.slice(1).join(" "));
         app.out.human(`attached: #${task.number} ${task.title}`);
         app.out.data(attachment);
       }),
@@ -107,7 +65,11 @@ export const sessionCommand = {
 
         const marker = store.describe(env, cwd(), RUNNING);
         marker.nextStep = step;
-        await addComment(taskId, format(marker));
+        // `session next` keeps no local record of the marker, so there is nothing
+        // here to disagree with the server over a listing that could not be made:
+        // the write landed and an unreachable board is what fail-open is for.
+        const posted = await postMarker(taskId, marker);
+        await confirmMarker(taskId, number, posted, "fail-open");
 
         app.out.human(`#${number} next: ${step}`);
         // A Go map, which its encoder writes with the keys sorted. The report is
@@ -160,7 +122,7 @@ export const sessionCommand = {
 
         const marker = store.describe(env, cwd(), CLOSED);
         marker.nextStep = `Session ended. Resume with \`claude --resume ${sessionId}\`.`;
-        await addComment(closed.taskId, format(marker));
+        const posted = await postMarker(closed.taskId, marker);
         // A task closed by name that the attachment does not hold has no board on
         // record here, so it is looked up as attach does, with the same best
         // effort. After the marker: the lookups only fill the history line, and
@@ -184,6 +146,14 @@ export const sessionCommand = {
           throw hard(`closed #${closed.number} and recorded it, but could not remove the attachment: ${(e as Error).message}`);
         }
         await runHook(app, "close", hookEnv("close", sessionId, closed.taskId, closed.number, ""));
+
+        // Confirmed last of all, so a marker this close cannot confirm fails on a
+        // machine that no longer says it holds the task. The trade-off is that a
+        // marker the server did not keep leaves the board's last marker saying
+        // running while this machine says closed; `session close --task <N>`
+        // posts it again. Held back the other way, a close whose marker was lost
+        // would leave the session attached to a task it has left.
+        await confirmMarker(closed.taskId, closed.number, posted, "fail-open");
 
         app.out.human(`closed: #${closed.number} ${closed.title}`);
         app.out.data({ number: closed.number, taskId: closed.taskId });
@@ -230,53 +200,6 @@ export const sessionCommand = {
 // The task reference people write, "slug#number". A record written before the
 // slug was kept, or whose lookup failed, has only the number.
 const ref = (slug: string | undefined, number: number | string): string => `${slug ?? ""}#${number}`;
-
-// The attachment a task is recorded as, before the board lookups fill in the
-// project and workspace it belongs to.
-const attachmentOf = (task: Task): Attachment => ({ taskId: task.id, number: task.number, title: task.title });
-
-// Fills in which project and workspace the task is on, which the attachment keeps
-// as well as answers the project's slug for the attach hook.
-//
-// Best effort: failing the attach over a name a statusline wants would leave the
-// session unattached. A lookup that fails leaves its fields unset, which a reader
-// treats as absent.
-const describeBoard = async (task: Task, attachment: Attachment): Promise<string> => {
-  // Never filled from the cwd's project: that is the wrong answer this field
-  // exists to avoid, so an unknown project stays unknown.
-  attachment.projectId = task.projectId;
-  if (attachment.projectId === "") {
-    debug(`attach: task ${task.id} carries no projectId; board not recorded`);
-    return "";
-  }
-  let project;
-  try {
-    project = await getProject(attachment.projectId);
-  } catch (e) {
-    debug(`attach: project ${attachment.projectId} lookup failed: ${(e as Error).message}`);
-    return "";
-  }
-  attachment.projectName = project.name;
-  // The slug is what the task reference is written as, so a reader that has the
-  // attachment can print "slug#number" without looking the project up again.
-  attachment.projectSlug = project.slug;
-  attachment.workspaceId = project.workspaceId;
-  if (attachment.workspaceId === "") return project.slug;
-
-  let workspaces;
-  try {
-    workspaces = await listWorkspaces();
-  } catch (e) {
-    debug(`attach: workspace lookup failed: ${(e as Error).message}`);
-    return project.slug;
-  }
-  for (const workspace of workspaces) {
-    if (workspace.id !== attachment.workspaceId) continue;
-    attachment.workspaceName = workspace.name;
-    break;
-  }
-  return project.slug;
-};
 
 // Picks the task a command acts on: the one named explicitly, otherwise the one
 // this session attached to.

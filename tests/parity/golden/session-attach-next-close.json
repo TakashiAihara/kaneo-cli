@@ -87,12 +87,22 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/comment/task-a1",
       "query": "",
       "body": {
         "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->\nship"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
     },
     {
       "method": "GET",
@@ -141,6 +151,11 @@
       "body": {
         "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-test`."
       }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
     },
     {
       "method": "GET",

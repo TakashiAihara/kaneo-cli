@@ -1,0 +1,65 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "create",
+        "Brand new",
+        "--attach",
+        "--next",
+        "start",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task0002\",\n  \"number\": 4,\n  \"title\": \"Brand new\",\n  \"description\": \"\",\n  \"status\": \"to-do\",\n  \"priority\": \"medium\",\n  \"position\": 3,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"labels\": null\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
+      "query": "",
+      "body": {
+        "title": "Brand new",
+        "description": "",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task0002",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-create host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->\nstart"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task0002",
+      "query": ""
+    }
+  ],
+  "files": {
+    ".config/kaneo/config.json": "{\"hooks\":{\"attach\":\"printf \\\"%s %s %s %s\\\\n\\\" \\\"$KANEO_HOOK_EVENT\\\" \\\"$KANEO_TASK_ID\\\" \\\"$KANEO_TASK_NUMBER\\\" \\\"$KANEO_TASK_REF\\\" >> \\\"$HOME/.config/kaneo/hook.out\\\"\"}}",
+    ".config/kaneo/hook.out": "attach task0002 4 kaneo ALP#4\n",
+    ".config/kaneo/sessions/sess-create.history.jsonl": "{\"event\":\"attach\",\"at\":\"<TIME>Z\",\"taskId\":\"task0002\",\"number\":4,\"title\":\"Brand new\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n",
+    ".config/kaneo/sessions/sess-create.json": "{\"taskId\":\"task0002\",\"number\":4,\"title\":\"Brand new\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}"
+  }
+}

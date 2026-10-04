@@ -66,9 +66,9 @@ export const currentId = (env: (name: string) => string): string => {
 // "../../x" read, overwrite and delete files anywhere the process can reach.
 // ".." is rejected outright rather than sanitised: a silently rewritten id would
 // point at a different session's file.
-const BAD_ID = "session id may not contain a path separator or a path element of . or ..";
+export const BAD_ID = "session id may not contain a path separator or a path element of . or ..";
 
-const validSessionId = (id: string): boolean =>
+export const validSessionId = (id: string): boolean =>
   id !== "" && id !== "." && id !== ".." && !/[/\\]/.test(id) && !id.includes("..");
 
 const at = (dir: string, sessionId: string): string => join(dir, `${sessionId}.json`);

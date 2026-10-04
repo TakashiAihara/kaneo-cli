@@ -4,25 +4,26 @@
       "args": [
         "project",
         "create",
-        "Gamma",
+        "Delta",
         "--slug",
-        "GAM",
+        "DEL",
         "-d",
-        "third",
+        "fourth",
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"proj0002\",\n  \"name\": \"Gamma\",\n  \"slug\": \"GAM\",\n  \"icon\": \"Layers\",\n  \"description\": \"third\",\n  \"workspaceId\": \"ws-main\",\n  \"isPublic\": false,\n  \"archivedAt\": null\n}\n",
+      "stdout": "{\n  \"id\": \"proj0002\",\n  \"name\": \"Delta\",\n  \"slug\": \"DEL\",\n  \"icon\": \"Layers\",\n  \"description\": \"fourth\",\n  \"workspaceId\": \"ws-main\",\n  \"isPublic\": false,\n  \"archivedAt\": null\n}\n",
       "stderr": ""
     },
     {
       "args": [
         "project",
-        "ls",
+        "get",
+        "proj0002",
         "--human"
       ],
       "exit": 0,
-      "stdout": "proj-alpha  Alpha\nproj-beta  Beta\nproj0002  Gamma\n",
+      "stdout": "proj0002  Delta\nfourth\n",
       "stderr": ""
     }
   ],
@@ -37,10 +38,10 @@
       "path": "/project",
       "query": "",
       "body": {
-        "name": "Gamma",
+        "name": "Delta",
         "workspaceId": "ws-main",
         "icon": "Layers",
-        "slug": "GAM"
+        "slug": "DEL"
       }
     },
     {
@@ -53,22 +54,17 @@
       "path": "/project/proj0002",
       "query": "",
       "body": {
-        "name": "Gamma",
+        "name": "Delta",
         "icon": "Layers",
-        "slug": "GAM",
-        "description": "third",
+        "slug": "DEL",
+        "description": "fourth",
         "isPublic": false
       }
     },
     {
       "method": "GET",
-      "path": "/auth/organization/list",
+      "path": "/project/proj0002",
       "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?workspaceId=ws-main"
     }
   ],
   "files": {}

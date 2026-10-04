@@ -57,6 +57,51 @@ const projectLine = (project: Project, workspaceName = ""): string => {
 // belongs to at the end, where a reader looking for it will look last.
 const named = ({ project, workspaceName }: ProjectIn) => ({ ...project, workspaceName });
 
+// The key a name derives, by the rule the Kaneo web app uses for a project made
+// there (generateProjectSlug in apps/web/src/lib/generate-project-id.ts), so a
+// project made here gets the kind of key its users already see: the first three
+// letters of a single word, or the initials of the first three words, upper
+// case, from any script. Every task identifier of the project starts with it,
+// and the server takes an empty one, so a name with no letter or number derives
+// nothing and that is reported rather than sent.
+export const deriveSlug = (name: string): string => {
+  const words = name
+    .normalize("NFKC")
+    .toUpperCase()
+    .replace(/[^\p{L}\p{M}\p{N}\s]/gu, "")
+    .split(/\s+/)
+    .filter((word) => /[\p{L}\p{N}]/u.test(word));
+
+  if (words.length === 0) return "";
+
+  // By code point, so a letter outside the BMP is not cut in half, and from the
+  // first letter or number, since a key has to start with one to be typed back.
+  const fromFirst = (word: string) => {
+    const points = Array.from(word);
+    return points.slice(points.findIndex((c) => /[\p{L}\p{N}]/u.test(c)));
+  };
+  if (words.length === 1) return fromFirst(words[0]!).slice(0, 3).join("");
+  return words
+    .slice(0, 3)
+    .map((word) => fromFirst(word)[0])
+    .join("");
+};
+
+// The description the create route cannot carry, written by the update that
+// follows the create. The project exists by then, so a failure names it: a
+// message that only said the description could not be set would leave a project
+// behind that nothing says is there.
+const withDescription = async (created: Project, description: string): Promise<Project> => {
+  try {
+    const { after } = await updateProject(created.id, { description });
+    return after;
+  } catch (e) {
+    throw new Error(
+      `created project ${created.id} but could not set its description: ${(e as Error).message}; set it with \`kaneo project update ${created.id} -d TEXT\``,
+    );
+  }
+};
+
 // The projects in a workspace, and the changes to one of them.
 export const projectCommand = {
   name: "project",
@@ -143,20 +188,45 @@ export const projectCommand = {
       args: minimumArgs(1),
       flags: [
         { name: "icon", type: "string" as const, usage: "icon name (default Layers)", defaultValue: "" },
-        { name: "slug", type: "string" as const, usage: "url slug", defaultValue: "" },
+        {
+          name: "slug",
+          type: "string" as const,
+          usage: "url slug, the prefix of task identifiers (default: derived from the name, as the web app does)",
+          defaultValue: "",
+        },
         { name: "description", shorthand: "d", type: "string" as const, usage: "project description", defaultValue: "" },
       ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const wanted = {
-          name: args.join(" "),
+        const name = args.join(" ");
+        const workspaceId = await resolveWorkspace(app, workspace(app));
+        // A slug that was given is the caller's own spelling of the prefix every
+        // task identifier will carry, so it is trimmed and sent as it was typed.
+        const given = String(flags.slug ?? "").trim();
+        const slug = given === "" ? deriveSlug(name) : given;
+        if (slug === "") throw new Error(`cannot derive a slug from the name ${JSON.stringify(name)}: pass --slug`);
+        // A derived key is one to three characters, so two names share one
+        // easily (Alpha Beta, Apple Banana), and a server before v2.31 takes the
+        // second without a word. A key the caller typed is theirs to answer for.
+        if (given === "") {
+          const taken = (await listProjectsIn(workspaceId, true)).find((p) => p.slug === slug);
+          if (taken !== undefined) {
+            throw new Error(`the slug ${slug} derived from the name is used by project ${taken.id} (${taken.name}): pass --slug`);
+          }
+        }
+        const created = await createProject({
+          name,
+          workspaceId,
           icon: String(flags.icon ?? ""),
-          slug: String(flags.slug ?? ""),
-          description: String(flags.description ?? ""),
-        };
-        const created = await createProject({ ...wanted, workspaceId: await resolveWorkspace(app, workspace(app)) });
-        app.out.human(`created ${created.id}  ${created.name}`);
-        app.out.data(created);
+          slug,
+        });
+        const description = String(flags.description ?? "");
+        // Without one asked for this is the project as the create left it, and
+        // only one request is made.
+        const saved = description === "" ? created : await withDescription(created, description);
+        app.out.human(`created ${saved.id}  ${saved.name}`);
+        app.out.human(`  task identifiers start with ${saved.slug}`);
+        app.out.data(saved);
       },
     },
     {

@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "create",
+        "!!!",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"cannot derive a slug from the name \\\"!!!\\\": pass --slug\"\n}\n",
+      "stderr": "Error: cannot derive a slug from the name \"!!!\": pass --slug\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

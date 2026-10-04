@@ -146,6 +146,7 @@ kaneo workspace rename <workspace-id> <name>   # name only; slug and description
 kaneo project ls [-A]           # -A lists every workspace, naming the workspace each project is in
 kaneo project find <text>       # substring match on name and slug, across every workspace
 kaneo project get [project-id]
+kaneo project create <name> [--slug SLUG] [-d TEXT] [--icon ICON]
 kaneo project update <project-id> [--name NAME] [--slug SLUG] [-d TEXT] [--icon ICON]   # only what is passed changes
 kaneo column ls                    # the resolved project's columns, in board order
 kaneo column create <name...> [--final] [--icon ICON] [--color COLOR]
@@ -174,6 +175,8 @@ kaneo label rm <label> --yes         # also removes it from every task
 ```
 
 A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds.
+
+A project's slug is the prefix of its task identifiers. Without `--slug`, `project create` derives it the way the Kaneo web app does: the first three letters of a one-word name, or the initials of the first three words, upper case, in any script (`Alpha Beta Gamma` → `ABG`, `日本語だけ` → `日本語`). A name with no letter or number derives nothing, and a derived slug another project in the workspace already has is refused; both have to be given `--slug`.
 
 Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project>#<number>` names a board and a number on it: `kaneo task get kaneo-cli#3` reads the reference written as `kaneo kaneo-cli#3`, which is also what `KANEO_TASK_REF` holds after its `kaneo ` prefix. The project before the `#` is an id, slug or name.
 

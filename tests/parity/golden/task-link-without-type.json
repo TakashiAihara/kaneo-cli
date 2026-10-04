@@ -3,12 +3,24 @@
     {
       "args": [
         "task",
-        "get",
+        "link",
         "1",
-        "--human"
+        "2",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"pass --type: subtask, blocks or related\"\n}\n",
+      "stderr": "Error: pass --type: subtask, blocks or related\n"
+    },
+    {
+      "args": [
+        "task",
+        "links",
+        "1",
+        "--json"
       ],
       "exit": 0,
-      "stdout": "#1  Write the parser\nstatus    to-do\npriority  high\n\nmulti\nline\n",
+      "stdout": "[]\n",
       "stderr": ""
     }
   ],

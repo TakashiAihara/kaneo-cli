@@ -2,6 +2,7 @@ import { apiKey, project, taskProject, type App } from "./app";
 import {
   boardTasks,
   createTask,
+  deleteRelation,
   deleteTask,
   getBoard,
   getTask,
@@ -14,7 +15,9 @@ import {
   setTaskAssignee,
   setTaskPriority,
   setTaskStatus,
+  taskSummary,
   type NewTask,
+  type Relation,
   type Task,
 } from "../api/kaneo";
 import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues } from "./args";
@@ -63,14 +66,23 @@ export const taskCommand = {
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
+        // The links are read as well, so a task is shown whole. A read of them
+        // that fails fails the command: a task whose links could not be read
+        // looks exactly like a task that has none.
+        const relations = await listRelations(task.id);
         app.out.human(`#${task.number}  ${task.title}`);
         app.out.human(`status    ${task.status}`);
         app.out.human(`priority  ${task.priority}`);
+        if (relations.length > 0) {
+          app.out.human("");
+          app.out.human("relations");
+          for (const relation of relations) app.out.human(`  ${relationLine(relation, task.id)}`);
+        }
         if (task.description !== "") {
           app.out.human("");
           app.out.human(task.description);
         }
-        app.out.data(task);
+        app.out.data({ ...task, relations });
       },
     },
     {
@@ -210,31 +222,101 @@ export const taskCommand = {
     },
     {
       name: "link",
-      use: "link <parent> <child>",
+      use: "link <task> <other-task> --type <type>",
       short: "Relate two tasks",
-      long: `Relate two tasks.\n\nFor a subtask link the first task is the parent. Types: ${RELATION_TYPES.join(", ")}.`,
+      long:
+        `Relate two tasks.\n\n` +
+        `The type carries the direction: subtask makes the first task the parent,\n` +
+        `blocks makes it the one doing the blocking, and related has neither.\n` +
+        `One of: ${RELATION_TYPES.join(", ")}.`,
       args: exactArgs(2),
       flags: [
         {
           name: "type",
           type: "string" as const,
-          usage: `relation type: ${RELATION_TYPES.join(", ")}`,
-          defaultValue: "subtask",
+          usage: `relation type (required): ${RELATION_TYPES.join(", ")}`,
+          defaultValue: "",
         },
       ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
+        // Refused before anything is asked of the server: a link written with a
+        // type nobody chose has to be undone before it can be written again.
+        const relationType = givenType(flags);
+        if (relationType === "") throw new Error(`pass --type: ${typeChoices}`);
         apiKey(app);
-        const relationType = String(flags.type ?? "");
-        if (!RELATION_TYPES.includes(relationType)) {
+        const first = await resolveTask(app, args[0]!);
+        const second = await resolveTask(app, args[1]!);
+        const relation = await linkTasks(first.id, second.id, relationType);
+        app.out.human(`#${first.number} ${relationWord(relationType, true)} #${second.number}`);
+        app.out.data({ ...relation, sourceTask: taskSummary(first), targetTask: taskSummary(second) });
+      },
+    },
+    {
+      name: "unlink",
+      use: "unlink <relation-id> | <task> <other-task>",
+      short: "Remove the link between two tasks",
+      long:
+        `Remove the link between two tasks.\n\n` +
+        `One argument is a relation id. Two are the two tasks, whose link is\n` +
+        `removed whichever way round it runs; two tasks related more than once\n` +
+        `need --type, one of ${RELATION_TYPES.join(", ")}, or the relation id itself.`,
+      args: rangeArgs(1, 2),
+      flags: [
+        {
+          name: "type",
+          type: "string" as const,
+          usage: `relation type: ${RELATION_TYPES.join(", ")}`,
+          defaultValue: "",
+        },
+      ],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
+        const relationType = givenType(flags);
+        // One word is a relation id, and only a relation can be acted on alone.
+        // A task number there means the other task was left out, and --type would
+        // be ignored by an id that already names one relation, so both are
+        // refused. A task id cannot be told from a relation id without asking the
+        // server, and goes to the delete, which answers not found.
+        if (args.length === 1) {
+          const word = args[0]!;
+          if (asNumber(word.startsWith("#") ? word.slice(1) : word) !== undefined) {
+            throw new Error(`one argument is a relation id; to unlink two tasks give both: unlink ${word} <other-task>`);
+          }
+          if (relationType !== "") throw new Error("--type picks among the links of two tasks; a relation id already names one");
+          apiKey(app);
+          // The delete reply carries no task summaries, so this line names the
+          // two tasks by id.
+          const removed = await deleteRelation(word);
+          app.out.human(`unlinked ${removed.sourceTaskId} ${relationWord(removed.relationType, true)} ${removed.targetTaskId}`);
+          app.out.data(removed);
+          return;
+        }
+        apiKey(app);
+        const first = await resolveTask(app, args[0]!);
+        const second = await resolveTask(app, args[1]!);
+        const between = (await listRelations(first.id)).filter(
+          (relation) =>
+            (relationType === "" || relation.relationType === relationType) &&
+            ((relation.sourceTaskId === first.id && relation.targetTaskId === second.id) ||
+              (relation.sourceTaskId === second.id && relation.targetTaskId === first.id)),
+        );
+        if (between.length === 0) {
           throw new Error(
-            `unknown relation type ${JSON.stringify(relationType)}; use one of: ${RELATION_TYPES.join(", ")}`,
+            `no ${relationType === "" ? "" : `${relationType} `}relation between #${first.number} and #${second.number}`,
           );
         }
-        const parent = await resolveTask(app, args[0]!);
-        const child = await resolveTask(app, args[1]!);
-        const relation = await linkTasks(parent.id, child.id, relationType);
-        app.out.human(`#${parent.number} ${relationType} #${child.number}`);
-        app.out.data(relation);
+        if (between.length > 1) {
+          const listed = between.map((relation) => `${relation.relationType} ${relation.id}`).join(", ");
+          throw new Error(
+            `#${first.number} and #${second.number} are related more than once (${listed}): pass --type or a relation id`,
+          );
+        }
+        // Worded the way the link runs, not the way the two tasks were given:
+        // `unlink 2 1` on a link where #1 blocks #2 still reads "#1 blocks #2".
+        const relation = between[0]!;
+        const [source, target] = relation.sourceTaskId === first.id ? [first, second] : [second, first];
+        const removed = await deleteRelation(relation.id);
+        app.out.human(`unlinked #${source.number} ${relationWord(relation.relationType, true)} #${target.number}`);
+        app.out.data({ ...removed, sourceTask: relation.sourceTask, targetTask: relation.targetTask });
       },
     },
     {
@@ -246,13 +328,52 @@ export const taskCommand = {
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
         const relations = await listRelations(task.id);
-        for (const relation of relations) {
-          app.out.human(`${relation.relationType}  ${relation.sourceTaskId} -> ${relation.targetTaskId}`);
-        }
+        for (const relation of relations) app.out.human(relationLine(relation, task.id));
         app.out.data(relations);
       },
     },
   ],
+};
+
+// The relation types, named the way a person reads a choice out loud.
+const typeChoices = `${RELATION_TYPES.slice(0, -1).join(", ")} or ${RELATION_TYPES[RELATION_TYPES.length - 1]!}`;
+
+// The type --type asked for, or "" when it was not given. Refused rather than
+// guessed, because a type is a word nobody reads back off the board: the wrong
+// one has to be undone before the right one can be written.
+const givenType = (flags: FlagValues): string => {
+  const wanted = String(flags.type ?? "");
+  if (wanted !== "" && !RELATION_TYPES.includes(wanted)) {
+    throw new Error(`unknown relation type ${JSON.stringify(wanted)}; use one of: ${RELATION_TYPES.join(", ")}`);
+  }
+  return wanted;
+};
+
+// How each relation type reads from the two ends of a link, the source first and
+// the target second. The type alone reads the wrong way round from one end: what
+// blocks a task is what the other task is blocked by, and a subtask link has a
+// parent at one end and a child at the other.
+const relationWords: Record<string, [string, string]> = {
+  blocks: ["blocks", "blocked by"],
+  subtask: ["parent of", "subtask of"],
+  related: ["related", "related"],
+};
+
+// The widest of those words, which is where every line's next column starts.
+const RELATION_WORD_WIDTH = Math.max(...Object.values(relationWords).flat().map((word) => word.length));
+
+// A type this CLI has no word for is shown as the server spelled it: the link is
+// still there, whatever it is called.
+const relationWord = (relationType: string, fromSource: boolean): string =>
+  relationWords[relationType]?.[fromSource ? 0 : 1] ?? relationType;
+
+const relationLine = (relation: Relation, taskId: string): string => {
+  const fromSource = relation.sourceTaskId === taskId;
+  const other = fromSource ? relation.targetTask : relation.sourceTask;
+  const otherId = fromSource ? relation.targetTaskId : relation.sourceTaskId;
+  const word = relationWord(relation.relationType, fromSource);
+  // A task the server gave no number would read as #0, so it is named by id.
+  return `${word.padEnd(RELATION_WORD_WIDTH)}  ${other === null || other.number === null ? otherId : `#${other.number}  ${other.title}`}`;
 };
 
 // Turns a reference into a task.

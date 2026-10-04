@@ -3,16 +3,22 @@
     {
       "args": [
         "task",
-        "get",
+        "unlink",
         "1",
-        "--human"
+        "2",
+        "--json"
       ],
-      "exit": 0,
-      "stdout": "#1  Write the parser\nstatus    to-do\npriority  high\n\nmulti\nline\n",
-      "stderr": ""
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no relation between #1 and #2\"\n}\n",
+      "stderr": "Error: no relation between #1 and #2\n"
     }
   ],
   "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
     {
       "method": "GET",
       "path": "/task/tasks/proj-alpha",

@@ -151,7 +151,6 @@ export const completionCommand: Command<App> = {
   long:
     "Generate the autocompletion script for kaneo for the specified shell.\n" +
     "See each sub-command's help for details on how to use the generated script.",
-  args: noArgs("kaneo completion"),
   children: [
     shellCommand("bash", BASH_LONG),
     shellCommand("fish", FISH_LONG),

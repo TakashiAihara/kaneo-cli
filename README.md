@@ -153,13 +153,19 @@ kaneo column rename <column> <new name...>   # the slug, and so every status in 
 kaneo column reorder <column>...   # the new order: every column exactly once, by id, slug or name
 kaneo column rm <column> --yes
 kaneo task ls [--status ...] [--priority ...] [--all]
-kaneo task get <task-id>
+kaneo task get <task-id>                 # also lists the task's relations
 kaneo task status <task-id> <status>
+kaneo task links <task>
+kaneo task link <task> <other> --type <type>    # subtask, blocks or related; the type says which way round
+kaneo task unlink <relation-id>
+kaneo task unlink <task> <other> [--type <type>]
 ```
 
 A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds.
 
 Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project>#<number>` names a board and a number on it: `kaneo task get kaneo-cli#3` reads the reference written as `kaneo kaneo-cli#3`, which is also what `KANEO_TASK_REF` holds after its `kaneo ` prefix. The project before the `#` is an id, slug or name.
+
+`task link` will not guess the type: a link written with one nobody asked for has to be undone before the right one can be written. `task unlink` takes two tasks and removes the one link joining them in either direction, or one relation id from `task links --json`.
 
 ### Shell completion
 

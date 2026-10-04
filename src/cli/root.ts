@@ -159,10 +159,12 @@ export const run = async (argv: string[]): Promise<number> => {
 
   try {
     // An unknown command is reported before any flag is judged, so a typo is
-    // corrected rather than argued with. Only the root refuses one: a group
-    // given a word it does not know prints its own help instead.
-    if (command.children !== undefined && command.args === undefined && chain.length === 1 && found.words.length > 0) {
-      throw unknownCommand(root, chain.map((c) => c.name).join(" "), found.words[0]!);
+    // corrected rather than argued with. Every group refuses one the way the
+    // root does, under its own path: a command that only groups others has
+    // nothing to do with a word it does not know, and answering with its help
+    // instead would exit 0 on a mistake.
+    if (command.children !== undefined && command.run === undefined && found.words.length > 0) {
+      throw unknownCommand(command, chain.map((c) => c.name).join(" "), found.words[0]!);
     }
 
     const parsed = readFlags(parsingFlags(chain), rest, command);

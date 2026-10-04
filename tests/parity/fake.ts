@@ -466,13 +466,16 @@ const VIRTUAL_STATUSES = ["planned", "archived"];
 
 // What a server older than the document leaves out, applied to any response.
 const LEGACY_DROPPED = new Set(["backgroundVersion", "pagination", "labels", "externalLinks", "subtaskCounts", "assigneeImage", "lastTaskNumber"]);
+// What it sends as null. The relation summaries are nullable in the document,
+// so the id fallback is exercised here.
+const LEGACY_NULLED = new Set(["user", "sourceTask", "targetTask"]);
 function legacy(body: unknown): unknown {
   if (Array.isArray(body)) return body.map(legacy);
   if (!body || typeof body !== "object") return body;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) {
     if (LEGACY_DROPPED.has(k)) continue;
-    out[k] = k === "user" ? null : legacy(v);
+    out[k] = LEGACY_NULLED.has(k) ? null : legacy(v);
   }
   return out;
 }

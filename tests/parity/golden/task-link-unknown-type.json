@@ -1,0 +1,34 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "link",
+        "1",
+        "2",
+        "--type",
+        "blocker",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown relation type \\\"blocker\\\"; use one of: subtask, blocks, related\"\n}\n",
+      "stderr": "Error: unknown relation type \"blocker\"; use one of: subtask, blocks, related\n"
+    },
+    {
+      "args": [
+        "task",
+        "unlink",
+        "1",
+        "2",
+        "--type",
+        "blocker",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown relation type \\\"blocker\\\"; use one of: subtask, blocks, related\"\n}\n",
+      "stderr": "Error: unknown relation type \"blocker\"; use one of: subtask, blocks, related\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

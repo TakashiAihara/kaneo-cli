@@ -641,9 +641,9 @@ export const addComment = async (taskId: string, content: string, signal?: Abort
   };
 };
 
-// Deletes a comment. The server looks for the id among the caller's own
-// comments only, so someone else's comment answers 404, the same as one that
-// does not exist.
+// Deletes a comment. An id that does not exist answers 400, since its
+// workspace cannot be found. Someone else's comment answers 404: the server
+// looks only among the caller's own. A key without task:update answers 403.
 export const deleteComment = async (commentId: string): Promise<void> => {
   await call(deleteTaskComment(pathParam(commentId)));
 };

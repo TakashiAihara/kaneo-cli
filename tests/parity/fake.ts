@@ -101,7 +101,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const comments: z.input<typeof M.Comment>[] = [];
   const addComment = (taskId: string, content: string, commentId = id("cmt"), userId = "user-self") => {
     const at = now();
-    const c = { id: commentId, taskId, userId, content, createdAt: at, updatedAt: at, user: { name: userId === "user-self" ? "Self" : userId, image: null } };
+    const c = { id: commentId, taskId, userId, content, createdAt: at, updatedAt: at, user: { name: userId === "user-self" ? "Self" : (seed.users?.find((u) => u.id === userId)?.name ?? userId), image: null } };
     comments.push(c);
     return c;
   };
@@ -286,10 +286,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // Upstream resolves the comment's workspace first and only then looks
       // for it among the caller's own comments.
       const i = comments.findIndex((c) => c.id === decodeURIComponent(p![1]));
-      if (i < 0) return fail(400, "Unknown comment");
+      if (i < 0) return fail(400, "Workspace ID could not be determined");
       if (comments[i]!.userId !== "user-self") return fail(404, "Comment not found or you are not the author");
-      const { user: _, ...c } = comments.splice(i, 1)[0]!;
-      return ok(M.Activity, { ...c, type: "comment", externalUserName: null, externalUserAvatar: null, externalSource: null, externalUrl: null } as z.input<typeof M.Activity>);
+      const { user: _, ...c } = comments[i]!;
+      const reply = ok(M.Activity, { ...c, type: "comment", externalUserName: null, externalUserAvatar: null, externalSource: null, externalUrl: null });
+      comments.splice(i, 1);
+      return reply;
     }
 
     if ((p = m(/^\/comment\/([^/]+)$/))) {

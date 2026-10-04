@@ -7,6 +7,9 @@
  */
 import * as zod from 'zod';
 
+export const createTaskBodyDraftAssetIdsMax = 100;
+
+
 export const CreateTaskBody = zod.object({
   "title": zod.string(),
   "description": zod.string(),
@@ -15,6 +18,7 @@ export const CreateTaskBody = zod.object({
   "priority": zod.enum(['no-priority', 'low', 'medium', 'high', 'urgent']),
   "status": zod.string().describe('The target column\'s slug.'),
   "userId": zod.string().optional().describe('Assignee, if any.'),
+  "draftAssetIds": zod.array(zod.string()).max(createTaskBodyDraftAssetIdsMax).optional(),
   "customFields": zod.array(zod.object({
   "fieldId": zod.string(),
   "value": zod.string()

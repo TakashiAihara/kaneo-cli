@@ -5,7 +5,9 @@ import { SPEC_VERSION, SPEC_PATH } from "../openapi/spec";
 // Re-pins the OpenAPI document to another Kaneo release: downloads the
 // document shipped at that tag, unchanged, replaces the pinned file and the
 // version in openapi/spec.ts. Run `bun run generate` afterwards and review the
-// diff of src/api/gen.
+// diff of src/api/gen. The api-check goldens count the server's operations, so
+// `bun run parity:record` follows; a schema field made required also has to be
+// answered by tests/parity/fake.ts, which typecheck points at.
 //
 // `--check` downloads the pinned version's document and fails unless the
 // pinned file is byte for byte the same. CI runs it: regenerating only proves

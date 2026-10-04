@@ -26,6 +26,17 @@ export const TaskWithAssignee = zod.object({
   "value": zod.string()
 })).optional()
 }).and(zod.object({
+  "workspaceId": zod.string().optional().describe('The workspace currently owning the task\'s project. Included in the detail view; omitted from the compact board view.'),
+  "columnId": zod.string().nullable().describe('The referenced workflow column; null for virtual statuses and legacy tasks without a column reference.'),
+  "subtaskCounts": zod.object({
+  "completed": zod.number(),
+  "total": zod.number()
+}).optional(),
+  "parentSubtaskCounts": zod.array(zod.object({
+  "taskId": zod.string(),
+  "completed": zod.number(),
+  "total": zod.number()
+})).optional(),
   "assigneeName": zod.string().nullable(),
   "assigneeId": zod.string().nullable()
 }))

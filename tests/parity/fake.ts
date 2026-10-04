@@ -4,7 +4,10 @@ import { SPEC_PATH } from "../../openapi/spec";
 import { readFileSync } from "node:fs";
 
 // An in-memory Kaneo that answers the operations in src/api/registry.ts the
-// way a v2.29.2 server does. Every response is parsed with the generated zod
+// way the pinned release's server does. Behaviour checked against a release
+// is named with it below (most of it against v2.29.2, before the pin moved to
+// 2.32.0); 2.32.0 changes are followed only where the generated schema
+// requires it. Every response is parsed with the generated zod
 // schema before it is sent, so the fake cannot drift from the document the
 // client is generated from. Ids and timestamps are deterministic, so two runs
 // of the same scenario (the Go reference and the TS build) see the same bytes.
@@ -855,7 +858,18 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const i = tasks.findIndex((x) => x.id === decodeURIComponent(p![1]));
       if (i < 0) return fail(404, "Task not found");
       const t = tasks[i]!;
-      if (req.method === "GET") return ok(M.TaskWithAssignee, { ...t, assigneeId: t.userId, assigneeName: t.userId ? (users.get(t.userId) ?? null) : null });
+      // The detail view of v2.32.0's get-task.ts. The fake keeps no column
+      // reference on a task, so it is the column the status names; a virtual
+      // status has none.
+      if (req.method === "GET") {
+        return ok(M.TaskWithAssignee, {
+          ...t,
+          columnId: columnsOf(t.projectId).find((c) => c.slug === t.status)?.id ?? null,
+          workspaceId: projects.find((x) => x.id === t.projectId)?.workspaceId,
+          assigneeId: t.userId,
+          assigneeName: t.userId ? (users.get(t.userId) ?? null) : null,
+        });
+      }
       // A full replace, as upstream's update-task.ts does it: a start date, due
       // date or assignee left out is stored as none, a description left out is
       // kept, and moving to another project is refused.

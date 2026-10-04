@@ -106,6 +106,23 @@ test("TestGeneratedCallFailuresKeepTheServerMessage", async () => {
   expect(e.messages).toEqual(['Invalid key: Expected "destinationProjectId"']);
 });
 
+// The server sends an HTTPException as a plain-text body. A short line of it is
+// the message, the way an envelope's would be; markup, several lines or a long
+// body stay a body only.
+test.each([
+  ["Workspace ID could not be determined\n", ["Workspace ID could not be determined"]],
+  ["<html><body>Bad Gateway</body></html>", []],
+  ["first line\nsecond line", []],
+  ["x".repeat(201), []],
+  ["x".repeat(200), ["x".repeat(200)]],
+  ["", []],
+])("TestPlainTextFailuresCarryTheirMessage (%#)", async (body, want) => {
+  newServer(() => new Response(body, { status: 400, headers: { "content-type": "text/plain;charset=UTF-8" } }));
+  const err = await failure(api.getBoard("p1"));
+  expect(err).toBeInstanceOf(KaneoApiError);
+  expect((err as KaneoApiError).messages).toEqual(want);
+});
+
 const boardPage = (page: number, pages: number, related: number, relatedPages: number, columns: unknown[]) =>
   JSON.stringify({
     data: { id: "p1", name: "Board", slug: "b", workspaceId: "w", columns, archivedTasks: [], plannedTasks: [] },

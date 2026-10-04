@@ -468,8 +468,17 @@ const failure = (
   const envelope = decodeEnvelope(raw);
   if (envelope) return new KaneoApiError(method, path, status, messagesOf(envelope), trimmed);
   if (status >= 200 && status < 300) return undefined;
-  return new KaneoApiError(method, path, status, [], trimmed);
+  return new KaneoApiError(method, path, status, plainMessage(trimmed), trimmed);
 };
+
+// The message of a failure sent as plain text. The server sends every
+// HTTPException that way — its access checks, its "not found"s and, from v2.25,
+// its validation failures — so this is the shape most failures arrive in, and a
+// caller deciding on the server's message has to find it in `messages` either
+// way. Only a short single line counts: a page of markup or a stack is a body,
+// not a message, and the report prints it cut short instead.
+const plainMessage = (text: string): string[] =>
+  text === "" || text.startsWith("<") || text.includes("\n") || text.length > BODY_LIMIT ? [] : [text];
 
 // The server's failure shape. The payload is read as raw JSON because the shape
 // it arrives in is the server's choice, not this client's: fixed as an array,

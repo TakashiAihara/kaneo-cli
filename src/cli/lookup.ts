@@ -105,12 +105,8 @@ const NO_PLACE = "Workspace ID could not be determined";
 // would not change that.
 const unknownProject = (e: unknown): e is KaneoApiError =>
   e instanceof KaneoApiError &&
-  ((e.statusCode === 400 && said(e, NO_PLACE)) || (e.statusCode === 404 && said(e, "Project not found")));
-
-// Whether the server's answer is this message. Both of the answers above come
-// from an HTTPException, which the server sends as a plain-text body rather than
-// the JSON envelope a validation failure arrives in, so both shapes are read.
-const said = (e: KaneoApiError, message: string): boolean => e.messages.includes(message) || e.body.trim() === message;
+  ((e.statusCode === 400 && e.messages.includes(NO_PLACE)) ||
+    (e.statusCode === 404 && e.messages.includes("Project not found")));
 
 // The projects a value names, by id, then by slug, then by name. An id is a
 // case-sensitive key; a slug or a name is tried exactly before ignoring case.

@@ -1,0 +1,439 @@
+{
+  "steps": [
+    {
+      "args": [
+        "time",
+        "add",
+        "1",
+        "--start",
+        "2026-01-01T09:00:00Z",
+        "--end",
+        "2026-01-01T10:30:00Z",
+        "-d",
+        "review",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"time0002\",\n  \"taskId\": \"task-a1\",\n  \"userId\": \"user-self\",\n  \"description\": \"review\",\n  \"startTime\": \"2026-01-01T09:00:00.000Z\",\n  \"endTime\": \"2026-01-01T10:30:00.000Z\",\n  \"duration\": 5400\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "time",
+        "start",
+        "1",
+        "--start",
+        "2026-01-01T08:00:00Z",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "started time0003 on #1\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "time",
+        "ls",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "time0003  2026-01-01T08:00:00.000Z -> running  Self\ntime0002  2026-01-01T09:00:00.000Z -> 2026-01-01T10:30:00.000Z  1h30m  Self  review\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "time",
+        "list",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"time0003\",\n    \"taskId\": \"task-a1\",\n    \"userId\": \"user-self\",\n    \"description\": \"\",\n    \"startTime\": \"2026-01-01T08:00:00.000Z\",\n    \"endTime\": null,\n    \"duration\": null,\n    \"userName\": \"Self\"\n  },\n  {\n    \"id\": \"time0002\",\n    \"taskId\": \"task-a1\",\n    \"userId\": \"user-self\",\n    \"description\": \"review\",\n    \"startTime\": \"2026-01-01T09:00:00.000Z\",\n    \"endTime\": \"2026-01-01T10:30:00.000Z\",\n    \"duration\": 5400,\n    \"userName\": \"Self\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "time",
+        "update",
+        "time0003",
+        "--end",
+        "2026-01-01T08:45:00Z",
+        "-d",
+        "triage",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated time0003  2026-01-01T08:00:00.000Z -> 2026-01-01T08:45:00.000Z  0h45m  triage\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "time",
+        "update",
+        "time0002",
+        "--end",
+        "2026-01-01T11:00:00Z",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"time0002\",\n  \"taskId\": \"task-a1\",\n  \"userId\": \"user-self\",\n  \"description\": \"review\",\n  \"startTime\": \"2026-01-01T09:00:00.000Z\",\n  \"endTime\": \"2026-01-01T11:00:00.000Z\",\n  \"duration\": 7200\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "time",
+        "update",
+        "time0002",
+        "-d",
+        "",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"time0002\",\n  \"taskId\": \"task-a1\",\n  \"userId\": \"user-self\",\n  \"description\": \"\",\n  \"startTime\": \"2026-01-01T09:00:00.000Z\",\n  \"endTime\": \"2026-01-01T11:00:00.000Z\",\n  \"duration\": 7200\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "time",
+        "update",
+        "time0002",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: nothing to change: pass --start, --end or --description\n"
+    },
+    {
+      "args": [
+        "time",
+        "update",
+        "time0002",
+        "--start",
+        "2026-01-01T12:00:00Z",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/time-entry/time0002: 400: Start time cannot be after end time. Please adjust the time range.\n"
+    },
+    {
+      "args": [
+        "time",
+        "update",
+        "time0002",
+        "--end",
+        "",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: end \"\" is not a real date and time in ISO 8601 with an offset, such as <TIME>Z\n"
+    },
+    {
+      "args": [
+        "time",
+        "get",
+        "time0003",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"time0003\",\n  \"taskId\": \"task-a1\",\n  \"userId\": \"user-self\",\n  \"description\": \"triage\",\n  \"startTime\": \"2026-01-01T08:00:00.000Z\",\n  \"endTime\": \"2026-01-01T08:45:00.000Z\",\n  \"duration\": 2700\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "time",
+        "add",
+        "1",
+        "--start",
+        "2026-01-01T10:00:00Z",
+        "--end",
+        "2026-01-01T09:00:00Z",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/time-entry: 400: Start time cannot be after end time. Please adjust the time range.\n"
+    },
+    {
+      "args": [
+        "time",
+        "add",
+        "1",
+        "--end",
+        "2026-01-01T09:00:00Z",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --end needs --start; leave out both to start a running timer now\n"
+    },
+    {
+      "args": [
+        "time",
+        "add",
+        "1",
+        "--start",
+        "2026-01-01T09:00",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: start \"2026-01-01T09:00\" is not a real date and time in ISO 8601 with an offset, such as <TIME>Z\n"
+    },
+    {
+      "args": [
+        "time",
+        "add",
+        "1",
+        "--start",
+        "2026-02-30T09:00:00Z",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"start \\\"<TIME>Z\\\" is not a real date and time in ISO 8601 with an offset, such as <TIME>Z\"\n}\n",
+      "stderr": "Error: start \"<TIME>Z\" is not a real date and time in ISO 8601 with an offset, such as <TIME>Z\n"
+    },
+    {
+      "args": [
+        "time",
+        "add",
+        "1",
+        "--start",
+        "",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: start \"\" is not a real date and time in ISO 8601 with an offset, such as <TIME>Z\n"
+    },
+    {
+      "args": [
+        "time",
+        "add",
+        "1",
+        "--start",
+        "2026-01-01T09:00:00Z",
+        "--end",
+        "2026-01-01T10:00",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: end \"2026-01-01T10:00\" is not a real date and time in ISO 8601 with an offset, such as <TIME>Z\n"
+    },
+    {
+      "args": [
+        "time",
+        "update",
+        "time0002",
+        "--start",
+        "2026-01-01T09:00",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: start \"2026-01-01T09:00\" is not a real date and time in ISO 8601 with an offset, such as <TIME>Z\n"
+    },
+    {
+      "args": [
+        "time",
+        "start",
+        "1",
+        "--start",
+        "2026-01-01T10:00:00+09:00",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "started time0004 on #1\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "time",
+        "stop",
+        "time0002",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: time entry time0002 already stopped at 2026-01-01T11:00:00.000Z; change its end with `kaneo time update \"time0002\" --end <time>`\n"
+    },
+    {
+      "args": [
+        "time",
+        "stop",
+        "nope",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/time-entry/nope: 400: Workspace ID could not be determined\n"
+    },
+    {
+      "args": [
+        "time",
+        "get",
+        "nope",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/time-entry/nope: 400: Workspace ID could not be determined\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/time-entry",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "startTime": "2026-01-01T09:00:00Z",
+        "endTime": "2026-01-01T10:30:00Z",
+        "description": "review"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/time-entry",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "startTime": "2026-01-01T08:00:00Z"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/time-entry/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/time-entry/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/time-entry/time0003",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/time-entry/time0003",
+      "query": "",
+      "body": {
+        "startTime": "2026-01-01T08:00:00.000Z",
+        "endTime": "2026-01-01T08:45:00Z",
+        "description": "triage"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/time-entry/time0002",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/time-entry/time0002",
+      "query": "",
+      "body": {
+        "startTime": "2026-01-01T09:00:00.000Z",
+        "endTime": "2026-01-01T11:00:00Z"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/time-entry/time0002",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/time-entry/time0002",
+      "query": "",
+      "body": {
+        "startTime": "2026-01-01T09:00:00.000Z",
+        "description": ""
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/time-entry/time0002",
+      "query": "",
+      "body": {
+        "startTime": "2026-01-01T12:00:00Z"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/time-entry/time0003",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/time-entry",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "startTime": "2026-01-01T10:00:00Z",
+        "endTime": "2026-01-01T09:00:00Z"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/time-entry",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "startTime": "2026-01-01T10:00:00+09:00"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/time-entry/time0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/time-entry/nope",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/time-entry/nope",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -424,6 +424,10 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["LinkTasks", "POST", "/api/task-relation", () => api.linkTasks("s", "d", "blocks")],
     ["DeleteRelation", "DELETE", "/api/task-relation/a%2Fb", () => api.deleteRelation(id)],
     ["CreateProject", "POST", "/api/project", () => api.createProject({ name: "n", workspaceId: "w", icon: "", slug: "" })],
+    ["ListTimeEntries", "GET", "/api/time-entry/task/a%2Fb", () => api.listTimeEntries(id)],
+    ["GetTimeEntry", "GET", "/api/time-entry/a%2Fb", () => api.getTimeEntryById(id)],
+    ["UpdateTimeEntry", "PUT", "/api/time-entry/a%2Fb", () => api.updateTimeEntryById(id, { startTime: TIME })],
+    ["AddTimeEntry", "POST", "/api/time-entry", () => api.addTimeEntry(id, { startTime: TIME, description: "" })],
     ["ListProjects", "GET", "/api/project", () => api.listProjectsIn("w", false)],
     ["ListWorkspaces", "GET", "/api/auth/organization/list", () => api.listWorkspaces()],
     ["ListWorkspaceLabels", "GET", "/api/label/workspace/a%2Fb", () => api.listWorkspaceLabels(id)],
@@ -446,7 +450,9 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
       () => undefined,
       (e) => e,
     );
-    expect(err !== undefined, `${name}: err = ${err}`).toBe(["GetBoard", "EditComment", "AddActivity"].includes(name));
+    expect(err !== undefined, `${name}: err = ${err}`).toBe(
+      ["GetBoard", "EditComment", "AddActivity", "AddTimeEntry", "UpdateTimeEntry"].includes(name),
+    );
     expect(seen[0]).toEqual({ method, path });
   });
 });
@@ -802,4 +808,104 @@ test("TestUpdateProjectEscapesTheID", async () => {
   });
   await api.updateProject("a/b", { name: "New" });
   expect(paths.join(", ")).toBe("GET /api/project/a%2Fb, PUT /api/project/a%2Fb");
+});
+
+describe("time entries", () => {
+  const entry = (id: string, extra = "") =>
+    `{"id":"${id}","taskId":"t1","userId":"u1","description":"d","startTime":"${TIME}","endTime":null,"duration":null,"createdAt":"${TIME}","updatedAt":"${TIME}"${extra}}`;
+
+  // An update without a start reads it back; a read that decoded to nothing, or
+  // to another entry, must not be written back as the start.
+  test.each([
+    ["an empty reply", "{}"],
+    ["another entry", entry("other")],
+    ["the entry with no start", entry("e1").replace(`"startTime":"${TIME}"`, '"startTime":null')],
+  ])("update refuses to write back %s", async (_name, reply) => {
+    const seen: string[] = [];
+    newServer((req) => {
+      seen.push(req.method);
+      return new Response(reply, { headers: { "content-type": "application/json" } });
+    });
+    const err = await failure(api.updateTimeEntryById("e1", { endTime: TIME }));
+    expect(String(err)).toContain("not writing");
+    expect(seen).toEqual(["GET"]);
+  });
+
+  test("add sends only what was given", async () => {
+    const seen = recorder(entry("e1"));
+    await api.addTimeEntry("t1", { startTime: TIME, description: "" });
+    expect(JSON.parse(seen.body)).toEqual({ taskId: "t1", startTime: TIME });
+    await api.addTimeEntry("t1", { startTime: TIME, endTime: TIME, description: "d" });
+    expect(JSON.parse(seen.body)).toEqual({ taskId: "t1", startTime: TIME, endTime: TIME, description: "d" });
+  });
+
+  test("update sends the start and only the changed fields", async () => {
+    const seen = recorder(entry("e1"));
+    await api.updateTimeEntryById("e1", { startTime: TIME, description: "" });
+    expect(JSON.parse(seen.body)).toEqual({ startTime: TIME, description: "" });
+  });
+
+  // A write the server did not echo is not reported as done.
+  test.each([
+    ["add, empty reply", () => api.addTimeEntry("t1", { startTime: TIME, description: "" }), "{}"],
+    ["update, empty reply", () => api.updateTimeEntryById("e1", { startTime: TIME }), "{}"],
+    ["update, another entry", () => api.updateTimeEntryById("e1", { startTime: TIME }), entry("other")],
+  ])("%s is refused", async (_name, call, reply) => {
+    recorder(reply);
+    expect(String(await failure(call()))).toContain("the write is not confirmed");
+  });
+
+  test("stop reads the entry, refuses one already stopped, and ends a running one", async () => {
+    let stored = entry("e1");
+    const seen: string[] = [];
+    newServer(async (req) => {
+      seen.push(req.method);
+      if (req.method === "PUT") stored = entry("e1").replace('"endTime":null', `"endTime":"${TIME}"`);
+      return new Response(stored, { headers: { "content-type": "application/json" } });
+    });
+    expect((await api.stopTimeEntry("e1", TIME)).endTime).toBe(TIME);
+    expect(String(await failure(api.stopTimeEntry("e1", TIME)))).toContain("already stopped");
+    expect(seen).toEqual(["GET", "PUT", "GET"]);
+  });
+
+  // The generated schema requires userName, but a reply is not refused for
+  // departing from the schema, so a server that leaves it out reads as null.
+  test("a listing without userName reads as null", async () => {
+    recorder(`[${entry("e1")}]`);
+    expect((await api.listTimeEntries("t1"))[0]!.userName).toBeNull();
+  });
+
+  test("the list carries the user's name and the single reads do not", async () => {
+    recorder(`[${entry("e1", ',"userName":"Ann"')}]`);
+    expect((await api.listTimeEntries("t1"))[0]!.userName).toBe("Ann");
+    recorder(entry("e1", ',"userName":"Ann"'));
+    expect("userName" in (await api.getTimeEntryById("e1"))).toBe(false);
+  });
+
+  test.each([
+    ["2026-01-02T09:00:00Z", true],
+    ["2026-01-02T09:00+09:00", true],
+    ["2026-01-02T09:00:00.123456789-05:30", true],
+    ["2026-01-02T09:00:00", false],
+    ["2026-01-02", false],
+    ["2026-02-30T09:00:00Z", false],
+    ["2026-13-01T09:00:00Z", false],
+    ["", false],
+    ["tomorrow", false],
+  ])("checkTimestamp(%p) accepts: %p", (value, ok) => {
+    const run = () => api.checkTimestamp("start", value);
+    if (ok) expect(run()).toBe(value);
+    else expect(run).toThrow("is not a real date and time in ISO 8601 with an offset");
+  });
+
+  test("a bad time is refused before any request", async () => {
+    const seen: string[] = [];
+    newServer((req) => {
+      seen.push(req.method);
+      return new Response("{}");
+    });
+    await failure(api.addTimeEntry("t1", { startTime: "2026-01-02T09:00", description: "" }));
+    await failure(api.updateTimeEntryById("e1", { endTime: "" }));
+    expect(seen).toEqual([]);
+  });
 });

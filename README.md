@@ -186,6 +186,12 @@ kaneo label attach <task> <label>    # a label by name or id
 kaneo label detach <task> <label>
 kaneo label update <label> [--name NAME] [--color COLOR]   # tasks carrying it follow
 kaneo label rm <label> --yes         # also removes it from every task
+kaneo time ls <task-id>
+kaneo time get <entry-id>
+kaneo time add <task-id> [--start TIME] [-d TEXT]               # starts a running timer, now by default (alias: time start)
+kaneo time add <task-id> --start TIME --end TIME [-d TEXT]      # logs a finished entry
+kaneo time stop <entry-id>                                      # ends a running timer now
+kaneo time update <entry-id> [--start TIME] [--end TIME] [-d TEXT]   # only what is passed changes
 ```
 
 A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds. `task update` writes the status first, and when a field after it fails the error names the fields that were already updated.
@@ -195,6 +201,8 @@ Long text is taken as it was written rather than as a shell passes it: `-` is st
 A project's slug is the prefix of its task identifiers. Without `--slug`, `project create` derives it the way the Kaneo web app does: the first three letters of a one-word name, or the initials of the first three words, upper case, in any script (`Alpha Beta Gamma` → `ABG`, `日本語だけ` → `日本語`). A name with no letter or number derives nothing, and a derived slug another project in the workspace already has is refused; both have to be given `--slug`.
 
 A task in no column at all — the server answers `planned` and `archived` tasks beside the columns — is read as a column of its own, and `task ls` leaves those out unless `--all` or an explicit `--status` asks for them. `board` shows neither.
+
+Times are ISO 8601 with an offset (`2026-01-02T09:00:00Z`, `2026-01-02T18:00+09:00`); a time without one is refused rather than read in some zone. "Now" is this machine's clock.
 
 Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project>#<number>` names a board and a number on it: `kaneo task get kaneo-cli#3` reads the reference written as `kaneo kaneo-cli#3`, which is also what `KANEO_TASK_REF` holds after its `kaneo ` prefix. The project before the `#` is an id, slug or name.
 

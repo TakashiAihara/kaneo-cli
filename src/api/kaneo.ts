@@ -23,6 +23,7 @@ import {
   createTaskRelation,
   deleteNotificationPreferenceWorkspaceRule,
   deleteColumn as removeColumn,
+  createTimeEntry,
   deleteTask as removeTask,
   getNotificationPreferences as readNotificationPreferences,
   deleteTaskComment,
@@ -36,6 +37,8 @@ import {
   getTaskComments,
   getTaskRelations,
   listNotifications as getNotifications,
+  getTaskTimeEntries,
+  getTimeEntry,
   listOrganization,
   listProjects,
   listTasks,
@@ -54,6 +57,7 @@ import {
   updateTaskPriority,
   updateTaskStatus,
   updateTaskTitle,
+  updateTimeEntry,
 } from "./gen/kaneo";
 import type {
   Board as GenBoard,
@@ -75,6 +79,7 @@ import type {
   TaskRelation as GenRelation,
   TaskRelationWithTasks,
   UpdateNotificationPreferencesBody,
+  TimeEntry as GenTimeEntry,
   UpdateTaskPriorityBody,
   UpsertNotificationPreferenceWorkspaceRuleBody,
 } from "./gen/model";
@@ -1065,6 +1070,162 @@ export const addActivity = async (
     throw new Error("/activity/create: server did not echo the event; check `kaneo activity ls`");
   }
   return activity(a);
+};
+
+// Time logged against a task. endTime and duration are null while the entry is
+// still running; duration is in seconds. userId is null once the user who
+// logged it has been removed.
+export type TimeEntry = {
+  id: string;
+  taskId: string;
+  userId: string | null;
+  description: string;
+  startTime: string;
+  endTime: string | null;
+  duration: number | null;
+};
+
+// The task listing is the one route that resolves who logged an entry, so the
+// name is only part of what it answers. A missing name is null, which is how
+// the server reports a user it no longer has.
+export type ListedTimeEntry = TimeEntry & { userName: string | null };
+
+const timeEntry = (t: GenTimeEntry): TimeEntry => ({
+  id: t.id ?? "",
+  taskId: t.taskId ?? "",
+  userId: t.userId ?? null,
+  description: t.description ?? "",
+  startTime: isoTime("startTime", t.startTime),
+  endTime: isoTimePtr("endTime", t.endTime),
+  duration: t.duration ?? null,
+});
+
+// A task's time entries, in the order the server lists them (by start).
+export const listTimeEntries = async (taskId: string): Promise<ListedTimeEntry[]> =>
+  zeroList(await getTaskTimeEntries(pathParam(taskId))).map((t) => ({
+    ...timeEntry(t),
+    userName: t.userName ?? null,
+  }));
+
+export const getTimeEntryById = async (entryId: string): Promise<TimeEntry> =>
+  timeEntry(zeroRecord(await getTimeEntry(pathParam(entryId))));
+
+// What v2.29.2 accepts as a time entry timestamp (apps/api/src/time-entry/
+// schema.ts), term for term: ISO 8601 with an offset, on a date the calendar
+// has. It is checked here because releases before v2.23 take any string and
+// hand it to new Date(), which stores a time without an offset in the server's
+// own zone, so a mistyped time would be written rather than refused.
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
+
+export const checkTimestamp = (field: string, value: string): string => {
+  const [year, month, day] = [value.slice(0, 4), value.slice(5, 7), value.slice(8, 10)].map(Number) as [number, number, number];
+  // Date.parse rolls an impossible date over (2026-02-30 reads as March 2), so
+  // the date is rebuilt and compared. A roll-over changes both the month and
+  // the day, so either comparison alone catches it and a test cannot tell them
+  // apart; all three are kept so the check stays upstream's term for term.
+  const probe = new Date(0);
+  probe.setUTCFullYear(year, month - 1, day);
+  const valid =
+    ISO_TIMESTAMP.test(value) &&
+    !Number.isNaN(Date.parse(value)) &&
+    probe.getUTCFullYear() === year &&
+    probe.getUTCMonth() === month - 1 &&
+    probe.getUTCDate() === day;
+  if (!valid) {
+    throw new Error(`${field} ${JSON.stringify(value)} is not a real date and time in ISO 8601 with an offset, such as 2026-01-31T09:00:00Z`);
+  }
+  return value;
+};
+
+// A write the server did not echo back is not reported as done, whatever its
+// status: it may well have happened, but printing an entry with no id as the
+// one just written would claim more than the reply said.
+const echoed = (entry: TimeEntry, route: string, wantId?: string): TimeEntry => {
+  if (entry.id === "" || (wantId !== undefined && entry.id !== wantId)) {
+    throw new Error(`${route}: server answered with time entry ${JSON.stringify(entry.id)}; the write is not confirmed`);
+  }
+  return entry;
+};
+
+// Logs time against a task. Without an end the entry is a running timer, closed
+// later by an update that sets one.
+export const addTimeEntry = async (
+  taskId: string,
+  wanted: { startTime: string; endTime?: string; description: string },
+): Promise<TimeEntry> =>
+  echoed(
+    timeEntry(
+      zeroRecord(
+        await createTimeEntry({
+          taskId,
+          startTime: checkTimestamp("start", wanted.startTime),
+          ...(wanted.endTime === undefined ? {} : { endTime: checkTimestamp("end", wanted.endTime) }),
+          ...(wanted.description === "" ? {} : { description: wanted.description }),
+        }),
+      ),
+    ),
+    "/time-entry",
+  );
+
+// An entry read in order to write its start back. A reply that decoded to no
+// entry, or to another one, would move the entry to 0001-01-01 (what isoTime
+// makes of a missing timestamp) or to a stranger's start, so it is refused.
+const readForWrite = async (entryId: string): Promise<TimeEntry> => {
+  const read = await getTimeEntryById(entryId);
+  if (read.id !== entryId || read.startTime === ZERO_TIME) {
+    throw new Error(`reading time entry ${entryId} before the update got id ${JSON.stringify(read.id)}, start ${read.startTime}; not writing`);
+  }
+  return read;
+};
+
+// Changes the fields given and keeps the rest.
+//
+// The document calls the update a replace, but the controller keeps the stored
+// endTime and description when the body leaves them out, from v2.18 through
+// v2.29.2 (apps/api/src/time-entry/controllers/update-time-entry.ts). startTime
+// is the one field it requires, so it is read back from the entry when not
+// given. An end, once set, cannot be cleared through this route.
+//
+// Because the start has to be sent, a change made to it elsewhere between the
+// read and the write is overwritten.
+export const updateTimeEntryById = async (
+  entryId: string,
+  changes: { startTime?: string; endTime?: string; description?: string },
+): Promise<TimeEntry> => {
+  if (changes.endTime !== undefined) checkTimestamp("end", changes.endTime);
+  const startTime =
+    changes.startTime === undefined ? (await readForWrite(entryId)).startTime : checkTimestamp("start", changes.startTime);
+  return putTimeEntry(entryId, { ...changes, startTime });
+};
+
+const putTimeEntry = async (
+  entryId: string,
+  body: { startTime: string; endTime?: string; description?: string },
+): Promise<TimeEntry> =>
+  echoed(
+    timeEntry(
+      zeroRecord(
+        await updateTimeEntry(pathParam(entryId), {
+          startTime: body.startTime,
+          ...(body.endTime === undefined ? {} : { endTime: body.endTime }),
+          ...(body.description === undefined ? {} : { description: body.description }),
+        }),
+      ),
+    ),
+    `/time-entry/${entryId}`,
+    entryId,
+  );
+
+// Ends a running entry. One that already had an end when it was read is
+// refused rather than moved to the new one: stopping twice is a slip, and an
+// end set elsewhere is somebody's record. An end set between the read and the
+// write is overwritten, as with any update.
+export const stopTimeEntry = async (entryId: string, endTime: string): Promise<TimeEntry> => {
+  const read = await readForWrite(entryId);
+  if (read.endTime !== null) {
+    throw new Error(`time entry ${entryId} already stopped at ${read.endTime}; change its end with \`kaneo time update ${JSON.stringify(entryId)} --end <time>\``);
+  }
+  return putTimeEntry(entryId, { startTime: read.startTime, endTime });
 };
 
 // The links the server accepts between two tasks.

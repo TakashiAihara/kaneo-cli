@@ -29,6 +29,8 @@ import {
   TaskRelation,
   TaskRelationWithTasks,
   TaskWithAssignee,
+  TimeEntry,
+  TimeEntryWithUser,
   WorkspaceMember
 } from './model';
 import type {
@@ -41,6 +43,7 @@ import type {
   CreateTaskBody,
   CreateTaskCommentBody,
   CreateTaskRelationBody,
+  CreateTimeEntryBody,
   GlobalSearchParams,
   ListProjectsParams,
   ListTasksParams,
@@ -58,6 +61,7 @@ import type {
   UpdateTaskPriorityBody,
   UpdateTaskStatusBody,
   UpdateTaskTitleBody,
+  UpdateTimeEntryBody,
   UpsertNotificationPreferenceWorkspaceRuleBody
 } from './model';
 
@@ -1064,6 +1068,139 @@ export const deleteTaskComment = async (id: string, options?: Parameters<typeof 
 
     ,
     schema: Activity
+  }
+);}
+
+
+
+export const getGetTaskTimeEntriesUrl = (taskId: string,) => {
+
+
+
+
+  return `/time-entry/task/${taskId}`
+}
+
+/**
+ * Get every time entry logged against a task.
+ * @summary Get task time entries
+ */
+export const getTaskTimeEntries = async (taskId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<TimeEntryWithUser[]> => {
+
+  return kaneoFetch<TimeEntryWithUser[]>(getGetTaskTimeEntriesUrl(taskId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(TimeEntryWithUser)
+  }
+);}
+
+
+
+export const getGetTimeEntryUrl = (id: string,) => {
+
+
+
+
+  return `/time-entry/${id}`
+}
+
+/**
+ * Get a single time entry by ID.
+ * @summary Get time entry
+ */
+export const getTimeEntry = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<TimeEntry> => {
+
+  return kaneoFetch<TimeEntry>(getGetTimeEntryUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: TimeEntry
+  }
+);}
+
+
+
+export const getUpdateTimeEntryUrl = (id: string,) => {
+
+
+
+
+  return `/time-entry/${id}`
+}
+
+/**
+ * Replace a time entry's start, end, and description. Setting endTime closes a running entry and fills in its duration.
+ * @summary Update time entry
+ */
+export const updateTimeEntry = async (id: string,
+    updateTimeEntryBody: UpdateTimeEntryBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<TimeEntry> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<TimeEntry>(getUpdateTimeEntryUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateTimeEntryBody),
+    schema: TimeEntry
+  }
+);}
+
+
+
+export const getCreateTimeEntryUrl = () => {
+
+
+
+
+  return `/time-entry`
+}
+
+/**
+ * Log time against a task. Omit endTime to start a running entry that can be closed later with an update.
+ * @summary Create time entry
+ */
+export const createTimeEntry = async (createTimeEntryBody: CreateTimeEntryBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<TimeEntry> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<TimeEntry>(getCreateTimeEntryUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createTimeEntryBody),
+    schema: TimeEntry
   }
 );}
 

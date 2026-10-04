@@ -29,6 +29,13 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      # The pinned document is the one the Kaneo release shipped. Regenerating
+      # below only proves the client matches the pinned file, so a hand edit to
+      # the file itself would pass without this. It needs the network, as
+      # bun install does.
+      - name: pinned spec matches the Kaneo release
+        run: bun run spec --check
+
       # The client is generated from the pinned OpenAPI document. A hand edit
       # to the generated code, or a document, transformer or registry change
       # committed without regenerating, fails here.

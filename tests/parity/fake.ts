@@ -177,6 +177,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
+  // What the real server sends for an HTTPException (its workspace middleware,
+  // and the routes that throw one): the message as a text/plain body, with no
+  // JSON envelope around it.
+  const failText = (status: number, message: string) =>
+    new Response(message, { status, headers: { "content-type": "text/plain;charset=UTF-8" } });
 
   const boardTask = (t: (typeof tasks)[number]) => ({
     id: t.id,
@@ -292,7 +297,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       // Checked by the server's workspace middleware before the route runs, as on
       // the task routes below.
-      if (!proj) return fail(400, "Workspace ID could not be determined");
+      if (!proj) return failText(400, "Workspace ID could not be determined");
       if (req.method === "GET" && !p[2]) return ok(M.Project, proj);
       if (req.method === "PUT" && !p[2]) {
         Object.assign(proj, body);
@@ -349,7 +354,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // The real server reads the path segment as a project id, finds no such
       // project and falls back to guessing a workspace from the key, which it
       // cannot: 400 with that complaint rather than a 404.
-      if (!proj) return fail(400, "Workspace ID could not be determined");
+      if (!proj) return failText(400, "Workspace ID could not be determined");
       const mine = tasks.filter((t) => t.projectId === proj.id);
       const size = opts.pageSize ?? 50;
       const page = Number(url.searchParams.get("page") ?? 1);
@@ -367,7 +372,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "POST" && (p = m(/^\/task\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj) return fail(400, "Workspace ID could not be determined");
+      if (!proj) return failText(400, "Workspace ID could not be determined");
       return ok(M.Task, addTask(proj.id, body as any));
     }
     if ((p = m(/^\/task\/(status|priority|assignee|move)\/([^/]+)$/)) && req.method === "PUT") {
@@ -384,7 +389,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (!b?.destinationProjectId) return fail(400, 'Invalid key: Expected "destinationProjectId" but received undefined');
         const from = t.projectId;
         const dest = projects.find((x) => x.id === b.destinationProjectId);
-        if (!dest) return fail(404, "Project not found");
+        if (!dest) return failText(404, "Project not found");
         dest.lastTaskNumber += 1;
         Object.assign(t, { projectId: dest.id, number: dest.lastTaskNumber, status: b.destinationStatus ?? firstColumn });
         return ok(M.MoveTaskResult, { task: t, sourceProjectId: from, destinationProjectId: dest.id });
@@ -406,7 +411,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // Upstream resolves the comment's workspace first and only then looks
       // for it among the caller's own comments.
       const i = comments.findIndex((c) => c.id === decodeURIComponent(p![1]));
-      if (i < 0) return fail(400, "Workspace ID could not be determined");
+      if (i < 0) return failText(400, "Workspace ID could not be determined");
       if (comments[i]!.userId !== "user-self") return fail(404, "Comment not found or you are not the author");
       const { user: _, ...c } = comments[i]!;
       const reply = ok(M.Activity, { ...c, type: "comment", externalUserName: null, externalUserAvatar: null, externalSource: null, externalUrl: null });

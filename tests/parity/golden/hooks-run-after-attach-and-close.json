@@ -8,7 +8,7 @@
         "--strict"
       ],
       "exit": 0,
-      "stdout": "{\n  \"taskId\": \"task-a2\",\n  \"number\": 2,\n  \"title\": \"Ship it\",\n  \"projectId\": \"proj-alpha\",\n  \"projectName\": \"Alpha\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
+      "stdout": "{\n  \"taskId\": \"task-a2\",\n  \"number\": 2,\n  \"title\": \"Ship it\",\n  \"projectId\": \"proj-alpha\",\n  \"projectName\": \"Alpha\",\n  \"projectSlug\": \"ALP\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
       "stderr": ""
     },
     {
@@ -57,6 +57,7 @@
   ],
   "files": {
     ".config/kaneo/config.json": "{\"hooks\":{\"attach\":\"printf \\\"%s %s %s %s\\\\n\\\" \\\"$KANEO_HOOK_EVENT\\\" \\\"$KANEO_TASK_ID\\\" \\\"$KANEO_TASK_NUMBER\\\" \\\"$KANEO_TASK_REF\\\" >> \\\"$HOME/.config/kaneo/hook.out\\\"\",\"close\":\"printf \\\"%s %s\\\\n\\\" \\\"$KANEO_HOOK_EVENT\\\" \\\"$KANEO_TASK_ID\\\" >> \\\"$HOME/.config/kaneo/hook.out\\\"\"}}",
-    ".config/kaneo/hook.out": "attach task-a2 2 kaneo ALP#2\nclose task-a2\n"
+    ".config/kaneo/hook.out": "attach task-a2 2 kaneo ALP#2\nclose task-a2\n",
+    ".config/kaneo/sessions/sess-hook.history.jsonl": "{\"event\":\"attach\",\"at\":\"<TIME>Z\",\"taskId\":\"task-a2\",\"number\":2,\"title\":\"Ship it\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n{\"event\":\"close\",\"at\":\"<TIME>Z\",\"taskId\":\"task-a2\",\"number\":2,\"title\":\"Ship it\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n"
   }
 }

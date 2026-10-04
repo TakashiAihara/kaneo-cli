@@ -59,7 +59,13 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
         .replaceAll(`host=${host} `, "host=<HOST> ")
         .replaceAll(`@${host} `, "@<HOST> ")
         .replaceAll(`"host": "${host}"`, `"host": "<HOST>"`)
-        .replaceAll(`"host":"${host}"`, `"host":"<HOST>"`);
+        .replaceAll(`"host":"${host}"`, `"host":"<HOST>"`)
+        // The CLI stamps its hook log and the attach history with the wall
+        // clock, and `session status` prints the history back out. Only the
+        // moment varies between runs; the zone is kept, because whether a stamp
+        // is UTC or local time is behaviour. The fake's times are all on
+        // 2026-01-01 and stay.
+        .replace(/\b(?!2026-01-01T)\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d:\d\d)/g, "<TIME>$2");
 
     const steps: StepResult[] = [];
     for (const args of s.steps) {
@@ -79,15 +85,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
       for (const name of readdirSync(dir).sort()) {
         const full = join(dir, name);
         if (statSync(full).isDirectory()) walk(full);
-        // The CLI stamps its own logs with the wall clock; the fake's times
-        // are all on 2026-01-01 and stay.
-        else
-          files[relative(home, full)] = normalize(readFileSync(full, "utf8")).replace(
-            /\b(?!2026-01-01T)\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d:\d\d)/g,
-            // The zone is kept: whether a log is written in UTC or local time
-            // is behaviour, and only the moment itself varies between runs.
-            "<TIME>$2",
-          );
+        else files[relative(home, full)] = normalize(readFileSync(full, "utf8"));
       }
     };
     if (existsSync(join(home, ".config"))) walk(join(home, ".config"));

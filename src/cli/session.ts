@@ -7,6 +7,7 @@ import { resolveTask } from "./task";
 import { CLOSED, format, RUNNING } from "../session/marker";
 import * as store from "../session/store";
 import type { Attachment } from "../session/store";
+import type { Json } from "../output/json";
 
 const env = (name: string): string => process.env[name] ?? "";
 
@@ -50,7 +51,7 @@ export const sessionCommand = {
 
         // Looked up before the marker is posted, so the lookups do not widen the
         // window where the server has a marker and this host has no record.
-        const attachment: Attachment = { taskId: task.id, number: task.number, title: task.title };
+        const attachment = attachmentOf(task);
         const slug = await describeBoard(app, task, attachment);
 
         const marker = store.describe(env, cwd(), RUNNING);
@@ -63,6 +64,16 @@ export const sessionCommand = {
           // leave `session next` believing nothing is attached, and a retry
           // would post a second marker.
           throw hard(`attached #${task.number} on the server, but could not record it locally: ${(e as Error).message}`);
+        }
+        try {
+          // Appended after the attachment is in place: a history line for an
+          // attachment that was never written would name a session as attached
+          // when nothing reads it as one.
+          store.appendHistory(store.sessionStore(), sessionId, "attach", attachment, new Date());
+        } catch (e) {
+          // The attachment is saved, so `session next` works; what is missing is
+          // the record a check after close relies on, which is worth failing over.
+          throw hard(`attached #${task.number}, but could not add it to the session history: ${(e as Error).message}`);
         }
 
         await runHook(app, "attach", hookEnv("attach", sessionId, task.id, task.number, slug));
@@ -108,30 +119,125 @@ export const sessionCommand = {
     },
     {
       name: "close",
+      use: "close [--task <task>]",
       short: "Mark this session's task as no longer held",
+      long:
+        "Mark a task this session was working on as no longer held.\n\n" +
+        "Without --task, the task in the attachment is closed: the one a plain\n" +
+        "`session attach` took, and the one whose attachment file is then removed.\n" +
+        "With --task, that task is closed instead, by number or id (a number is\n" +
+        "looked up in the current project; -p picks another), which releases\n" +
+        "one of several a session may hold. The attachment is only removed when it\n" +
+        "is that task, so a session attached elsewhere stays attached there, and a\n" +
+        "task this session attached earlier can be closed with no attachment at all.",
       args: noArgs("kaneo session close"),
-      flags: [strictFlag],
-      run: failOpen(async ({ app }: RunContext<App>) => {
+      flags: [
+        {
+          name: "task",
+          type: "string" as const,
+          usage: "task to close, by number or id; defaults to the attached one",
+          defaultValue: "",
+        },
+        strictFlag,
+      ],
+      run: failOpen(async ({ flags, app }: RunContext<App>) => {
         const sessionId = requireSessionId();
-        const attached = store.load(store.sessionStore(), sessionId);
-        if (attached === undefined) throw new Error("this session is not attached to a task");
+        const sessions = store.sessionStore();
+        const attached = store.load(sessions, sessionId);
+        const named = String(flags.task ?? "").trim();
+        if (named === "" && attached === undefined) throw new Error("this session is not attached to a task");
         apiKey(app);
+        // A named task is allowed with no attachment: a session that attached,
+        // re-attached elsewhere and now wants the first one released is the case
+        // --task is for, so the attachment is not the gate.
+        const task = named === "" ? undefined : await resolveTask(taskProject(app), named);
+        // What the marker is written against and what the attachment holds can
+        // differ once one of several tasks is named, so the attachment is only
+        // dropped for the task it actually names.
+        const holds = attached !== undefined && (task === undefined || attached.taskId === task.id);
+        // The close line is written from the attachment's record when the named
+        // task is the one held, so it carries the board as an unnamed close does.
+        const closed = holds ? attached! : attachmentOf(task!);
 
         const marker = store.describe(env, cwd(), CLOSED);
         marker.nextStep = `Session ended. Resume with \`claude --resume ${sessionId}\`.`;
-        await addComment(attached.taskId, format(marker));
-        store.clear(store.sessionStore(), sessionId);
-        await runHook(app, "close", hookEnv("close", sessionId, attached.taskId, attached.number, ""));
+        await addComment(closed.taskId, format(marker));
+        // A task closed by name that the attachment does not hold has no board on
+        // record here, so it is looked up as attach does, with the same best
+        // effort. After the marker: the lookups only fill the history line, and
+        // spending the time budget on them first could time out the close itself.
+        if (!holds) await describeBoard(app, task!, closed);
+        try {
+          // History first: a failed append then leaves the attachment in place,
+          // where the other order would drop it and leave the history ending in
+          // an attach with no close.
+          store.appendHistory(sessions, sessionId, "close", closed, new Date());
+        } catch (e) {
+          throw hard(
+            `closed #${closed.number} on the server, but could not add it to the session history (still attached here): ${(e as Error).message}`,
+          );
+        }
+        try {
+          if (holds) store.clear(sessions, sessionId);
+        } catch (e) {
+          // Re-running close would post a second marker; what is left is only
+          // the local file, so the message names that.
+          throw hard(`closed #${closed.number} and recorded it, but could not remove the attachment: ${(e as Error).message}`);
+        }
+        await runHook(app, "close", hookEnv("close", sessionId, closed.taskId, closed.number, ""));
 
-        app.out.human(`closed: #${attached.number} ${attached.title}`);
-        app.out.data({ number: attached.number, taskId: attached.taskId });
+        app.out.human(`closed: #${closed.number} ${closed.title}`);
+        app.out.data({ number: closed.number, taskId: closed.taskId });
       }),
+    },
+    {
+      name: "status",
+      short: "Show what this session holds, and what it has held",
+      long:
+        "Show what this session holds, and what it has held.\n\n" +
+        "Read from the files this session wrote under the config directory: no\n" +
+        "request is made and no API key is needed, so it answers on a machine\n" +
+        "that cannot reach a board. The attachment is what the session holds now,\n" +
+        "and the history every attach and close since, which close keeps.",
+      args: noArgs("kaneo session status"),
+      // Accepted so a hook can pass --strict to every session command alike;
+      // status is not fail-open, so there is nothing for it to turn off.
+      flags: [strictFlag],
+      run: async ({ app }: RunContext<App>) => {
+        const sessionId = requireSessionId();
+        const sessions = store.sessionStore();
+        const attached = store.load(sessions, sessionId) ?? null;
+        const { entries, skipped } = store.readHistory(sessions, sessionId);
+
+        if (attached === null) app.out.human("attached: none");
+        else app.out.human(`attached: ${ref(attached.projectSlug, attached.number)} ${attached.title}`);
+        for (const entry of entries) {
+          const line = entry as Record<string, Json | undefined>;
+          const slug = typeof line["projectSlug"] === "string" ? line["projectSlug"] : undefined;
+          app.out.human(
+            `${String(line["at"] ?? "")}  ${String(line["event"] ?? "").padEnd(6)} ${ref(slug, String(line["number"] ?? ""))} ${String(line["title"] ?? "")}`,
+          );
+        }
+        // Only where a person reads it: the JSON already carries every entry that
+        // was read, and a count of the ones that were not has nothing to add to it.
+        if (skipped > 0) app.out.status(`skipped ${skipped} unreadable history line(s)`);
+
+        app.out.data({ sessionId, attached, history: entries });
+      },
     },
   ],
 };
 
-// Fills in which project and workspace the task is on, and answers the project's
-// slug, which the attach hook needs and the attachment does not keep.
+// The task reference people write, "slug#number". A record written before the
+// slug was kept, or whose lookup failed, has only the number.
+const ref = (slug: string | undefined, number: number | string): string => `${slug ?? ""}#${number}`;
+
+// The attachment a task is recorded as, before the board lookups fill in the
+// project and workspace it belongs to.
+const attachmentOf = (task: Task): Attachment => ({ taskId: task.id, number: task.number, title: task.title });
+
+// Fills in which project and workspace the task is on, which the attachment keeps
+// as well as answers the project's slug for the attach hook.
 //
 // Best effort: failing the attach over a name a statusline wants would leave the
 // session unattached. A lookup that fails leaves its fields unset, which a reader
@@ -156,6 +262,9 @@ const describeBoard = async (app: App, task: Task, attachment: Attachment): Prom
     return "";
   }
   attachment.projectName = project.name;
+  // The slug is what the task reference is written as, so a reader that has the
+  // attachment can print "slug#number" without looking the project up again.
+  attachment.projectSlug = project.slug;
   attachment.workspaceId = project.workspaceId;
   if (attachment.workspaceId === "") return project.slug;
 

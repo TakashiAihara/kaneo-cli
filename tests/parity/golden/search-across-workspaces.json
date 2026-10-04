@@ -1,0 +1,327 @@
+{
+  "steps": [
+    {
+      "args": [
+        "search",
+        "elsewhere",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"elsewhere\",\n  \"totalCount\": 0,\n  \"results\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "elsewhere",
+        "-A",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "task  GAM#1  Filed elsewhere first  (to-do)  (Other)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "first",
+        "--all-workspaces",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"first\",\n  \"totalCount\": 3,\n  \"results\": [\n    {\n      \"id\": \"task-g1\",\n      \"type\": \"task\",\n      \"title\": \"Filed elsewhere first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-gamma\",\n      \"projectName\": \"Gamma\",\n      \"projectSlug\": \"GAM\",\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"priority\": \"low\",\n      \"status\": \"to-do\"\n    },\n    {\n      \"id\": \"task-b1\",\n      \"type\": \"task\",\n      \"title\": \"Beta first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-beta\",\n      \"projectName\": \"Beta\",\n      \"projectSlug\": \"BET\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:08.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"priority\": \"urgent\",\n      \"status\": \"to-do\"\n    },\n    {\n      \"id\": \"cmt0001\",\n      \"type\": \"comment\",\n      \"title\": \"Comment on Write the parser\",\n      \"description\": null,\n      \"content\": \"first comment\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"\",\n      \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n      \"relevanceScore\": 1,\n      \"taskNumber\": 1,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "first",
+        "-A",
+        "--limit",
+        "2",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "task  GAM#1  Filed elsewhere first  (to-do)  (Other)\ntask  BET#1  Beta first  (to-do)  (Main)\n2 shown; there may be more (--limit up to 50)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "first",
+        "-A",
+        "--in-project",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--all-workspaces searches every workspace, so it cannot be narrowed to a project\"\n}\n",
+      "stderr": "Error: --all-workspaces searches every workspace, so it cannot be narrowed to a project\n"
+    },
+    {
+      "args": [
+        "search",
+        "first",
+        "-A",
+        "-p",
+        "BET",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --all-workspaces searches every workspace, so it cannot be narrowed to a project\n"
+    },
+    {
+      "args": [
+        "search",
+        "other",
+        "-A",
+        "--type",
+        "workspaces",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"other\",\n  \"totalCount\": 1,\n  \"results\": [\n    {\n      \"id\": \"ws-other\",\n      \"type\": \"workspace\",\n      \"title\": \"Other\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": null,\n      \"projectName\": null,\n      \"projectSlug\": null,\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "er",
+        "-A",
+        "--limit",
+        "2",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace         Other\ntask       GAM#1  Filed elsewhere first  (to-do)  (Other)\n2 shown; there may be more (--limit up to 50)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "first",
+        "-A",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"first\",\n  \"totalCount\": 3,\n  \"results\": [\n    {\n      \"id\": \"task-g1\",\n      \"type\": \"task\",\n      \"title\": \"Filed elsewhere first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-gamma\",\n      \"projectName\": \"Gamma\",\n      \"projectSlug\": \"GAM\",\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"priority\": \"low\",\n      \"status\": \"to-do\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "x",
+        "-A",
+        "--limit",
+        "0",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--limit must be a whole number from 1 to 50\"\n}\n",
+      "stderr": "Error: --limit must be a whole number from 1 to 50\n"
+    },
+    {
+      "args": [
+        "search",
+        "x",
+        "-A",
+        "--limit",
+        "51",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --limit must be a whole number from 1 to 50\n"
+    },
+    {
+      "args": [
+        "search",
+        "x",
+        "-A",
+        "--limit",
+        "1.5",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --limit must be a whole number from 1 to 50\n"
+    },
+    {
+      "args": [
+        "search",
+        "first",
+        "-A",
+        "--limit",
+        "3",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "task     GAM#1  Filed elsewhere first  (to-do)  (Other)\ntask     BET#1  Beta first  (to-do)  (Main)\ncomment  ALP#1  Comment on Write the parser  (Main)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "er",
+        "--limit",
+        "3",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace         Other\ntask       ALP#1  Write the parser  (to-do)\n2 shown; there may be more (--limit up to 50)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "er",
+        "--limit",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"er\",\n  \"totalCount\": 3,\n  \"results\": [\n    {\n      \"id\": \"ws-other\",\n      \"type\": \"workspace\",\n      \"title\": \"Other\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": null,\n      \"projectName\": null,\n      \"projectSlug\": null,\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=elsewhere&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=elsewhere&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=elsewhere&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=other&type=workspaces&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=other&type=workspaces&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=er&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=er&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=3&q=er&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=2&q=er&workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

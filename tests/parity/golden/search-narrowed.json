@@ -72,7 +72,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "project  BET    Beta\ntask     BET#1  Beta first  (to-do)\ntask     ALP#3  Old news  (done)\ntask     ALP#1  Write the parser  (to-do)\ncomment  ALP#3  Comment on Old news\ncomment  ALP#1  Comment on Write the parser\n",
+      "stdout": "project    BET    Beta\nworkspace         Other\ntask       BET#1  Beta first  (to-do)\ntask       ALP#3  Old news  (done)\ntask       ALP#1  Write the parser  (to-do)\ncomment    ALP#3  Comment on Old news\ncomment    ALP#1  Comment on Write the parser\n",
       "stderr": ""
     },
     {
@@ -96,7 +96,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "project  BET    Beta\ntask     BET#1  Beta first  (to-do)\n2 shown; there may be more (--limit up to 50)\n",
+      "stdout": "project    BET  Beta\nworkspace       Other\n2 shown; there may be more (--limit up to 50)\n",
       "stderr": ""
     },
     {

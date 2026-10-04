@@ -1,0 +1,33 @@
+{
+  "steps": [
+    {
+      "args": [
+        "search",
+        "er",
+        "-A",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace    Other\n1 shown; there may be more (--limit up to 50)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=er&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=er&workspaceId=ws-other"
+    }
+  ],
+  "files": {}
+}

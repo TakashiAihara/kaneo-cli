@@ -145,8 +145,9 @@ kaneo workspace ls
 kaneo workspace rename <workspace-id> <name>   # name only; slug and description unchanged
 kaneo workspace members         # the resolved workspace's members and their roles
 kaneo invitation get <invitation-id>   # whether one can still be accepted, and why not
-kaneo search <text...> [--type tasks|projects|workspaces|comments|activities] [--limit N] [--in-project]
+kaneo search <text...> [--type tasks|projects|workspaces|comments|activities] [--limit N] [--in-project | -A]
                                 # the whole resolved workspace unless --in-project or -p narrows it; --limit is at most 50
+                                # -A searches every workspace as one ranked list; `search <text> -A --type tasks --limit 50` is the duplicate check before task create
 kaneo project ls [-A]           # -A lists every workspace, naming the workspace each project is in
 kaneo project find <text>       # substring match on name and slug, across every workspace
 kaneo project get [project-id]

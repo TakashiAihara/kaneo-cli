@@ -481,6 +481,18 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const found: Hit[] = [];
       const taskHits: Hit[] = [];
       const commentHits: Hit[] = [];
+      // Workspaces are matched across every one the key can reach whichever
+      // workspace is asked, and each once per member, as in v2.29.2 (it joins
+      // the members without narrowing them), so the same match comes back from a
+      // search of each, and more than once.
+      const workspaceHits: Hit[] = [];
+      for (const w of workspaces) {
+        if ((type === "all" || type === "workspaces") && hit(w.name)) {
+          for (let n = 0; n < Math.max(1, seed.members?.length ?? 0); n++) {
+            workspaceHits.push({ id: w.id, type: "workspace", title: w.name, createdAt: seededAt, relevanceScore: 3, workspaceId: w.id, workspaceName: w.name });
+          }
+        }
+      }
       for (const x of inWorkspace) {
         if ((type === "all" || type === "projects") && hit(x.name, x.slug)) {
           found.push({ id: x.id, type: "project", title: x.name, createdAt: x.createdAt, relevanceScore: 3, ...where(x) });
@@ -499,7 +511,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         }
       }
       const ranked = (list: Hit[]) => list.sort((a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt));
-      const results = ranked([...capped(ranked(found)), ...capped(ranked(taskHits)), ...capped(ranked(commentHits))]);
+      const results = ranked([...capped(ranked(found)), ...capped(ranked(taskHits)), ...capped(workspaceHits), ...capped(ranked(commentHits))]);
       return ok(M.SearchResponse, { results: capped(results), totalCount: results.length, searchQuery: url.searchParams.get("q") ?? "" });
     }
 

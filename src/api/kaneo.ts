@@ -725,7 +725,7 @@ export const deleteComment = async (commentId: string): Promise<void> => {
 // empty 2xx would otherwise read as an edit. It may still have been stored, so
 // the message says where to look.
 export const editComment = async (comment: Comment, content: string): Promise<Comment> => {
-  const a = zeroRecord(await call(updateTaskComment(pathParam(comment.id), { content })));
+  const a = zeroRecord(await updateTaskComment(pathParam(comment.id), { content }));
   if (a.id !== comment.id || a.content !== content) {
     throw new Error(`/comment/${comment.id}: server did not echo the edit; check \`kaneo comment ls\``);
   }
@@ -750,13 +750,13 @@ const activity = (a: GenActivity): Activity => ({
   // It came off the wire as JSON, so it is JSON.
   eventData: (a.eventData ?? null) as Json,
   userId: a.userId ?? "",
-  createdAt: isoTime(a.createdAt),
+  createdAt: isoTime("createdAt", a.createdAt),
 });
 
 // A task's history, oldest first like its comments. The server sends it newest
 // first.
 export const listActivities = async (taskId: string): Promise<Activity[]> =>
-  zeroList(await call(getActivities(pathParam(taskId)))).map(activity).reverse();
+  zeroList(await getActivities(pathParam(taskId))).map(activity).reverse();
 
 // Records an event on a task, the way an importer writes one. An empty message
 // is sent as null, which is how the server stores an event that has none.
@@ -770,7 +770,7 @@ export const addActivity = async (
   message: string,
   eventData: Record<string, unknown> | null,
 ): Promise<Activity> => {
-  const a = zeroRecord(await call(createActivity({ taskId, type, message: message === "" ? null : message, eventData })));
+  const a = zeroRecord(await createActivity({ taskId, type, message: message === "" ? null : message, eventData }));
   if (!a.id || a.taskId !== taskId || a.type !== type) {
     throw new Error("/activity/create: server did not echo the event; check `kaneo activity ls`");
   }

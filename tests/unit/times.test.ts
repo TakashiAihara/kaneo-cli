@@ -151,6 +151,12 @@ describe("the other times a reply carries", () => {
     expect((await api.getProject("p1")).archivedAt).toBe(null);
   });
 
+  test("an activity's createdAt that is not a date names createdAt", async () => {
+    answers(JSON.stringify([{ id: "a1", taskId: "t1", type: "comment", createdAt: "soon", updatedAt: TIME }]));
+    const e = (await failure(api.listActivities("t1"))) as Error;
+    expect(e.message).toBe('createdAt "soon" is not a timestamp');
+  });
+
   test("a comment's createdAt that is not a date names createdAt", async () => {
     answers(JSON.stringify([{ id: "c1", content: "x", userId: "u1", createdAt: "soon" }]));
     const e = (await failure(api.listComments("t1"))) as Error;

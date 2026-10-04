@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFake } from "../parity/fake";
@@ -19,8 +19,8 @@ const INDEX = join(import.meta.dir, "../../src/index.ts");
 // The whole pid: two runs share a pid namespace, so no two live at once share
 // it, where a slice of it (pid % 10000) could collide.
 const RUN = String(process.pid);
-const sleepArg = (base: "29.5" | "29.4" | "29.3"): string => `${base}${RUN}`;
-const SLEEPS = [sleepArg("29.5"), sleepArg("29.4"), sleepArg("29.3")];
+const sleepArg = (base: "29.5" | "29.4" | "29.3" | "29.2"): string => `${base}${RUN}`;
+const SLEEPS = [sleepArg("29.5"), sleepArg("29.4"), sleepArg("29.3"), sleepArg("29.2")];
 
 type Run = { exit: number | null; signal: string | null; stdout: string; stderr: string; ms: number };
 
@@ -299,4 +299,51 @@ describe("signals around the hook's lifetime", () => {
       expect({ run, signal: p.signalCode, exit: p.exitCode }).toEqual({ run, signal: "SIGTERM", exit: null });
     }
   }, 60_000);
+
+  // Only a signal handled while the hook runs is the hook's killer. One that
+  // arrives after it exited, here while the failure is held on the FIFO, must
+  // neither relabel the failure nor kill the group: the hook ended on its own,
+  // and what it left in its group is no longer kaneo's to kill.
+  test("a signal after the hook exited is not reported as its killer and kills nothing", async () => {
+    writeConfig({ attach: `(sleep ${sleepArg("29.2")}) & exit 3` });
+    const fifo = join(config, "kaneo", "hooks.log");
+    expect(Bun.spawnSync(["mkfifo", fifo]).exitCode).toBe(0);
+    const p = kaneoWith({}, "session", "attach", "1", "--strict");
+    const reader = p.stderr.getReader();
+    let seen = "";
+    while (!seen.includes("hook failed")) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      seen += new TextDecoder().decode(value);
+    }
+    await Bun.sleep(200);
+    p.kill("SIGTERM");
+    await Bun.sleep(200);
+    const drain = Bun.spawn(["timeout", "10", "cat", fifo], { stdout: "pipe", stderr: "ignore" });
+    const logged = await new Response(drain.stdout).text();
+    await Promise.race([p.exited, Bun.sleep(10_000)]);
+    expect(p.signalCode).toBe("SIGTERM");
+    expect(logged).toContain("attach hook failed: exit status 3");
+    expect(sleepersLeft().filter((s) => s.arg === sleepArg("29.2")), "the group was killed after the hook exited").toHaveLength(1);
+  }, 30_000);
+
+  // hooks.log is where a failure goes when stderr is lost, so a stderr that
+  // cannot be written to must not keep the failure from it.
+  test("a failure is logged when stderr cannot be written to", async () => {
+    writeConfig({ attach: "exit 3" });
+    const full = openSync("/dev/full", "w");
+    try {
+      const p = Bun.spawn(["bun", INDEX, "session", "attach", "1", "--strict"], {
+        cwd: home,
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: full,
+        env: { PATH: process.env.PATH ?? "", HOME: home, XDG_CONFIG_HOME: config, CLAUDE_CODE_SESSION_ID: "s1", NO_COLOR: "1" },
+      });
+      expect(await p.exited).toBe(0);
+    } finally {
+      closeSync(full);
+    }
+    expect(hooksLog()).toContain("session=s1 attach hook failed: exit status 3");
+  }, 30_000);
 });

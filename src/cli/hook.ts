@@ -59,17 +59,15 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
   // hook that ended cleanly is a hook that did its work whatever arrived while it
   // was running.
   let running = true;
-  // Set once the capture has been given back, which is the point from which a
-  // caught signal has nothing left to act on but this process.
-  let over = false;
   let captured: string | undefined;
   let output: number | undefined;
 
   const killGroup = (why: "timeout" | "signalled") => {
     if (!running) return;
     killed ??= why;
-    // The hook has not been started yet, so there is no group to signal: the
-    // kill waits for one and is applied the moment there is.
+    // No hook was started: its capture or its spawn failed, and the handler can
+    // only run at the await in the finally below, after that failure has been
+    // reported.
     if (group === undefined) return;
     try {
       process.kill(-group, "SIGKILL");
@@ -81,13 +79,7 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
   const listeners = SIGNALS.map((signal) => {
     const handler = () => {
       caught ??= signal;
-      // Nothing is left to read what the handler recorded, so the process ends
-      // here. Ending it from inside the handler is what keeps a signal from ever
-      // arriving with nobody to act on it: this is the last thing one can arrive
-      // at, and taking the handlers down here is what gives it the default action
-      // that ends this process.
-      if (over) raise(caught);
-      else killGroup("signalled");
+      killGroup("signalled");
     };
     process.on(signal, handler);
     return { signal, handler };
@@ -157,10 +149,6 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
       return;
     }
     group = hook.pid;
-    // A kill recorded while the hook did not exist yet is applied here, so that a
-    // report cannot claim a kill that never happened and the hook does not get to
-    // run before being killed.
-    if (killed !== undefined) killGroup(killed);
 
     const deadline = setTimeout(() => killGroup("timeout"), HOOK_TIMEOUT_MS);
 
@@ -168,34 +156,37 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
     running = false;
     clearTimeout(deadline);
 
-    // A signal is queued when it arrives and its handler runs on the next turn of
-    // the loop, and the turn that brings the hook's exit is not always that one —
-    // measured at about one time in eight. So this wait is part of the decision
-    // rather than a margin on it: without it a hook that signals kaneo on its way
-    // out is reported as a hook killed for some other reason, or as one that ran
-    // clean, and nothing is re-raised at all.
-    await nextTurn();
-
-    // Decided with the handlers still installed, which is what a signal arriving
-    // during the report below finds.
+    // Decided on the turn that saw the hook exit, with nothing awaited since, so a
+    // signal is reported as the hook's killer only if its handler ran while the
+    // hook was running. One whose handler runs later is still re-sent below.
     const failure = failureOf(hook, killed);
     if (failure !== undefined) reportHookFailure(event, env, failure, tailOf(log));
   } finally {
     // Given back here rather than left to the operating system, which only takes
     // it when the re-raise below ends this process without running the finally.
     // Closed before the directory holding it goes, in the order the Go build's
-    // deferred calls ran.
-    if (output !== undefined) closeSync(output);
-    if (captured !== undefined) rmSync(captured, { recursive: true, force: true });
-    over = true;
+    // deferred calls ran, and failing silently as those did: a capture left behind
+    // is not a reason to fail the command, nor to skip re-sending a caught signal.
+    try {
+      if (output !== undefined) closeSync(output);
+    } catch {
+      // Nothing to do about a descriptor that cannot be closed.
+    }
+    try {
+      if (captured !== undefined) rmSync(captured, { recursive: true, force: true });
+    } catch {
+      // The temp dir is left for whoever cleans it.
+    }
 
-    // The last wait, and the one the report makes necessary: hooks.log is appended
+    // The one wait, and the one the report makes necessary: hooks.log is appended
     // to, and a FIFO in its place holds that append open for as long as nobody is
     // reading it, so a signal can arrive while the failure is being written and
-    // find no turn to be handled on until this one. The handler ends the process
-    // from there.
+    // find no turn to be handled on until this one.
     await nextTurn();
 
+    // A signal arriving between that turn and the handlers coming off is queued
+    // for handlers that are gone and is lost; the Go build had no such instant,
+    // and the difference is accepted as too narrow to have been seen.
     raise(caught);
     // Delivery is asynchronous, and without the wait kaneo could print its
     // success line before it dies.
@@ -210,9 +201,8 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
 // before the loop turned is handled on that one turn.
 //
 // One is the whole of it once a hook has ended, because everything the hook sent
-// was queued before its exit was and so is already ahead of this. What was sent
-// after it exited is not waited for, since there is no telling how long that
-// could be, and it reaches the default action anyway.
+// was queued before its exit was and so is already ahead of this. What is sent
+// later is not waited for, since there is no telling how long that could be.
 const nextTurn = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 // How a hook ended badly, in the Go build's words, because that is what
@@ -285,7 +275,13 @@ const tailOf = (log: string): string => {
 
 const reportHookFailure = (event: string, env: Record<string, string>, failure: string, output: string): void => {
   const message = `${event} hook failed: ${failure}: ${output.trim()}`;
-  writeSync(2, `kaneo: ${message}\n`);
+  // An unwritable stderr is the case hooks.log is there for, so it does not keep
+  // the failure from reaching the log.
+  try {
+    writeSync(2, `kaneo: ${message}\n`);
+  } catch {
+    // Recorded below instead.
+  }
   logHookFailure(env["KANEO_SESSION_ID"] ?? "", message);
 };
 

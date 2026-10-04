@@ -15,6 +15,7 @@ import {
   Column,
   Comment,
   CreateNotification200,
+  InvitationDetails,
   Label,
   MoveTaskResult,
   Notification,
@@ -23,10 +24,12 @@ import {
   Organization,
   Project,
   ProjectListItem,
+  SearchResponse,
   Task,
   TaskRelation,
   TaskRelationWithTasks,
-  TaskWithAssignee
+  TaskWithAssignee,
+  WorkspaceMember
 } from './model';
 import type {
   AttachLabelToTaskBody,
@@ -38,6 +41,7 @@ import type {
   CreateTaskBody,
   CreateTaskCommentBody,
   CreateTaskRelationBody,
+  GlobalSearchParams,
   ListProjectsParams,
   ListTasksParams,
   MoveTaskBody,
@@ -1593,6 +1597,39 @@ export const deleteNotificationPreferenceWorkspaceRule = async (workspaceId: str
 
 
 
+export const getGlobalSearchUrl = (params: GlobalSearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/search?${stringifiedParams}` : `/search`
+}
+
+/**
+ * Search across tasks, projects, workspaces, comments, and activities in one workspace. Results are ranked by relevance and returned as a single flat list, each entry tagged with its `type`.
+ * @summary Global search
+ */
+export const globalSearch = async (params: GlobalSearchParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<SearchResponse> => {
+
+  return kaneoFetch<SearchResponse>(getGlobalSearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: SearchResponse
+  }
+);}
+
+
+
 export const getGetTaskRelationsUrl = (taskId: string,) => {
 
 
@@ -1680,5 +1717,57 @@ export const deleteTaskRelation = async (id: string, options?: Parameters<typeof
 
     ,
     schema: TaskRelation
+  }
+);}
+
+
+
+export const getGetInvitationDetailsUrl = (id: string,) => {
+
+
+
+
+  return `/invitation/${id}`
+}
+
+/**
+ * Look up an invitation by ID. Always 200 -- an unusable invitation is reported with valid: false and a reason rather than an error status.
+ * @summary Get invitation details
+ */
+export const getInvitationDetails = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<InvitationDetails> => {
+
+  return kaneoFetch<InvitationDetails>(getGetInvitationDetailsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: InvitationDetails
+  }
+);}
+
+
+
+export const getGetWorkspaceMembersUrl = (workspaceId: string,) => {
+
+
+
+
+  return `/workspace/${workspaceId}/members`
+}
+
+/**
+ * Get all members of a workspace, with their role.
+ * @summary Get workspace members
+ */
+export const getWorkspaceMembers = async (workspaceId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<WorkspaceMember[]> => {
+
+  return kaneoFetch<WorkspaceMember[]>(getGetWorkspaceMembersUrl(workspaceId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(WorkspaceMember)
   }
 );}

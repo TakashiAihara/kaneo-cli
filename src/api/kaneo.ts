@@ -28,6 +28,9 @@ import {
   deleteTaskComment,
   deleteTaskRelation as removeRelation,
   getColumns as readColumns,
+  getInvitationDetails,
+  getWorkspaceMembers,
+  globalSearch,
   getProject as readProject,
   getTask as readTask,
   getTaskComments,
@@ -62,6 +65,7 @@ import type {
   NotificationPreferences as GenNotificationPreferences,
   CreateTaskRelationBody,
   Activity as GenActivity,
+  GlobalSearchParams,
   Label as GenLabel,
   Organization,
   ProjectListItem,
@@ -209,6 +213,134 @@ export const renameWorkspace = async (workspaceId: string, name: string): Promis
     );
   }
   return renamed;
+};
+
+// Someone with access to a workspace. role is a built-in role (owner, admin,
+// member, guest) or a custom role's name, so it is a string rather than a closed
+// list. image is null for a member who has none.
+export type Member = { id: string; name: string; email: string; image: string | null; role: string };
+
+export const listMembers = async (workspaceId: string): Promise<Member[]> =>
+  zeroList(await getWorkspaceMembers(pathParam(workspaceId))).map((m) => ({
+    id: m.id ?? "",
+    name: m.name ?? "",
+    email: m.email ?? "",
+    image: m.image ?? null,
+    role: m.role ?? "",
+  }));
+
+// What the server will say about one invitation.
+//
+// The route answers 200 for an invitation that cannot be used, with valid false
+// and the reason in error, so an unusable invitation is a reply rather than a
+// failure. The details are withheld for one that does not exist, was accepted or
+// was canceled, which is why invitation can be null while valid is false.
+export type InvitationDetails = {
+  valid: boolean;
+  invitation: {
+    id: string;
+    email: string;
+    workspaceName: string;
+    inviterName: string;
+    expiresAt: string;
+    status: string;
+    expired: boolean;
+  } | null;
+  error: string | null;
+};
+
+export const getInvitation = async (invitationId: string): Promise<InvitationDetails> => {
+  const reply = zeroRecord(await getInvitationDetails(pathParam(invitationId)));
+  const i = reply.invitation;
+  return {
+    valid: reply.valid ?? false,
+    invitation:
+      i === undefined
+        ? null
+        : {
+            id: i.id ?? "",
+            email: i.email ?? "",
+            workspaceName: i.workspaceName ?? "",
+            inviterName: i.inviterName ?? "",
+            expiresAt: isoTime("expiresAt", i.expiresAt),
+            status: i.status ?? "",
+            expired: i.expired ?? false,
+          },
+    error: reply.error ?? null,
+  };
+};
+
+// One match of a search. Every field but id, type, title, createdAt and
+// relevanceScore depends on the type — a project has no task number, only a
+// comment or an activity has content — so the ones a match lacks are null
+// rather than absent, and every result has the same keys.
+export type SearchResult = {
+  id: string;
+  type: string;
+  title: string;
+  description: string | null;
+  content: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  projectSlug: string | null;
+  workspaceId: string | null;
+  workspaceName: string | null;
+  userId: string | null;
+  userName: string | null;
+  createdAt: string;
+  relevanceScore: number;
+  taskNumber: number | null;
+  priority: string | null;
+  status: string | null;
+};
+
+// totalCount is what the server reports, which is not what the document says.
+// The document calls it every match before the limit, but v2.29.2 applies the
+// limit to each type's query first and counts what those returned, so it is not
+// the number of matches. A full page is the signal that more may exist.
+export type Search = { query: string; results: SearchResult[]; totalCount: number };
+
+// What to search for. type and limit are "" to take the server's defaults (every
+// type, 20 results), and projectId is "" to search the whole workspace.
+export type SearchQuery = { query: string; workspaceId: string; projectId: string; type: string; limit: string };
+
+// Searches from one workspace: tasks, comments and activities in it, though the
+// server takes workspace matches from every workspace the key can reach. The
+// query keys are in sorted order, as every other query this client sends is, so
+// a request reads the same however the call was written.
+export const search = async (wanted: SearchQuery): Promise<Search> => {
+  const reply = zeroRecord(
+    await globalSearch({
+      ...(wanted.limit === "" ? {} : { limit: wanted.limit }),
+      ...(wanted.projectId === "" ? {} : { projectId: wanted.projectId }),
+      q: wanted.query,
+      ...(wanted.type === "" ? {} : { type: unchecked<NonNullable<GlobalSearchParams["type"]>>(wanted.type) }),
+      workspaceId: wanted.workspaceId,
+    }),
+  );
+  return {
+    query: reply.searchQuery ?? "",
+    totalCount: reply.totalCount ?? 0,
+    results: zeroList(reply.results).map((r) => ({
+      id: r.id ?? "",
+      type: r.type ?? "",
+      title: r.title ?? "",
+      description: r.description ?? null,
+      content: r.content ?? null,
+      projectId: r.projectId ?? null,
+      projectName: r.projectName ?? null,
+      projectSlug: r.projectSlug ?? null,
+      workspaceId: r.workspaceId ?? null,
+      workspaceName: r.workspaceName ?? null,
+      userId: r.userId ?? null,
+      userName: r.userName ?? null,
+      createdAt: isoTime("createdAt", r.createdAt),
+      relevanceScore: r.relevanceScore ?? 0,
+      taskNumber: r.taskNumber ?? null,
+      priority: r.priority ?? null,
+      status: r.status ?? null,
+    })),
+  };
 };
 
 // A project belongs to exactly one workspace. archivedAt is set once a project

@@ -1,0 +1,135 @@
+{
+  "steps": [
+    {
+      "args": [
+        "invitation",
+        "get",
+        "inv-open",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"valid\": true,\n  \"invitation\": {\n    \"id\": \"inv-open\",\n    \"email\": \"ada@example.com\",\n    \"workspaceName\": \"Other\",\n    \"inviterName\": \"Grace\",\n    \"expiresAt\": \"2026-01-01T13:00:00.000Z\",\n    \"status\": \"pending\",\n    \"expired\": false\n  },\n  \"error\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "invitation",
+        "get",
+        "inv-open",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "inv-open  Other  from Grace  expires 2026-01-01T13:00:00.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "invitation",
+        "get",
+        "inv-expired",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"valid\": false,\n  \"invitation\": {\n    \"id\": \"inv-expired\",\n    \"email\": \"ada@example.com\",\n    \"workspaceName\": \"Other\",\n    \"inviterName\": \"Grace\",\n    \"expiresAt\": \"2026-01-01T01:00:00.000Z\",\n    \"status\": \"pending\",\n    \"expired\": true\n  },\n  \"error\": \"This invitation has expired\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "invitation",
+        "get",
+        "inv-expired",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "inv-expired  Other  from Grace  expires 2026-01-01T01:00:00.000Z\nnot valid: This invitation has expired\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "invitation",
+        "get",
+        "inv-accepted",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"valid\": false,\n  \"invitation\": null,\n  \"error\": \"This invitation has already been accepted\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "invitation",
+        "get",
+        "inv-canceled",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "not valid: This invitation has been canceled\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "invitation",
+        "get",
+        "inv-boundary",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "inv-boundary  Main  from Grace  expires 2026-01-01T12:00:00.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "invitation",
+        "get",
+        "nope",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "not valid: Invitation not found\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/invitation/inv-open",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/invitation/inv-open",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/invitation/inv-expired",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/invitation/inv-expired",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/invitation/inv-accepted",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/invitation/inv-canceled",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/invitation/inv-boundary",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/invitation/nope",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

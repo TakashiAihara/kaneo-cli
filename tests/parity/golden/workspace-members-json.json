@@ -1,0 +1,27 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workspace",
+        "members",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"user-self\",\n    \"name\": \"Self\",\n    \"email\": \"self@example.com\",\n    \"image\": null,\n    \"role\": \"owner\"\n  },\n  {\n    \"id\": \"user-1\",\n    \"name\": \"Ada\",\n    \"email\": \"ada@example.com\",\n    \"image\": null,\n    \"role\": \"reviewer\"\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

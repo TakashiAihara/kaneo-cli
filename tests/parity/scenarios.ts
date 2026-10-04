@@ -154,6 +154,22 @@ export const SCENARIOS: Scenario[] = [
       ["comment", "ls", "1", "--json"],
     ],
   },
+  { name: "comment edit", steps: [["comment", "edit", "2", "cmt0001", "x"], ["comment", "edit", "1", "nope", "x"], ["comment", "edit", "1", "cmt0001", ""], ["comment", "edit", "3", "cmt-other", "x"], ["comment", "edit", "1", "cmt0001", "rewritten", "text", "--json"], ["comment", "ls", "1", "--human"]] },
+
+  ...both("activity list", ["activity", "list", "1"]),
+  {
+    name: "activity add",
+    steps: [
+      ["activity", "add", "1", "status_changed", "--data", '{"oldStatus":"to-do","newStatus":"done"}', "--json"],
+      ["activity", "add", "1", "imported", "from\ntrello", "--data", '{"source":"trello"}', "--human"],
+      ["activity", "add", "1", "comment", "hi"],
+      ["activity", "add", "1", "created", "--data", "{}"],
+      ["activity", "add", "1", "x", "--data", "[1]"],
+      ["activity", "add", "1", "x", "--data", "nope"],
+      ["activity", "ls", "1", "--human"],
+      ["activity", "ls", "1", "--json"],
+    ],
+  },
 
   {
     name: "session attach, next, close",

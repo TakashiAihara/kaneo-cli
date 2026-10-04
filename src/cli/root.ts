@@ -22,6 +22,7 @@ import { columnCommand } from "./column";
 import { taskCommand } from "./task";
 import { boardCommand } from "./board";
 import { sessionCommand } from "./session";
+import { activityCommand } from "./activity";
 import { commentCommand } from "./comment";
 import { apiCheckCommand } from "./apicheck";
 import { completeCommand, completionCommand } from "./completion";
@@ -94,6 +95,7 @@ const rootCommand = (): { root: Command<App> } => {
     boardCommand,
     sessionCommand,
     commentCommand,
+    activityCommand,
     apiCheckCommand,
     completionCommand,
     helpCommand,

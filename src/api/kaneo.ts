@@ -1,8 +1,12 @@
 import { OPERATIONS, type Operation } from "./registry";
 import { kaneoFetch, KaneoApiError } from "./http";
+import type { Json } from "../output/json";
 import {
   archiveProject,
   createColumn as postColumn,
+  createActivity,
+  getActivities,
+  updateTaskComment,
   createProject as postProject,
   createTask as postTask,
   createTaskComment,
@@ -34,6 +38,7 @@ import type {
   Column as GenColumn,
   CreateTaskBody,
   CreateTaskRelationBody,
+  Activity as GenActivity,
   Organization,
   ProjectListItem,
   RelatedTask,
@@ -742,6 +747,65 @@ export const addComment = async (taskId: string, content: string, signal?: Abort
 // looks only among the caller's own. A key without task:update answers 403.
 export const deleteComment = async (commentId: string): Promise<void> => {
   await call(deleteTaskComment(pathParam(commentId)));
+};
+
+// Rewrites a comment's text. The reply carries no author name, so the comment
+// as listed is returned with its new text.
+//
+// A write the server did not echo back is reported, as with updateProject: an
+// empty 2xx would otherwise read as an edit. It may still have been stored, so
+// the message says where to look.
+export const editComment = async (comment: Comment, content: string): Promise<Comment> => {
+  const a = zeroRecord(await call(updateTaskComment(pathParam(comment.id), { content })));
+  if (a.id !== comment.id || a.content !== content) {
+    throw new Error(`/comment/${comment.id}: server did not echo the edit; check \`kaneo comment ls\``);
+  }
+  return { ...comment, content: a.content };
+};
+
+// One entry of a task's history: a comment, or an event such as a status
+// change, whose details are in eventData rather than in content.
+export type Activity = {
+  id: string;
+  type: string;
+  content: string;
+  eventData: Json;
+  userId: string;
+  createdAt: string;
+};
+
+const activity = (a: GenActivity): Activity => ({
+  id: a.id ?? "",
+  type: a.type ?? "",
+  content: a.content ?? "",
+  // It came off the wire as JSON, so it is JSON.
+  eventData: (a.eventData ?? null) as Json,
+  userId: a.userId ?? "",
+  createdAt: isoTime(a.createdAt),
+});
+
+// A task's history, oldest first like its comments. The server sends it newest
+// first.
+export const listActivities = async (taskId: string): Promise<Activity[]> =>
+  zeroList(await call(getActivities(pathParam(taskId)))).map(activity).reverse();
+
+// Records an event on a task, the way an importer writes one. An empty message
+// is sent as null, which is how the server stores an event that has none.
+//
+// The pinned document's body. A server before Kaneo 2.23.0 also requires
+// userId and answers 400 without it; that is left to fail rather than sent,
+// since this client targets the pinned release.
+export const addActivity = async (
+  taskId: string,
+  type: string,
+  message: string,
+  eventData: Record<string, unknown> | null,
+): Promise<Activity> => {
+  const a = zeroRecord(await call(createActivity({ taskId, type, message: message === "" ? null : message, eventData })));
+  if (!a.id || a.taskId !== taskId || a.type !== type) {
+    throw new Error("/activity/create: server did not echo the event; check `kaneo activity ls`");
+  }
+  return activity(a);
 };
 
 // The links the server accepts between two tasks.

@@ -1,0 +1,182 @@
+{
+  "steps": [
+    {
+      "args": [
+        "activity",
+        "add",
+        "1",
+        "status_changed",
+        "--data",
+        "{\"oldStatus\":\"to-do\",\"newStatus\":\"done\"}",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"act0002\",\n  \"type\": \"status_changed\",\n  \"content\": \"\",\n  \"eventData\": {\n    \"oldStatus\": \"to-do\",\n    \"newStatus\": \"done\"\n  },\n  \"userId\": \"user-self\",\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "activity",
+        "add",
+        "1",
+        "imported",
+        "from\ntrello",
+        "--data",
+        "{\"source\":\"trello\"}",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "recorded imported on #1\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "activity",
+        "add",
+        "1",
+        "comment",
+        "hi"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"type comment is a comment: use `kaneo comment add`\"\n}\n",
+      "stderr": "Error: type comment is a comment: use `kaneo comment add`\n"
+    },
+    {
+      "args": [
+        "activity",
+        "add",
+        "1",
+        "created",
+        "--data",
+        "{}"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"act0004\",\n  \"type\": \"created\",\n  \"content\": \"\",\n  \"eventData\": {},\n  \"userId\": \"user-self\",\n  \"createdAt\": \"2026-01-01T00:00:12.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "activity",
+        "add",
+        "1",
+        "x",
+        "--data",
+        "[1]"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--data must be a JSON object: [1]\"\n}\n",
+      "stderr": "Error: --data must be a JSON object: [1]\n"
+    },
+    {
+      "args": [
+        "activity",
+        "add",
+        "1",
+        "x",
+        "--data",
+        "nope"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--data is not JSON: nope\"\n}\n",
+      "stderr": "Error: --data is not JSON: nope\n"
+    },
+    {
+      "args": [
+        "activity",
+        "ls",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "2026-01-01T00:00:08.000Z  comment  first comment\n2026-01-01T00:00:10.000Z  status_changed  {\"oldStatus\":\"to-do\",\"newStatus\":\"done\"}\n2026-01-01T00:00:11.000Z  imported  from\n  trello  {\"source\":\"trello\"}\n2026-01-01T00:00:12.000Z  created\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "activity",
+        "ls",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"cmt0001\",\n    \"type\": \"comment\",\n    \"content\": \"first comment\",\n    \"eventData\": null,\n    \"userId\": \"user-self\",\n    \"createdAt\": \"2026-01-01T00:00:08.000Z\"\n  },\n  {\n    \"id\": \"act0002\",\n    \"type\": \"status_changed\",\n    \"content\": \"\",\n    \"eventData\": {\n      \"oldStatus\": \"to-do\",\n      \"newStatus\": \"done\"\n    },\n    \"userId\": \"user-self\",\n    \"createdAt\": \"2026-01-01T00:00:10.000Z\"\n  },\n  {\n    \"id\": \"act0003\",\n    \"type\": \"imported\",\n    \"content\": \"from\\ntrello\",\n    \"eventData\": {\n      \"source\": \"trello\"\n    },\n    \"userId\": \"user-self\",\n    \"createdAt\": \"2026-01-01T00:00:11.000Z\"\n  },\n  {\n    \"id\": \"act0004\",\n    \"type\": \"created\",\n    \"content\": \"\",\n    \"eventData\": {},\n    \"userId\": \"user-self\",\n    \"createdAt\": \"2026-01-01T00:00:12.000Z\"\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/activity/create",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "type": "status_changed",
+        "message": null,
+        "eventData": {
+          "oldStatus": "to-do",
+          "newStatus": "done"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/activity/create",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "type": "imported",
+        "message": "from\ntrello",
+        "eventData": {
+          "source": "trello"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/activity/create",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "type": "created",
+        "message": null,
+        "eventData": {}
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/activity/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/activity/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

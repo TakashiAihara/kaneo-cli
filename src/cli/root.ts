@@ -9,7 +9,7 @@ import {
   type Command,
   type Flag,
 } from "./args";
-import { deadlineFor, type App } from "./app";
+import type { App } from "./app";
 import { resolveFromEnvironment, type Flags as ResolvedFlags } from "../config/resolve";
 import { isTTY, resolveMode, sanitizeControl, Writer } from "../output/output";
 import { loadFilter, JqFailure, type Filter } from "../output/jq";
@@ -207,13 +207,13 @@ export const run = async (argv: string[]): Promise<number> => {
     };
     const { cfg, global } = resolveFromEnvironment(flags);
     const timeout = Number(parsed.flags.timeout ?? 0);
-    // One deadline for the whole command, as the Go build's app.Context() was one
-    // context: the lookups a command makes before it writes and the write itself
-    // share one budget, so a slow server cannot use up the time each was given
-    // and still have some left for the one that matters.
-    const { deadline, deadlineAt } = deadlineFor(timeout);
-    const app: App = { cfg, flags, global, out, deadline, deadlineAt };
-    configureClient({ baseUrl: cfg.apiUrl, apiKey: cfg.apiKey, timeoutMs: timeout, deadline });
+    // The transport bounds each request on its own, which is what --timeout
+    // documents: the lookups a command makes before it writes and the write
+    // itself each get the full timeout, and so does every page of a board. Nothing
+    // bounds the command as a whole; a caller that needs a ceiling on it (a hook
+    // with its own timeout) puts one around the process.
+    const app: App = { cfg, flags, global, out };
+    configureClient({ baseUrl: cfg.apiUrl, apiKey: cfg.apiKey, timeoutMs: timeout });
 
     await command.run({
       args: parsed.args,

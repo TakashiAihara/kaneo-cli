@@ -18,7 +18,7 @@ export type ProjectIn = { project: Project; workspaceName: string };
 // one somebody still has to be able to name to unarchive it.
 export const allProjects = async (app: App, includeArchived: boolean): Promise<ProjectIn[]> => {
   const found: ProjectIn[] = [];
-  for (const workspace of await listWorkspaces(app.deadline)) {
+  for (const workspace of await listWorkspaces()) {
     for (const project of await listProjectsIn(workspace.id, includeArchived)) {
       found.push({ project, workspaceName: workspace.name });
     }
@@ -70,7 +70,7 @@ export const withProject = async <T>(app: App, value: string, op: (id: string) =
 // holds only the workspaces the key's user is a member of, so an admin reaching
 // another one has to go through the web app.
 export const resolveWorkspace = async (app: App, value: string): Promise<string> => {
-  const found = workspacesNamed(await listWorkspaces(app.deadline), value);
+  const found = workspacesNamed(await listWorkspaces(), value);
   if (found.length === 0) throw new Error(noWorkspace(value));
   if (found.length > 1) throw new Error(severalWorkspaces(value, found));
   return found[0]!.id;

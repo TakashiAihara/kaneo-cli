@@ -24,6 +24,12 @@ A lane on the board. **A column's slug is also the `status` value of every task 
 
 `kaneo column` reads and changes them: `ls`, `create`, `rename`, `reorder`, `rm`, all against the resolved project. A column is named by its id (the opaque `id` in `kaneo column ls --json`), its slug, or its name when no other column shares it, anywhere one is taken. Its slug is derived from its name when the column is created and the server's update route takes no slug at all, which is why a rename leaves the slug, and every task's status in the column, as it was.
 
+### planned task and archived task
+
+A task the listing answers beside the columns, in `plannedTasks` and `archivedTasks`, rather than in one of them: a planned task has not been picked up, an archived one has been filed away. Their `status` is `planned` or `archived`, which is the one place a status names no column of the project.
+
+`kaneo` reads both as two columns of their own, appended after the real ones. `task ls` leaves them out unless `--all` or an explicit `--status` asks for them, and `board` shows neither.
+
 ### task
 
 A work item. Has a `number`, unique within its project and stable, which is what a person reads off the board. Its `id` is an opaque string, which is what the API takes.

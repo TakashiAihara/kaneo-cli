@@ -46,6 +46,8 @@ export type Scenario = {
   repo?: string;
   // Writes this text as config.json, for a file that is not valid JSON.
   rawConfig?: string;
+  // Tasks seeded alongside SEED, for a board the shared seed does not have.
+  extraTasks?: Seed["tasks"];
   // The fake answers like a server older than the pinned document.
   legacy?: boolean;
   // The fake holds every response back this long.
@@ -56,6 +58,13 @@ export type Scenario = {
   // A seed layered over SEED for this scenario alone, so one that needs a project
   // in the second workspace does not put it in every other scenario's goldens.
   seed?: Partial<Seed>;
+  // The fake grows the project by a task when the listing is asked for this
+  // page, so the board changes while it is read. growTimes caps how many
+  // requests grow it; without a cap it never settles.
+  growOnPage?: number;
+  growTimes?: number;
+  // The fake answers the listing without applying status or priority.
+  ignoreFilters?: boolean;
 };
 
 const both = (name: string, args: string[]): Scenario[] => [
@@ -111,7 +120,39 @@ export const SCENARIOS: Scenario[] = [
   ...both("task list all", ["task", "ls", "--all"]),
   ...both("task list by status", ["task", "ls", "--status", "in-progress"]),
   ...both("task list by priority", ["task", "ls", "--priority", "high"]),
+  { name: "task list filters on the server", steps: [["task", "ls", "--status", "in-progress", "--priority", "no-priority", "--json"]] },
+  // What is printed does not rest on the server having applied the filters.
+  { name: "task list filters what the server did not", ignoreFilters: true, steps: [["task", "ls", "--status", "in-progress", "--json"], ["task", "ls", "--priority", "high", "--json"]] },
+  // The listing answers the tasks in no column beside the columns: both are
+  // hidden unless asked for by name, and neither counts as work on the board.
+  {
+    name: "planned and archived tasks",
+    extraTasks: [
+      { id: "task-a4", projectId: P1, title: "Next quarter", status: "planned" },
+      { id: "task-a5", projectId: P1, title: "Last year's plan", status: "archived" },
+    ],
+    steps: [["task", "ls", "--json"], ["task", "ls", "--all", "--human"], ["task", "ls", "--status", "planned", "--json"], ["task", "get", "5", "--json"], ["board", "--json"]],
+  },
   ...both("task get by number", ["task", "get", "1"]),
+  // A description above 64 KiB is left out of the listing, so resolving the task
+  // by number reads it from the task detail.
+  {
+    name: "deferred description",
+    // The second is under 64 Ki characters but over 64 KiB, which is what the
+    // server measures; that step holds the fake to the server, since the CLI
+    // trusts the flag and measures nothing. The write after them reads no
+    // description: only task get pays for one.
+    extraTasks: [
+      { id: "task-a4", projectId: P1, title: "A long story", description: "x".repeat(64 * 1024 + 1) },
+      { id: "task-a5", projectId: P1, title: "A long story in kana", description: "あ".repeat(30_000) },
+    ],
+    steps: [["task", "get", "4", "--json"], ["task", "get", "5", "--json"], ["task", "status", "4", "done", "--json"]],
+  },
+  // A number is looked up on the page that holds it, so a board past one page
+  // costs the first page rather than all of them.
+  { name: "task get stops paging early", pageSize: 2, steps: [["task", "get", "1", "--json"]] },
+  // A task past the first page is still found, and the pages after it are not read.
+  { name: "task get on a later page", pageSize: 1, steps: [["task", "get", "2", "--json"]] },
   ...both("task get by id", ["task", "get", "task-a2"]),
   ...both("task get unknown", ["task", "get", "99"]),
   { name: "task get with no relations", steps: [["task", "get", "2", "--json"]] },
@@ -306,6 +347,12 @@ export const SCENARIOS: Scenario[] = [
   ...both("board", ["board"]),
   ...both("board archived", ["board", "--archived"]),
   { name: "board pages past one page", pageSize: 2, steps: [["task", "ls", "--all", "--json"], ["board", "--json"]] },
+  // The board gains a task while it is being read, so the total the listing
+  // reports moves under the reader and the read is taken again.
+  { name: "board changed mid-read", pageSize: 2, growOnPage: 2, growTimes: 1, steps: [["task", "ls", "--all", "--json"]] },
+  // A board that keeps moving is reported rather than passed on as if it were
+  // whole.
+  { name: "board keeps changing", pageSize: 2, growOnPage: 2, steps: [["task", "ls", "--all", "--json"]] },
 
   ...both("api-check", ["api-check"]),
 
@@ -389,9 +436,10 @@ export const SCENARIOS: Scenario[] = [
     config: { hooks: { attach: "kill -USR1 $$", close: "kill -SEGV $$" } },
     steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"]],
   },
-  // Each request alone fits in the timeout; the command's requests together do
-  // not. One deadline for the whole command fails; one per request would pass.
-  { name: "one deadline per command", delayMs: 400, env: { KANEO_SESSION_ID: "sess-budget" }, steps: [["session", "attach", "1", "--strict", "--timeout", "1s"], ["board", "--json", "--timeout", "1s"]] },
+  // Each request alone fits in the timeout, and the command's requests together
+  // do not. Every request gets the whole of it, so both steps pass; one budget
+  // for the command failed a board that takes several pages.
+  { name: "one timeout per request", delayMs: 400, env: { KANEO_SESSION_ID: "sess-budget" }, steps: [["session", "attach", "1", "--strict", "--timeout", "1s"], ["board", "--json", "--timeout", "1s"]] },
   { name: "whitespace reply to the marker post", whitespaceOn: "^POST /comment/", env: { KANEO_SESSION_ID: "sess-ws" }, config: { hooks: { attach: 'echo ran > "$HOME/hook-ran"' } }, steps: [["session", "attach", "1", "--strict"], ["session", "next", "x", "--strict"]] },
   { name: "whitespace reply to project get", whitespaceOn: "^GET /project/", steps: [["project", "get", "--json"]] },
   { name: "whitespace reply to task create", whitespaceOn: "^POST /task/", steps: [["task", "create", "x", "--json"]] },

@@ -1,9 +1,10 @@
 import { apiKey, project, taskProject, type App } from "./app";
 import {
-  boardTasks,
   createTask,
   deleteRelation,
   deleteTask,
+  descriptionDeferred,
+  findTaskByNumber,
   getBoard,
   getTask,
   linkTasks,
@@ -11,6 +12,7 @@ import {
   moveTask,
   PRIORITIES,
   priorityRank,
+  projectTasks,
   RELATION_TYPES,
   setTaskAssignee,
   setTaskPriority,
@@ -39,21 +41,22 @@ export const taskCommand = {
         {
           name: "all",
           type: "bool" as const,
-          // Done tasks accumulate without bound, so the listing hides them
-          // unless asked. --status done still shows them, since that is an
-          // explicit request.
-          usage: "include tasks in the done column",
+          // Finished and filed-away work accumulates without bound, and neither
+          // a planned task nor an archived one is on the board, so the listing
+          // hides all three unless asked. --status done still shows them, since
+          // that is an explicit request.
+          usage: "include tasks in the done, planned and archived columns",
           defaultValue: "false",
         },
       ],
       run: async ({ flags, app }: { flags: FlagValues; app: App }) => {
         apiKey(app);
-        const tasks = filterTasks(
-          boardTasks(await withProject(app, project(app), (id) => getBoard(id))),
-          String(flags.status ?? ""),
-          String(flags.priority ?? ""),
-          flags.all === true,
-        );
+        const status = String(flags.status ?? "");
+        const priority = String(flags.priority ?? "");
+        // Asked of the server, which filters before it pages, and of the answer
+        // as well (see TaskFilters).
+        const board = await withProject(app, project(app), (id) => getBoard(id, { status, priority }));
+        const tasks = filterTasks(projectTasks(board), status, priority, flags.all === true);
         for (const task of tasks) app.out.human(taskLine(task));
         app.out.data(tasks);
       },
@@ -65,7 +68,7 @@ export const taskCommand = {
       args: exactArgs(1),
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await withDescription(await resolveTask(app, args[0]!));
         // The links are read as well, so a task is shown whole. A read of them
         // that fails fails the command: a task whose links could not be read
         // looks exactly like a task that has none.
@@ -386,7 +389,8 @@ const relationLine = (relation: Relation, taskId: string): string => {
 // Numbers are what a person reads off the board, so they have to work wherever an
 // id does — and a number is answered from the board rather than fetched as an id,
 // because sending it as one makes the server answer 400 for a reason that names
-// neither the task nor the number.
+// neither the task nor the number. The read stops at the page holding it, so the
+// pages after that one are not read.
 //
 // An empty project is not refused here: a reference may be an id, which needs no
 // board, so only a number asks for one.
@@ -428,8 +432,7 @@ const namedReference = (wanted: string): { project: string; number: number } | u
 // because "no task #12" on its own cannot be acted on: the reader has to know
 // which board to look somewhere else on.
 const numberOn = async (app: App, value: string, number: number, origin: string): Promise<Task> => {
-  const board = await withProject(app, value, (id) => getBoard(id));
-  const found = boardTasks(board).find((task) => task.number === number);
+  const { board, task: found } = await withProject(app, value, (id) => findTaskByNumber(id, number));
   if (found === undefined) {
     // --project only steers a bare number; a reference names its board itself.
     const hint = origin === "the reference" ? "check the number" : "pass --project to look elsewhere";
@@ -441,17 +444,30 @@ const numberOn = async (app: App, value: string, number: number, origin: string)
   return found;
 };
 
+// A task found by number with its description in full. A description above
+// 64 KiB is left out of the listing, and the listing is the only route that
+// carries the labels, so only the description is taken from the task detail.
+// Of the commands that resolve a task, only `task get` prints it, so only it pays
+// the extra request; the listings print such a description as empty (#254).
+const withDescription = async (task: Task): Promise<Task> =>
+  descriptionDeferred(task) ? { ...task, description: (await getTask(task.id)).description } : task;
+
 // Go's strconv.Atoi: a whole decimal integer and nothing else, so a reference
 // that merely starts with digits stays a task id.
 const asNumber = (text: string): number | undefined =>
   /^[+-]?\d+$/.test(text) ? Number.parseInt(text, 10) : undefined;
 
-const filterTasks = (tasks: Task[], status: string, priority: string, includeDone: boolean): Task[] =>
+// The statuses the listing leaves out unless they are asked for by name:
+// finished and filed-away work accumulates without bound. A --status naming one
+// of them is that question asked, so it shows them anyway.
+const HIDDEN = ["done", "planned", "archived"];
+
+const filterTasks = (tasks: Task[], status: string, priority: string, all: boolean): Task[] =>
   tasks.filter(
     (task) =>
       (status === "" || task.status === status) &&
       (priority === "" || task.priority === priority) &&
-      (includeDone || status !== "" || task.status !== "done"),
+      (all || status !== "" || !HIDDEN.includes(task.status)),
   );
 
 const taskLine = (task: Task): string =>

@@ -14,32 +14,6 @@ export type App = {
   flags: Flags;
   global: GlobalConfig;
   out: Writer;
-  // The one budget every request of this command shares, as the Go build's
-  // app.Context() was one context: a command that looks something up before it
-  // writes spends part of the same timeout as the write.
-  deadline: AbortSignal;
-  // When that budget runs out, so a command sharing it with something else can
-  // see what is left of it.
-  deadlineAt: number;
-};
-
-// The budget --timeout asked for.
-//
-// A timeout of zero or less is not "no timeout" and not the default: it is a
-// deadline that has already passed, so every request under it fails at once. Go
-// reads --timeout the same way, through a context.WithTimeout on a duration the
-// flag supplied, and this is what a context with no time left behaves like.
-export const deadlineFor = (ms: number): { deadline: AbortSignal; deadlineAt: number } => {
-  const deadlineAt = Date.now() + ms;
-  return { deadline: ms > 0 ? AbortSignal.timeout(ms) : AbortSignal.abort(), deadlineAt };
-};
-
-// Half of what is left of the command's budget, for work that must not use up
-// what something after it needs: the board lookups an attach shares with the
-// marker post get half, as they did when both ran under one context.
-export const halfLeft = (app: App): AbortSignal => {
-  const left = Math.max(0, (app.deadlineAt - Date.now()) / 2);
-  return AbortSignal.any([app.deadline, AbortSignal.timeout(left)]);
 };
 
 export const NO_API_KEY = "no API key: set KANEO_API_KEY, or pass --api-key";

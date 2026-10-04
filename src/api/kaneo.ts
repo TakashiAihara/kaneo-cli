@@ -42,6 +42,7 @@ import {
   updateTaskStatus,
 } from "./gen/kaneo";
 import type {
+  Board as GenBoard,
   BoardTask,
   Column as GenColumn,
   CreateTaskBody,
@@ -164,8 +165,8 @@ export type Workspace = { id: string; name: string; slug: string };
 // one. /auth/get-session answers 200 with null for a valid key, an invalid key
 // and no key at all, so it has no discriminating power and must not be used to
 // check credentials.
-export const listWorkspaces = async (signal?: AbortSignal): Promise<Workspace[]> =>
-  zeroList(await listOrganization({ ...(signal === undefined ? {} : { signal }) })).map((org) => workspace(org));
+export const listWorkspaces = async (): Promise<Workspace[]> =>
+  zeroList(await listOrganization()).map((org) => workspace(org));
 
 const workspace = (org: Organization): Workspace => ({
   id: org.id ?? "",
@@ -242,14 +243,10 @@ const project = (item: ProjectFields): Project => ({
   archivedAt: isoTimePtr("archivedAt", item.archivedAt),
 });
 
-// Fetches one project by id.
-//
-// A signal bounds the call when the caller shares its budget with other work,
-// which is how the attach lookups leave room for the marker post. The transport
-// applies the command's own deadline as well, and a signal here only ever cuts
-// this one request short.
-export const getProject = async (projectId: string, signal?: AbortSignal): Promise<Project> =>
-  project(zeroRecord(await readProject(pathParam(projectId), { ...(signal === undefined ? {} : { signal }) })));
+// Fetches one project by id. Every request is bounded by the transport's own
+// timeout, so there is no budget here for a caller to divide.
+export const getProject = async (projectId: string): Promise<Project> =>
+  project(zeroRecord(await readProject(pathParam(projectId))));
 
 // The payload for creating a project. The server's create route carries no
 // description at all, so none is sent: a description a caller asked for is
@@ -478,6 +475,39 @@ export type Board = {
   columns: { id: string; name: string; tasks: Task[] }[];
 };
 
+// The listing answers the tasks that are in no column beside the columns: a
+// planned task has not been picked up, an archived one has been filed away.
+// They become two columns of their own, appended after the real ones and only
+// when the server sent something, so the rest of the CLI reads a project as one
+// list of columns.
+const OFF_BOARD = [
+  { id: "planned", name: "Planned", tasks: (data: GenBoard) => data.plannedTasks },
+  { id: "archived", name: "Archived", tasks: (data: GenBoard) => data.archivedTasks },
+];
+
+const isOffBoard = (column: { id: string }): boolean => OFF_BOARD.some((off) => off.id === column.id);
+
+// What the listing is asked for. Both are sent as query parameters, which the
+// server applies before it pages. The callers filter the answer as well, so what
+// they print does not depend on the server having applied them.
+export type TaskFilters = { status?: string; priority?: string };
+
+// A board read page by page: the board itself, the task the read stopped on if
+// one was asked for, and whether the board moved under the reader.
+type Reading = { board: Board; stopped: Task | undefined; moved: boolean };
+
+// How many more times a board that changed under the reader is read whole: one
+// for a write that landed mid-read, one more for a write that landed during that
+// reread. A board still moving after that is being written to steadily, so it is
+// reported rather than read again for ever.
+const REREADS = 2;
+
+// What a board that never settles is reported as, naming the project because
+// `board` reads several. Stderr, so the JSON a script reads on stdout stays a
+// document it can parse.
+const changed = (projectId: string): string =>
+  `kaneo: the board of project ${projectId} changed while it was read; the listing may be incomplete`;
+
 // A project's columns and tasks, every page of them.
 //
 // The two levels of paging, as v2.29.2 serves the listing:
@@ -498,22 +528,85 @@ export type Board = {
 // pagination block at all, which reads as one page of everything and no related
 // pages: zero is how Go's paging counted a block that was not there, and the
 // loop stops on it after the first request instead of asking for pages that hold
-// nothing.
-export const getBoard = async (projectId: string): Promise<Board> => {
-  let board: Board | undefined;
-  const columnAt = new Map<string, number>();
-  const taskAt = new Map<string, { column: number; task: number }>();
+// nothing. It is also a board that cannot be seen to move, since the total only
+// a paginated listing reports is what the read is compared by.
+//
+// The pages are read one request at a time with no snapshot behind them, so a
+// board that gains or loses a task while it is read reports a different total at
+// the end of the read than at the start, and the pages held in between may not
+// add up to either. Such a read is taken again, and a board that is still moving
+// is reported on stderr so the JSON a script reads on stdout stays a document.
+//
+// Only a change in the number of tasks is seen. A task that moves to another
+// position, a delete and a create within one read, or a label added between two
+// related pages leave the total where it was, and such a read is answered as if
+// it were whole.
+export const getBoard = async (projectId: string, filters: TaskFilters = {}): Promise<Board> => {
+  let read = await readBoard(projectId, filters);
+  for (let again = 0; read.moved && again < REREADS; again++) read = await readBoard(projectId, filters);
+  if (read.moved) console.error(changed(projectId));
+  return read.board;
+};
 
-  for (let page = 1, pages = 1; page <= pages; page++) {
+// One task by number, read off the board and no further: the read stops at the
+// page that holds it, once that page's related pages have been read so the task
+// carries every label the listing has for it. Answers the board as far as it was
+// read, which names the project, and the task, undefined when no page holds it.
+//
+// A miss on a board that moved under the reader is read again: the task may have
+// been pulled back onto a page the read had already passed, as a delete before
+// it does, and a miss fails the command that asked as if the task did not exist.
+// A board still moving after the rereads is reported the way getBoard reports it.
+export const findTaskByNumber = async (
+  projectId: string,
+  number: number,
+): Promise<{ board: Board; task: Task | undefined }> => {
+  const stopAt = (page: Task[]): Task | undefined => page.find((task) => task.number === number);
+  let read = await readBoard(projectId, {}, stopAt);
+  for (let again = 0; read.stopped === undefined && read.moved && again < REREADS; again++) {
+    read = await readBoard(projectId, {}, stopAt);
+  }
+  if (read.stopped === undefined && read.moved) console.error(changed(projectId));
+  return { board: read.board, task: read.stopped };
+};
+
+// Reads the listing into a board.
+//
+// stopAt, when given, is asked after a task page and all of its related pages
+// have been read, and the task it answers is the read's reason to stop.
+const readBoard = async (
+  projectId: string,
+  filters: TaskFilters,
+  stopAt?: (page: Task[]) => Task | undefined,
+): Promise<Reading> => {
+  const status = filters.status ?? "";
+  const priority = filters.priority ?? "";
+  let board: Board | undefined;
+  let stopped: Task | undefined;
+  const columnAt = new Map<string, number>();
+  const offBoard = new Map(OFF_BOARD.map((column) => [column.id, [] as Task[]]));
+  const taskAt = new Map<string, Task>();
+  let first: number | undefined;
+  let last: number | undefined;
+
+  for (let page = 1, pages = 1; page <= pages && stopped === undefined; page++) {
+    const onPage: Task[] = [];
     for (let related = 1, relatedPages = 1; related <= relatedPages; related++) {
+      // In sorted order, as above listProjectsIn: the generated client writes
+      // the query in the order it is given, and the Go build sorted it.
       const response = zeroRecord(
         await listTasks(pathParam(projectId), {
           ...(page > 1 ? { page } : {}),
+          ...(priority === "" ? {} : { priority }),
           ...(related > 1 ? { relatedPage: related } : {}),
+          ...(status === "" ? {} : { status }),
         }),
       );
       pages = response.pagination?.totalPages ?? 0;
       relatedPages = response.pagination?.relatedTotalPages ?? 0;
+      const total = response.pagination?.total;
+      if (page === 1 && related === 1) first = total;
+      last = total;
 
       const data = zeroRecord(response.data);
       if (board === undefined) {
@@ -525,6 +618,21 @@ export const getBoard = async (projectId: string): Promise<Board> => {
         };
       }
       const target = board;
+      // A task seen again on a related page brings more labels; the same task on
+      // a later task page is the same task twice.
+      const place = (from: BoardTask[], into: Task[]): void => {
+        for (const task of from) {
+          const seen = taskAt.get(task.id);
+          if (seen !== undefined) {
+            if (related > 1) seen.labels = appendNewLabels(seen.labels, labels(task.labels));
+            continue;
+          }
+          const placed = toTask(task);
+          taskAt.set(task.id, placed);
+          into.push(placed);
+          onPage.push(placed);
+        }
+      };
       for (const column of zeroList(data.columns)) {
         let at = columnAt.get(column.id);
         if (at === undefined) {
@@ -532,34 +640,36 @@ export const getBoard = async (projectId: string): Promise<Board> => {
           columnAt.set(column.id, at);
           target.columns.push({ id: column.id, name: column.name, tasks: [] });
         }
-        for (const task of zeroList(column.tasks)) {
-          const seen = taskAt.get(task.id);
-          if (seen !== undefined) {
-            // A repeat on a related page brings more labels; a repeat on a later
-            // task page is the same task twice.
-            if (related > 1) {
-              target.columns[seen.column]!.tasks[seen.task]!.labels = appendNewLabels(
-                target.columns[seen.column]!.tasks[seen.task]!.labels,
-                labels(task.labels),
-              );
-            }
-            continue;
-          }
-          taskAt.set(task.id, { column: at, task: target.columns[at]!.tasks.length });
-          target.columns[at]!.tasks.push(toTask(task));
-        }
+        place(zeroList(column.tasks), target.columns[at]!.tasks);
+      }
+      for (const column of OFF_BOARD) {
+        place(zeroList(column.tasks(data)), offBoard.get(column.id)!);
       }
     }
+    stopped = stopAt?.(onPage);
   }
+
   if (board === undefined || board.projectId === "") {
     throw new Error(`board ${projectId}: the server answered without a project`);
   }
-  return board;
+  for (const column of OFF_BOARD) {
+    const tasks = offBoard.get(column.id)!;
+    if (tasks.length > 0) board.columns.push({ id: column.id, name: column.name, tasks });
+  }
+  return { board, stopped, moved: first !== undefined && first !== last };
 };
 
-// The board flattened, most urgent first, then by task number.
-export const boardTasks = (board: Board): Task[] =>
-  board.columns
+// Every task the listing answered, the planned and the archived ones included,
+// most urgent first and then by task number.
+export const projectTasks = (board: Board): Task[] => byPriority(board.columns);
+
+// The tasks on the board: the same list without the two columns that are none of
+// the project's, since neither a planned task nor an archived one is work a
+// board is showing.
+export const boardTasks = (board: Board): Task[] => byPriority(board.columns.filter((c) => !isOffBoard(c)));
+
+const byPriority = (columns: Board["columns"]): Task[] =>
+  columns
     .flatMap((column) => column.tasks)
     .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.number - b.number);
 
@@ -616,8 +726,20 @@ const task = (from: TaskFields, extra: Pick<Task, "assigneeId" | "assigneeName" 
 
 // The board listing, the only route that resolves the assignee's name and carries
 // the labels.
-const toTask = (t: BoardTask): Task =>
-  task(t, { assigneeId: t.assigneeId, assigneeName: t.assigneeName, labels: labels(t.labels) });
+//
+// A description above 64 KiB is left out of that listing and the task says so
+// with descriptionDeferred, which only the task detail route answers in full.
+// The flag is held beside the task rather than in it, so printing a task does
+// not grow a field that is only ever true of some of them.
+const deferredDescriptions = new WeakSet<Task>();
+
+export const descriptionDeferred = (task: Task): boolean => deferredDescriptions.has(task);
+
+const toTask = (t: BoardTask): Task => {
+  const read = task(t, { assigneeId: t.assigneeId, assigneeName: t.assigneeName, labels: labels(t.labels) });
+  if (t.descriptionDeferred === true) deferredDescriptions.add(read);
+  return read;
+};
 
 // Fetches one task by id, with its assignee's name resolved. Labels are not part
 // of the reply, so they read as null.
@@ -709,10 +831,8 @@ export const listComments = async (taskId: string): Promise<Comment[]> =>
 // Posts a comment on a task. The server answers with the stored activity row,
 // which carries no author, so the reply's name is empty and a caller that needs
 // one reads the listing back.
-export const addComment = async (taskId: string, content: string, signal?: AbortSignal): Promise<Comment> => {
-  const a = zeroRecord(
-    await createTaskComment(pathParam(taskId), { content }, { ...(signal === undefined ? {} : { signal }) }),
-  );
+export const addComment = async (taskId: string, content: string): Promise<Comment> => {
+  const a = zeroRecord(await createTaskComment(pathParam(taskId), { content }));
   return {
     id: a.id ?? "",
     content: a.content ?? "",

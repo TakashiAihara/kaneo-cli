@@ -17,18 +17,16 @@ export type KaneoInit<T = unknown> = RequestInit & { schema?: ZodType<T> | ZodTy
 type ClientConfig = {
   baseUrl: string;
   apiKey?: string;
+  // What --timeout bounds: one request, every request. Each page of a board gets
+  // the whole of it, so a board's size does not decide whether it can be read.
   timeoutMs?: number;
-  // The budget every request of the running command shares. Applied to each of
-  // them rather than to one, which is the difference between a command that
-  // times out once and a command whose four lookups each get the full timeout.
-  deadline?: AbortSignal;
   // KANEO_DEBUG is the switch the documentation names; taking it here as well
   // means the transport reports what it saw without every caller having to
   // remember to pass the flag on.
   debug?: boolean;
 };
 
-type Settings = Required<Omit<ClientConfig, "deadline">> & { deadline: AbortSignal | undefined };
+type Settings = Required<ClientConfig>;
 
 // Bounds a single request, as the Go build's DefaultTimeout did.
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -38,7 +36,7 @@ const REDIRECT_STATUSES = [301, 302, 303, 307, 308];
 // the whole of it for whoever wants to look closer.
 const BODY_LIMIT = 200;
 
-let settings: Settings = { baseUrl: "", apiKey: "", timeoutMs: DEFAULT_TIMEOUT_MS, deadline: undefined, debug: false };
+let settings: Settings = { baseUrl: "", apiKey: "", timeoutMs: DEFAULT_TIMEOUT_MS, debug: false };
 
 // Called once per process, before the first generated call. The transport is a
 // module the generated client imports, so there is no other way to hand it the
@@ -47,8 +45,7 @@ export const configureClient = (config: ClientConfig): void => {
   settings = {
     baseUrl: normalizeBaseUrl(config.baseUrl),
     apiKey: config.apiKey ?? "",
-    timeoutMs: config.timeoutMs && config.timeoutMs > 0 ? config.timeoutMs : DEFAULT_TIMEOUT_MS,
-    deadline: config.deadline,
+    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     debug: config.debug ?? Boolean(process.env.KANEO_DEBUG),
   };
 };
@@ -171,13 +168,15 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     headers.set("Authorization", `Bearer ${settings.apiKey}`);
   }
 
-  // Three things can cut a request short: the budget its command shares with
-  // everything else it does, a signal the caller passed to bound this one
-  // further, and the cap on any single request. The same deadline covers the
-  // redirect chain, so a server that keeps redirecting cannot hold the process
-  // open either.
-  const cap = AbortSignal.timeout(settings.timeoutMs);
-  const signal = AbortSignal.any([settings.deadline, request.signal, cap].filter(isSignal));
+  // The cap --timeout puts on the request is what cuts it short. The same cap
+  // covers the redirect chain, so a server that keeps redirecting cannot hold
+  // the process open either.
+  //
+  // A --timeout of zero or less is not the default and not no timeout: it is a
+  // budget that has already run out, so every request fails at once, which is
+  // what a context.WithTimeout of no duration did.
+  const cap = settings.timeoutMs > 0 ? AbortSignal.timeout(settings.timeoutMs) : AbortSignal.abort();
+  const signal = cap;
 
   // The method the call was made with, before a 301, 302 or 303 rewrote it into
   // a GET. Failures name it together with served, the pair Go's send reported.
@@ -299,9 +298,6 @@ const reason = (e: unknown): string => (e instanceof Error ? e.message : String(
 const goTrimSpace = (text: string): string =>
   text.replace(/^(?:[^\S\uFEFF]|\u0085)+|(?:[^\S\uFEFF]|\u0085)+$/g, "");
 
-const isSignal = (signal: AbortSignal | null | undefined): signal is AbortSignal =>
-  signal !== undefined && signal !== null;
-
 // The operation a request was made for, as the registry of them sees it.
 //
 // The generated client is built for exactly the operations in the registry, and
@@ -394,8 +390,8 @@ const dialReason = (target: URL, code: unknown, e: unknown): string => {
       return `dial tcp ${target.host}: connect: connection refused`;
     case "ENOTFOUND":
       return `dial tcp: lookup ${target.hostname}: no such host`;
-    // Both aborts are a deadline: the only signal this CLI ever passes in is
-    // the command's timeout, and Go reports that as a deadline exceeded.
+    // Both aborts are a timeout: the only signal this CLI passes in is the cap
+    // --timeout sets, and Go reports that as a deadline exceeded.
     case 23:
     case 20:
       return "context deadline exceeded";

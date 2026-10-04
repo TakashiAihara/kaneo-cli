@@ -53,6 +53,15 @@ export type FakeOptions = {
   // Answers a request whose "METHOD path" matches with a 200 holding only
   // whitespace, a reply no schema accepts and Go's client rejects.
   whitespaceOn?: string;
+  // Adds a task when the listing is asked for this page, so the board changes
+  // while it is being read and the total it reports moves under the reader.
+  // Unbounded unless growTimes caps how many requests grow it, which is how a
+  // board that never settles is reproduced.
+  growOnPage?: number;
+  growTimes?: number;
+  // Answers the listing without applying status or priority, so what the CLI
+  // prints is seen not to rest on the server having filtered.
+  ignoreFilters?: boolean;
 };
 
 export function startFake(seed: Seed, opts: FakeOptions = {}) {
@@ -182,6 +191,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     return l;
   };
   const requests: Recorded[] = [];
+  let grew = 0;
 
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
@@ -192,26 +202,34 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const failText = (status: number, message: string) =>
     new Response(message, { status, headers: { "content-type": "text/plain;charset=UTF-8" } });
 
-  const boardTask = (t: (typeof tasks)[number]) => ({
-    id: t.id,
-    title: t.title,
-    number: t.number,
-    description: t.description,
-    status: t.status,
-    priority: t.priority,
-    startDate: t.startDate,
-    dueDate: t.dueDate,
-    position: t.position,
-    createdAt: t.createdAt,
-    userId: t.userId,
-    assigneeName: t.userId ? (users.get(t.userId) ?? null) : null,
-    assigneeId: t.userId,
-    assigneeImage: null,
-    projectId: t.projectId,
-    subtaskCounts: { completed: 0, total: 0 },
-    labels: labels.filter((l) => l.taskId === t.id).map((l) => ({ id: l.id, name: l.name, color: l.color })),
-    externalLinks: [],
-  });
+  // A description above 64 KiB is left out of the listing, which marks the task
+  // rather than carrying the text; the task detail route still has it.
+  const DEFERRED_OVER = 64 * 1024;
+  const boardTask = (t: (typeof tasks)[number]) => {
+    // Measured in bytes, as the server's octet_length is, not in UTF-16 units.
+    const deferred = Buffer.byteLength(t.description ?? "", "utf8") > DEFERRED_OVER;
+    return {
+      id: t.id,
+      title: t.title,
+      number: t.number,
+      description: deferred ? null : t.description,
+      ...(deferred ? { descriptionDeferred: true } : {}),
+      status: t.status,
+      priority: t.priority,
+      startDate: t.startDate,
+      dueDate: t.dueDate,
+      position: t.position,
+      createdAt: t.createdAt,
+      userId: t.userId,
+      assigneeName: t.userId ? (users.get(t.userId) ?? null) : null,
+      assigneeId: t.userId,
+      assigneeImage: null,
+      projectId: t.projectId,
+      subtaskCounts: { completed: 0, total: 0 },
+      labels: labels.filter((l) => l.taskId === t.id).map((l) => ({ id: l.id, name: l.name, color: l.color })),
+      externalLinks: [],
+    };
+  };
   const related = (t: (typeof tasks)[number] | undefined) =>
     t
       ? {
@@ -367,17 +385,32 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // project and falls back to guessing a workspace from the key, which it
       // cannot: 400 with that complaint rather than a 404.
       if (!proj) return failText(400, "Workspace ID could not be determined");
-      const mine = tasks.filter((t) => t.projectId === proj.id);
-      const size = opts.pageSize ?? 50;
       const page = Number(url.searchParams.get("page") ?? 1);
+      // Grown before the page is cut, so the reply carries both the task and the
+      // new total: a board that moved while it was read says so in the total.
+      if (opts.growOnPage === page && grew < (opts.growTimes ?? Infinity)) {
+        grew += 1;
+        addTask(proj.id, { title: `Arrived late ${grew}` });
+      }
+      // Filters apply before the page is cut, as the document says they do.
+      const filterStatus = opts.ignoreFilters ? null : url.searchParams.get("status");
+      const filterPriority = opts.ignoreFilters ? null : url.searchParams.get("priority");
+      const mine = tasks.filter(
+        (t) =>
+          t.projectId === proj.id &&
+          (filterStatus === null || t.status === filterStatus) &&
+          (filterPriority === null || t.priority === filterPriority),
+      );
+      const size = opts.pageSize ?? 50;
       const slice = url.searchParams.has("page") || url.searchParams.has("limit") || opts.pageSize ? mine.slice((page - 1) * size, page * size) : mine;
       const { lastTaskNumber, archivedAt, createdAt, position, ...head } = proj;
       return ok(M.BoardResponse, {
         data: {
           ...head,
           columns: columnsOf(proj.id).map((c) => ({ id: c.slug, slug: c.slug, name: c.name, icon: c.icon, isFinal: c.isFinal, position: c.position, tasks: slice.filter((t) => t.status === c.slug).map(boardTask) })),
-          archivedTasks: [],
-          plannedTasks: [],
+          // A task in no column is answered beside the columns, one list each.
+          archivedTasks: slice.filter((t) => t.status === "archived").map(boardTask),
+          plannedTasks: slice.filter((t) => t.status === "planned").map(boardTask),
         },
         pagination: { total: mine.length, page, pageSize: size, totalPages: Math.max(1, Math.ceil(mine.length / size)), relatedPage: 1, relatedPageSize: 100, relatedTotalPages: 1 },
       });

@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "export",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"project\": {\n    \"name\": \"Alpha\",\n    \"slug\": \"ALP\",\n    \"description\": null,\n    \"exportedAt\": \"2026-01-01T00:00:10.000Z\"\n  },\n  \"tasks\": [\n    {\n      \"title\": \"Write the parser\",\n      \"description\": \"multi\\nline\",\n      \"status\": \"to-do\",\n      \"priority\": \"high\",\n      \"dueDate\": null,\n      \"startDate\": null,\n      \"userId\": null,\n      \"labels\": []\n    },\n    {\n      \"title\": \"Ship it\",\n      \"description\": \"\",\n      \"status\": \"in-progress\",\n      \"priority\": \"no-priority\",\n      \"dueDate\": null,\n      \"startDate\": null,\n      \"userId\": \"user-1\",\n      \"labels\": []\n    },\n    {\n      \"title\": \"Old news\",\n      \"description\": \"\",\n      \"status\": \"done\",\n      \"priority\": \"no-priority\",\n      \"dueDate\": null,\n      \"startDate\": null,\n      \"userId\": null,\n      \"labels\": []\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/export/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

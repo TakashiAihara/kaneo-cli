@@ -20,6 +20,7 @@ import {
   createProject as postProject,
   createTask as postTask,
   createTaskComment,
+  bulkUpdateTasks,
   createTaskRelation,
   deleteNotificationPreferenceWorkspaceRule,
   deleteColumn as removeColumn,
@@ -30,6 +31,7 @@ import {
   deleteTaskComment,
   deleteTaskRelation as removeRelation,
   deleteWorkflowRule as removeRule,
+  exportTasks as readExport,
   getColumns as readColumns,
   getInvitationDetails,
   getWorkspaceMembers,
@@ -43,6 +45,7 @@ import {
   getTaskTimeEntries,
   getTimeEntry,
   getWorkflowRules as readRules,
+  importTasks as postImport,
   listOrganization,
   listProjects,
   listTasks,
@@ -59,6 +62,7 @@ import {
   upsertNotificationPreferenceWorkspaceRule,
   updateTaskAssignee,
   updateTaskDescription,
+  updateTaskDueDate,
   updateTaskPriority,
   updateTaskStatus,
   updateTaskTitle,
@@ -69,6 +73,7 @@ import type {
   Board as GenBoard,
   BoardTask,
   CreateNotificationBody,
+  BulkUpdateTasksBody,
   Column as GenColumn,
   CreateTaskBody,
   Notification as GenNotification,
@@ -78,7 +83,9 @@ import type {
   GlobalSearchParams,
   Label as GenLabel,
   ExternalLink as GenExternalLink,
+  ImportTasksBody,
   Organization,
+  TaskExport,
   ProjectListItem,
   RelatedTask,
   TaskLabel,
@@ -1088,6 +1095,126 @@ export const setTaskAssignee = async (taskId: string, userId: string): Promise<v
   await updateTaskAssignee(pathParam(taskId), { userId: userId === "" ? null : userId });
 };
 
+// Sets a task's due date, or clears it when dueDate is empty. The body leaves the
+// field out to clear it: the route takes a string or nothing, never null, and the
+// server stores nothing for a missing one.
+//
+// The reply is checked against what was asked, as a rename is: a set has to come
+// back as the same instant, and a clear as no date. A reply that omits the field
+// would otherwise read as a clear that went through. The instant is compared as
+// Date reads the string, which is how the server parses it.
+export const setTaskDueDate = async (taskId: string, dueDate: string): Promise<Task> => {
+  const t = zeroRecord(await updateTaskDueDate(pathParam(taskId), dueDate === "" ? {} : { dueDate }));
+  const updated = task(t, { assigneeId: t.userId, assigneeName: null, labels: null });
+  const landed =
+    dueDate === "" ? updated.dueDate === null : updated.dueDate !== null && Date.parse(updated.dueDate) === Date.parse(dueDate);
+  if (updated.id !== taskId || !landed) {
+    throw new Error(
+      `/task/due-date/${taskId}: server answered with task ${quoted(updated.id)} due ${quoted(String(updated.dueDate))}`,
+    );
+  }
+  return updated;
+};
+
+export type BulkOperation = BulkUpdateTasksBody["operation"];
+
+// Applies one operation to many tasks in a single request. value is null for an
+// operation that clears (an assignee, a due date) and unused by delete.
+//
+// The count is what the server changed, which can be fewer than the tasks named:
+// adding a label skips a task that already has it, and removing one skips a task
+// that never had it. Only a label may come back short: for anything else a short
+// count is a task the server did not find (the route skips those as long as one
+// is found), which is reported rather than passed off as done. A reply with no
+// count is refused rather than read as zero; one with success false never gets
+// here, since the transport fails it.
+export const bulkUpdate = async (taskIds: string[], operation: BulkOperation, value: string | null): Promise<number> => {
+  const reply = zeroRecord(await bulkUpdateTasks({ taskIds, operation, value }));
+  const count = reply.updatedCount;
+  const short = operation !== "addLabel" && operation !== "removeLabel" && count !== taskIds.length;
+  if (typeof count !== "number" || short) {
+    throw new Error(`/task/bulk: sent ${taskIds.length} task(s), server answered count ${String(count)}`);
+  }
+  return count;
+};
+
+// A project's tasks as the server exports them: the project's name and slug, and
+// each task with its labels by name and color. The document is handed back as the
+// server wrote it, fields a newer server adds included; import picks out only the
+// fields it sends.
+//
+// A reply without the project or the task list is refused rather than written
+// out: import refuses that document anyway, and it would leave a file that looks
+// like an export of an empty project.
+export const exportProjectTasks = async (projectId: string): Promise<TaskExport> => {
+  const exported = zeroRecord(await readExport(pathParam(projectId)));
+  if (exported.project === null || typeof exported.project !== "object" || !Array.isArray(exported.tasks)) {
+    throw new Error(`/task/export/${projectId}: server answered without a project and its tasks`);
+  }
+  return exported;
+};
+
+export type ImportedTask = ImportTasksBody["tasks"][number];
+
+// One task's outcome. The server reports each task on its own, so a partial
+// import still answers 200 and the failures are only found here.
+// id and number are the created task's, and empty and zero on a failure.
+export type ImportOutcome = { success: boolean; id: string; number: number; title: string; error: string; warnings: string[] };
+
+export type ImportResult = { total: number; successful: number; failed: number; tasks: ImportOutcome[] };
+
+// Creates the given tasks in a project. The server takes a status it does not
+// know or a priority it does not accept and coerces it, which it reports as a
+// warning on that task rather than as a failure.
+//
+// The summary is checked against what was sent: a reply that accounts for fewer
+// tasks than the request carried (none at all, or a truncated list) would
+// otherwise read as an import that went through. Its success count is checked
+// against the outcomes too, since the command fails on the count: a failed
+// outcome the count leaves out would be printed and still exit 0. With the
+// lengths equal, that also fixes the failure count.
+export const importProjectTasks = async (projectId: string, tasks: ImportedTask[]): Promise<ImportResult> => {
+  const summary = zeroRecord(zeroRecord(await postImport(pathParam(projectId), { tasks })).results);
+  const result: ImportResult = {
+    total: summary.total ?? 0,
+    successful: summary.successful ?? 0,
+    failed: summary.failed ?? 0,
+    tasks: zeroList(summary.tasks).map(outcome),
+  };
+  if (
+    result.total !== tasks.length ||
+    result.successful + result.failed !== tasks.length ||
+    result.tasks.length !== tasks.length ||
+    result.successful !== result.tasks.filter((t) => t.success).length
+  ) {
+    throw new Error(
+      `/task/import/${projectId}: sent ${tasks.length} task(s), server reported ${result.total} (${result.successful} imported, ${result.failed} failed)`,
+    );
+  }
+  return result;
+};
+
+// The document types each outcome as anything with a success flag; what the
+// server writes is the flag, an error on a failure, the task, and warnings when
+// a field was coerced.
+const outcome = (raw: unknown): ImportOutcome => {
+  const o = (raw ?? {}) as {
+    success?: unknown;
+    error?: unknown;
+    task?: { id?: unknown; number?: unknown; title?: unknown } | null;
+    warnings?: unknown;
+  };
+  const success = o.success === true;
+  return {
+    success,
+    id: typeof o.task?.id === "string" ? o.task.id : "",
+    number: typeof o.task?.number === "number" ? o.task.number : 0,
+    title: typeof o.task?.title === "string" ? o.task.title : "",
+    error: reason(o.error),
+    warnings: Array.isArray(o.warnings) ? o.warnings.filter((w): w is string => typeof w === "string") : [],
+  };
+};
+
 export const moveTask = async (taskId: string, projectId: string): Promise<void> => {
   await putTaskMove(pathParam(taskId), { destinationProjectId: projectId });
 };
@@ -1734,4 +1861,14 @@ export const checkApi = async (): Promise<CheckResult> => {
     missing: OPERATIONS.filter((operation) => !seen.has(operation.id)),
     newOnServer: onServer.filter((id) => !used.has(id)),
   };
+};
+
+// A failure's reason. The import route writes a string, but other routes have
+// answered with {"message": ...}, and a failure reported without its reason is
+// one the reader cannot act on.
+const reason = (error: unknown): string => {
+  if (typeof error === "string") return error;
+  const message = (error as { message?: unknown } | null)?.message;
+  if (typeof message === "string") return message;
+  return error === undefined || error === null ? "" : JSON.stringify(error);
 };

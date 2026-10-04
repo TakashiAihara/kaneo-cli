@@ -199,6 +199,10 @@ kaneo time add <task-id> [--start TIME] [-d TEXT]               # starts a runni
 kaneo time add <task-id> --start TIME --end TIME [-d TEXT]      # logs a finished entry
 kaneo time stop <entry-id>                                      # ends a running timer now
 kaneo time update <entry-id> [--start TIME] [--end TIME] [-d TEXT]   # only what is passed changes
+kaneo task due <task> [date]       # no date clears it
+kaneo task bulk <task>... --status done   # one change for many tasks; --help lists the change flags
+kaneo task export > tasks.json     # the project's tasks as JSON, labels by name
+kaneo task import tasks.json       # creates them in the resolved project; - reads stdin; exits non-zero if any task failed
 ```
 
 A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds. `task update` writes the status first, and when a field after it fails the error names the fields that were already updated.
@@ -292,7 +296,7 @@ When something fails, stdout stays empty and the exit code is 1:
 - an expression jq cannot compile is refused before any request is made
 - an expression that fails on the payload reports jq's message on stderr, followed by a line saying the command had already run — `task create … --jq` that exits 1 this way has still created the task, so do not retry it blindly
 - a failing command reports its error on stderr only; the `{"error": ...}` object `--json` prints is left out
-- `api-check` is the exception: its report is its output, so a failed check still prints what the expression makes of the report
+- `api-check` and `task import` are the exceptions: the report is the output, so a failed check, or an import where any task failed, still prints the report (and what the expression makes of it) before exiting 1
 
 ## Develop
 

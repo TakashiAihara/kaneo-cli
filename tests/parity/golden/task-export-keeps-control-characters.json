@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "export",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"project\": {\n    \"name\": \"Alpha\",\n    \"slug\": \"ALP\",\n    \"description\": null,\n    \"exportedAt\": \"2026-01-01T00:00:07.000Z\"\n  },\n  \"tasks\": [\n    {\n      \"title\": \"oddtitle\",\n      \"description\": \"\",\n      \"status\": \"to-do\",\n      \"priority\": \"no-priority\",\n      \"dueDate\": null,\n      \"startDate\": null,\n      \"userId\": null,\n      \"labels\": []\n    }\n  ]\n}\n",
+      "stderr": "exported 1 task(s) from ALP\n"
+    },
+    {
+      "args": [
+        "task",
+        "export",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"project\": {\n    \"name\": \"Alpha\",\n    \"slug\": \"ALP\",\n    \"description\": null,\n    \"exportedAt\": \"2026-01-01T00:00:08.000Z\"\n  },\n  \"tasks\": [\n    {\n      \"title\": \"oddtitle\",\n      \"description\": \"\",\n      \"status\": \"to-do\",\n      \"priority\": \"no-priority\",\n      \"dueDate\": null,\n      \"startDate\": null,\n      \"userId\": null,\n      \"labels\": []\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/export/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/export/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

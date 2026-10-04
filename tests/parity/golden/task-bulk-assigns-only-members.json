@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "--assign",
+        "user-nobody",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PATCH /api/task/bulk: 403: Assignee is not a member of this workspace\"\n}\n",
+      "stderr": "Error: PATCH /api/task/bulk: 403: Assignee is not a member of this workspace\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/task/bulk",
+      "query": "",
+      "body": {
+        "taskIds": [
+          "task-a1"
+        ],
+        "operation": "updateAssignee",
+        "value": "user-nobody"
+      }
+    }
+  ],
+  "files": {}
+}

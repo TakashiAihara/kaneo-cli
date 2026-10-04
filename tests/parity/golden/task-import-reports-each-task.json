@@ -1,0 +1,108 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "import",
+        "tasks.json",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "created  #4 Imported\ncreated  #5 Planned on purpose\nfailed   Stranger: Assignee is not a member of this workspace\nimported 2 of 3 task(s)\n",
+      "stderr": "labels on 1 task(s) were not imported\nError: 1 of 3 task(s) were not imported\n"
+    },
+    {
+      "args": [
+        "task",
+        "import",
+        "tasks.json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"total\": 3,\n  \"successful\": 2,\n  \"failed\": 1,\n  \"tasks\": [\n    {\n      \"success\": true,\n      \"id\": \"task0004\",\n      \"number\": 6,\n      \"title\": \"Imported\",\n      \"error\": \"\",\n      \"warnings\": []\n    },\n    {\n      \"success\": true,\n      \"id\": \"task0005\",\n      \"number\": 7,\n      \"title\": \"Planned on purpose\",\n      \"error\": \"\",\n      \"warnings\": []\n    },\n    {\n      \"success\": false,\n      \"id\": \"\",\n      \"number\": 0,\n      \"title\": \"Stranger\",\n      \"error\": \"Assignee is not a member of this workspace\",\n      \"warnings\": []\n    }\n  ]\n}\n{\n  \"error\": \"1 of 3 task(s) were not imported\"\n}\n",
+      "stderr": "Error: 1 of 3 task(s) were not imported\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"description\": \"multi\\nline\",\n    \"status\": \"to-do\",\n    \"priority\": \"high\",\n    \"position\": 0,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task0002\",\n    \"number\": 4,\n    \"title\": \"Imported\",\n    \"description\": \"from a file\",\n    \"status\": \"in-progress\",\n    \"priority\": \"high\",\n    \"position\": 3,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": \"<TIME>Z\",\n    \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task0004\",\n    \"number\": 6,\n    \"title\": \"Imported\",\n    \"description\": \"from a file\",\n    \"status\": \"in-progress\",\n    \"priority\": \"high\",\n    \"position\": 5,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": \"<TIME>Z\",\n    \"createdAt\": \"2026-01-01T00:00:12.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task-a2\",\n    \"number\": 2,\n    \"title\": \"Ship it\",\n    \"description\": \"\",\n    \"status\": \"in-progress\",\n    \"priority\": \"no-priority\",\n    \"position\": 1,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": \"user-1\",\n    \"assigneeName\": \"Ada\",\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n    \"labels\": []\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/import/proj-alpha",
+      "query": "",
+      "body": {
+        "tasks": [
+          {
+            "title": "Imported",
+            "status": "in-progress",
+            "description": "from a file",
+            "priority": "high",
+            "startDate": null,
+            "dueDate": "<TIME>Z",
+            "userId": null
+          },
+          {
+            "title": "Planned on purpose",
+            "status": "planned"
+          },
+          {
+            "title": "Stranger",
+            "status": "to-do",
+            "userId": "user-nobody"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/import/proj-alpha",
+      "query": "",
+      "body": {
+        "tasks": [
+          {
+            "title": "Imported",
+            "status": "in-progress",
+            "description": "from a file",
+            "priority": "high",
+            "startDate": null,
+            "dueDate": "<TIME>Z",
+            "userId": null
+          },
+          {
+            "title": "Planned on purpose",
+            "status": "planned"
+          },
+          {
+            "title": "Stranger",
+            "status": "to-do",
+            "userId": "user-nobody"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,127 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "import",
+        "missing.json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"reading missing.json: ENOENT: no such file or directory, open 'missing.json'\"\n}\n",
+      "stderr": "Error: reading missing.json: ENOENT: no such file or directory, open 'missing.json'\n"
+    },
+    {
+      "args": [
+        "task",
+        "import",
+        "broken.json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"broken.json: not JSON: JSON Parse error: Expected '}'\"\n}\n",
+      "stderr": "Error: broken.json: not JSON: JSON Parse error: Expected '}'\n"
+    },
+    {
+      "args": [
+        "task",
+        "import",
+        "empty.json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty.json: no tasks to import\"\n}\n",
+      "stderr": "Error: empty.json: no tasks to import\n"
+    },
+    {
+      "args": [
+        "task",
+        "import",
+        "untitled.json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"untitled.json: task 1 has no title\"\n}\n",
+      "stderr": "Error: untitled.json: task 1 has no title\n"
+    },
+    {
+      "args": [
+        "task",
+        "import",
+        "blank-title.json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"blank-title.json: task 1 has no title\"\n}\n",
+      "stderr": "Error: blank-title.json: task 1 has no title\n"
+    },
+    {
+      "args": [
+        "task",
+        "import",
+        "no-status.json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no-status.json: task 1 has no status\"\n}\n",
+      "stderr": "Error: no-status.json: task 1 has no status\n"
+    },
+    {
+      "args": [
+        "task",
+        "import",
+        "blank-status.json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"blank-status.json: task 1 has no status\"\n}\n",
+      "stderr": "Error: blank-status.json: task 1 has no status\n"
+    },
+    {
+      "args": [
+        "task",
+        "import",
+        "second-bad.json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"second-bad.json: task 2 has dueDate \\\"someday\\\", which is not a date\"\n}\n",
+      "stderr": "Error: second-bad.json: task 2 has dueDate \"someday\", which is not a date\n"
+    },
+    {
+      "args": [
+        "task",
+        "import",
+        "bad-start.json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"bad-start.json: task 1 has startDate \\\"soon\\\", which is not a date\"\n}\n",
+      "stderr": "Error: bad-start.json: task 1 has startDate \"soon\", which is not a date\n"
+    },
+    {
+      "args": [
+        "task",
+        "import",
+        ".",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"reading .: Directories cannot be read like files\"\n}\n",
+      "stderr": "Error: reading .: Directories cannot be read like files\n"
+    },
+    {
+      "args": [
+        "task",
+        "import",
+        "object.json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"object.json: expected a task export, {\\\"tasks\\\": [...]} or an array of tasks\"\n}\n",
+      "stderr": "Error: object.json: expected a task export, {\"tasks\": [...]} or an array of tasks\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

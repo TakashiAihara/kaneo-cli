@@ -1,0 +1,83 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "2",
+        "--delete",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to delete 2 task(s) (#1 #2) without --yes; this also removes their comments, where session history is kept\n"
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "2",
+        "--delete",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"operation\": \"delete\",\n  \"value\": null,\n  \"taskIds\": [\n    \"task-a1\",\n    \"task-a2\"\n  ],\n  \"updatedCount\": 2\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--all",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"task-a3\",\n    \"number\": 3,\n    \"title\": \"Old news\",\n    \"description\": \"\",\n    \"status\": \"done\",\n    \"priority\": \"no-priority\",\n    \"position\": 2,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:06.000Z\",\n    \"labels\": []\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/task/bulk",
+      "query": "",
+      "body": {
+        "taskIds": [
+          "task-a1",
+          "task-a2"
+        ],
+        "operation": "delete",
+        "value": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

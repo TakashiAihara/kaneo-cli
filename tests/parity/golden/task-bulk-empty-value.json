@@ -1,0 +1,32 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "--status",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--status is empty\"\n}\n",
+      "stderr": "Error: --status is empty\n"
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "--assign",
+        " ",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--assign is empty\"\n}\n",
+      "stderr": "Error: --assign is empty\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

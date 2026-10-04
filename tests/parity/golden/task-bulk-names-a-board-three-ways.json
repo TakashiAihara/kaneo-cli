@@ -1,0 +1,71 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "ALP#2",
+        "proj-alpha#3",
+        "--priority",
+        "low",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"operation\": \"updatePriority\",\n  \"value\": \"low\",\n  \"taskIds\": [\n    \"task-a1\",\n    \"task-a2\",\n    \"task-a3\"\n  ],\n  \"updatedCount\": 3\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/task/bulk",
+      "query": "",
+      "body": {
+        "taskIds": [
+          "task-a1",
+          "task-a2",
+          "task-a3"
+        ],
+        "operation": "updatePriority",
+        "value": "low"
+      }
+    }
+  ],
+  "files": {}
+}

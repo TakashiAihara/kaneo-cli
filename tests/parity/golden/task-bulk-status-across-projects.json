@@ -1,0 +1,166 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "create",
+        "Waiting",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0010\",\n  \"slug\": \"waiting\",\n  \"name\": \"Waiting\",\n  \"position\": 3,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "BET#1",
+        "--status",
+        "waiting",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"project BET (#1) has no column \\\"waiting\\\"; its columns are to-do, in-progress, done\"\n}\n",
+      "stderr": "Error: project BET (#1) has no column \"waiting\"; its columns are to-do, in-progress, done\n"
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "BET#1",
+        "--status",
+        "done",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "--status done: the server changed 2 of the 2 task(s) named (ALP#1 BET#1)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--all",
+        "-p",
+        "proj-beta",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"task-b1\",\n    \"number\": 1,\n    \"title\": \"Beta first\",\n    \"description\": \"\",\n    \"status\": \"done\",\n    \"priority\": \"urgent\",\n    \"position\": 0,\n    \"projectId\": \"proj-beta\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:07.000Z\",\n    \"labels\": []\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/column/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Waiting",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/task/bulk",
+      "query": "",
+      "body": {
+        "taskIds": [
+          "task-a1",
+          "task-b1"
+        ],
+        "operation": "updateStatus",
+        "value": "done"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

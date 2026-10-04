@@ -423,6 +423,10 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["SetTaskPriority", "PUT", "/api/task/priority/a%2Fb", () => api.setTaskPriority(id, "low")],
     ["SetTaskAssignee", "PUT", "/api/task/assignee/a%2Fb", () => api.setTaskAssignee(id, "")],
     ["MoveTask", "PUT", "/api/task/move/a%2Fb", () => api.moveTask(id, "p")],
+    ["SetTaskDueDate", "PUT", "/api/task/due-date/a%2Fb", () => api.setTaskDueDate(id, "")],
+    ["ExportTasks", "GET", "/api/task/export/a%2Fb", () => api.exportProjectTasks(id)],
+    ["ImportTasks", "POST", "/api/task/import/a%2Fb", () => api.importProjectTasks(id, [{ title: "t", status: "to-do" }])],
+    ["BulkUpdate", "PATCH", "/api/task/bulk", () => api.bulkUpdate([id], "delete", null)],
     ["DeleteTask", "DELETE", "/api/task/a%2Fb", () => api.deleteTask(id)],
     ["CreateTask", "POST", "/api/task/a%2Fb", () => api.createTask(id, newTask({}))],
     ["ListComments", "GET", "/api/comment/a%2Fb", () => api.listComments(id)],
@@ -455,14 +459,25 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
       seen.push({ method: req.method, path: new URL(req.url).pathname });
       return new Response(null, { status: 204 });
     });
-    // An empty reply is an error for the board, which must name a project, and
-    // for the writes that must echo what they wrote; a success for everything else.
+    // An empty reply is an error for the board, which must name a project, for
+    // the writes that must echo what they wrote, and for an export, an import or
+    // a bulk change, which must account for the tasks; a success for everything else.
     const err = await call().then(
       () => undefined,
       (e) => e,
     );
     expect(err !== undefined, `${name}: err = ${err}`).toBe(
-      ["GetBoard", "EditComment", "AddActivity", "AddTimeEntry", "UpdateTimeEntry"].includes(name),
+      [
+        "GetBoard",
+        "EditComment",
+        "AddActivity",
+        "AddTimeEntry",
+        "UpdateTimeEntry",
+        "SetTaskDueDate",
+        "ExportTasks",
+        "ImportTasks",
+        "BulkUpdate",
+      ].includes(name),
     );
     expect(seen[0]).toEqual({ method, path });
   });
@@ -795,6 +810,134 @@ describe("TestReadsMapEveryField", () => {
 
 // What each write puts on the wire.
 describe("TestWritesSendEveryField", () => {
+  // Clearing leaves the field out: the route takes a string or nothing, never
+  // null, and the server stores nothing for a missing one.
+  test.each([
+    ["2026-10-31", '{"dueDate":"2026-10-31"}', `,"dueDate":"2026-10-31T00:00:00.000Z"`, "2026-10-31T00:00:00.000Z"],
+    ["", "{}", `,"dueDate":null`, null],
+  ])("due date %j", async (given, body, reply, want) => {
+    const seen = recorder(taskReply(reply));
+    const task = await api.setTaskDueDate("t1", given);
+    expect([seen.method, seen.path, seen.body]).toEqual(["PUT", "/api/task/due-date/t1", body]);
+    expect(task.dueDate).toBe(want);
+  });
+
+  // A reply that did not take the change is not reported as one: a set echoed
+  // without a date, a clear echoed with one, and another task's record.
+  test.each([
+    ["2026-10-31", `,"dueDate":null`],
+    ["", `,"dueDate":"2026-10-31T00:00:00.000Z"`],
+    ["2026-10-31", ""],
+  ])("due date %j not echoed by %j", async (given, reply) => {
+    recorder(taskReply(reply));
+    expect(String(await failure(api.setTaskDueDate("t1", given)))).toContain("/task/due-date/t1: server answered with task");
+  });
+
+  // The instant is compared, not the spelling: a bare date comes back as the
+  // same moment written out in full, and a different moment is refused.
+  test("due date echoed as another instant", async () => {
+    recorder(taskReply(`,"dueDate":"2026-12-31T00:00:00.000Z"`));
+    expect(String(await failure(api.setTaskDueDate("t1", "2026-10-31")))).toContain("/task/due-date/t1: server answered with task");
+  });
+
+  test("due date from another task", async () => {
+    recorder(taskReply(`,"dueDate":"2026-10-31T00:00:00.000Z"`).replace('"id":"t1"', () => '"id":"t2"'));
+    expect(String(await failure(api.setTaskDueDate("t1", "2026-10-31")))).toContain('task "t2"');
+  });
+
+  // A clear sends null. The route reads an omitted value as "clear" only for a
+  // due date and refuses it for an assignee, so null is the one form both take.
+  // The count is the server's, not the number of tasks sent.
+  test.each([
+    ["updateStatus", "done", '{"taskIds":["t1","t2"],"operation":"updateStatus","value":"done"}'],
+    ["updateAssignee", null, '{"taskIds":["t1","t2"],"operation":"updateAssignee","value":null}'],
+    ["updateDueDate", null, '{"taskIds":["t1","t2"],"operation":"updateDueDate","value":null}'],
+  ] as const)("bulk %s", async (operation, value, body) => {
+    const seen = recorder('{"success":true,"updatedCount":2}');
+    expect(await api.bulkUpdate(["t1", "t2"], operation, value)).toBe(2);
+    expect(seen.body).toBe(body);
+  });
+
+  // A label may come back short, since the server skips a task that already has
+  // it; the count is the server's, not the number of tasks sent.
+  test.each(["addLabel", "removeLabel"] as const)("bulk %s short", async (operation) => {
+    recorder('{"success":true,"updatedCount":1}');
+    expect(await api.bulkUpdate(["t1", "t2", "t3"], operation, "l1")).toBe(1);
+  });
+
+  test.each([
+    ["a short count", "updateStatus", '{"success":true,"updatedCount":1}'],
+    ["a short delete", "delete", '{"success":true,"updatedCount":1}'],
+    ["no count", "updateStatus", '{"success":true}'],
+    ["no count for a label", "addLabel", '{"success":true}'],
+  ] as const)("bulk with %s", async (_, operation, reply) => {
+    recorder(reply);
+    expect(String(await failure(api.bulkUpdate(["t1", "t2"], operation, "done")))).toContain("/task/bulk: sent 2 task(s)");
+  });
+
+  test("bulk answered with success false", async () => {
+    recorder('{"success":false,"updatedCount":2}');
+    expect(String(await failure(api.bulkUpdate(["t1", "t2"], "updateStatus", "done")))).toContain("PATCH /api/task/bulk: 200");
+  });
+
+  // The summary has to account for every task sent, as total and as successes
+  // plus failures; a reply that does not is not an import that went through.
+  test.each([
+    ["no results", "{}"],
+    ["a short total", `{"results":{"total":1,"successful":1,"failed":0,"tasks":[]}}`],
+    ["counts that do not add up", `{"results":{"total":2,"successful":1,"failed":0,"tasks":[{"success":true},{"success":true}]}}`],
+    ["a total past what was sent", `{"results":{"total":3,"successful":2,"failed":0,"tasks":[{"success":true},{"success":true}]}}`],
+    ["a short task list", `{"results":{"total":2,"successful":2,"failed":0,"tasks":[{"success":true}]}}`],
+    ["a count that hides a failure", `{"results":{"total":2,"successful":2,"failed":0,"tasks":[{"success":true},{"success":false}]}}`],
+  ])("import with %s", async (_, reply) => {
+    recorder(reply);
+    const err = String(await failure(api.importProjectTasks("p1", [{ title: "a", status: "x" }, { title: "b", status: "x" }])));
+    expect(err).toContain("/task/import/p1: sent 2 task(s)");
+  });
+
+  // An error written as {"message": ...} keeps its reason, and an outcome
+  // without its task keeps an empty title rather than failing the report.
+  test("import failure with an unreadable reason", async () => {
+    recorder(`{"results":{"total":1,"successful":0,"failed":1,"tasks":[{"success":false,"error":{"code":7}}]}}`);
+    expect((await api.importProjectTasks("p1", [{ title: "a", status: "x" }])).tasks[0]!.error).toBe('{"code":7}');
+  });
+
+  test("import failure as an object", async () => {
+    recorder(`{"results":{"total":1,"successful":0,"failed":1,"tasks":[{"success":false,"error":{"message":"no"},"task":null}]}}`);
+    expect((await api.importProjectTasks("p1", [{ title: "a", status: "x" }])).tasks).toEqual([
+      { success: false, id: "", number: 0, title: "", error: "no", warnings: [] },
+    ]);
+  });
+
+  test.each([
+    ["no reply", "{}"],
+    ["no project", `{"tasks":[]}`],
+    ["a null project", `{"project":null,"tasks":[]}`],
+    ["no tasks", `{"project":{"name":"A","slug":"A","description":null,"exportedAt":"${TIME}"}}`],
+  ])("export with %s", async (_, reply) => {
+    recorder(reply);
+    expect(String(await failure(api.exportProjectTasks("p1")))).toContain("/task/export/p1: server answered without");
+  });
+
+  test("import", async () => {
+    const seen = recorder(
+      `{"results":{"total":2,"successful":1,"failed":1,"tasks":[` +
+        `{"success":true,"task":{"id":"t9","number":12,"title":"a"},"warnings":["Unknown status \\"x\\" mapped to \\"planned\\""]},` +
+        `{"success":false,"error":"Assignee is not a member of this workspace","task":{"title":"b","status":"to-do"}}]}}`,
+    );
+    const result = await api.importProjectTasks("p1", [{ title: "a", status: "x" }, { title: "b", status: "to-do", userId: "u9" }]);
+    expect(seen.body).toBe('{"tasks":[{"title":"a","status":"x"},{"title":"b","status":"to-do","userId":"u9"}]}');
+    expect(result).toEqual({
+      total: 2,
+      successful: 1,
+      failed: 1,
+      tasks: [
+        { success: true, id: "t9", number: 12, title: "a", error: "", warnings: ['Unknown status "x" mapped to "planned"'] },
+        { success: false, id: "", number: 0, title: "b", error: "Assignee is not a member of this workspace", warnings: [] },
+      ],
+    });
+  });
+
   test("create task", async () => {
     const seen = recorder(taskReply());
     await api.createTask("p1", newTask({ title: "x", description: "d", priority: "high", status: "review", dueDate: "2026-10-01" }));

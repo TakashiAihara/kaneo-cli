@@ -311,7 +311,9 @@ export type SearchResult = {
 // totalCount is what the server reports, which is not what the document says.
 // The document calls it every match before the limit, but v2.29.2 applies the
 // limit to each type's query first and counts what those returned, so it is not
-// the number of matches. A full page is the signal that more may exist.
+// the number of matches; it also counts each repeat of a workspace match (see
+// SearchPage), which results do not keep. A full page is the signal that more
+// may exist.
 export type Search = { query: string; results: SearchResult[]; totalCount: number };
 
 // What to search for. type and limit are "" to take the server's defaults (every

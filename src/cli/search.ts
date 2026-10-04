@@ -63,6 +63,8 @@ export const searchCommand = {
       found = page.found;
       // totalCount cannot say whether matches were cut (see Search), so a page
       // the server filled, repeats counted, is taken to mean there may be more.
+      // The repeats still take places in the server's page, so it can show fewer
+      // than --limit even then.
       more = page.rows >= wanted;
     }
 
@@ -97,7 +99,7 @@ export const searchCommand = {
 // for the most the server returns rather than for --limit, which the server then
 // no longer checks; it is checked here instead. There may be more when the merge
 // had to be cut, or when a workspace's page came back full.
-// ponytail: repeats that fill a workspace's page of 50 still push out matches that would rank in; the hint then says there may be more.
+// ponytail: a workspace page of 50 filled by repeats, or by more than 50 matches, still drops matches that would rank in; the hint then says there may be more. Asking for workspaces apart from the other types would end the repeats' share.
 const searchEverywhere = async (wanted: SearchQuery, limit: number) => {
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
     throw new Error(`--limit must be a whole number from 1 to ${MAX_LIMIT}`);
@@ -116,9 +118,9 @@ const searchEverywhere = async (wanted: SearchQuery, limit: number) => {
     }
   }
   merged.sort((a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  // totalCount counts the matches before the cut, each workspace's page capped
-  // at 50 as the server caps each type's.
-  const found = { query: wanted.query, results: merged.slice(0, limit), totalCount: merged.length };
+  // totalCount counts the distinct matches before the cut, out of pages the
+  // server has already cut to 50 each.
+  const found = { query: wanted.query, totalCount: merged.length, results: merged.slice(0, limit) };
   return { found, more: pageFull || merged.length > limit };
 };
 

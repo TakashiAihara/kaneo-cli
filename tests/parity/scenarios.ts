@@ -196,6 +196,14 @@ export const SCENARIOS: Scenario[] = [
   { name: "search and members need a workspace", env: { KANEO_WORKSPACE: "" }, steps: [["search", "first", "--json"], ["workspace", "members", "--json"]] },
   { name: "search across workspaces needs none", env: { KANEO_WORKSPACE: "" }, steps: [["search", "first", "-A", "--human"]] },
   {
+    // Fifty members make the server fill each workspace's page of 50 with
+    // repeats of "Other", so the tasks that match are pushed out: the output has
+    // to say there may be more although only one match is left.
+    name: "search across workspaces filled by repeats",
+    seed: { members: Array.from({ length: 50 }, (_, i) => ({ id: `user-m${i}`, name: `M${i}`, email: `m${i}@example.com`, role: "member" })) },
+    steps: [["search", "er", "-A", "--human"]],
+  },
+  {
     // A project in the second workspace whose task matches alone ("elsewhere") and
     // alongside the first workspace's ("first"), so the merge, its ranking and the
     // cut to --limit across workspaces all show in the output. Two members make

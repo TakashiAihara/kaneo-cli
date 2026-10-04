@@ -25,10 +25,12 @@ permissions:
 
 # Automatic runs are one at a time, so two cannot read the same highest tag and
 # both claim the next one. A newer main push replacing a pending one is fine.
-# A named tag gets its own group: sharing one would let a later main push
-# cancel a pending hand-pushed or dispatched release.
+# A group holds one pending run and a newer one replaces it, so only a run that
+# will release joins the automatic group: a run for a failed ci (its jobs are
+# skipped) gets a group of its own, or it could push out a pending run that was
+# going to release. A named tag gets its own group for the same reason.
 concurrency:
-  group: release-${{ github.event_name == 'workflow_run' && 'auto' || github.event.inputs.tag || github.ref_name }}
+  group: release-${{ github.event_name == 'workflow_run' && (github.event.workflow_run.conclusion == 'success' && 'auto' || github.run_id) || github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -76,7 +78,12 @@ jobs:
           fi
           # A newer commit is already on main and its own run releases it.
           # Releasing this one afterwards would make older code the latest.
-          if [ "$(git rev-parse origin/main)" != "$(git rev-parse HEAD)" ]; then
+          # Each side assigned on its own line: inside the if condition set -e
+          # does not apply, and a failed rev-parse would compare an empty string,
+          # read as "main moved on" and skip the release while showing green.
+          main="$(git rev-parse origin/main)"
+          head="$(git rev-parse HEAD)"
+          if [ "$main" != "$head" ]; then
             echo "main has moved past this commit; not releasing it"
             exit 0
           fi
@@ -151,6 +158,15 @@ jobs:
         run: |
           set -eu
           if gh release view "$TAG" >/dev/null 2>&1; then
+            # Only a re-run for the commit the tag names replaces the assets. A
+            # tag on another commit means someone pushed that name first, and
+            # overwriting would ship binaries that do not match the tag.
+            head="$(git rev-parse HEAD)"
+            tagged="$(git rev-parse "refs/tags/$TAG^{commit}")"
+            if [ "$tagged" != "$head" ]; then
+              echo "::error::$TAG points at $tagged, not the built $head; not replacing its assets"
+              exit 1
+            fi
             gh release upload "$TAG" dist/*.tar.gz dist/checksums.txt --clobber
           else
             gh release create "$TAG" dist/*.tar.gz dist/checksums.txt --verify-tag --generate-notes --latest

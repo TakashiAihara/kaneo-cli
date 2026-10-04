@@ -1,0 +1,26 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "status",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"sessionId\": \"sess-test\",\n  \"attached\": null,\n  \"history\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "status",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "attached: none\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

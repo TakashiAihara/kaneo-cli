@@ -144,6 +144,51 @@ export const SCENARIOS: Scenario[] = [
   },
   { name: "session attach fails quietly", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "99"]] },
   { name: "session attach strict reports", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "99", "--strict"]] },
+  // Reads only what is on this machine, so it answers before anything is
+  // attached and makes no request.
+  {
+    name: "session status before attaching",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [["session", "status", "--json"], ["session", "status", "--human"]],
+  },
+  {
+    name: "session history survives close",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"], ["session", "status", "--json"]],
+  },
+  // A session may hold several tasks, and closing one of them must leave the
+  // attachment on the other alone.
+  {
+    name: "session close names a task",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "attach", "2", "--strict"],
+      ["session", "close", "--task", "1", "--strict"],
+      ["session", "status", "--json"],
+      ["session", "status", "--human"],
+      ["session", "close", "--strict"],
+      ["session", "status", "--human"],
+    ],
+  },
+  // Naming the attached task closes it as a plain close would, board included.
+  {
+    name: "session close names the attached task",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [["session", "attach", "1", "--strict"], ["session", "close", "--task", "1", "--strict"], ["session", "status", "--json"]],
+  },
+  {
+    name: "session close --task without an attachment",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    // Named the way `session status` prints it, so a reference read off the
+    // history can be handed straight back.
+    steps: [["session", "close", "--task", "ALP#2", "--strict", "--json"]],
+  },
+  {
+    name: "session status without a session id",
+    env: { KANEO_SESSION_ID: "" },
+    steps: [["session", "status", "--json"]],
+  },
   ...both("board", ["board"]),
   ...both("board archived", ["board", "--archived"]),
   { name: "board pages past one page", pageSize: 2, steps: [["task", "ls", "--all", "--json"], ["board", "--json"]] },

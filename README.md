@@ -177,7 +177,11 @@ kaneo board                     # open tasks, and which sessions hold them
 
 The session is identified by `KANEO_SESSION_ID`, falling back to `CLAUDE_CODE_SESSION_ID`.
 
-The `session` commands are **fail-open**: an unreachable server, a missing key or an unconfigured project makes them print nothing and exit 0, so a session-start hook is not broken by any of them. `--strict` turns that off and `KANEO_DEBUG=1` prints the reason that was swallowed. `board` is not: it fails like any other command, so an empty board and one that could not be read look different.
+`kaneo session close [--task <task>]` acts on the task in the attachment, the one last attached; `--task` names another one, as `slug#number` (the form `session status` prints), a number in the current project, or an id, so a session that has attached to several tasks releases only the one named. The attachment is only removed when it is that task, and a task can be closed by name with no attachment at all — a session that attached, re-attached elsewhere and then wants the first one released.
+
+What a session holds is kept in `~/.config/kaneo/sessions/<session id>.json`, and every attach and close is appended to `<session id>.history.jsonl` beside it, one JSON line each, holding the time, the task and the board it was on. Close removes the attachment — other tools read that file as "currently attached" — and keeps the history, so a check running after the session has ended can still see what it did. `kaneo session status` prints the attachment and the history, reading only those files: no request is made and no key is needed.
+
+The `session` commands are **fail-open**, `session status` excepted: it makes no request, so there is nothing for fail-open to swallow, and a session id nobody set is worth reporting. An unreachable server, a missing key or an unconfigured project makes the others print nothing and exit 0, so a session-start hook is not broken by any of them. `--strict` turns that off and `KANEO_DEBUG=1` prints the reason that was swallowed. `board` is not: it fails like any other command, so an empty board and one that could not be read look different.
 
 A failure that already changed something elsewhere is reported regardless — `session attach` that wrote the comment but could not record it locally, for instance. Staying quiet there would leave `session next` believing nothing is attached.
 

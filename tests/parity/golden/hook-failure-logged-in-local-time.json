@@ -8,7 +8,7 @@
         "--strict"
       ],
       "exit": 0,
-      "stdout": "{\n  \"taskId\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"projectId\": \"proj-alpha\",\n  \"projectName\": \"Alpha\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
+      "stdout": "{\n  \"taskId\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"projectId\": \"proj-alpha\",\n  \"projectName\": \"Alpha\",\n  \"projectSlug\": \"ALP\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
       "stderr": "kaneo: attach hook failed: exit status 2: \n"
     }
   ],
@@ -40,6 +40,7 @@
   "files": {
     ".config/kaneo/config.json": "{\"hooks\":{\"attach\":\"exit 2\"}}",
     ".config/kaneo/hooks.log": "<TIME>+09:00 session=sess-tz attach hook failed: exit status 2: \n",
-    ".config/kaneo/sessions/sess-tz.json": "{\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}"
+    ".config/kaneo/sessions/sess-tz.history.jsonl": "{\"event\":\"attach\",\"at\":\"<TIME>Z\",\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n",
+    ".config/kaneo/sessions/sess-tz.json": "{\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}"
   }
 }

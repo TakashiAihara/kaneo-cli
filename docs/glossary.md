@@ -110,6 +110,16 @@ The prefix is `kn:` rather than `kaneo:` because that is what is already written
 
 Values are percent-encoded where they contain whitespace. Fields are separated by spaces, so a raw space inside a value is indistinguishable from the start of the next field — a path like `/work/client foo=bar` would otherwise be read back as `/work/client`. Markers written by the older implementation carry raw values and are still read as-is.
 
+### attachment
+
+The record of which task a session currently holds, written beside the markers as `~/.config/kaneo/sessions/<session id>.json` when `session attach` succeeds and removed when the session closes that task. It carries the task's id, number and title, and the project and workspace it is on — including the project slug, which is what a task reference is written as, so a reader can print `slug#number` without an API call. Each of those is left out when unknown rather than written empty.
+
+### attach history
+
+Every attach and close a session made, one JSON line each in `~/.config/kaneo/sessions/<session id>.history.jsonl`, holding the time, the task and the board as the attachment had it at that moment. Lines are only ever appended to.
+
+It exists because the attachment is deleted on close, which leaves nothing that says the session was ever working on anything; a retro or a check that runs afterwards reads this instead. It is kept for that reason alone: the attachment stays the record of what is held *now*, since other tools read it as "currently attached", and a history that outlived every close would say nothing about the present. `session status` prints both, from these files alone.
+
 ### fail-open
 
 Producing no output and exiting 0 on failure. The `session` commands do this because they run from a session-start hook, where a missing board is a smaller harm than a broken session. Every other command reports failures normally, `board` included: its callers read the board to decide something, and an empty answer from a failure read as "no tasks" (#16).

@@ -1,0 +1,24 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "--all",
+        "--jq",
+        ".[] | .description"
+      ],
+      "exit": 0,
+      "stdout": "multi\nline\n\n\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

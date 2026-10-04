@@ -1,0 +1,24 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "99",
+        "--jq",
+        ".number"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: no task #99 in project ALP (proj-alpha, from env); pass --project to look elsewhere\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

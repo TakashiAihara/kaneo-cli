@@ -1,0 +1,24 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--jq",
+        ".title | tonumber"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --jq: jq: error: string (\"Write the parser\") cannot be parsed as a number\nthe command had already run when --jq failed; anything it changes has been changed\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

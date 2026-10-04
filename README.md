@@ -209,6 +209,22 @@ kaneo task ls --human      # a table through a pipe
 
 Data goes to stdout and progress goes to stderr, so piping into `jq` is always safe.
 
+`--jq <expression>` narrows the JSON to what a caller wants, so reading one field is one command instead of a pipe into `jq`:
+
+```bash
+kaneo task create "fix the parser" --jq .number   # 4
+kaneo task get 1 --jq .status                    # to-do
+```
+
+jq runs inside the binary, so nothing has to be installed. Output follows `gh --jq` to a pipe: each value ends with a newline, strings print raw and everything else as compact JSON. `--jq` implies `--json` and wins over `--human`.
+
+When something fails, stdout stays empty and the exit code is 1:
+
+- an expression jq cannot compile is refused before any request is made
+- an expression that fails on the payload reports jq's message on stderr, followed by a line saying the command had already run — `task create … --jq` that exits 1 this way has still created the task, so do not retry it blindly
+- a failing command reports its error on stderr only; the `{"error": ...}` object `--json` prints is left out
+- `api-check` is the exception: its report is its output, so a failed check still prints what the expression makes of the report
+
 ## Develop
 
 ```bash

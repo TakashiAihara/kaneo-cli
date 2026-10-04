@@ -54,18 +54,14 @@ describe("requestShapes", () => {
     expect(requestShapes(doc, ["a"])).toEqual({ a: { "query.p": true, "query.q": false } });
   });
 
-  test("merges allOf members, and takes oneOf branches as required only where all require", () => {
-    const schema = {
-      allOf: [{ properties: { a: {} }, required: ["a"] }, { properties: { b: {} } }],
-      oneOf: [
-        { properties: { c: {}, d: {} }, required: ["c", "d"] },
-        { properties: { c: {} }, required: ["c"] },
-      ],
-    };
-    const doc = op("x", { requestBody: { content: { "application/json": { schema } } } });
-    expect(requestShapes(doc, ["x"])).toEqual({
-      x: { "body.a": true, "body.b": false, "body.c": true, "body.d": false },
-    });
+  test("takes a required body field that properties does not list", () => {
+    const doc = op("a", { requestBody: { content: { "application/json": { schema: { required: ["x"] } } } } });
+    expect(requestShapes(doc, ["a"])).toEqual({ a: { "body.x": true } });
+  });
+
+  test("compares header names case-insensitively", () => {
+    const doc = op("a", { parameters: [{ name: "X-Trace", in: "header", required: true }] });
+    expect(requestShapes(doc, ["a"])).toEqual({ a: { "header.x-trace": true } });
   });
 
   test("leaves out operations it was not asked for", () => {
@@ -104,8 +100,11 @@ describe("requestDrift", () => {
   });
 
   test("sorts by operation, then field", () => {
-    const got = requestDrift({ createTaskComment: { "body.a": false }, createTask: { "body.b": false } }, { createTaskComment: {}, createTask: {} });
-    expect(got.map((d) => d.id)).toEqual(["createTask", "createTaskComment"]);
+    const got = requestDrift(
+      { createTaskComment: { "body.a": false }, createTask: { "body.z": false, "body.b": false } },
+      { createTaskComment: {}, createTask: {} },
+    );
+    expect(got.map((d) => `${d.id} ${d.field}`)).toEqual(["createTask body.b", "createTask body.z", "createTaskComment body.a"]);
   });
 
   test("the same document has no drift", () => {

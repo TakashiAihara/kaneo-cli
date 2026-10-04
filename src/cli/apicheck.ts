@@ -6,8 +6,9 @@ import type { Json } from "../output/json";
 // Compares what this client calls against what the server offers.
 //
 // It exits non-zero when an operation this client uses is missing from the
-// server, so it can gate a release. Reporting a mismatch and exiting 0 would
-// make the check unusable in CI, which is the whole reason to have it.
+// server, so it can gate a release. Reporting a missing operation and exiting 0
+// would make the check unusable in CI, which is the whole reason to have it.
+// Request drift is reported without failing: see requestDrift in api/shape.ts.
 export const apiCheckCommand = {
   name: "api-check",
   short: "Check this client's operations against the server's OpenAPI document",

@@ -31,39 +31,21 @@ const shapeOf = (doc: Node, item: Node, op: Node): RequestShape => {
   // operation's own entry for the same name and location replaces it.
   for (const raw of [...(item.parameters ?? []), ...(op.parameters ?? [])]) {
     const p = deref(doc, raw);
-    if (typeof p?.name === "string" && p.in !== "path") shape[`${p.in}.${p.name}`] = p.required === true;
+    if (typeof p?.name !== "string" || p.in === "path") continue;
+    // Header names are case-insensitive on the wire.
+    const name = p.in === "header" ? p.name.toLowerCase() : p.name;
+    shape[`${p.in}.${name}`] = p.required === true;
   }
+  // Every body in the Kaneo documents measured (2.20 to 2.29) is a plain
+  // object; allOf / oneOf / anyOf would read as no fields, so every pinned
+  // field shows as drift rather than going unnoticed.
   const body = deref(doc, op.requestBody);
-  for (const [name, required] of fieldsOf(doc, body?.content?.["application/json"]?.schema, 0)) {
-    shape[`body.${name}`] = required;
-  }
+  const schema = deref(doc, body?.content?.["application/json"]?.schema);
+  const required = new Set<string>(Array.isArray(schema?.required) ? schema.required : []);
+  for (const name of Object.keys(schema?.properties ?? {})) shape[`body.${name}`] = required.has(name);
+  // A required name need not be listed under properties to be required.
+  for (const name of required) shape[`body.${name}`] = true;
   return shape;
-};
-
-// A body schema's top-level fields. allOf merges its members (a field is
-// required if any member requires it); oneOf and anyOf take every field any
-// branch has, required only where every branch requires it, since the client
-// may be sending any one of them.
-const fieldsOf = (doc: Node, raw: unknown, depth: number): Map<string, boolean> => {
-  const schema = deref(doc, raw);
-  const fields = new Map<string, boolean>();
-  if (!schema || typeof schema !== "object" || depth > 16) return fields;
-
-  const required = new Set<string>(Array.isArray(schema.required) ? schema.required : []);
-  for (const name of Object.keys(schema.properties ?? {})) fields.set(name, required.has(name));
-  for (const name of required) if (!fields.has(name)) fields.set(name, true);
-
-  for (const member of schema.allOf ?? []) {
-    for (const [name, req] of fieldsOf(doc, member, depth + 1)) fields.set(name, req || fields.get(name) === true);
-  }
-  for (const key of ["oneOf", "anyOf"]) {
-    const branches = (schema[key] ?? []).map((b: unknown) => fieldsOf(doc, b, depth + 1)) as Map<string, boolean>[];
-    for (const name of new Set(branches.flatMap((b) => [...b.keys()]))) {
-      const everywhere = branches.every((b) => b.get(name) === true);
-      fields.set(name, fields.get(name) === true || everywhere);
-    }
-  }
-  return fields;
 };
 
 // Only local references: both documents keep their schemas under components.

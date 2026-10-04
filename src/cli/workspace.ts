@@ -31,7 +31,7 @@ export const workspaceCommand = {
       args: noArgs("kaneo workspace members"),
       run: async ({ app }: { app: App }) => {
         apiKey(app);
-        const members = await listMembers(await resolveWorkspace(app, workspace(app)));
+        const members = await listMembers(await resolveWorkspace(workspace(app)));
         const idWidth = members.reduce((at, m) => Math.max(at, m.id.length), 0);
         const roleWidth = members.reduce((at, m) => Math.max(at, m.role.length), 0);
         for (const m of members) {

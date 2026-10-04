@@ -4,11 +4,11 @@ import { currentRepo } from "./repo";
 
 // The hosted Kaneo instance. A self-hosted deployment is selected through a
 // profile, KANEO_API_URL or --api-url.
-export const DEFAULT_API_URL = "https://cloud.kaneo.app";
+const DEFAULT_API_URL = "https://cloud.kaneo.app";
 
 // Which layer a resolved value came from, so `kaneo context` can explain itself
 // and a surprising value can be traced back to where it was written down.
-export type Source = "flag" | "env" | "local" | "profile" | "repo-map" | "owner-map" | "default" | "unset";
+type Source = "flag" | "env" | "local" | "profile" | "repo-map" | "owner-map" | "default" | "unset";
 
 export type Flags = { apiUrl: string; apiKey: string; workspaceId: string; projectId: string };
 
@@ -27,7 +27,7 @@ export type Resolved = {
   repo: string;
 };
 
-export type Input = {
+type Input = {
   flags: Flags;
   env: (name: string) => string;
   // Where the .kaneo.json walk starts, and the directory it stops at. A null
@@ -58,7 +58,7 @@ const NO_LOCAL: Local = { workspace: "", project: "", path: "" };
 // owner's repositories belong to and nothing else. Neither can supply a
 // credential, and .kaneo.json cannot either — it is a file meant to be
 // committed.
-export const resolve = (input: Input): Resolved => {
+const resolve = (input: Input): Resolved => {
   const { env } = input;
   const local = input.dir === null ? NO_LOCAL : mergeLocals(findLocals(input.dir, input.home));
   const active = activeProfile(input.global);

@@ -7,6 +7,7 @@
     "generate": "orval --config orval.config.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "knip": "knip",
     "build": "bun scripts/build.ts",
     "parity:record": "bun scripts/record-golden.ts",
     "spec": "bun scripts/spec.ts"
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@types/bun": "^1.4.0",
     "@types/node": "^26.4.0",
+    "knip": "6.39.0",
     "orval": "8.39.0",
     "typescript": "^5.9.0"
   }

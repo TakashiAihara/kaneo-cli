@@ -52,10 +52,10 @@ export const searchCommand = {
     if (acrossAll) {
       ({ found, more } = await searchEverywhere({ query, workspaceId: "", projectId: "", type, limit }, wanted));
     } else {
-      const inProject = narrow ? await withProject(app, project(app), (id) => getProject(id)) : undefined;
+      const inProject = narrow ? await withProject(project(app), (id) => getProject(id)) : undefined;
       const page = await search({
         query,
-        workspaceId: inProject?.workspaceId ?? (await resolveWorkspace(app, workspace(app))),
+        workspaceId: inProject?.workspaceId ?? (await resolveWorkspace(workspace(app))),
         projectId: inProject?.id ?? "",
         type,
         limit,

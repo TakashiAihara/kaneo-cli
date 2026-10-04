@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Orval writes every model a kept operation reaches, used or not. Only
+  // exports and types are let through; anything else there still fails.
+  "ignoreIssues": { "src/api/gen/**": ["exports", "types"] },
+  // knip reads `bun build` inside scripts/build.ts as `bun run build`, the
+  // package.json script, and resolves that script's file from scripts/.
+  // REMOVE WHEN knip no longer reports scripts/build.ts as unresolved with this
+  // line gone.
+  "ignoreUnresolved": ["scripts/build.ts"]
+}

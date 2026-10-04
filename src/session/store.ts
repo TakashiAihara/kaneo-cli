@@ -39,7 +39,7 @@ export type Store = {
 };
 
 // The store rooted at the user's config directory.
-export const defaultStore = (home: string, env: (name: string) => string): Store => {
+const defaultStore = (home: string, env: (name: string) => string): Store => {
   const configured = env("XDG_CONFIG_HOME");
   const configHome = configured === "" ? join(home, ".config") : configured;
   return { dir: join(configHome, "kaneo", "sessions"), legacyDirs: [join(configHome, "kn", "sessions")] };

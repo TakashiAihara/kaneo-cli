@@ -145,11 +145,7 @@ export const columnCommand = {
 // columns can share one, and a name that does is refused rather than guessed.
 // All of it is read off the listing rather than by asking the server, so a word
 // that is none of these is a mistake this names rather than one answered by 404.
-//
-// Exported because a command outside this file has to name a column the same way
-// this one does — `workflow set` takes one — and a second copy of these rules
-// would be a second answer to the same reference.
-export const findColumn = (columns: Column[], ref: string): Column | undefined => {
+const findColumn = (columns: Column[], ref: string): Column | undefined => {
   const wanted = ref.trim();
   const exact = columns.find((column) => column.id === wanted || column.slug === wanted);
   if (exact !== undefined) return exact;
@@ -162,6 +158,10 @@ export const findColumn = (columns: Column[], ref: string): Column | undefined =
 
 // The same, refused rather than undefined when nothing matches, so a caller that
 // cannot go on does not have to say what is missing.
+//
+// Exported because a command outside this file has to name a column the same way
+// this one does — `workflow set` takes one — and a second copy of these rules
+// would be a second answer to the same reference.
 export const resolveColumn = async (projectId: string, ref: string): Promise<Column> => {
   const found = findColumn(await listColumns(projectId), ref);
   if (found !== undefined) return found;

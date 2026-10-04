@@ -311,6 +311,7 @@ When something fails, stdout stays empty and the exit code is 1:
 bun install
 bun test              # unit tests and the parity suite
 bun run typecheck
+bun run knip          # unused exports, files and dependencies
 bun run generate      # regenerate the API client from the pinned document
 bun run build         # build every release archive into dist/, as the release job does
 bun src/index.ts ...  # run the CLI from source

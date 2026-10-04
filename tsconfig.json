@@ -8,9 +8,11 @@
     "resolveJsonModule": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "scripts"]
+  "include": ["src", "tests", "scripts", "openapi", "orval.config.ts"]
 }

@@ -8,7 +8,7 @@
 // command is reported before any flag is judged, and the found command then
 // parses what is left.
 
-export type FlagType = "string" | "bool" | "duration";
+type FlagType = "string" | "bool" | "duration";
 
 export type Flag = {
   name: string;
@@ -121,7 +121,7 @@ const quoteRune = (letter: string): string => `'${letter}'`;
 
 // A Go duration, in milliseconds. The error messages are Go's, because they are
 // what a user sees when they mistype the value.
-export const parseDuration = (text: string): number => {
+const parseDuration = (text: string): number => {
   const invalid = (): Error => new Error(`time: invalid duration ${quote(text)}`);
   let rest = text;
   let negative = false;
@@ -236,7 +236,7 @@ export const readFlags = <A>(flags: Flag[], args: string[], command: Command<A>)
   return parseFlags(flags, args);
 };
 
-export const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
+const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
   const byName = new Map(flags.map((flag) => [flag.name, flag]));
   const byShorthand = new Map(flags.flatMap((flag) => (flag.shorthand ? [[flag.shorthand, flag] as const] : [])));
   const values: FlagValues = {};

@@ -4,7 +4,7 @@ import { join, relative, resolve } from "node:path";
 import { startFake, type Recorded } from "./fake";
 import { P1, SEED, WS, type Scenario } from "./scenarios";
 
-export type StepResult = { args: string[]; exit: number; stdout: string; stderr: string };
+type StepResult = { args: string[]; exit: number; stdout: string; stderr: string };
 export type ScenarioResult = { steps: StepResult[]; requests: Recorded[]; files: Record<string, string> };
 
 // Runs one scenario through `bin` (argv prefix of the CLI under test) and

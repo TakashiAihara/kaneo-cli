@@ -38,7 +38,7 @@ const string = (value: string): string => {
 
 const number = (value: number): string => (Object.is(value, -0) ? "-0" : String(value));
 
-export const encode = (value: Json, depth = 0): string => {
+const encode = (value: Json, depth = 0): string => {
   if (value === null) return "null";
   switch (typeof value) {
     case "boolean":

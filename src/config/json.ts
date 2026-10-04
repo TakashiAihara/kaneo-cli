@@ -31,7 +31,7 @@ export type GoType =
   // and complains in its own words when neither fits.
   | { at: "either"; name: string; of: GoType[]; complaint: string };
 
-export type Field = { name: string; type: GoType };
+type Field = { name: string; type: GoType };
 
 export const STRING: GoType = { at: "string" };
 

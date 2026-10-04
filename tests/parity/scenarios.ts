@@ -10,7 +10,7 @@ import type { Seed } from "./fake";
 
 export const WS = "ws-main";
 export const P1 = "proj-alpha";
-export const P2 = "proj-beta";
+const P2 = "proj-beta";
 
 export const SEED: Seed = {
   workspaces: [

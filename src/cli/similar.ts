@@ -17,7 +17,7 @@ export const SIMILAR_TITLE = 0.6;
 
 // How many of them a warning or a refusal names: enough to recognise the work,
 // few enough that the message stays one readable line.
-export const SIMILAR_REPORTED = 5;
+const SIMILAR_REPORTED = 5;
 
 // Statuses holding finished or filed-away work, so a title repeating one of them
 // is the next round of it rather than a duplicate. planned is not among them:

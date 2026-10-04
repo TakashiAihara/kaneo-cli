@@ -9,7 +9,7 @@ const URL_LIKE = /^(?:ssh|git|https?):\/\/(?:[^/@]+@)?[^/]+\/([^/]+)\/([^/]+?)(?
 // trailing components look exactly like owner/repo — /home/me/acme/thing would
 // otherwise resolve to the acme workspace and send writes to a board that has
 // nothing to do with it.
-export const parseRemote = (remote: string): string => {
+const parseRemote = (remote: string): string => {
   const url = remote.trim();
   if (url === "") return "";
   for (const pattern of [URL_LIKE, SCP_LIKE]) {

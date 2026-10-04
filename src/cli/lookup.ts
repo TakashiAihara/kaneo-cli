@@ -1,6 +1,5 @@
 import { KaneoApiError } from "../api/http";
 import { listProjectsIn, listWorkspaces, type Project, type Workspace } from "../api/kaneo";
-import type { App } from "./app";
 
 // Turning a value somebody typed into the id the API takes, so a slug or a name
 // works wherever an id does. A slug is what people and agents type: it is the
@@ -16,7 +15,7 @@ export type ProjectIn = { project: Project; workspaceName: string };
 // per workspace. Archived projects are left out unless asked for, which is the
 // view every listing takes; a lookup asks for them, since an archived project is
 // one somebody still has to be able to name to unarchive it.
-export const allProjects = async (app: App, includeArchived: boolean): Promise<ProjectIn[]> => {
+export const allProjects = async (includeArchived: boolean): Promise<ProjectIn[]> => {
   const found: ProjectIn[] = [];
   for (const workspace of await listWorkspaces()) {
     for (const project of await listProjectsIn(workspace.id, includeArchived)) {
@@ -38,7 +37,7 @@ const resolved = new Map<string, string>();
 // writes anything: every op here either reads first or is a single request whose
 // project the server checks before acting on it. A new op has to keep that true —
 // its first request must be the one that carries the project.
-export const withProject = async <T>(app: App, value: string, op: (id: string) => Promise<T>): Promise<T> => {
+export const withProject = async <T>(value: string, op: (id: string) => Promise<T>): Promise<T> => {
   if (value === "") return op(value);
   const known = resolved.get(value);
   if (known !== undefined) return op(known);
@@ -48,7 +47,7 @@ export const withProject = async <T>(app: App, value: string, op: (id: string) =
     return result;
   } catch (e) {
     if (!unknownProject(e)) throw e;
-    const found = projectsNamed(await lookingUp(e, () => allProjects(app, true)), value);
+    const found = projectsNamed(await lookingUp(e, () => allProjects(true)), value);
     if (found.length === 0) throw new Error(`${e.message}: ${noProject(value)}`);
     if (found.length > 1) throw new Error(severalProjects(value, found));
     const only = found[0]!.project;
@@ -69,7 +68,7 @@ export const withProject = async <T>(app: App, value: string, op: (id: string) =
 // workspace with no projects in it. The listing costs one small request, and
 // holds only the workspaces the key's user is a member of, so an admin reaching
 // another one has to go through the web app.
-export const resolveWorkspace = async (app: App, value: string): Promise<string> => {
+export const resolveWorkspace = async (value: string): Promise<string> => {
   const found = workspacesNamed(await listWorkspaces(), value);
   if (found.length === 0) throw new Error(noWorkspace(value));
   if (found.length > 1) throw new Error(severalWorkspaces(value, found));

@@ -5,7 +5,7 @@ import { dirname, join, relative, resolve } from "node:path";
 // credentials: the file is meant to be committed, so anything secret in it would
 // leak with the repository.
 
-export const LOCAL_FILE_NAME = ".kaneo.json";
+const LOCAL_FILE_NAME = ".kaneo.json";
 
 export type Local = { workspace: string; project: string; path: string };
 

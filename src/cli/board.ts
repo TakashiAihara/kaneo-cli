@@ -62,14 +62,14 @@ export const boardCommand = {
         // point of archiving it.
         let open;
         try {
-          open = await withProject(app, id, (projectId) => getProject(projectId));
+          open = await withProject(id, (projectId) => getProject(projectId));
         } catch (e) {
           throw new Error(`project ${id}: ${(e as Error).message}`);
         }
         if (archived(open)) continue;
       }
       try {
-        reports.push(await withProject(app, id, (projectId) => buildBoard(projectId)));
+        reports.push(await withProject(id, (projectId) => buildBoard(projectId)));
       } catch (e) {
         // A board with one project missing reads, to a caller, as that project
         // having nothing on it (#16).

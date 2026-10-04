@@ -1,4 +1,4 @@
-import type { OpenAPIObject } from "openapi3-ts/oas30";
+import type { OpenApiDocument as OpenAPIObject } from "orval";
 import { OPERATIONS } from "../src/api/registry";
 
 // Orval filters by tag or schema only, so the operation filter lives here:

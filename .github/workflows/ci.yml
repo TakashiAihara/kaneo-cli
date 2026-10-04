@@ -39,6 +39,10 @@ jobs:
 
       - run: bun run typecheck
 
+      # Unused exports, files and dependencies fail here rather than in review.
+      # tsconfig's noUnusedLocals / noUnusedParameters cover the inside of a file.
+      - run: bun run knip
+
       - run: bun test
 
       # Every release ships linux/arm64 and darwin, so a build failure there has

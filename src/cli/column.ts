@@ -149,7 +149,7 @@ export const columnCommand = {
 // Exported because a command outside this file has to name a column the same way
 // this one does — `workflow set` takes one — and a second copy of these rules
 // would be a second answer to the same reference.
-export const findColumn = (columns: Column[], ref: string): Column | undefined => {
+const findColumn = (columns: Column[], ref: string): Column | undefined => {
   const wanted = ref.trim();
   const exact = columns.find((column) => column.id === wanted || column.slug === wanted);
   if (exact !== undefined) return exact;

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/index.ts", "scripts/*.ts", "tests/**/*.test.ts"],
+  "project": ["src/**/*.ts", "scripts/**/*.ts", "openapi/**/*.ts", "tests/**/*.ts"],
+  // Orval writes every model a kept operation reaches, used or not.
+  "ignore": ["src/api/gen/**"],
+  // knip reads `bun build` inside scripts/build.ts as `bun run build`, the
+  // package.json script, and resolves that script's file from scripts/.
+  "ignoreUnresolved": ["scripts/build.ts"]
+}

@@ -324,7 +324,7 @@ export type SearchResult = {
 // the number of matches; it also counts each repeat of a workspace match (see
 // SearchPage), which results do not keep. A full page is the signal that more
 // may exist.
-export type Search = { query: string; results: SearchResult[]; totalCount: number };
+type Search = { query: string; results: SearchResult[]; totalCount: number };
 
 // What to search for. type and limit are "" to take the server's defaults (every
 // type, 20 results), and projectId is "" to search the whole workspace.
@@ -724,7 +724,7 @@ export const setWorkflowRule = async (projectId: string, wanted: WorkflowRuleTar
 export const deleteWorkflowRule = async (ruleId: string): Promise<WorkflowRuleRow> =>
   ruleRow(zeroRecord(await removeRule(pathParam(ruleId))));
 
-export type Label = { id: string; name: string; color: string };
+type Label = { id: string; name: string; color: string };
 
 // A single work item, as every route that returns one agrees on it.
 //
@@ -1254,7 +1254,7 @@ export type ImportedTask = ImportTasksBody["tasks"][number];
 // One task's outcome. The server reports each task on its own, so a partial
 // import still answers 200 and the failures are only found here.
 // id and number are the created task's, and empty and zero on a failure.
-export type ImportOutcome = { success: boolean; id: string; number: number; title: string; error: string; warnings: string[] };
+type ImportOutcome = { success: boolean; id: string; number: number; title: string; error: string; warnings: string[] };
 
 export type ImportResult = { total: number; successful: number; failed: number; tasks: ImportOutcome[] };
 

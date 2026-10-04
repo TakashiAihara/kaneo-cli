@@ -7,7 +7,7 @@ import { JqFailure } from "../output/jq";
 // Fail-open exists so an unreachable server cannot break a session. It is not a
 // licence to hide a failure that leaves things inconsistent — a comment written
 // to the server with no local record of it, for instance.
-export class HardError extends Error {}
+class HardError extends Error {}
 
 // Wraps an error so fail-open will not swallow it.
 export const hard = (message: string): Error => new HardError(message);

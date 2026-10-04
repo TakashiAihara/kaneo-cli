@@ -32,7 +32,7 @@ const archiveCommand = (verb: "archive" | "unarchive") => {
     run: async ({ args, app }: { args: string[]; app: App }) => {
       apiKey(app);
       const id = args[0] ?? project(app);
-      const projectId = await withProject(app, id, async (projectId) => {
+      const projectId = await withProject(id, async (projectId) => {
         await setProjectArchived(projectId, archived);
         return projectId;
       });
@@ -137,8 +137,8 @@ export const projectCommand = {
         // One list either way. Only whether a workspace is part of each entry
         // differs, and it can only be named when the listing covers more than one.
         const found = acrossAll
-          ? await allProjects(app, includeArchived)
-          : (await listProjectsIn(await resolveWorkspace(app, workspace(app)), includeArchived)).map(
+          ? await allProjects(includeArchived)
+          : (await listProjectsIn(await resolveWorkspace(workspace(app)), includeArchived)).map(
               (project) => ({ project, workspaceName: "" }),
             );
         for (const { project, workspaceName } of found) app.out.human(projectLine(project, workspaceName));
@@ -157,7 +157,7 @@ export const projectCommand = {
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
         const wanted = args[0]!.toLowerCase();
-        const found = (await allProjects(app, true)).filter(
+        const found = (await allProjects(true)).filter(
           (p) =>
             p.project.name.toLowerCase().includes(wanted) || p.project.slug.toLowerCase().includes(wanted),
         );
@@ -175,7 +175,7 @@ export const projectCommand = {
       args: maximumArgs(1),
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
-        const found = await withProject(app, args[0] ?? project(app), (id) => getProject(id));
+        const found = await withProject(args[0] ?? project(app), (id) => getProject(id));
         app.out.human(`${found.id}  ${found.name}`);
         if (found.description !== "") app.out.human(found.description);
         app.out.data(found);
@@ -201,7 +201,7 @@ export const projectCommand = {
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
         const name = args.join(" ");
-        const workspaceId = await resolveWorkspace(app, workspace(app));
+        const workspaceId = await resolveWorkspace(workspace(app));
         // A slug that was given is the caller's own spelling of the prefix every
         // task identifier will carry, so it is trimmed and sent as it was typed.
         const given = String(flags.slug ?? "").trim();
@@ -271,7 +271,7 @@ export const projectCommand = {
         // The read of the project comes first inside updateProject, so a value the
         // server does not know is retried before anything is written rather than
         // after.
-        const { before, after } = await withProject(app, args[0]!, (id) => updateProject(id, changes));
+        const { before, after } = await withProject(args[0]!, (id) => updateProject(id, changes));
         app.out.human(`updated ${after.id}`);
         for (const [field, from, to] of [
           ["name", before.name, after.name],
@@ -309,7 +309,7 @@ export const projectCommand = {
       flags: [{ name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" }],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const found = await withProject(app, args[0]!, (id) => getProject(id));
+        const found = await withProject(args[0]!, (id) => getProject(id));
         // Everything in the project goes with it — its tasks, their comments and
         // links, its columns, its workflow rules — and the server keeps no copy,
         // so there is nothing to restore from; archive is the reversible way off
@@ -342,7 +342,7 @@ export const projectCommand = {
       args: minimumArgs(1),
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
-        const workspaceId = await resolveWorkspace(app, workspace(app));
+        const workspaceId = await resolveWorkspace(workspace(app));
         // The archived projects are read as well, so naming one is reported as
         // what it is rather than as a word the workspace does not hold: the
         // server would take its id, this command will not.

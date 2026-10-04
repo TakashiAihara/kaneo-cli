@@ -75,7 +75,7 @@ export const taskCommand = {
         const priority = String(flags.priority ?? "");
         // Asked of the server, which filters before it pages, and of the answer
         // as well (see TaskFilters).
-        const board = await withProject(app, project(app), (id) => getBoard(id, { status, priority }));
+        const board = await withProject(project(app), (id) => getBoard(id, { status, priority }));
         const tasks = filterTasks(projectTasks(board), status, priority, flags.all === true);
         for (const task of tasks) app.out.human(taskLine(task));
         app.out.data(tasks);
@@ -204,7 +204,7 @@ export const taskCommand = {
         }
 
         let open: Task[] = [];
-        const task = await withProject(app, project(app), async (id) => {
+        const task = await withProject(project(app), async (id) => {
           // Inside the resolution because withProject needs its first request to
           // carry the project (see withProject in src/cli/lookup.ts), so the board
           // and the create are written as the one project a slug or a name
@@ -550,7 +550,7 @@ export const taskCommand = {
       args: noArgs("kaneo task export"),
       run: async ({ app }: { app: App }) => {
         apiKey(app);
-        const exported = await withProject(app, project(app), (id) => exportProjectTasks(id));
+        const exported = await withProject(project(app), (id) => exportProjectTasks(id));
         // The export is the payload in both modes: a human asking for it wants the
         // file, and a summary instead would leave nothing to redirect. Only a
         // terminal gets the text with control characters replaced; a file gets
@@ -583,7 +583,7 @@ export const taskCommand = {
         // The file is read and checked before anything is sent, so a typo in the
         // path or a broken document creates nothing.
         const { tasks, labelled } = importedTasks(await readInput(args[0]!), args[0]!);
-        const result = await withProject(app, project(app), async (id) => {
+        const result = await withProject(project(app), async (id) => {
           checkImport(tasks, await listColumns(id), args[0]!);
           return importProjectTasks(id, tasks);
         });
@@ -611,7 +611,7 @@ export const taskCommand = {
         const task = await resolveTask(app, args[0]!);
         // The destination is resolved before the task is read back, so the two are
         // compared as what the server was given rather than as what was typed.
-        const projectId = await withProject(app, target, async (id) => {
+        const projectId = await withProject(target, async (id) => {
           await moveTask(task.id, id);
           return id;
         });
@@ -906,7 +906,7 @@ export const resolveTask = async (app: App, ref: string, slugs?: Map<string, str
 
   const named = namedReference(wanted);
   if (named !== undefined) {
-    return numberOn(app, named.project, named.number, "the reference", slugs);
+    return numberOn(named.project, named.number, "the reference", slugs);
   }
 
   const number = asNumber(wanted.startsWith("#") ? wanted.slice(1) : wanted);
@@ -916,7 +916,7 @@ export const resolveTask = async (app: App, ref: string, slugs?: Map<string, str
     throw new Error(`task #${number} needs a project: pass --project or set KANEO_PROJECT`);
   }
   const origin = app.cfg.origin.project ?? "unset";
-  return numberOn(app, projectId, number, origin === "repo-map" ? `the repo map for ${app.cfg.repo}` : origin, slugs);
+  return numberOn(projectId, number, origin === "repo-map" ? `the repo map for ${app.cfg.repo}` : origin, slugs);
 };
 
 // Several references at once. All are resolved before the caller writes
@@ -954,13 +954,12 @@ const namedReference = (wanted: string): { project: string; number: number } | u
 // slugs, when given, collects the slug of the board read, so a caller naming
 // several projects can name them the way a reference does.
 const numberOn = async (
-  app: App,
   value: string,
   number: number,
   origin: string,
   slugs?: Map<string, string>,
 ): Promise<Task> => {
-  const { board, task: found } = await withProject(app, value, (id) => findTaskByNumber(id, number));
+  const { board, task: found } = await withProject(value, (id) => findTaskByNumber(id, number));
   slugs?.set(board.projectId, board.projectSlug);
   if (found === undefined) {
     // --project only steers a bare number; a reference names its board itself.

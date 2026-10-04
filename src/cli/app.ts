@@ -16,12 +16,12 @@ export type App = {
   out: Writer;
 };
 
-export const NO_API_KEY = "no API key: set KANEO_API_KEY, or pass --api-key";
+const NO_API_KEY = "no API key: set KANEO_API_KEY, or pass --api-key";
 
-export const NO_WORKSPACE =
+const NO_WORKSPACE =
   "no workspace: pass --workspace, set KANEO_WORKSPACE, or add one to .kaneo.json";
 
-export const NO_PROJECT = "no project: pass --project, set KANEO_PROJECT, or add one to .kaneo.json";
+const NO_PROJECT = "no project: pass --project, set KANEO_PROJECT, or add one to .kaneo.json";
 
 // Every command but api-check needs a credential, and says so here rather than
 // letting a request go out without one. api-check reads the document the server

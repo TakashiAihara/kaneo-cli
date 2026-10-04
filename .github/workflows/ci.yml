@@ -45,3 +45,11 @@ jobs:
       # to stop the pipeline rather than surface at release time.
       - name: build every release target
         run: bun scripts/build.ts
+
+      # The pinned document is the one the Kaneo release shipped. The generate
+      # step only proves the client matches the pinned file, so a hand edit to
+      # the file itself would pass without this. It reaches
+      # raw.githubusercontent.com, a host nothing else here depends on, so it
+      # runs last: an outage there should not hide the other results.
+      - name: pinned spec matches the Kaneo release
+        run: bun run spec --check

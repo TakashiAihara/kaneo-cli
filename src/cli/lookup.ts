@@ -36,8 +36,10 @@ const resolved = new Map<string, string>();
 //
 // The retry is safe because the server refuses an unknown project before it
 // writes anything: every op here either reads first or is a single request whose
-// project the server checks before acting on it.
+// project the server checks before acting on it. A new op has to keep that true —
+// its first request must be the one that carries the project.
 export const withProject = async <T>(app: App, value: string, op: (id: string) => Promise<T>): Promise<T> => {
+  if (value === "") return op(value);
   const known = resolved.get(value);
   if (known !== undefined) return op(known);
   try {
@@ -64,7 +66,9 @@ export const withProject = async <T>(app: App, value: string, op: (id: string) =
 // A workspace cannot be tried as an id first the way a project is: the project
 // listing answers 403 for one the key cannot reach, but an instance admin's key
 // passes that check and gets 200 with an empty list, which would print as a
-// workspace with no projects in it. The listing costs one small request.
+// workspace with no projects in it. The listing costs one small request, and
+// holds only the workspaces the key's user is a member of, so an admin reaching
+// another one has to go through the web app.
 export const resolveWorkspace = async (app: App, value: string): Promise<string> => {
   const found = workspacesNamed(await listWorkspaces(app.deadline), value);
   if (found.length === 0) throw new Error(noWorkspace(value));
@@ -104,19 +108,21 @@ const unknownProject = (e: unknown): e is KaneoApiError =>
   ((e.statusCode === 400 && e.messages.includes(NO_PLACE)) ||
     (e.statusCode === 404 && e.messages.includes("Project not found")));
 
-// The projects a value names, by id, then by slug, then by name, each tried
-// exactly before ignoring case.
+// The projects a value names, by id, then by slug, then by name. An id is a
+// case-sensitive key; a slug or a name is tried exactly before ignoring case.
 //
 // The steps are tried in turn rather than all at once, so a value that is an id
 // and also spells somebody's slug is still read as the id it is, and `bet` picks
 // the project whose slug is `bet` over one whose slug is `BET`.
 const projectsNamed = (all: ProjectIn[], value: string): ProjectIn[] =>
-  firstMatch(all, value, [(p) => p.project.id, (p) => p.project.slug, (p) => p.project.name]);
+  firstMatch(all, value, (p) => p.project.id, [(p) => p.project.slug, (p) => p.project.name]);
 
 const workspacesNamed = (all: Workspace[], value: string): Workspace[] =>
-  firstMatch(all, value, [(w) => w.id, (w) => w.slug, (w) => w.name]);
+  firstMatch(all, value, (w) => w.id, [(w) => w.slug, (w) => w.name]);
 
-const firstMatch = <T>(all: T[], value: string, keys: ((item: T) => string)[]): T[] => {
+const firstMatch = <T>(all: T[], value: string, id: (item: T) => string, keys: ((item: T) => string)[]): T[] => {
+  const byId = all.filter((item) => id(item) === value);
+  if (byId.length > 0) return byId;
   const lower = value.toLowerCase();
   for (const key of keys) {
     const exact = all.filter((item) => key(item) === value);

@@ -291,8 +291,9 @@ export const resolveTask = async (app: App, ref: string): Promise<Task> => {
 // `<project>#<number>`: the project named before the hash, and a number on it.
 //
 // A hash with nothing in front of it names no project, so `#12` is a number and
-// `BET#1` is a project and a number. A task id holding a hash is not a reference
-// at all, and stays an id: what follows the last hash has to be a number.
+// `BET#1` is a project and a number. A task id is a cuid and never holds a hash,
+// so a value with one is a reference only when what follows the last hash is a
+// number; anything else is passed on as an id.
 const namedReference = (wanted: string): { project: string; number: number } | undefined => {
   const at = wanted.lastIndexOf("#");
   if (at < 1) return undefined;

@@ -7,6 +7,7 @@ import {
   createTaskComment,
   createTaskRelation,
   deleteTask as removeTask,
+  deleteTaskComment,
   getProject as readProject,
   getTask as readTask,
   getTaskComments,
@@ -638,6 +639,12 @@ export const addComment = async (taskId: string, content: string, signal?: Abort
     userName: "",
     createdAt: isoTime(a.createdAt),
   };
+};
+
+// Deletes a comment. The server lets only its author do this and answers 403
+// for anyone else.
+export const deleteComment = async (commentId: string): Promise<void> => {
+  await call(deleteTaskComment(pathParam(commentId)));
 };
 
 // The links the server accepts between two tasks.

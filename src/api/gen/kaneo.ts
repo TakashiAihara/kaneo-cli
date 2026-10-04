@@ -655,6 +655,32 @@ return kaneoFetch<Activity>(getCreateTaskCommentUrl(taskId),
 
 
 
+export const getDeleteTaskCommentUrl = (id: string,) => {
+
+
+
+
+  return `/comment/${id}`
+}
+
+/**
+ * Delete a comment. Only the comment's author may do this.
+ * @summary Delete task comment
+ */
+export const deleteTaskComment = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Activity> => {
+
+  return kaneoFetch<Activity>(getDeleteTaskCommentUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: Activity
+  }
+);}
+
+
+
 export const getGetTaskRelationsUrl = (taskId: string,) => {
 
 

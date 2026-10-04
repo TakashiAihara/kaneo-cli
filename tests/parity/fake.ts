@@ -280,6 +280,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
     }
 
+    if (req.method === "DELETE" && (p = m(/^\/comment\/([^/]+)$/))) {
+      const i = comments.findIndex((c) => c.id === decodeURIComponent(p![1]));
+      if (i < 0) return fail(404, "Comment not found");
+      const { user: _, ...c } = comments.splice(i, 1)[0]!;
+      return ok(M.Activity, { ...c, type: "comment", externalUserName: null, externalUserAvatar: null, externalSource: null, externalUrl: null } as z.input<typeof M.Activity>);
+    }
+
     if ((p = m(/^\/comment\/([^/]+)$/))) {
       const taskId = decodeURIComponent(p[1]);
       if (!tasks.some((t) => t.id === taskId)) return fail(404, "Task not found");

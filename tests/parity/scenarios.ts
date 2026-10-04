@@ -95,6 +95,7 @@ export const SCENARIOS: Scenario[] = [
 
   ...both("comment list", ["comment", "list", "1"]),
   { name: "comment add", steps: [["comment", "add", "1", "hello", "world", "--json"], ["comment", "ls", "1", "--human"]] },
+  { name: "comment delete", steps: [["comment", "delete", "2", "cmt0001", "--human"], ["comment", "rm", "1", "nope", "--json"], ["comment", "delete", "1", "cmt0001", "--human"], ["comment", "delete", "1", "cmt0001", "--human"], ["comment", "add", "1", "second", "--human"], ["comment", "rm", "1", "cmt0002", "--json"], ["comment", "ls", "1", "--json"]] },
 
   {
     name: "session attach, next, close",

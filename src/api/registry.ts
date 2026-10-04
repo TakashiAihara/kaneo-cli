@@ -32,4 +32,5 @@ export const OPERATIONS: Operation[] = [
   { id: "deleteTaskRelation", method: "DELETE", path: "/task-relation/{id}", command: "kaneo task unlink" },
   { id: "getTaskComments", method: "GET", path: "/comment/{taskId}", command: "kaneo comment ls / board" },
   { id: "createTaskComment", method: "POST", path: "/comment/{taskId}", command: "kaneo comment add / session" },
+  { id: "deleteTaskComment", method: "DELETE", path: "/comment/{id}", command: "kaneo comment delete" },
 ];

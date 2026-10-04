@@ -33,8 +33,10 @@ permissions:
 # own group, so a main push never replaces a pending hand-cut release.
 #
 # A hand-pushed tag and an automatic run for the same commit can still run side
-# by side: both then release the same tag from the same commit, and the second
-# replaces the first's assets with identical ones.
+# by side. If the automatic run checked out after the tag was pushed, both
+# publish that tag, one after the other (the publish job's own group); if
+# before, it cuts the next rc for the same commit. A ci run that finishes after
+# a newer one can still replace that newer pending run (#57).
 concurrency:
   group: release-${{ github.event_name == 'workflow_run' && (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository && 'auto' || github.run_id) || github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
@@ -74,7 +76,7 @@ jobs:
           set -eu
           if [ "$EVENT" != workflow_run ]; then
             # A dispatch input is free text. Anything but a version would be
-            # checked out as a branch and created as a tag of that name.
+            # released under that name, with --latest.
             if ! printf '%s\n' "$GIVEN" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$'; then
               echo "::error::$GIVEN is not a vX.Y.Z or vX.Y.Z-rc.N tag"
               exit 1
@@ -84,9 +86,10 @@ jobs:
           fi
           # A newer commit is already on main and its own run releases it.
           # Releasing this one afterwards would make older code the latest.
-          # Each side assigned on its own line: inside the if condition set -e
-          # does not apply, and a failed rev-parse would compare an empty string,
-          # read as "main moved on" and skip the release while showing green.
+          # Each side assigned on its own line: set -e does not see a failure
+          # inside a substitution in a command's arguments, and a failed
+          # rev-parse there would read as "main moved on" and skip the release
+          # while showing green.
           main="$(git rev-parse origin/main)"
           built="$(git rev-parse HEAD)"
           if [ "$main" != "$built" ]; then
@@ -98,8 +101,16 @@ jobs:
           # failure inside a substitution embedded in echo's argument nor one
           # before the last command of a pipe, and either would output an empty
           # tag, skip the release and still show green.
+          # Only a version tag is reused: any other v* name on the commit
+          # (v-test) would otherwise be released with --latest.
           tags="$(git tag --points-at HEAD --list 'v*')"
-          tag="${tags%%[[:space:]]*}"
+          tag=""
+          for t in $tags; do
+            if [[ "$t" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
+              tag="$t"
+              break
+            fi
+          done
           if [ -z "$tag" ]; then
             tag="$(bun scripts/next-tag.ts)"
           fi
@@ -108,6 +119,13 @@ jobs:
   publish:
     needs: tag
     if: needs.tag.outputs.tag != ''
+    # Two runs publishing the same tag (a hand-pushed tag and an automatic run
+    # for that commit) build separately, and archives are not byte-identical
+    # between builds; interleaved uploads would leave archives from one build
+    # beside checksums.txt from the other. One at a time per tag.
+    concurrency:
+      group: publish-${{ needs.tag.outputs.tag }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       contents: write

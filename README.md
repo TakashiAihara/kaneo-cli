@@ -152,11 +152,16 @@ kaneo project find <text>       # substring match on name and slug, across every
 kaneo project get [project-id]
 kaneo project create <name> [--slug SLUG] [-d TEXT] [--icon ICON]
 kaneo project update <project-id> [--name NAME] [--slug SLUG] [-d TEXT] [--icon ICON]   # only what is passed changes
+kaneo project reorder <project>...   # the new order: every project not archived in the workspace, exactly once, by id, slug or name
+kaneo project rm <project> --yes   # permanent: everything in it goes — tasks, comments, columns, workflow rules, external links
 kaneo column ls                    # the resolved project's columns, in board order
 kaneo column create <name...> [--final] [--icon ICON] [--color COLOR]
 kaneo column rename <column> <new name...>   # the slug, and so every status in it, stays
 kaneo column reorder <column>...   # the new order: every column exactly once, by id, slug or name
 kaneo column rm <column> --yes
+kaneo workflow ls                 # the resolved project's rules, and where each one puts a task
+kaneo workflow set <integration> <event> <column>   # one of the pairs listed below; setting a pair again moves the column
+kaneo workflow rm <rule-id>       # or <integration> <event>, instead of the id; by id the rule is deleted wherever it is
 kaneo task ls [--status ...] [--priority ...] [--all]
 kaneo task get <task-id>                 # also lists the task's relations
 kaneo task create <title> [-d TEXT | --description-file PATH] [flags]
@@ -171,6 +176,7 @@ kaneo notification preferences set [--email=false] [--ntfy] [--ntfy-topic T] [--
 kaneo notification preferences workspace set <workspace-id> [--active=false] [--webhook] [--projects id,id]
 kaneo notification preferences workspace rm <workspace-id>   # the workspace is then sent nothing outside the app
 kaneo task links <task>
+kaneo task external-links <task>   # links to what is outside the board, from an integration or added by hand
 kaneo task link <task> <other> --type <type>    # subtask, blocks or related; the type says which way round
 kaneo task unlink <relation-id>
 kaneo task unlink <task> <other> [--type <type>]
@@ -209,6 +215,10 @@ Anywhere a task is taken, either its number or its id works — `kaneo task stat
 `task link` will not guess the type: a link written with one nobody asked for has to be undone before the right one can be written. `task unlink` takes two tasks and removes the one link joining them in either direction, or one relation id from `task links --json`.
 
 `--timeout` bounds one request, not the command: every page of a board gets the whole of it, so a board's size does not decide whether it can be read. Nothing bounds the command as a whole. A timeout of zero or less is not the default and not no timeout: every request fails at once.
+
+A workflow rule moves a task with nobody at the board: `kaneo workflow set github pr_opened in-review` says that a task whose pull request was opened lands in that column. The integration and the event are Kaneo's own names, the ones its plugins fire, and not the provider's webhook names: an integration of `github`, `gitea` or `gitlab`, and an event of `branch_push`, `pr_opened`, `pr_merged`, `issue_opened`, `issue_closed` or `issue_reopened`. Anything else is stored as written and warned about on stderr, since no plugin fires it. The server's upsert looks for a rule the project already has for the pair and moves its column, so setting a pair again moves the rule already there rather than adding a second one — though nothing on the server keeps it to one, and `workflow rm` refuses a pair it finds twice rather than delete one of the two. `kaneo workflow rm` deletes a rule by its id, wherever it is, or by the integration and event it names in the resolved project.
+
+`kaneo task external-links <task>` lists what a task points at outside the board: the links an integration brought in — an issue, a pull request — and the ones somebody added by hand. A link that came through an integration is marked with the integration it came through, since the same URL can be either.
 
 ### Shell completion
 

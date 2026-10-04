@@ -1,0 +1,24 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workflow",
+        "rm",
+        "rule0002",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"DELETE /api/workflow-rule/rule0002: error decoding response: status=200, content-type=application/json, content-length=3, target-type=DeleteWorkflowRuleResponse: unexpected end of JSON input\"\n}\n",
+      "stderr": "Error: DELETE /api/workflow-rule/rule0002: error decoding response: status=200, content-type=application/json, content-length=3, target-type=DeleteWorkflowRuleResponse: unexpected end of JSON input\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "DELETE",
+      "path": "/workflow-rule/rule0002",
+      "query": "",
+      "body": null
+    }
+  ],
+  "files": {}
+}

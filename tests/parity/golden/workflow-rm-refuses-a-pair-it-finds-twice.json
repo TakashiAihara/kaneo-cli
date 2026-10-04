@@ -1,0 +1,39 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workflow",
+        "rm",
+        "github",
+        "pr_opened",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"2 workflow rules for github pr_opened; delete one by id (rule0002, rule0003)\"\n}\n",
+      "stderr": "Error: 2 workflow rules for github pr_opened; delete one by id (rule0002, rule0003)\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "github pr_opened -> in-progress  (rule0002)\ngithub pr_opened -> done  (rule0003)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

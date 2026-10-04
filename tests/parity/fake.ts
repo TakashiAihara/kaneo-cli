@@ -32,6 +32,11 @@ export type Seed = {
   members?: { id: string; name: string; email: string; role: string }[];
   // Invitations the detail route can be asked about.
   invitations?: { id: string; workspaceId: string; inviterName: string; expiresAt: string; status?: string }[];
+  // A rule names its column by slug here, since the seeded columns' ids are only
+  // handed out when the fake starts.
+  workflowRules?: { projectId: string; integrationType: string; eventType: string; columnSlug: string }[];
+  // A link without an integration is one a person added by hand.
+  externalLinks?: { taskId: string; url: string; title?: string | null; resourceType?: string; externalId?: string; integration?: { id: string; type: string } }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
@@ -283,6 +288,30 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     task_overdue: "dueDateReminderEnabled",
   };
 
+  const workflowRules: z.input<typeof M.WorkflowRuleRow>[] = [];
+  for (const r of seed.workflowRules ?? []) {
+    const at = now();
+    const column = columnsOf(r.projectId).find((c) => c.slug === r.columnSlug)!;
+    workflowRules.push({ id: id("rule"), projectId: r.projectId, integrationType: r.integrationType, eventType: r.eventType, columnId: column.id!, createdAt: at, updatedAt: at });
+  }
+  const links: z.input<typeof M.ExternalLink>[] = [];
+  for (const l of seed.externalLinks ?? []) {
+    const at = now();
+    links.push({
+      id: id("link"),
+      taskId: l.taskId,
+      integrationId: l.integration?.id ?? null,
+      resourceType: l.resourceType ?? "url",
+      externalId: l.externalId ?? l.url,
+      url: l.url,
+      title: l.title ?? null,
+      metadata: null,
+      createdAt: at,
+      updatedAt: at,
+      integration: l.integration ?? null,
+    });
+  }
+
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
@@ -353,7 +382,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     const BODIES: [string, RegExp, z.ZodTypeAny][] = [
       ["POST", /^\/auth\/organization\/update$/, M.UpdateOrganizationBody],
       ["POST", /^\/project$/, M.CreateProjectBody],
-      ["PUT", /^\/project\/[^/]+$/, M.UpdateProjectBody],
+      ["PUT", /^\/project\/(?!reorder$)[^/]+$/, M.UpdateProjectBody],
+      ["PUT", /^\/project\/reorder$/, M.ReorderProjectsBody],
+      ["PUT", /^\/workflow-rule\/[^/]+$/, M.UpsertWorkflowRuleBody],
       ["POST", /^\/column\/[^/]+$/, M.CreateColumnBody],
       ["PUT", /^\/column\/[^/]+$/, M.UpdateColumnBody],
       ["PUT", /^\/column\/reorder\/[^/]+$/, M.ReorderColumnsBody],
@@ -479,7 +510,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // problem rather than as an unknown value.
       if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
       const all = url.searchParams.get("includeArchived") === "true";
-      const list = projects
+      // Sidebar order, as upstream's get-projects.ts sorts it.
+      const list = [...projects]
+        .sort((a, b) => a.position - b.position)
         .filter((x) => x.workspaceId === ws && (all || !x.archivedAt))
         .map((x) => ({
           ...x,
@@ -496,6 +529,23 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       projects.push(proj);
       return ok(M.Project, proj);
     }
+    if (req.method === "PUT" && path === "/project/reorder") {
+      // As upstream's reorder-projects.ts: the payload's positions only say an
+      // order, a project left out keeps its rank, and the requested ones fill the
+      // slots around it. The whole workspace comes back, archived projects too.
+      const ws = url.searchParams.get("workspaceId");
+      if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
+      const wanted = ((body as any)?.projects ?? []) as { id: string; position: number }[];
+      const ids = wanted.map((x) => x.id);
+      if (new Set(ids).size !== ids.length) return fail(400, "Duplicate project ids in reorder payload");
+      const existing = projects.filter((x) => x.workspaceId === ws).sort((a, b) => a.position - b.position);
+      const foreign = ids.find((x) => !existing.some((e) => e.id === x));
+      if (foreign) return fail(400, `Project ${foreign} does not belong to this workspace`);
+      const requested = [...wanted].sort((a, b) => a.position - b.position).map((x) => x.id)[Symbol.iterator]();
+      const order = existing.map((e) => (ids.includes(e.id) ? requested.next().value! : e.id));
+      for (const [at, pid] of order.entries()) projects.find((x) => x.id === pid)!.position = at;
+      return ok(z.array(M.Project), projects.filter((x) => x.workspaceId === ws).sort((a, b) => a.position - b.position));
+    }
     if ((p = m(/^\/project\/([^/]+)(\/(archive|unarchive))?$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       // Checked by the server's workspace middleware before the route runs, as on
@@ -508,6 +558,24 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       if (req.method === "PUT" && p[3] === "archive") return ok(M.Project, Object.assign(proj, { archivedAt: now() }));
       if (req.method === "PUT" && p[3] === "unarchive") return ok(M.Project, Object.assign(proj, { archivedAt: null }));
+      // Everything in the project goes with it, as the database's cascades do.
+      if (req.method === "DELETE" && !p[2]) {
+        const reply = ok(M.Project, proj);
+        const gone = new Set(tasks.filter((t) => t.projectId === proj.id).map((t) => t.id));
+        for (const list of [tasks, columns, workflowRules] as { projectId?: string }[][]) {
+          for (let i = list.length - 1; i >= 0; i--) if (list[i]!.projectId === proj.id) list.splice(i, 1);
+        }
+        for (let i = links.length - 1; i >= 0; i--) if (gone.has(links[i]!.taskId)) links.splice(i, 1);
+        for (let i = comments.length - 1; i >= 0; i--) if (gone.has(comments[i]!.taskId)) comments.splice(i, 1);
+        // A link between two tasks is two rows of one thing, so one end going
+        // takes it with it, as the cascade on task_relation does.
+        for (let i = relations.length - 1; i >= 0; i--) {
+          const r = relations[i]!;
+          if (gone.has(r.sourceTaskId) || gone.has(r.targetTaskId)) relations.splice(i, 1);
+        }
+        projects.splice(projects.indexOf(proj), 1);
+        return reply;
+      }
     }
 
     if ((p = m(/^\/column\/reorder\/([^/]+)$/)) && req.method === "PUT") {
@@ -547,6 +615,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (tasks.some((t) => t.projectId === column.projectId && t.status === column.slug)) {
           return fail(409, "Cannot delete column that contains tasks. Move or delete tasks first.");
         }
+        // The rules that point at it go with it, as workflow_rule.column_id does
+        // on delete: a rule cannot outlive its column.
+        for (let i = workflowRules.length - 1; i >= 0; i--) if (workflowRules[i]!.columnId === column.id) workflowRules.splice(i, 1);
         columns.splice(columns.indexOf(column), 1);
         return ok(M.Column, column);
       }
@@ -726,6 +797,45 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         Object.assign(e, { startTime: new Date(b.startTime).toISOString(), endTime: end, duration: d, updatedAt: now() }, b.description === undefined ? {} : { description: b.description });
         return ok(M.TimeEntry, e);
       }
+    }
+
+    if ((p = m(/^\/workflow-rule\/([^/]+)$/))) {
+      const key = decodeURIComponent(p[1]);
+      if (req.method === "DELETE") {
+        // The workspace middleware looks the rule up first, so an unknown one is
+        // its 400 rather than the controller's 404.
+        const i = workflowRules.findIndex((r) => r.id === key);
+        if (i < 0) return fail(400, "Workspace ID could not be determined");
+        return ok(M.WorkflowRuleRow, workflowRules.splice(i, 1)[0]!);
+      }
+      if (!projects.some((x) => x.id === key)) return fail(400, "Workspace ID could not be determined");
+      if (req.method === "GET") {
+        return ok(
+          z.array(M.WorkflowRule),
+          workflowRules
+            .filter((r) => r.projectId === key)
+            .map((r) => {
+              const column = columns.find((c) => c.id === r.columnId);
+              return { ...r, columnName: column?.name ?? null, columnSlug: column?.slug ?? null };
+            }),
+        );
+      }
+      if (req.method === "PUT") {
+        const b = body as z.input<typeof M.UpsertWorkflowRuleBody>;
+        if (!columnsOf(key).some((c) => c.id === b.columnId)) return fail(400, "Column does not belong to the provided project");
+        const found = workflowRules.find((r) => r.projectId === key && r.integrationType === b.integrationType && r.eventType === b.eventType);
+        if (found) return ok(M.WorkflowRuleRow, Object.assign(found, { columnId: b.columnId, updatedAt: now() }));
+        const at = now();
+        const rule = { id: id("rule"), projectId: key, integrationType: b.integrationType, eventType: b.eventType, columnId: b.columnId, createdAt: at, updatedAt: at };
+        workflowRules.push(rule);
+        return ok(M.WorkflowRuleRow, rule);
+      }
+    }
+
+    if (req.method === "GET" && (p = m(/^\/external-link\/task\/([^/]+)$/))) {
+      const taskId = decodeURIComponent(p[1]);
+      if (!tasks.some((t) => t.id === taskId)) return fail(400, "Workspace ID could not be determined");
+      return ok(z.array(M.ExternalLink), links.filter((l) => l.taskId === taskId));
     }
 
     if (req.method === "POST" && path === "/task-relation") {

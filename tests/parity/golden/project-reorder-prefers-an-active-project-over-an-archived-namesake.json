@@ -1,0 +1,85 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "reorder",
+        "Beta",
+        "Alpha",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-beta  Beta\nproj-alpha  Alpha\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "reorder",
+        "alpha",
+        "bet",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha\nproj-beta  Beta\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "PUT",
+      "path": "/project/reorder",
+      "query": "?workspaceId=ws-main",
+      "body": {
+        "projects": [
+          {
+            "id": "proj-beta",
+            "position": 0
+          },
+          {
+            "id": "proj-alpha",
+            "position": 1
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "PUT",
+      "path": "/project/reorder",
+      "query": "?workspaceId=ws-main",
+      "body": {
+        "projects": [
+          {
+            "id": "proj-alpha",
+            "position": 0
+          },
+          {
+            "id": "proj-beta",
+            "position": 1
+          }
+        ]
+      }
+    }
+  ],
+  "files": {}
+}

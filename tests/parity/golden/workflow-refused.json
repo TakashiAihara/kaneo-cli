@@ -1,0 +1,159 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workflow",
+        "set",
+        "github",
+        "pr_opened",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no column \\\"nope\\\" in this project; kaneo column ls lists them\"\n}\n",
+      "stderr": "Error: no column \"nope\" in this project; kaneo column ls lists them\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "set",
+        "github",
+        "pr_opened",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"requires at least 3 arg(s), only received 2\"\n}\n",
+      "stderr": "Error: requires at least 3 arg(s), only received 2\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "set",
+        "",
+        "pr_opened",
+        "done",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"an integration and an event are both needed\"\n}\n",
+      "stderr": "Error: an integration and an event are both needed\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "set",
+        "github",
+        "",
+        "done",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"an integration and an event are both needed\"\n}\n",
+      "stderr": "Error: an integration and an event are both needed\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "rm",
+        "github",
+        "pr_opened",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no workflow rule for github pr_opened in this project; kaneo workflow ls lists them\"\n}\n",
+      "stderr": "Error: no workflow rule for github pr_opened in this project; kaneo workflow ls lists them\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "rm",
+        "rule9999",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no workflow rule rule9999; kaneo workflow ls --json lists the ids\"\n}\n",
+      "stderr": "Error: no workflow rule rule9999; kaneo workflow ls --json lists the ids\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "rm",
+        " ",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"a rule id cannot be blank\"\n}\n",
+      "stderr": "Error: a rule id cannot be blank\n"
+    },
+    {
+      "args": [
+        "column",
+        "create",
+        "Waiting",
+        "on",
+        "review",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0010\",\n  \"slug\": \"waiting-on-review\",\n  \"name\": \"Waiting on review\",\n  \"position\": 3,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "set",
+        "github",
+        "pr_opened",
+        "Waiting",
+        "on",
+        "review",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "github pr_opened -> waiting-on-review\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/workflow-rule/rule9999",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/column/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Waiting on review",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/workflow-rule/proj-alpha",
+      "query": "",
+      "body": {
+        "integrationType": "github",
+        "eventType": "pr_opened",
+        "columnId": "col0010"
+      }
+    }
+  ],
+  "files": {}
+}

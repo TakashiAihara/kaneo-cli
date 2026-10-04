@@ -1,0 +1,145 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "reorder",
+        "Beta",
+        "ALP",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-beta  Beta\nproj-alpha  Alpha\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "ls",
+        "--archived",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"proj-beta\",\n    \"name\": \"Beta\",\n    \"slug\": \"BET\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"ALP\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  {\n    \"id\": \"proj-old\",\n    \"name\": \"Old\",\n    \"slug\": \"OLD\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": \"2026-01-01T00:00:03.000Z\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "reorder",
+        "proj-alpha",
+        "proj-beta",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"ALP\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  {\n    \"id\": \"proj-beta\",\n    \"name\": \"Beta\",\n    \"slug\": \"BET\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  {\n    \"id\": \"proj-old\",\n    \"name\": \"Old\",\n    \"slug\": \"OLD\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": \"2026-01-01T00:00:03.000Z\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "reorder",
+        "bet",
+        "alp",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"proj-beta\",\n    \"name\": \"Beta\",\n    \"slug\": \"BET\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"ALP\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  {\n    \"id\": \"proj-old\",\n    \"name\": \"Old\",\n    \"slug\": \"OLD\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": \"2026-01-01T00:00:03.000Z\"\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "PUT",
+      "path": "/project/reorder",
+      "query": "?workspaceId=ws-main",
+      "body": {
+        "projects": [
+          {
+            "id": "proj-beta",
+            "position": 0
+          },
+          {
+            "id": "proj-alpha",
+            "position": 1
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "PUT",
+      "path": "/project/reorder",
+      "query": "?workspaceId=ws-main",
+      "body": {
+        "projects": [
+          {
+            "id": "proj-alpha",
+            "position": 0
+          },
+          {
+            "id": "proj-beta",
+            "position": 1
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "PUT",
+      "path": "/project/reorder",
+      "query": "?workspaceId=ws-main",
+      "body": {
+        "projects": [
+          {
+            "id": "proj-beta",
+            "position": 0
+          },
+          {
+            "id": "proj-alpha",
+            "position": 1
+          }
+        ]
+      }
+    }
+  ],
+  "files": {}
+}

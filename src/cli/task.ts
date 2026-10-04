@@ -8,6 +8,7 @@ import {
   getBoard,
   getTask,
   linkTasks,
+  listExternalLinks,
   listRelations,
   moveTask,
   PRIORITIES,
@@ -19,6 +20,7 @@ import {
   setTaskPriority,
   setTaskStatus,
   taskSummary,
+  type ExternalLink,
   type NewTask,
   type Relation,
   setTaskTitle,
@@ -460,6 +462,24 @@ export const taskCommand = {
         app.out.data(relations);
       },
     },
+    {
+      name: "external-links",
+      aliases: ["xlinks"],
+      use: "external-links <task>",
+      short: "List a task's external links",
+      long:
+        "List the links a task holds to what is outside the board.\n\n" +
+        "A link an integration brought in is marked with the integration it came\n" +
+        "through, which is what tells it apart from one added by hand.",
+      args: exactArgs(1),
+      run: async ({ args, app }: { args: string[]; app: App }) => {
+        apiKey(app);
+        const task = await resolveTask(app, args[0]!);
+        const links = await listExternalLinks(task.id);
+        for (const link of links) app.out.human(externalLinkLine(link));
+        app.out.data(links);
+      },
+    },
   ],
 };
 
@@ -671,3 +691,12 @@ const filterTasks = (tasks: Task[], status: string, priority: string, all: boole
 
 const taskLine = (task: Task): string =>
   `#${String(task.number).padEnd(4)} [${task.priority.padEnd(11)}] ${task.status.padEnd(13)} ${task.title}`;
+
+// One external link as a person reads it: the URL, then whatever the provider or
+// the author called it, then the integration it came through when it came through
+// one at all. The second column is left out rather than padded when the title is
+// absent or empty, since a blank one reads as a link that lost its name.
+const externalLinkLine = (link: ExternalLink): string =>
+  `${link.url}${link.title ? `  ${link.title}` : ""}${
+    link.integrationType === null ? "" : `  (${link.integrationType} ${link.resourceType})`
+  }`;

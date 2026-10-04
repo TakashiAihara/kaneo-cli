@@ -1,0 +1,78 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workflow",
+        "set",
+        "github",
+        "pull_request.opened",
+        "done",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "github pull_request.opened -> done\n",
+      "stderr": "warning: Kaneo fires pull_request.opened for no integration it ships (known events: branch_push, pr_opened, pr_merged, issue_opened, issue_closed, issue_reopened); the rule is stored but will not move a task\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "set",
+        "gerrit",
+        "pr_opened",
+        "done",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "gerrit pr_opened -> done\n",
+      "stderr": "warning: Kaneo ships no integration for gerrit (known integrations: github, gitea, gitlab); the rule is stored but will not move a task\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "github pull_request.opened -> done  (rule0002)\ngerrit pr_opened -> done  (rule0003)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/workflow-rule/proj-alpha",
+      "query": "",
+      "body": {
+        "integrationType": "github",
+        "eventType": "pull_request.opened",
+        "columnId": "col0003"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/workflow-rule/proj-alpha",
+      "query": "",
+      "body": {
+        "integrationType": "gerrit",
+        "eventType": "pr_opened",
+        "columnId": "col0003"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

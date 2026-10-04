@@ -8,7 +8,7 @@
         "--"
       ],
       "exit": 0,
-      "stdout": "--api-key\tAPI key; prefer KANEO_API_KEY, since a flag is visible in the process list\n--api-url\tKaneo base URL (env KANEO_API_URL)\n--human\tforce human-readable output, even through a pipe\n--jq\tfilter JSON output with a jq expression (implies --json)\n--json\tforce JSON output\n--project\tproject id, slug or name (env KANEO_PROJECT)\n--timeout\tper-request timeout\n--workspace\tworkspace id, slug or name (env KANEO_WORKSPACE)\n--assignee\tuser id to assign\n--description\ttask description\n--due-date\tdue date\n--help\thelp for create\n--priority\turgent, high, medium, low or no-priority (default medium)\n--status\tcolumn id to create the task in (default to-do)\n:4\n",
+      "stdout": "--api-key\tAPI key; prefer KANEO_API_KEY, since a flag is visible in the process list\n--api-url\tKaneo base URL (env KANEO_API_URL)\n--human\tforce human-readable output, even through a pipe\n--jq\tfilter JSON output with a jq expression (implies --json)\n--json\tforce JSON output\n--project\tproject id, slug or name (env KANEO_PROJECT)\n--timeout\tper-request timeout\n--workspace\tworkspace id, slug or name (env KANEO_WORKSPACE)\n--assignee\tuser id to assign\n--description\ttask description\n--due-date\tdue date\n--help\thelp for create\n--priority\turgent, high, medium, low or no-priority (default medium)\n--status\tcolumn slug to create the task in (default to-do)\n:4\n",
       "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
     }
   ],

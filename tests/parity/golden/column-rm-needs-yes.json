@@ -1,0 +1,102 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "rm",
+        "done",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to delete column done without --yes\n"
+    },
+    {
+      "args": [
+        "column",
+        "rm",
+        "done",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"column done still holds tasks; move them out first (kaneo task ls -p proj-alpha --status done lists them)\"\n}\n",
+      "stderr": "Error: column done still holds tasks; move them out first (kaneo task ls -p proj-alpha --status done lists them)\n"
+    },
+    {
+      "args": [
+        "column",
+        "create",
+        "Waiting",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0010\",\n  \"slug\": \"waiting\",\n  \"name\": \"Waiting\",\n  \"position\": 3,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "rm",
+        "waiting",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0010\",\n  \"slug\": \"waiting\",\n  \"name\": \"Waiting\",\n  \"position\": 3,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"col0001\",\n    \"slug\": \"to-do\",\n    \"name\": \"To Do\",\n    \"position\": 0,\n    \"isFinal\": false,\n    \"icon\": null,\n    \"color\": null\n  },\n  {\n    \"id\": \"col0002\",\n    \"slug\": \"in-progress\",\n    \"name\": \"In Progress\",\n    \"position\": 1,\n    \"isFinal\": false,\n    \"icon\": null,\n    \"color\": null\n  },\n  {\n    \"id\": \"col0003\",\n    \"slug\": \"done\",\n    \"name\": \"Done\",\n    \"position\": 2,\n    \"isFinal\": true,\n    \"icon\": null,\n    \"color\": null\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/column/col0003",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/column/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Waiting",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/column/col0010",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

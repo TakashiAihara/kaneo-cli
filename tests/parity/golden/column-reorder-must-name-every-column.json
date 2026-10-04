@@ -1,0 +1,62 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "reorder",
+        "done",
+        "to-do",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"every column of this project has to be named exactly once: missing: in-progress\"\n}\n",
+      "stderr": "Error: every column of this project has to be named exactly once: missing: in-progress\n"
+    },
+    {
+      "args": [
+        "column",
+        "reorder",
+        "to-do",
+        "to-do",
+        "in-progress",
+        "done",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"every column of this project has to be named exactly once: repeated: to-do\"\n}\n",
+      "stderr": "Error: every column of this project has to be named exactly once: repeated: to-do\n"
+    },
+    {
+      "args": [
+        "column",
+        "reorder",
+        "to-do",
+        "nope",
+        "in-progress",
+        "done",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"every column of this project has to be named exactly once: unknown: nope\"\n}\n",
+      "stderr": "Error: every column of this project has to be named exactly once: unknown: nope\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

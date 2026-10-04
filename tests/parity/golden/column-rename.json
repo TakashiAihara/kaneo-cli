@@ -1,0 +1,47 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "rename",
+        "in-progress",
+        "Doing",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0002\",\n  \"slug\": \"in-progress\",\n  \"name\": \"Doing\",\n  \"position\": 1,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "to-do        To Do\nin-progress  Doing\ndone         Done  (final)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/column/col0002",
+      "query": "",
+      "body": {
+        "name": "Doing"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

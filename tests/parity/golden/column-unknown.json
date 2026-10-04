@@ -1,0 +1,24 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "rename",
+        "nope",
+        "x",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no column \\\"nope\\\" in this project; kaneo column ls lists them\"\n}\n",
+      "stderr": "Error: no column \"nope\" in this project; kaneo column ls lists them\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -18,6 +18,7 @@ import { contextCommand } from "./context";
 import { whoamiCommand } from "./whoami";
 import { workspaceCommand } from "./workspace";
 import { projectCommand } from "./project";
+import { columnCommand } from "./column";
 import { taskCommand } from "./task";
 import { boardCommand } from "./board";
 import { sessionCommand } from "./session";
@@ -88,6 +89,7 @@ const rootCommand = (): { root: Command<App> } => {
     whoamiCommand,
     workspaceCommand,
     projectCommand,
+    columnCommand,
     taskCommand,
     boardCommand,
     sessionCommand,

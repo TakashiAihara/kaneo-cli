@@ -91,7 +91,7 @@ export const taskCommand = {
         {
           name: "status",
           type: "string" as const,
-          usage: "column id to create the task in (default to-do)",
+          usage: "column slug to create the task in (default to-do)",
           defaultValue: "",
         },
         { name: "due-date", type: "string" as const, usage: "due date", defaultValue: "" },
@@ -118,7 +118,7 @@ export const taskCommand = {
       short: "Move a task to another column",
       long:
         "Move a task to another column.\n\n" +
-        "A status is a column id. `kaneo project get` lists the columns a project has;\n" +
+        "A status is a column slug. `kaneo column ls` lists the columns a project has;\n" +
         "the defaults are to-do, in-progress, in-review and done.",
       args: exactArgs(2),
       run: async ({ args, app }: { args: string[]; app: App }) => {

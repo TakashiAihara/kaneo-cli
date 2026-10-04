@@ -2,12 +2,15 @@ import { OPERATIONS, type Operation } from "./registry";
 import { kaneoFetch, KaneoApiError } from "./http";
 import {
   archiveProject,
+  createColumn as postColumn,
   createProject as postProject,
   createTask as postTask,
   createTaskComment,
   createTaskRelation,
+  deleteColumn as removeColumn,
   deleteTask as removeTask,
   deleteTaskComment,
+  getColumns as readColumns,
   getProject as readProject,
   getTask as readTask,
   getTaskComments,
@@ -16,7 +19,9 @@ import {
   listProjects,
   listTasks,
   moveTask as putTaskMove,
+  reorderColumns as putColumns,
   unarchiveProject,
+  updateColumn as putColumn,
   updateOrganization,
   updateProject as putProject,
   updateTaskAssignee,
@@ -25,6 +30,7 @@ import {
 } from "./gen/kaneo";
 import type {
   BoardTask,
+  Column as GenColumn,
   CreateTaskBody,
   CreateTaskRelationBody,
   Organization,
@@ -359,6 +365,83 @@ export const updateProject = async (
 const quoted = (value: string | boolean): string =>
   typeof value === "string" ? JSON.stringify(value) : JSON.stringify(String(value));
 
+// A lane on a project's board.
+//
+// A column's slug is what every task in it stores as its status, so a task's
+// status and a column are the same string. The id is a separate opaque string on
+// the column routes, which is why a column is named by either.
+//
+// icon and color are nullable rather than empty: a column may carry neither, and
+// the server says so with null.
+export type Column = {
+  id: string;
+  slug: string;
+  name: string;
+  position: number;
+  isFinal: boolean;
+  icon: string | null;
+  color: string | null;
+};
+
+// Every route that returns a column agrees on these, so they are read once.
+const column = (c: GenColumn): Column => ({
+  id: c.id ?? "",
+  slug: c.slug ?? "",
+  name: c.name ?? "",
+  position: c.position ?? 0,
+  isFinal: c.isFinal ?? false,
+  icon: c.icon ?? null,
+  color: c.color ?? null,
+});
+
+// A project's columns, in board order.
+export const listColumns = async (projectId: string): Promise<Column[]> =>
+  zeroList(await call(readColumns(pathParam(projectId)))).map(column);
+
+// The payload for creating a column. An icon and a color are left out of the body
+// when there are none: the route takes a string or nothing at all, never null,
+// and a column without either is what the board shows by default.
+export type NewColumn = { name: string; icon: string; color: string; isFinal: boolean };
+
+// Adds a column to the end of the board. The server derives the slug from the
+// name, so it is not sent and the reply's slug is the one to report back.
+export const createColumn = async (projectId: string, wanted: NewColumn): Promise<Column> =>
+  column(
+    zeroRecord(
+      await call(
+        postColumn(pathParam(projectId), {
+          name: wanted.name,
+          isFinal: wanted.isFinal,
+          ...(wanted.icon === "" ? {} : { icon: wanted.icon }),
+          ...(wanted.color === "" ? {} : { color: wanted.color }),
+        }),
+      ),
+    ),
+  );
+
+// Writes a new position for every column of a project, so the answer is the
+// whole set rather than the one column that moved.
+export const reorderColumns = async (projectId: string, columnIds: string[]): Promise<Column[]> =>
+  zeroList(
+    await call(
+      putColumns(pathParam(projectId), {
+        columns: columnIds.map((id, position) => ({ id, position })),
+      }),
+    ),
+  ).map(column);
+
+// Renames a column.
+//
+// Only the name is sent. The slug is derived from the name when the column is
+// created and the update route takes no slug at all, so the slug — which is what
+// every task in the column stores as its status — stays as it was.
+export const renameColumn = async (columnId: string, name: string): Promise<Column> =>
+  column(zeroRecord(await call(putColumn(pathParam(columnId), { name }))));
+
+// Deletes a column, which the server allows only while the column holds no tasks.
+export const deleteColumn = async (columnId: string): Promise<Column> =>
+  column(zeroRecord(await call(removeColumn(pathParam(columnId)))));
+
 export type Label = { id: string; name: string; color: string };
 
 // A single work item, as every route that returns one agrees on it.
@@ -397,6 +480,8 @@ export type Board = {
   // a report that names the board a number was not found on needs it. Asking the
   // project route as well would be a request the caller already paid for.
   projectSlug: string;
+  // The board route reports a column's id as its slug, so this id is a status,
+  // not the opaque id the column routes take.
   columns: { id: string; name: string; tasks: Task[] }[];
 };
 

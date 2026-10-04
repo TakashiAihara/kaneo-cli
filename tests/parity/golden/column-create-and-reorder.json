@@ -1,0 +1,140 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "create",
+        "Waiting",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0010\",\n  \"slug\": \"waiting\",\n  \"name\": \"Waiting\",\n  \"position\": 3,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "reorder",
+        "to-do",
+        "waiting",
+        "in-progress",
+        "done",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "to-do        To Do\nwaiting      Waiting\nin-progress  In Progress\ndone         Done  (final)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"col0001\",\n    \"slug\": \"to-do\",\n    \"name\": \"To Do\",\n    \"position\": 0,\n    \"isFinal\": false,\n    \"icon\": null,\n    \"color\": null\n  },\n  {\n    \"id\": \"col0010\",\n    \"slug\": \"waiting\",\n    \"name\": \"Waiting\",\n    \"position\": 1,\n    \"isFinal\": false,\n    \"icon\": null,\n    \"color\": null\n  },\n  {\n    \"id\": \"col0002\",\n    \"slug\": \"in-progress\",\n    \"name\": \"In Progress\",\n    \"position\": 2,\n    \"isFinal\": false,\n    \"icon\": null,\n    \"color\": null\n  },\n  {\n    \"id\": \"col0003\",\n    \"slug\": \"done\",\n    \"name\": \"Done\",\n    \"position\": 3,\n    \"isFinal\": true,\n    \"icon\": null,\n    \"color\": null\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "status",
+        "1",
+        "waiting",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"status\": \"waiting\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "board",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Alpha (open 2 / done 1)\n- [high] #1 Write the parser (waiting)\n- [no-priority] #2 Ship it (in-progress)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/column/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Waiting",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/column/reorder/proj-alpha",
+      "query": "",
+      "body": {
+        "columns": [
+          {
+            "id": "col0001",
+            "position": 0
+          },
+          {
+            "id": "col0010",
+            "position": 1
+          },
+          {
+            "id": "col0002",
+            "position": 2
+          },
+          {
+            "id": "col0003",
+            "position": 3
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/status/task-a1",
+      "query": "",
+      "body": {
+        "status": "waiting"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

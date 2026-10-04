@@ -266,9 +266,19 @@ describe("failures after a redirect", () => {
     configureClient({ baseUrl: origin });
     const e = (await failure(kaneoFetch("/task-relation", { method: "POST", body: "{}" }))) as Error;
     expect(e.message).toBe(
-      'POST /api/task-relation: Get "http://127.0.0.1:9/api/elsewhere": dial tcp 127.0.0.1:9: connect: connection refused',
+      'POST /api/task-relation: Post "http://127.0.0.1:9/api/elsewhere": dial tcp 127.0.0.1:9: connect: connection refused',
     );
   });
+});
+
+// What Go 1.25 printed for a POST answered by a 303 to a relative Location
+// that answers 303 again: the call, then the first request's method and the
+// Location as the header wrote it.
+test("a redirect loop names the call, the first method and the Location as written", async () => {
+  const url = serve(() => new Response(null, { status: 303, headers: { location: "/api/again" } }));
+  configureClient({ baseUrl: url });
+  const e = (await failure(kaneoFetch("/task-relation", { method: "POST", body: "{}" }))) as Error;
+  expect(e.message).toBe('POST /api/task-relation: Post "/api/again": stopped after 10 redirects');
 });
 
 describe("failures", () => {
@@ -382,10 +392,52 @@ describe("responses", () => {
   // a byte order mark alone, so a reply holding only the mark is not the empty
   // document that JavaScript's trim() would make of it.
   test("a document holding only a byte order mark fails to decode", async () => {
-    const url = serve(() => new Response("﻿\n", { headers: { "content-type": "application/json" } }));
+    const url = serve(() => new Response("\uFEFF\n", { headers: { "content-type": "application/json" } }));
     configureClient({ baseUrl: url });
     const e = (await failure(kaneoFetch("/openapi", { method: "GET" }))) as Error;
     expect(e.message).toMatch(/^GET \/api\/openapi: decode response: /);
+  });
+
+  // NEL is the other side of the difference: Go's TrimSpace removes it and
+  // JavaScript's trim() does not, so a document holding only NEL is the empty one.
+  test("a document holding only NEL is the empty one", async () => {
+    const url = serve(() => new Response(`${String.fromCharCode(0x85)}\n`, { headers: { "content-type": "application/json" } }));
+    configureClient({ baseUrl: url });
+    expect(await kaneoFetch("/openapi", { method: "GET" })).toBeUndefined();
+  });
+
+  test("an error body loses NEL at both ends, as Go's Error.Body did", async () => {
+    const nel = String.fromCharCode(0x85);
+    const url = serve(() => new Response(`${nel}oops${nel}`, { status: 500 }));
+    configureClient({ baseUrl: url });
+    const e = (await failure(kaneoFetch("/project/p1", { method: "GET" }))) as KaneoApiError;
+    expect(e.message).toBe("GET /api/project/p1: 500: oops");
+  });
+
+  test("an error body keeps a byte order mark, as Go's Error.Body did", async () => {
+    const bom = String.fromCharCode(0xfeff);
+    const url = serve(() => new Response(`${bom}oops`, { status: 500 }));
+    configureClient({ baseUrl: url });
+    const e = (await failure(kaneoFetch("/project/p1", { method: "GET" }))) as KaneoApiError;
+    expect(e.message).toBe(`GET /api/project/p1: 500: ${bom}oops`);
+  });
+
+  // Go read the envelope from the raw bytes, where JSON allows only space, tab
+  // and line breaks around a value, so a body led by NBSP is not an envelope.
+  test("a body led by a character JSON does not count as space is not the envelope", async () => {
+    const nbsp = String.fromCharCode(0xa0);
+    const url = serve(() => new Response(`${nbsp}{"success":false,"error":"nope"}`, { headers: { "content-type": "application/json" } }));
+    configureClient({ baseUrl: url });
+    const e = (await failure(kaneoFetch("/project/p1", { method: "GET" }))) as Error;
+    expect(e).not.toBeInstanceOf(KaneoApiError);
+    expect(e.message).toStartWith("GET /api/project/p1: error decoding response:");
+  });
+
+  test("a body led by JSON whitespace is still the envelope", async () => {
+    const url = serve(() => new Response(`\r\n {"success":false,"error":"nope"}`, { headers: { "content-type": "application/json" } }));
+    configureClient({ baseUrl: url });
+    const e = (await failure(kaneoFetch("/project/p1", { method: "GET" }))) as KaneoApiError;
+    expect(e.message).toBe("GET /api/project/p1: 200: nope");
   });
 
   test("a body that matches the schema is returned", async () => {

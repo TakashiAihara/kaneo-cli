@@ -67,6 +67,8 @@ describe("a createdAt in a reply", () => {
     ["2026-09-30 00:00:00Z", "a space for the T"],
     ["2026-09-30t00:00:00z", "lower-case t and z"],
     ["2026-02-30T00:00:00Z", "a day the month does not have"],
+    ["2026-02-29T00:00:00Z", "29 February in a year that is not a leap year"],
+    ["2100-02-29T00:00:00Z", "29 February in a century that is not a leap year"],
     ["2026-09-30T24:00:00Z", "an hour past 23"],
     [2026, "a number"],
   ])("that is %p (%s) fails the read, naming the field", async (createdAt) => {
@@ -78,6 +80,7 @@ describe("a createdAt in a reply", () => {
   test.each([
     ["2026-09-30T00:00:00.123456789Z", "2026-09-30T00:00:00.123Z"],
     ["2028-02-29T00:00:00Z", "2028-02-29T00:00:00.000Z"],
+    ["2000-02-29T00:00:00Z", "2000-02-29T00:00:00.000Z"],
   ])("that is %p, which Go reads, reads as %p", async (createdAt, want) => {
     answers(taskReply({ createdAt }));
     expect((await api.getTask("t1")).createdAt).toBe(want);
@@ -103,6 +106,7 @@ describe("a dueDate, which may be absent", () => {
     ["left out", undefined, null],
     ["null", null, null],
     ["a time", TIME, TIME],
+    ["a time with an offset", "2026-09-30T09:00:00+09:00", TIME],
   ])("that is %s reads as %p", async (_what, dueDate, want) => {
     answers(taskReply({ dueDate }));
     expect((await api.getTask("t1")).dueDate).toBe(want);

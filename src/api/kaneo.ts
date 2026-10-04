@@ -74,35 +74,35 @@ const zeroRecord = <T>(reply: T | undefined): T => reply ?? ({} as T);
 //
 // Go decoded these fields into a time.Time, so a field it could not parse failed
 // the decode there rather than becoming a timestamp nobody can act on, and this
-// fails the call with the field and the value for the same reason. What it could
-// parse is RFC 3339 and nothing looser: Date.parse also takes a bare year, a date
-// alone, or a time with no offset, which it reads in the local zone, so the same
-// reply would name a different instant on another machine. The value is cut in
-// the message, since the reply decides how long it is.
+// fails the call with the field and the value for the same reason. What is
+// accepted is RFC 3339 and nothing looser: Date.parse also takes a bare year, a
+// date alone, or a time with no offset, which it reads in the local zone, so the
+// same reply would name a different instant on another machine. Go's own check
+// is looser in a few spellings no server writes (a comma before the fraction, a
+// one-digit hour, an offset of +24:00); those are refused here, as the design
+// document records. The value is cut in the message, since the reply decides
+// how long it is.
 const isoTime = (field: string, value: unknown): string => {
   if (value === null || value === undefined) return ZERO_TIME;
   const at = typeof value === "string" && isRfc3339(value) ? Date.parse(value) : Number.NaN;
   if (!Number.isNaN(at)) return new Date(at).toISOString();
-  const shown = JSON.stringify(value) ?? String(value);
+  const shown = Array.from(JSON.stringify(value));
   throw new Error(
-    `${field} ${shown.length > VALUE_LIMIT ? `${shown.slice(0, VALUE_LIMIT)}...` : shown} is not a timestamp`,
+    `${field} ${shown.length > VALUE_LIMIT ? `${shown.slice(0, VALUE_LIMIT).join("")}...` : shown.join("")} is not a timestamp`,
   );
 };
 
-// The layout Go's time.Time reads from JSON, time.RFC3339 with any fraction of
-// a second: upper-case T and Z, and an offset that is always written. Each field
-// is held to its range as Go holds it, because Date.parse carries a 30 February
-// over into March instead of refusing it.
+// time.RFC3339 with any fraction of a second: upper-case T and Z, and an offset
+// that is always written. The day and the hour are checked here because
+// Date.parse carries a 30 February into March and 24:00 into the next day where
+// Go refuses both; the other fields out of range it refuses on its own.
 const isRfc3339 = (value: string): boolean => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/.exec(value);
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
   if (!m) return false;
-  const [year, month, day, hour, minute, second, offHour = 0, offMinute = 0] = m.slice(1).map((n) => Number(n ?? 0));
+  const [year, month, day, hour] = m.slice(1).map(Number);
   const leap = year! % 4 === 0 && (year! % 100 !== 0 || year! % 400 === 0);
   const daysInMonth = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month! - 1] ?? 0;
-  return (
-    month! >= 1 && month! <= 12 && day! >= 1 && day! <= daysInMonth &&
-    hour! <= 23 && minute! <= 59 && second! <= 59 && offHour <= 23 && offMinute <= 59
-  );
+  return day! <= daysInMonth && hour! <= 23;
 };
 const VALUE_LIMIT = 200;
 

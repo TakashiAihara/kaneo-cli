@@ -208,6 +208,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     labels.push(l);
     return l;
   };
+  const timeEntries: z.input<typeof M.TimeEntry>[] = [];
   const requests: Recorded[] = [];
   let grew = 0;
 
@@ -373,6 +374,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/label$/, M.CreateLabelBody],
       ["PUT", /^\/label\/[^/]+$/, M.UpdateLabelBody],
       ["PUT", /^\/label\/[^/]+\/task$/, M.AttachLabelToTaskBody],
+      ["POST", /^\/time-entry$/, M.CreateTimeEntryBody],
+      ["PUT", /^\/time-entry\/[^/]+$/, M.UpdateTimeEntryBody],
     ];
     for (const [method, re, schema] of BODIES) {
       if (req.method !== method || !re.test(path)) continue;
@@ -632,6 +635,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "GET") return ok(M.TaskWithAssignee, { ...t, assigneeId: t.userId, assigneeName: t.userId ? (users.get(t.userId) ?? null) : null });
       if (req.method === "DELETE") {
         tasks.splice(i, 1);
+        // The document says a task takes its time entries with it.
+        for (let j = timeEntries.length - 1; j >= 0; j--) if (timeEntries[j]!.taskId === t.id) timeEntries.splice(j, 1);
         return ok(M.Task, t);
       }
     }
@@ -678,6 +683,49 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const e = asActivity({ id: id("act"), taskId: b.taskId, userId: "user-self", content: b.message, createdAt: at, updatedAt: at }, b.type, b.eventData ?? null);
       events.push(e);
       return ok(M.Activity, e);
+    }
+
+    // As v2.29.2 answers: an update keeps the end and description the body
+    // leaves out, and an end before the start is a 400. An unknown task or entry
+    // never reaches a controller: the workspace-access middleware finds no
+    // workspace for it first and says so. The duration cap is not modelled.
+    const noWorkspace = () => fail(400, "Workspace ID could not be determined");
+    const duration = (start: string, end: string | null | undefined) => {
+      if (!end) return null;
+      const d = Math.floor((Date.parse(end) - Date.parse(start)) / 1000);
+      return d < 0 ? undefined : d;
+    };
+    if (req.method === "POST" && path === "/time-entry") {
+      const b = body as any;
+      if (!tasks.some((t) => t.id === b.taskId)) return noWorkspace();
+      const d = duration(b.startTime, b.endTime);
+      if (d === undefined) return fail(400, "Start time cannot be after end time. Please adjust the time range.");
+      const at = now();
+      const e = { id: id("time"), taskId: b.taskId, userId: "user-self", description: b.description || "", startTime: new Date(b.startTime).toISOString(), endTime: b.endTime ? new Date(b.endTime).toISOString() : null, duration: d, createdAt: at, updatedAt: at };
+      timeEntries.push(e);
+      return ok(M.TimeEntry, e);
+    }
+    if ((p = m(/^\/time-entry\/task\/([^/]+)$/))) {
+      const taskId = decodeURIComponent(p[1]);
+      if (!tasks.some((t) => t.id === taskId)) return noWorkspace();
+      const list = timeEntries
+        .filter((e) => e.taskId === taskId)
+        .sort((a, b) => Date.parse(a.startTime) - Date.parse(b.startTime))
+        .map((e) => ({ ...e, userName: "Self" }));
+      return ok(z.array(M.TimeEntryWithUser), list);
+    }
+    if ((p = m(/^\/time-entry\/([^/]+)$/))) {
+      const e = timeEntries.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!e) return noWorkspace();
+      if (req.method === "GET") return ok(M.TimeEntry, e);
+      if (req.method === "PUT") {
+        const b = body as any;
+        const end = b.endTime ? new Date(b.endTime).toISOString() : e.endTime;
+        const d = duration(b.startTime, end);
+        if (d === undefined) return fail(400, "Start time cannot be after end time. Please adjust the time range.");
+        Object.assign(e, { startTime: new Date(b.startTime).toISOString(), endTime: end, duration: d, updatedAt: now() }, b.description === undefined ? {} : { description: b.description });
+        return ok(M.TimeEntry, e);
+      }
     }
 
     if (req.method === "POST" && path === "/task-relation") {

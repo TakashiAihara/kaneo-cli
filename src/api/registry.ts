@@ -63,4 +63,8 @@ export const OPERATIONS: Operation[] = [
   { id: "deleteLabel", method: "DELETE", path: "/label/{id}", command: "kaneo label rm" },
   { id: "attachLabelToTask", method: "PUT", path: "/label/{id}/task", command: "kaneo label attach" },
   { id: "detachLabelFromTask", method: "DELETE", path: "/label/{id}/task", command: "kaneo label detach" },
+  { id: "getTaskTimeEntries", method: "GET", path: "/time-entry/task/{taskId}", command: "kaneo time ls" },
+  { id: "getTimeEntry", method: "GET", path: "/time-entry/{id}", command: "kaneo time get / update / stop" },
+  { id: "createTimeEntry", method: "POST", path: "/time-entry", command: "kaneo time add" },
+  { id: "updateTimeEntry", method: "PUT", path: "/time-entry/{id}", command: "kaneo time update / stop" },
 ];

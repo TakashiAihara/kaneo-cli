@@ -239,6 +239,7 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["CreateTask", "POST", "/api/task/a%2Fb", () => api.createTask(id, newTask({}))],
     ["ListComments", "GET", "/api/comment/a%2Fb", () => api.listComments(id)],
     ["AddComment", "POST", "/api/comment/a%2Fb", () => api.addComment(id, "x")],
+    ["DeleteComment", "DELETE", "/api/comment/a%2Fb", () => api.deleteComment(id)],
     ["ListRelations", "GET", "/api/task-relation/a%2Fb", () => api.listRelations(id)],
     ["LinkTasks", "POST", "/api/task-relation", () => api.linkTasks("s", "d", "blocks")],
     ["CreateProject", "POST", "/api/project", () => api.createProject({ name: "n", workspaceId: "w", icon: "", slug: "", description: "" })],

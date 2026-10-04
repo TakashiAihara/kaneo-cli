@@ -10,7 +10,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"cmt0002\",\n  \"content\": \"hello world\",\n  \"userId\": \"user-self\",\n  \"userName\": \"\",\n  \"createdAt\": \"2026-01-01T00:00:09.000Z\"\n}\n",
+      "stdout": "{\n  \"id\": \"cmt0002\",\n  \"content\": \"hello world\",\n  \"userId\": \"user-self\",\n  \"userName\": \"\",\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\"\n}\n",
       "stderr": ""
     },
     {
@@ -21,7 +21,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "2026-01-01T00:00:08.000Z  first comment\n2026-01-01T00:00:09.000Z  hello world\n",
+      "stdout": "2026-01-01T00:00:08.000Z  first comment\n2026-01-01T00:00:10.000Z  hello world\n",
       "stderr": ""
     }
   ],

@@ -1,5 +1,5 @@
 import { apiKey, taskProject, type App } from "./app";
-import { addComment, listComments, type Comment } from "../api/kaneo";
+import { addComment, deleteComment, listComments, type Comment } from "../api/kaneo";
 import { exactArgs, minimumArgs, type RunContext } from "./args";
 import { resolveTask } from "./task";
 
@@ -39,6 +39,36 @@ export const commentCommand = {
         const task = await resolveTask(taskProject(app), args[0]!);
         const comment = await addComment(task.id, args.slice(1).join(" "));
         app.out.human(`commented on #${task.number}`);
+        app.out.data(comment);
+      },
+    },
+    {
+      name: "delete",
+      aliases: ["rm"],
+      use: "delete <task> <comment-id>",
+      short: "Delete a comment from a task",
+      long:
+        "Delete a comment from a task.\n\n" +
+        "The id is the comment's id from `kaneo comment list <task> --json`. The server\n" +
+        "deletes only comments written by the account the API key belongs to.",
+      // Unlike `task rm` there is no --yes: a task takes its comments with it,
+      // while this removes the one comment named by a server-made random id,
+      // which a typo does not turn into another valid one.
+      args: exactArgs(2),
+      run: async ({ args, app }: RunContext<App>) => {
+        apiKey(app);
+        const task = await resolveTask(taskProject(app), args[0]!);
+        // The server finds the comment by id among the caller's own, on any
+        // task. Naming the task as well, and checking the comment is on it,
+        // keeps a wrong id from removing one of your comments somewhere else,
+        // which is the slip this command exists to undo.
+        const comment = (await listComments(task.id)).find((c) => c.id === args[1]);
+        if (comment === undefined) {
+          throw new Error(`no comment ${JSON.stringify(args[1])} on #${task.number}; see \`kaneo comment list ${task.number} --json\``);
+        }
+        await deleteComment(comment.id);
+        app.out.human(`deleted comment ${comment.id} from #${task.number}`);
+        app.out.human(commentLine(comment));
         app.out.data(comment);
       },
     },

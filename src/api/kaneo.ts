@@ -7,6 +7,7 @@ import {
   createTaskComment,
   createTaskRelation,
   deleteTask as removeTask,
+  deleteTaskComment,
   getProject as readProject,
   getTask as readTask,
   getTaskComments,
@@ -638,6 +639,13 @@ export const addComment = async (taskId: string, content: string, signal?: Abort
     userName: "",
     createdAt: isoTime(a.createdAt),
   };
+};
+
+// Deletes a comment. An id that does not exist answers 400, since its
+// workspace cannot be found. Someone else's comment answers 404: the server
+// looks only among the caller's own. A key without task:update answers 403.
+export const deleteComment = async (commentId: string): Promise<void> => {
+  await call(deleteTaskComment(pathParam(commentId)));
 };
 
 // The links the server accepts between two tasks.

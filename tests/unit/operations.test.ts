@@ -828,6 +828,11 @@ describe("TestStartAndPositionSendTheTaskBack", () => {
     createdAt: TIME,
   };
 
+  const without = (field: keyof typeof stored) => {
+    const { [field]: _, ...rest } = stored;
+    return rest;
+  };
+
   // Answers the read with the stored task and the write with what the write
   // asked for, unless echo says otherwise.
   const server = (echo: (sent: Record<string, unknown>) => Record<string, unknown> = (sent) => sent) => {
@@ -866,19 +871,24 @@ describe("TestStartAndPositionSendTheTaskBack", () => {
   // Every field of the read is written back, so a read that came back empty or
   // as another task stops the write rather than blanking the task.
   test.each([
-    ["an empty read", {}],
-    ["another task", { ...stored, id: "t2" }],
-    ["no project", { ...stored, projectId: "" }],
-    ["no position", { ...stored, position: null }],
-  ])("%s writes nothing", async (_, read) => {
+    ["an empty read", {}, { position: 7 }],
+    ["another task", { ...stored, id: "t2" }, { position: 7 }],
+    ["no project", { ...stored, projectId: "" }, { position: 7 }],
+    // A position being set needs none from the read, so only a start date alone
+    // depends on it.
+    ["no position", { ...stored, position: null }, { startDate: "2026-10-20" }],
+    ["no title", without("title"), { position: 7 }],
+    ["no status", without("status"), { position: 7 }],
+    ["no priority", without("priority"), { position: 7 }],
+    ["no description", without("description"), { position: 7 }],
+    ["no due date", without("dueDate"), { position: 7 }],
+    ["no assignee", without("assigneeId"), { position: 7 }],
+  ] as const)("%s writes nothing", async (_, read, changes) => {
     const seen: string[] = [];
     newServer((req) => {
       seen.push(req.method);
       return Response.json(read);
     });
-    // The position case asks for a start date only, since a position that is
-    // being set does not need the one read.
-    const changes = read === undefined || (read as { position?: unknown }).position !== null ? { position: 7 } : { startDate: "2026-10-20" };
     expect(String(await failure(api.setStartAndPosition("t1", changes)))).toContain("before the update got");
     expect(seen).toEqual(["GET"]);
   });
@@ -894,6 +904,13 @@ describe("TestStartAndPositionSendTheTaskBack", () => {
     });
     expect((await api.setStartAndPosition("t1", { position: 7 })).position).toBe(7);
     expect(seen).toEqual(["GET", "PUT"]);
+  });
+
+  // A description too long for the listing comes back from the write as a
+  // summary, so it is not compared.
+  test("a deferred description in the reply", async () => {
+    server((s) => ({ ...s, description: null, descriptionDeferred: true }));
+    expect((await api.setStartAndPosition("t1", { position: 7 })).position).toBe(7);
   });
 
   // Both requests escape the id: the read and the write.
@@ -914,6 +931,8 @@ describe("TestStartAndPositionSendTheTaskBack", () => {
     ["title", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, title: "y" })],
     ["status", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, status: "done" })],
     ["priority", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, priority: "no-priority" })],
+    ["projectId", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, projectId: "p2" })],
+    ["description", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, description: "other" })],
     ["start date", { startDate: "2026-10-20" }, (s: Record<string, unknown>) => ({ ...s, startDate: "2026-12-01" })],
     ["due date", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, dueDate: null })],
     ["assignee", { position: 7 }, (s: Record<string, unknown>) => ({ ...s, userId: null })],

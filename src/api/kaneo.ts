@@ -1114,10 +1114,12 @@ export const MAX_TASK_POSITION = updateTaskBodyPositionMax;
 // the description). So the task is read by id and every field not being changed
 // is sent back as read; a change made elsewhere between the read and the write is
 // overwritten, as project update does. The description is sent back whole, which
-// the detail route carries even when the listing leaves it out; the server
-// records a description change only when the text differs, so sending it back
-// unchanged writes no activity, though a description that was null is stored as
-// the empty one it reads as.
+// the detail route carries even when the listing leaves it out. The server
+// reports a description change only when the text differs, so sending it back
+// unchanged reports nothing; a description that was null goes back as the empty
+// one it reads as, which is stored and reported as a change from null. Leaving
+// it out would avoid that, but a server older than the pinned document refuses
+// an update without one.
 //
 // The reply is checked against what was written, field by field. A reply that
 // does not match is reported rather than taken as done; the write may still have
@@ -1126,12 +1128,22 @@ export const setStartAndPosition = async (taskId: string, changes: StartAndPosit
   const read = zeroRecord(await readTask(pathParam(taskId)));
   const before = task(read, { assigneeId: read.assigneeId, assigneeName: read.assigneeName, labels: null });
   // Every field of this read is written back. A read that is empty or names
-  // another task would blank or move the wrong one, and a position the reply
-  // left out reads as 0, a real position, so writing it back would move the
-  // task to the top of its column with nothing to show it.
-  if (before.id !== taskId || before.projectId === "" || (changes.position === undefined && typeof read.position !== "number")) {
+  // another task would blank or move the wrong one. A field the reply left out
+  // reads as a value the route takes (no due date, no assignee, an empty
+  // description, position 0), so writing it back would clear or move something
+  // with nothing to show it; each one sent back has to have been in the reply.
+  const missing = [
+    ...(typeof read.title === "string" ? [] : ["title"]),
+    ...(typeof read.status === "string" ? [] : ["status"]),
+    ...(typeof read.priority === "string" ? [] : ["priority"]),
+    ...(read.description === undefined ? ["description"] : []),
+    ...(read.dueDate === undefined ? ["dueDate"] : []),
+    ...(read.assigneeId === undefined ? ["assigneeId"] : []),
+    ...(changes.position === undefined && typeof read.position !== "number" ? ["position"] : []),
+  ];
+  if (before.id !== taskId || before.projectId === "" || missing.length > 0) {
     throw new Error(
-      `reading task ${taskId} before the update got id ${quoted(before.id)}, project ${quoted(before.projectId)}, position ${String(read.position)}; not writing`,
+      `reading task ${taskId} before the update got id ${quoted(before.id)}, project ${quoted(before.projectId)}${missing.length > 0 ? `, without ${missing.join(", ")}` : ""}; not writing`,
     );
   }
   const startDate = changes.startDate === undefined ? before.startDate : changes.startDate;
@@ -1158,16 +1170,21 @@ export const setStartAndPosition = async (taskId: string, changes: StartAndPosit
   if (after.position !== position) off.push(`position ${after.position}, want ${position}`);
   if (!sameInstant(after.dueDate, before.dueDate)) off.push(`dueDate ${quoted(String(after.dueDate))}, want ${quoted(String(before.dueDate))}`);
   if (after.assigneeId !== before.assigneeId) off.push(`assignee ${quoted(String(after.assigneeId))}, want ${quoted(String(before.assigneeId))}`);
-  // What was sent back unchanged has to come back unchanged too: a server that
-  // replaced a value it did not take (a priority outside its list, a status
-  // without a column) would otherwise change it under a command that never named
-  // it.
+  // What was sent back unchanged has to come back unchanged too. v2.29.2 echoes
+  // the row it stored, so these hold there; they are here for a server that
+  // answers with something else, which would otherwise change a field under a
+  // command that never named it. The description is compared only when the reply
+  // carries it: one too long for a listing comes back as a summary.
   for (const [name, got, sent] of [
     ["title", after.title, before.title],
     ["status", after.status, before.status],
     ["priority", after.priority, before.priority],
+    ["projectId", after.projectId, before.projectId],
   ] as const) {
     if (got !== sent) off.push(`${name} ${quoted(got)}, want ${quoted(sent)}`);
+  }
+  if (t.descriptionDeferred !== true && after.description !== before.description) {
+    off.push(`description of ${after.description.length} characters, want ${before.description.length}`);
   }
   if (off.length > 0) throw new Error(`/task/${taskId}: the reply does not match the update: ${off.join("; ")}`);
   return after;

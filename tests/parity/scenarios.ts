@@ -270,7 +270,19 @@ export const SCENARIOS: Scenario[] = [
   { name: "task update with nothing to change", steps: [["task", "update", "1", "--json"]] },
   { name: "task update start date and position keep the rest", steps: [["task", "due", "2", "2026-11-01", "--json"], ["task", "update", "2", "--start-date", "2026-10-20", "--position", "5", "--json"], ["task", "get", "2", "--json"], ["task", "get", "2", "--human"], ["task", "update", "2", "--position", "6", "--human"], ["task", "update", "2", "--start-date", "", "--human"], ["task", "get", "2", "--json"]] },
   { name: "task update start after the due date changes nothing", steps: [["task", "due", "1", "2026-11-01", "--json"], ["task", "update", "1", "--title", "Renamed", "--start-date", "2026-11-02", "--json"], ["task", "get", "1", "--json"]] },
-  { name: "task dates are sent as instants", steps: [["task", "update", "1", "--start-date", "2026-10-20T09:00+09:00", "--json"], ["task", "due", "1", "2026-10-21T09:00:00+09:00", "--json"], ["task", "bulk", "1", "--due", "2026-10-22", "--json"]] },
+  // Dates on 2026-01-01, which the recorder leaves as they are, so the instant
+  // each one is sent as shows in the golden.
+  {
+    name: "task dates are sent as instants",
+    stdin: '[{"title":"Dated","status":"to-do","dueDate":"2026-01-01T12:00+09:00"}]',
+    steps: [
+      ["task", "update", "1", "--start-date", "2026-01-01T09:00+09:00", "--json"],
+      ["task", "due", "1", "2026-01-01T18:00:00+09:00", "--json"],
+      ["task", "bulk", "1", "--due", "2026-01-01", "--json"],
+      ["task", "import", "-", "--json"],
+    ],
+  },
+  { name: "task update position with a stored start past the due date changes nothing", steps: [["task", "update", "1", "--start-date", "2026-11-05", "--json"], ["task", "due", "1", "2026-11-01", "--json"], ["task", "update", "1", "--title", "Renamed", "--position", "3", "--json"], ["task", "get", "1", "--json"], ["task", "update", "1", "--title", "Renamed", "--json"]] },
   {
     name: "task dates need a calendar date or an offset",
     steps: [

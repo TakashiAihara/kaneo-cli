@@ -186,7 +186,12 @@ export const taskCommand = {
           usage: `one of: ${PRIORITIES.join(", ")}`,
           defaultValue: "",
         },
-        { name: "start-date", type: "string" as const, usage: "when the task starts; empty clears it", defaultValue: "" },
+        {
+          name: "start-date",
+          type: "string" as const,
+          usage: "when the task starts: 2026-10-31 or 2026-10-31T09:00+09:00; empty clears it",
+          defaultValue: "",
+        },
         {
           name: "position",
           type: "string" as const,
@@ -226,11 +231,22 @@ export const taskCommand = {
 
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
-        // The server refuses a start after the due date, and the full update that
-        // writes the start comes last, so that refusal would arrive after the
-        // other fields of this command had landed.
-        if (startDate && task.dueDate !== null && Date.parse(startDate) > Date.parse(task.dueDate)) {
-          throw new Error(`--start-date ${startDate} is after #${task.number}'s due date ${task.dueDate}`);
+        // The server refuses a start after the due date on the full update, and
+        // that update comes last, so its refusal would arrive after the other
+        // fields of this command had landed. The start it would check is the one
+        // being set or, for --position alone, the one already stored: task due
+        // and bulk --due do not check the range, so a stored start can already be
+        // past the due date. (The null checks only narrow the types: a null date
+        // parses to NaN, which compares false anyway.)
+        if (startDate !== undefined || position !== undefined) {
+          const start = startDate === undefined ? task.startDate : startDate;
+          if (start !== null && task.dueDate !== null && Date.parse(start) > Date.parse(task.dueDate)) {
+            throw new Error(
+              startDate === undefined
+                ? `#${task.number} starts ${start}, after its due date ${task.dueDate}, and the server refuses that on the update --position goes through; move the start with --start-date (or clear it with --start-date "") in the same command`
+                : `--start-date ${start} is after #${task.number}'s due date ${task.dueDate}`,
+            );
+          }
         }
 
         // Each field that has its own endpoint is written by it rather than by
@@ -400,7 +416,7 @@ export const taskCommand = {
         { name: "priority", type: "string" as const, usage: `set the priority: ${PRIORITIES.join(", ")}`, defaultValue: "" },
         { name: "assign", type: "string" as const, usage: "assign every task to this user id", defaultValue: "" },
         { name: "unassign", type: "bool" as const, usage: "clear every task's assignee", defaultValue: "false" },
-        { name: "due", type: "string" as const, usage: "set the due date", defaultValue: "" },
+        { name: "due", type: "string" as const, usage: "set the due date: 2026-10-31 or 2026-10-31T09:00+09:00", defaultValue: "" },
         { name: "clear-due", type: "bool" as const, usage: "clear every task's due date", defaultValue: "false" },
         { name: "add-label", type: "string" as const, usage: "add the label with this id", defaultValue: "" },
         { name: "remove-label", type: "string" as const, usage: "remove the label with this id", defaultValue: "" },
@@ -848,10 +864,10 @@ const wantedStartDate = (given: string): string | null => (given === "" ? null :
 // date and time with an offset, as the time commands take one.
 //
 // Anything else is refused rather than handed to the server's Date: a time
-// without an offset would be read in the server's zone, a bare year or month
-// name would be read as January 1st or this year, and an impossible date such
-// as 2026-02-30 would roll over to March. Each of those stores another instant
-// than the one typed, and compares equal to it afterwards.
+// without an offset would be read in the server's zone, a bare number or a month
+// and day as some day of 2001, and an impossible date such as 2026-02-30 would
+// roll over to March. Each of those stores another instant than the one typed,
+// and compares equal to it afterwards.
 const instant = (given: string, label: string): string => {
   const full = /^\d{4}-\d{2}-\d{2}$/.test(given) ? `${given}T00:00:00Z` : given;
   try {
@@ -1057,7 +1073,7 @@ const importedTasks = (text: string, source: string): { tasks: ImportedTask[]; l
       // unparsable one would fail that task with an error that names neither
       // the field nor the value. A date is sent as the instant it was read as.
       if (name !== "userId" && value !== null && value !== "") {
-        out[name] = instant(value, `${source}: task ${at + 1} has ${name}`);
+        out[name] = instant(value, `${source}: task ${at + 1}'s ${name}`);
         continue;
       }
       out[name] = value;

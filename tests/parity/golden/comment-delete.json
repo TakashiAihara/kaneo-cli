@@ -27,30 +27,6 @@
     {
       "args": [
         "comment",
-        "delete",
-        "1",
-        "cmt0001",
-        "--human"
-      ],
-      "exit": 0,
-      "stdout": "deleted comment cmt0001 from #1\n",
-      "stderr": ""
-    },
-    {
-      "args": [
-        "comment",
-        "delete",
-        "1",
-        "cmt0001",
-        "--human"
-      ],
-      "exit": 1,
-      "stdout": "",
-      "stderr": "Error: no comment \"cmt0001\" on #1; see `kaneo comment list 1 --json`\n"
-    },
-    {
-      "args": [
-        "comment",
         "add",
         "1",
         "second",
@@ -63,14 +39,74 @@
     {
       "args": [
         "comment",
+        "add",
+        "1",
+        "third",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "commented on #1\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
+        "delete",
+        "1",
+        "cmt000",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: no comment \"cmt000\" on #1; see `kaneo comment list 1 --json`\n"
+    },
+    {
+      "args": [
+        "comment",
+        "delete",
+        "1",
+        "cmt0002",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "deleted comment cmt0002 from #1\n2026-01-01T00:00:10.000Z  second\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
         "rm",
         "1",
         "cmt0002",
         "--json"
       ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no comment \\\"cmt0002\\\" on #1; see `kaneo comment list 1 --json`\"\n}\n",
+      "stderr": "Error: no comment \"cmt0002\" on #1; see `kaneo comment list 1 --json`\n"
+    },
+    {
+      "args": [
+        "comment",
+        "delete",
+        "1",
+        "cmt0003",
+        "--json"
+      ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"cmt0002\",\n  \"content\": \"second\",\n  \"userId\": \"user-self\",\n  \"userName\": \"Self\",\n  \"createdAt\": \"2026-01-01T00:00:09.000Z\"\n}\n",
+      "stdout": "{\n  \"id\": \"cmt0003\",\n  \"content\": \"third\",\n  \"userId\": \"user-self\",\n  \"userName\": \"Self\",\n  \"createdAt\": \"2026-01-01T00:00:11.000Z\"\n}\n",
       "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
+        "delete",
+        "3",
+        "cmt-other",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: DELETE /api/comment/cmt-other: 404: Comment not found or you are not the author\n"
     },
     {
       "args": [
@@ -80,7 +116,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "[]\n",
+      "stdout": "[\n  {\n    \"id\": \"cmt0001\",\n    \"content\": \"first comment\",\n    \"userId\": \"user-self\",\n    \"userName\": \"Self\",\n    \"createdAt\": \"2026-01-01T00:00:08.000Z\"\n  }\n]\n",
       "stderr": ""
     }
   ],
@@ -93,31 +129,6 @@
     {
       "method": "GET",
       "path": "/comment/task-a2",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/task/tasks/proj-alpha",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/comment/task-a1",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/task/tasks/proj-alpha",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/comment/task-a1",
-      "query": ""
-    },
-    {
-      "method": "DELETE",
-      "path": "/comment/cmt0001",
       "query": ""
     },
     {
@@ -149,6 +160,29 @@
       "query": ""
     },
     {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "third"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "GET",
       "path": "/comment/task-a1",
       "query": ""
@@ -156,6 +190,46 @@
     {
       "method": "DELETE",
       "path": "/comment/cmt0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/comment/cmt0003",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a3",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/comment/cmt-other",
       "query": ""
     },
     {

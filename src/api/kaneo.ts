@@ -641,8 +641,9 @@ export const addComment = async (taskId: string, content: string, signal?: Abort
   };
 };
 
-// Deletes a comment. The server lets only its author do this and answers 403
-// for anyone else.
+// Deletes a comment. The server looks for the id among the caller's own
+// comments only, so someone else's comment answers 404, the same as one that
+// does not exist.
 export const deleteComment = async (commentId: string): Promise<void> => {
   await call(deleteTaskComment(pathParam(commentId)));
 };

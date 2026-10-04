@@ -29,7 +29,7 @@ export const SEED: Seed = {
     { id: "task-a3", projectId: P1, title: "Old news", status: "done" },
     { id: "task-b1", projectId: P2, title: "Beta first", priority: "urgent" },
   ],
-  comments: [{ taskId: "task-a1", content: "first comment" }],
+  comments: [{ taskId: "task-a1", content: "first comment" }, { taskId: "task-a3", content: "not mine", id: "cmt-other", userId: "user-1" }],
 };
 
 export type Scenario = {
@@ -95,7 +95,21 @@ export const SCENARIOS: Scenario[] = [
 
   ...both("comment list", ["comment", "list", "1"]),
   { name: "comment add", steps: [["comment", "add", "1", "hello", "world", "--json"], ["comment", "ls", "1", "--human"]] },
-  { name: "comment delete", steps: [["comment", "delete", "2", "cmt0001", "--human"], ["comment", "rm", "1", "nope", "--json"], ["comment", "delete", "1", "cmt0001", "--human"], ["comment", "delete", "1", "cmt0001", "--human"], ["comment", "add", "1", "second", "--human"], ["comment", "rm", "1", "cmt0002", "--json"], ["comment", "ls", "1", "--json"]] },
+  {
+    name: "comment delete",
+    steps: [
+      ["comment", "delete", "2", "cmt0001", "--human"],
+      ["comment", "rm", "1", "nope", "--json"],
+      ["comment", "add", "1", "second", "--human"],
+      ["comment", "add", "1", "third", "--human"],
+      ["comment", "delete", "1", "cmt000", "--human"],
+      ["comment", "delete", "1", "cmt0002", "--human"],
+      ["comment", "rm", "1", "cmt0002", "--json"],
+      ["comment", "delete", "1", "cmt0003", "--json"],
+      ["comment", "delete", "3", "cmt-other", "--human"],
+      ["comment", "ls", "1", "--json"],
+    ],
+  },
 
   {
     name: "session attach, next, close",

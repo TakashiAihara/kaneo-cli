@@ -21,7 +21,9 @@ export type Seed = {
     description?: string | null;
     userId?: string | null;
   }[];
-  comments?: { taskId: string; content: string }[];
+  // A comment with a userId of its own was written by someone else, so only
+  // the server's author check stands between it and a delete.
+  comments?: { taskId: string; content: string; id?: string; userId?: string }[];
   // Users the server knows, so assign has a name to report.
   users?: { id: string; name: string }[];
 };
@@ -97,13 +99,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   for (const t of seed.tasks) addTask(t.projectId, t, t.id);
 
   const comments: z.input<typeof M.Comment>[] = [];
-  const addComment = (taskId: string, content: string) => {
+  const addComment = (taskId: string, content: string, commentId = id("cmt"), userId = "user-self") => {
     const at = now();
-    const c = { id: id("cmt"), taskId, userId: "user-self", content, createdAt: at, updatedAt: at, user: { name: "Self", image: null } };
+    const c = { id: commentId, taskId, userId, content, createdAt: at, updatedAt: at, user: { name: userId === "user-self" ? "Self" : userId, image: null } };
     comments.push(c);
     return c;
   };
-  for (const c of seed.comments ?? []) addComment(c.taskId, c.content);
+  for (const c of seed.comments ?? []) addComment(c.taskId, c.content, c.id, c.userId);
 
   const relations: z.input<typeof M.TaskRelation>[] = [];
   const requests: Recorded[] = [];
@@ -281,8 +283,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
 
     if (req.method === "DELETE" && (p = m(/^\/comment\/([^/]+)$/))) {
+      // Upstream resolves the comment's workspace first and only then looks
+      // for it among the caller's own comments.
       const i = comments.findIndex((c) => c.id === decodeURIComponent(p![1]));
-      if (i < 0) return fail(404, "Comment not found");
+      if (i < 0) return fail(400, "Unknown comment");
+      if (comments[i]!.userId !== "user-self") return fail(404, "Comment not found or you are not the author");
       const { user: _, ...c } = comments.splice(i, 1)[0]!;
       return ok(M.Activity, { ...c, type: "comment", externalUserName: null, externalUserAvatar: null, externalSource: null, externalUrl: null } as z.input<typeof M.Activity>);
     }

@@ -258,7 +258,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: time entry time0002 already stopped at 2026-01-01T11:00:00.000Z; change its end with `kaneo time update \"time0002\" --end <time>`\n"
+      "stderr": "Error: time entry time0002 already stopped at 2026-01-01T11:00:00.000Z; change its end with `kaneo time update time0002 --end <time>`\n"
     },
     {
       "args": [

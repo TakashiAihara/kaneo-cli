@@ -10,7 +10,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: no comment \"cmt0001\" on #2; see `kaneo comment list 2 --json`\n"
+      "stderr": "Error: no comment \"cmt0001\" on #2; see `kaneo comment list task-a2 --json`\n"
     },
     {
       "args": [
@@ -21,8 +21,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"no comment \\\"nope\\\" on #1; see `kaneo comment list 1 --json`\"\n}\n",
-      "stderr": "Error: no comment \"nope\" on #1; see `kaneo comment list 1 --json`\n"
+      "stdout": "{\n  \"error\": \"no comment \\\"nope\\\" on #1; see `kaneo comment list task-a1 --json`\"\n}\n",
+      "stderr": "Error: no comment \"nope\" on #1; see `kaneo comment list task-a1 --json`\n"
     },
     {
       "args": [
@@ -58,7 +58,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: no comment \"cmt000\" on #1; see `kaneo comment list 1 --json`\n"
+      "stderr": "Error: no comment \"cmt000\" on #1; see `kaneo comment list task-a1 --json`\n"
     },
     {
       "args": [
@@ -81,8 +81,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"no comment \\\"cmt0002\\\" on #1; see `kaneo comment list 1 --json`\"\n}\n",
-      "stderr": "Error: no comment \"cmt0002\" on #1; see `kaneo comment list 1 --json`\n"
+      "stdout": "{\n  \"error\": \"no comment \\\"cmt0002\\\" on #1; see `kaneo comment list task-a1 --json`\"\n}\n",
+      "stderr": "Error: no comment \"cmt0002\" on #1; see `kaneo comment list task-a1 --json`\n"
     },
     {
       "args": [

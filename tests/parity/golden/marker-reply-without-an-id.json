@@ -7,8 +7,8 @@
         "1"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"posted the marker on #1 but the reply carried no id to confirm it by; check kaneo comment ls 1 before retrying\"\n}\n",
-      "stderr": "Error: posted the marker on #1 but the reply carried no id to confirm it by; check kaneo comment ls 1 before retrying\n"
+      "stdout": "{\n  \"error\": \"posted the marker on #1 but the reply carried no id to confirm it by; check kaneo comment ls task-a1 before retrying\"\n}\n",
+      "stderr": "Error: posted the marker on #1 but the reply carried no id to confirm it by; check kaneo comment ls task-a1 before retrying\n"
     }
   ],
   "requests": [

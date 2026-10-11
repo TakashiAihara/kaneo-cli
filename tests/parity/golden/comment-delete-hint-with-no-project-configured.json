@@ -1,0 +1,81 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "delete",
+        "BET#1",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no comment \\\"nope\\\" on #1; see `kaneo comment list task-b1 --json`\"\n}\n",
+      "stderr": "Error: no comment \"nope\" on #1; see `kaneo comment list task-b1 --json`\n"
+    },
+    {
+      "args": [
+        "comment",
+        "list",
+        "task-b1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
+        "list",
+        "1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"task #1 needs a project: pass --project or set KANEO_PROJECT\"\n}\n",
+      "stderr": "Error: task #1 needs a project: pass --project or set KANEO_PROJECT\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-b1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-b1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-b1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

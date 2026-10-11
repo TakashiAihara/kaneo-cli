@@ -1,13 +1,19 @@
 import { apiKey, type App } from "./app";
-import { addComment, deleteComment, editComment, listComments, type Comment } from "../api/kaneo";
+import { addComment, deleteComment, editComment, listComments, type Comment, type Task } from "../api/kaneo";
 import { exactArgs, minimumArgs, type RunContext } from "./args";
 import { readInput } from "./input";
 import { resolveTask } from "./task";
+import { shellWord } from "../output/output";
 
 // A human line for one comment. The timestamp first and the text indented
 // beneath it, so a multi-line comment reads as belonging to one moment.
 const commentLine = (comment: Comment): string =>
   `${comment.createdAt}  ${comment.content.replaceAll("\n", "\n  ")}`;
+
+// The suggested command names the task by id: a number is resolved through the
+// project settings of whoever pastes it, which may pick another project's task.
+const noComment = (id: string, task: Task): string =>
+  `no comment ${JSON.stringify(id)} on #${task.number}; see \`kaneo comment list ${shellWord(task.id)} --json\``;
 
 export const commentCommand = {
   name: "comment",
@@ -93,7 +99,7 @@ export const commentCommand = {
         // which is the slip this command exists to undo.
         const comment = (await listComments(task.id)).find((c) => c.id === args[1]);
         if (comment === undefined) {
-          throw new Error(`no comment ${JSON.stringify(args[1])} on #${task.number}; see \`kaneo comment list ${task.number} --json\``);
+          throw new Error(noComment(args[1]!, task));
         }
         await deleteComment(comment.id);
         app.out.human(`deleted comment ${comment.id} from #${task.number}`);
@@ -113,7 +119,7 @@ export const commentCommand = {
         // named task keeps a mistyped id from rewriting a comment elsewhere.
         const found = (await listComments(task.id)).find((c) => c.id === args[1]);
         if (found === undefined) {
-          throw new Error(`no comment ${JSON.stringify(args[1])} on #${task.number}; see \`kaneo comment list ${task.number} --json\``);
+          throw new Error(noComment(args[1]!, task));
         }
         const comment = await editComment(found, args.slice(2).join(" "));
         app.out.human(`edited comment ${comment.id} on #${task.number}`);

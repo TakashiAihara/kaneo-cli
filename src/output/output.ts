@@ -34,6 +34,14 @@ export const isTTY = (fd: number): boolean => {
   }
 };
 
+// A server-made value as one shell word, for a command a message asks the
+// reader to paste: an id the server chose could otherwise carry `$(...)` or a
+// space into their shell. `=` and `~` stay quoted, since zsh expands a word
+// that starts with either. A leading `-` would still read as a flag; Kaneo's
+// ids are cuid2, which start with a letter.
+export const shellWord = (value: string): string =>
+  /^[A-Za-z0-9_.:@%+,/-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
+
 export const sanitizeControl = (text: string): string => {
   // Tab and newline are kept: they are ordinary in what this renders and
   // neither can move the cursor arbitrarily. Everything else in the C0 and C1

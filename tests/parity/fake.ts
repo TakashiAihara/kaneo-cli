@@ -463,9 +463,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         body("/activity/create", "post").required.push("userId");
       }
       if (opts.specWithoutOperation) {
-        // Named so a pinned spec that drops the path fails here, not as a 500.
-        if (doc.paths["/task/{projectId}"]?.post === undefined) throw new Error("pinned spec has no POST /task/{projectId}");
-        delete doc.paths["/task/{projectId}"];
+        // The operation alone, so another method a later pin adds to the path
+        // stays served; the path goes too once nothing is left on it.
+        delete doc.paths["/task/{projectId}"].post;
+        if (Object.keys(doc.paths["/task/{projectId}"]).length === 0) delete doc.paths["/task/{projectId}"];
       }
       return Response.json(doc);
     }

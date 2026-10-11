@@ -67,8 +67,9 @@ export class Writer {
     readonly terminal: boolean,
   ) {}
 
-  // Whether the payload is already on stdout, so a failure after it does not
-  // add a second JSON document a reader cannot parse.
+  // Whether the JSON payload is already on stdout, so a failure after it does
+  // not add a second document a reader cannot parse. Not set under a filter:
+  // error() writes nothing to stdout there anyway.
   private wroteData = false;
 
   // The payload of a command. In JSON mode it is the only thing on stdout, and
@@ -79,7 +80,6 @@ export class Writer {
       // A string the filter picked out is printed raw, so on a terminal it gets
       // the treatment human() gives server text; a pipe gets the bytes as they are.
       writeSync(1, this.terminal ? sanitizeControl(out) : out);
-      this.wroteData = true;
       return;
     }
     if (!this.mode.json) return;

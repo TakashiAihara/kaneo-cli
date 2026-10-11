@@ -298,7 +298,9 @@ kaneo task get 1 --jq .status                    # to-do
 
 jq runs inside the binary, so nothing has to be installed. Output follows `gh --jq` to a pipe: each value ends with a newline, strings print raw and everything else as compact JSON. `--jq` implies `--json` and wins over `--human`.
 
-When something fails, stdout stays empty and the exit code is 1:
+With `--json` alone, a failure puts `{"error": ...}` on stdout, unless the command has already printed its payload: `api-check` and `task import` print their report and then exit 1, and the report stays the only document on stdout, with the error on stderr.
+
+With `--jq`, when something fails, stdout stays empty and the exit code is 1:
 
 - an expression jq cannot compile is refused before any request is made
 - an expression that fails on the payload reports jq's message on stderr, followed by a line saying the command had already run — `task create … --jq` that exits 1 this way has still created the task, so do not retry it blindly

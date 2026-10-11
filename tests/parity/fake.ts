@@ -457,13 +457,16 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "GET" && path === "/openapi") {
       if (!opts.driftedSpec && !opts.specWithoutOperation) return new Response(Bun.file(SPEC_PATH));
       const doc = JSON.parse(readFileSync(SPEC_PATH, "utf8"));
-      if (opts.specWithoutOperation) {
-        delete doc.paths["/task/{projectId}"].post;
-        return Response.json(doc);
-      }
       const body = (p: string, m: string) => doc.paths[p][m].requestBody.content["application/json"].schema;
-      delete body("/task/{projectId}", "post").properties.customFields;
-      body("/activity/create", "post").required.push("userId");
+      if (opts.driftedSpec) {
+        delete body("/task/{projectId}", "post").properties.customFields;
+        body("/activity/create", "post").required.push("userId");
+      }
+      if (opts.specWithoutOperation) {
+        // Named so a pinned spec that drops the path fails here, not as a 500.
+        if (doc.paths["/task/{projectId}"]?.post === undefined) throw new Error("pinned spec has no POST /task/{projectId}");
+        delete doc.paths["/task/{projectId}"];
+      }
       return Response.json(doc);
     }
     if (req.method === "GET" && path === "/auth/organization/list") return ok(z.array(M.Organization), workspaces);

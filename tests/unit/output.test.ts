@@ -75,6 +75,13 @@ describe("Writer", () => {
     else expect(out).toBe("");
   });
 
+  // A command that reports and then fails keeps stdout to the one document.
+  test("TestErrorAfterDataLeavesOneDocument", () => {
+    const { out, err } = run(true, `w.data({ count: 2 }); w.error("boom");`);
+    expect(JSON.parse(out)).toEqual({ count: 2 });
+    expect(err).toContain("boom");
+  });
+
   // Task titles, branch names and session notes come from the server. An escape
   // sequence in one of them would otherwise reach the terminal.
   test("TestHumanOutputStripsControlCharacters", () => {

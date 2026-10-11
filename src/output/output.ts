@@ -74,16 +74,17 @@ export class Writer {
   // The payload of a command. In JSON mode it is the only thing on stdout, and
   // with a filter it is what the filter makes of it.
   data(value: Json): void {
-    this.wroteData = true;
     if (this.filter !== undefined) {
       const out = this.filter(line(value));
       // A string the filter picked out is printed raw, so on a terminal it gets
       // the treatment human() gives server text; a pipe gets the bytes as they are.
       writeSync(1, this.terminal ? sanitizeControl(out) : out);
+      this.wroteData = true;
       return;
     }
     if (!this.mode.json) return;
     writeSync(1, line(value));
+    this.wroteData = true;
   }
 
   // Human-readable payload, suppressed in JSON mode so that data stays the sole
@@ -106,7 +107,9 @@ export class Writer {
 
   // A failure. stderr always gets the readable form; JSON mode also puts a
   // machine-readable object on stdout, so a script sees it without having to
-  // read stderr as well.
+  // read stderr as well — unless the payload is already there. A command that
+  // reports and then fails (api-check, task import) leaves its report as the one
+  // document, carrying the failure in its own fields, with exit 1.
   //
   // With a filter, stdout stays empty, as gh --jq leaves it. A caller of
   // `--jq .number` reads stdout as the number, so an error object there would

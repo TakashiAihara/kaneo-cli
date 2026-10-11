@@ -9,7 +9,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: refusing to delete project Beta [BET] (proj-beta) without --yes; kaneo project archive proj-beta keeps it\n"
+      "stderr": "Error: refusing to delete project Beta [BET] (proj-beta) without --yes; `kaneo project archive proj-beta` keeps it\n"
     },
     {
       "args": [

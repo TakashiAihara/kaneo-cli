@@ -168,6 +168,15 @@ export const SCENARIOS: Scenario[] = [
     seed: { projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }] },
     steps: [["project", "update", "proj-noslug", "--name", "Has a name now", "--json"]],
   },
+  // A project whose id the shell would split or expand: the hints quote it.
+  {
+    name: "hints quote an id the shell would expand",
+    seed: {
+      projects: [{ id: "p q$(x)", workspaceId: WS, name: "Odd", slug: "ODD" }],
+      tasks: [{ id: "task-o1", projectId: "p q$(x)", title: "Held" }],
+    },
+    steps: [["project", "rm", "ODD", "--human"], ["column", "rm", "to-do", "--yes", "-p", "ODD", "--human"]],
+  },
   { name: "project archive and unarchive", steps: [["project", "archive", P2, "--json"], ["project", "ls", "--human"], ["project", "unarchive", P2, "--human"], ["project", "ls", "--json"]] },
   { name: "project rm needs --yes", steps: [["project", "rm", P2, "--human"], ["project", "rm", "Beta", "--yes", "--json"], ["project", "ls", "--human"], ["project", "ls", "--archived", "--human"], ["task", "ls", "-p", P2, "--json"], ["project", "rm", "OLD", "--yes", "--human"]] },
   { name: "project rm unknown", steps: [["project", "rm", "nope", "--yes", "--json"]] },

@@ -13,6 +13,7 @@ import {
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
 import { allProjects, firstMatch, resolveWorkspace, withProject, type ProjectIn } from "./lookup";
+import { shellWord } from "../output/output";
 
 // `archive` and `unarchive` are the same request with the opposite verb, so they
 // are built from one place rather than written out twice.
@@ -99,7 +100,7 @@ const withDescription = async (created: Project, description: string): Promise<P
     return after;
   } catch (e) {
     throw new Error(
-      `created project ${created.id} but could not set its description: ${(e as Error).message}; set it with \`kaneo project update ${created.id} -d TEXT\``,
+      `created project ${created.id} but could not set its description: ${(e as Error).message}; set it with \`kaneo project update ${shellWord(created.id)} -d TEXT\``,
     );
   }
 };
@@ -317,7 +318,7 @@ export const projectCommand = {
         // which project it resolved to rather than echoing the word typed.
         if (flags.yes !== true) {
           throw new Error(
-            `refusing to delete project ${found.name} [${found.slug}] (${found.id}) without --yes; kaneo project archive ${found.id} keeps it`,
+            `refusing to delete project ${found.name} [${found.slug}] (${found.id}) without --yes; \`kaneo project archive ${shellWord(found.id)}\` keeps it`,
           );
         }
         const deleted = await deleteProject(found.id);

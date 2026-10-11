@@ -1,0 +1,87 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "rm",
+        "ODD",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to delete project Odd [ODD] (p q$(x)) without --yes; `kaneo project archive 'p q$(x)'` keeps it\n"
+    },
+    {
+      "args": [
+        "column",
+        "rm",
+        "to-do",
+        "--yes",
+        "-p",
+        "ODD",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: column to-do still holds tasks; move them out first (`kaneo task ls -p 'p q$(x)' --status to-do` lists them)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/ODD",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/p%20q$%28x%29",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/ODD",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/column/p%20q$%28x%29",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/column/col0001",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

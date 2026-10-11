@@ -121,8 +121,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"column to-do still holds tasks; move them out first (kaneo task ls -p proj-beta --status to-do lists them)\"\n}\n",
-      "stderr": "Error: column to-do still holds tasks; move them out first (kaneo task ls -p proj-beta --status to-do lists them)\n"
+      "stdout": "{\n  \"error\": \"column to-do still holds tasks; move them out first (`kaneo task ls -p proj-beta --status to-do` lists them)\"\n}\n",
+      "stderr": "Error: column to-do still holds tasks; move them out first (`kaneo task ls -p proj-beta --status to-do` lists them)\n"
     },
     {
       "args": [

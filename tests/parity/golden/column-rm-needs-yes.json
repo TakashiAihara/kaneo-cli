@@ -20,8 +20,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"column done still holds tasks; move them out first (kaneo task ls -p proj-alpha --status done lists them)\"\n}\n",
-      "stderr": "Error: column done still holds tasks; move them out first (kaneo task ls -p proj-alpha --status done lists them)\n"
+      "stdout": "{\n  \"error\": \"column done still holds tasks; move them out first (`kaneo task ls -p proj-alpha --status done` lists them)\"\n}\n",
+      "stderr": "Error: column done still holds tasks; move them out first (`kaneo task ls -p proj-alpha --status done` lists them)\n"
     },
     {
       "args": [

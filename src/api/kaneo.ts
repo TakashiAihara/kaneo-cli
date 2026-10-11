@@ -3,6 +3,7 @@ import { requestDrift, requestShapes, type Drift, type RequestShape } from "./sh
 import pinnedRequests from "./gen/requests.json";
 import { kaneoFetch, KaneoApiError } from "./http";
 import type { Json } from "../output/json";
+import { shellWord } from "../output/output";
 import {
   archiveProject,
   clearAllNotifications,
@@ -1597,7 +1598,7 @@ const putTimeEntry = async (
 export const stopTimeEntry = async (entryId: string, endTime: string): Promise<TimeEntry> => {
   const read = await readForWrite(entryId);
   if (read.endTime !== null) {
-    throw new Error(`time entry ${entryId} already stopped at ${read.endTime}; change its end with \`kaneo time update ${JSON.stringify(entryId)} --end <time>\``);
+    throw new Error(`time entry ${entryId} already stopped at ${read.endTime}; change its end with \`kaneo time update ${shellWord(entryId)} --end <time>\``);
   }
   return putTimeEntry(entryId, { startTime: read.startTime, endTime });
 };
@@ -1872,7 +1873,7 @@ export const deleteLabel = async (labelId: string): Promise<LabelRecord> => {
       // Only a refusal on the first request (a 4xx, which the server gives
       // before touching the label) means nothing changed.
       if (last === undefined && status >= 400 && status < 500) throw e;
-      const hint = `; the label may be partly deleted, run \`kaneo label rm ${labelId} --yes\` again to finish`;
+      const hint = `; the label may be partly deleted, run \`kaneo label rm ${shellWord(labelId)} --yes\` again to finish`;
       if (e instanceof Error) {
         e.message += hint;
         throw e;

@@ -16,7 +16,7 @@ import { resolveTask } from "./task";
 import { shellWord } from "../output/output";
 
 const labelLine = (label: LabelRecord): string =>
-  `${label.id}  ${label.name}  (${label.color})${label.deletionStartedAt === null ? "" : `  deleting; \`kaneo label rm ${label.id} --yes\` to finish`}`;
+  `${label.id}  ${label.name}  (${label.color})${label.deletionStartedAt === null ? "" : `  deleting; \`kaneo label rm ${shellWord(label.id)} --yes\` to finish`}`;
 
 // A label in the given list by id or by name. Names are what a person types
 // and the server keeps them unique among a workspace's labels and among one

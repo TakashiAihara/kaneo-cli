@@ -87,6 +87,9 @@ export type FakeOptions = {
   // Answers a request whose "METHOD path" matches with a 500, having changed
   // nothing, for a write that is refused or a read that fails.
   failOn?: string;
+  // How many matching requests are answered as usual before failOn starts, so
+  // a scenario can set something up through the route it then breaks.
+  failOnSkip?: number;
   // Answers a matching PUT with the ordinary 200 while storing its title or
   // description with " (altered)" appended, so a client that reads the task
   // back finds something other than what it sent.
@@ -393,6 +396,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       : null;
 
   const failing = opts.failOn ? new RegExp(opts.failOn) : undefined;
+  let skipped = 0;
   const misstoring = opts.misstoreOn ? new RegExp(opts.misstoreOn) : undefined;
 
   const route = async (req: Request): Promise<Response> => {
@@ -403,7 +407,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (!url.pathname.startsWith("/api/")) return new Response("<html>app</html>", { headers: { "content-type": "text/html" } });
     if (req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
-    if (failing?.test(`${req.method} ${path}`)) return fail(500, "injected failure");
+    if (failing?.test(`${req.method} ${path}`) && skipped++ >= (opts.failOnSkip ?? 0)) return fail(500, "injected failure");
 
     // The server validates request bodies against the same schemas the
     // document declares, and answers 400 with the first issue.
@@ -934,7 +938,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if ((p = m(/^\/comment\/([^/]+)$/)) && req.method !== "PUT") {
       const taskId = decodeURIComponent(p[1]);
-      if (!tasks.some((t) => t.id === taskId)) return fail(404, "Task not found");
+      // The workspace middleware finds no task before the controller runs, and
+      // its HTTPException is plain text.
+      if (!tasks.some((t) => t.id === taskId)) return failText(400, "Workspace ID could not be determined");
       if (req.method === "GET") {
         return ok(z.array(M.Comment), comments.filter((c) => c.taskId === taskId && !(dropped?.test(c.content) ?? false)));
       }

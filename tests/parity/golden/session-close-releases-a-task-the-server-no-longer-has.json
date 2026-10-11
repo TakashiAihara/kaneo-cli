@@ -13,15 +13,24 @@
     },
     {
       "args": [
-        "session",
-        "close",
-        "--task",
+        "task",
+        "rm",
         "1",
-        "--strict"
+        "--yes",
+        "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"number\": 1,\n  \"taskId\": \"task-a1\"\n}\n",
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1\n}\n",
       "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "close"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"released ALP#1 Write the parser here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written\"\n}\n",
+      "stderr": "Error: released ALP#1 Write the parser here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written\n"
     },
     {
       "args": [
@@ -64,17 +73,22 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/comment/task-a1",
       "query": "",
       "body": {
         "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-test`."
       }
-    },
-    {
-      "method": "GET",
-      "path": "/comment/task-a1",
-      "query": ""
     }
   ],
   "files": {

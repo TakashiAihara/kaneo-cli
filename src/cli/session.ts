@@ -1,4 +1,4 @@
-import { apiKey, type App } from "./app";
+import { apiKey, taskProject, type App } from "./app";
 import { minimumArgs, noArgs, type RunContext } from "./args";
 import { failOpen, hard, strictFlag } from "./failopen";
 import { hookEnv, runHook } from "./hook";
@@ -7,6 +7,7 @@ import { CLOSED, RUNNING } from "../session/marker";
 import * as store from "../session/store";
 import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
+import { placesNothing } from "./lookup";
 
 const requireSessionId = (): string => {
   const id = store.currentId(env);
@@ -111,7 +112,10 @@ export const sessionCommand = {
         // A named task is allowed with no attachment: a session that attached,
         // re-attached elsewhere and now wants the first one released is the case
         // --task is for, so the attachment is not the gate.
-        const task = named === "" ? undefined : await resolveTask(app, named);
+        // The held task named the way the attachment knows it is taken as held
+        // without a lookup, which a task the server no longer has would fail.
+        const namesHeld = attached !== undefined && heldAs(app, attached, named);
+        const task = named === "" || namesHeld ? undefined : await resolveTask(app, named);
         // What the marker is written against and what the attachment holds can
         // differ once one of several tasks is named, so the attachment is only
         // dropped for the task it actually names.
@@ -122,7 +126,16 @@ export const sessionCommand = {
 
         const marker = store.describe(env, cwd(), CLOSED);
         marker.nextStep = `Session ended. Resume with \`claude --resume ${sessionId}\`.`;
-        const posted = await postMarker(closed.taskId, marker);
+        // A held task the server can no longer place (deleted, or not in any
+        // workspace the key reaches) can never take the marker, so the
+        // attachment is released anyway rather than left for every later close
+        // to fail on. The marker is then never written, even if the task comes
+        // back. A task named but not held is not released: there is nothing of
+        // it here to release.
+        const posted = await postMarker(closed.taskId, marker).catch((e: unknown) => {
+          if (holds && placesNothing(e)) return undefined;
+          throw e;
+        });
         // A task closed by name that the attachment does not hold has no board on
         // record here, so it is looked up as attach does, with the same best
         // effort. After the marker: the lookups only fill the history line, and
@@ -153,6 +166,13 @@ export const sessionCommand = {
         // running while this machine says closed; `session close --task <N>`
         // posts it again. Held back the other way, a close whose marker was lost
         // would leave the session attached to a task it has left.
+        // After the hook: the session has let go of the task, which is what the
+        // hook follows. The exit is still 1, since the board was not told.
+        if (posted === undefined) {
+          throw hard(
+            `released ${ref(closed.projectSlug, closed.number)} ${closed.title} here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written`,
+          );
+        }
         await confirmMarker(closed.taskId, closed.number, posted, "fail-open");
 
         app.out.human(`closed: #${closed.number} ${closed.title}`);
@@ -216,4 +236,16 @@ const targetTask = async (app: App, ref: string): Promise<{ taskId: string; numb
     );
   }
   return { taskId: attached.taskId, number: attached.number };
+};
+
+// Whether a --task value names the held task in a form close can recognise
+// without asking the server: its id, its slug#number (any case, as the slug
+// lookup reads it), or a bare number when the current project is the held one.
+// Without a slug on record, `#N` is not matched: it would read as the current
+// project's task.
+const heldAs = (app: App, held: store.Attachment, named: string): boolean => {
+  if (named === held.taskId) return true;
+  const slug = held.projectSlug ?? "";
+  if (slug !== "" && named.toLowerCase() === ref(slug, held.number).toLowerCase()) return true;
+  return /^\d+$/.test(named) && Number(named) === held.number && taskProject(app) === held.projectId;
 };

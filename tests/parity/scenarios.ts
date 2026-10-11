@@ -859,17 +859,22 @@ export const SCENARIOS: Scenario[] = [
     steps: [["session", "attach", "1", "--strict"], ["task", "rm", "1", "--yes", "--json"], ["session", "close"], ["session", "status", "--json"]],
   },
   // Named the way the attachment knows it, a gone task is still released: by
-  // id, then as session status prints it.
+  // id, as session status prints it (in another case), and as a bare number in
+  // its own project. The close hook runs for each release.
   {
     name: "session close --task releases a held task the server no longer has",
     env: { KANEO_SESSION_ID: "sess-test" },
+    config: { hooks: { close: 'printf "%s %s\\n" "$KANEO_HOOK_EVENT" "$KANEO_TASK_ID" >> "$HOME/.config/kaneo/hook.out"' } },
     steps: [
       ["session", "attach", "1", "--strict"],
       ["task", "rm", "1", "--yes", "--json"],
       ["session", "close", "--task", "task-a1"],
       ["session", "attach", "2", "--strict"],
       ["task", "rm", "2", "--yes", "--json"],
-      ["session", "close", "--task", "ALP#2", "--json"],
+      ["session", "close", "--task", "alp#2", "--json"],
+      ["session", "attach", "3", "--strict"],
+      ["task", "rm", "3", "--yes", "--json"],
+      ["session", "close", "--task", "3"],
       ["session", "status", "--json"],
     ],
   },

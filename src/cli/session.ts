@@ -1,4 +1,4 @@
-import { apiKey, type App } from "./app";
+import { apiKey, taskProject, type App } from "./app";
 import { minimumArgs, noArgs, type RunContext } from "./args";
 import { failOpen, hard, strictFlag } from "./failopen";
 import { hookEnv, runHook } from "./hook";
@@ -114,7 +114,7 @@ export const sessionCommand = {
         // --task is for, so the attachment is not the gate.
         // The held task named the way the attachment knows it is taken as held
         // without a lookup, which a task the server no longer has would fail.
-        const namesHeld = attached !== undefined && (named === attached.taskId || named === ref(attached.projectSlug, attached.number));
+        const namesHeld = attached !== undefined && heldAs(app, attached, named);
         const task = named === "" || namesHeld ? undefined : await resolveTask(app, named);
         // What the marker is written against and what the attachment holds can
         // differ once one of several tasks is named, so the attachment is only
@@ -236,4 +236,16 @@ const targetTask = async (app: App, ref: string): Promise<{ taskId: string; numb
     );
   }
   return { taskId: attached.taskId, number: attached.number };
+};
+
+// Whether a --task value names the held task in a form close can recognise
+// without asking the server: its id, its slug#number (any case, as the slug
+// lookup reads it), or a bare number when the current project is the held one.
+// Without a slug on record, `#N` is not matched: it would read as the current
+// project's task.
+const heldAs = (app: App, held: store.Attachment, named: string): boolean => {
+  if (named === held.taskId) return true;
+  const slug = held.projectSlug ?? "";
+  if (slug !== "" && named.toLowerCase() === ref(slug, held.number).toLowerCase()) return true;
+  return /^\d+$/.test(named) && Number(named) === held.number && taskProject(app) === held.projectId;
 };

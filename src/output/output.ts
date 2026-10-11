@@ -67,6 +67,11 @@ export class Writer {
     readonly terminal: boolean,
   ) {}
 
+  // Whether the JSON payload is already on stdout, so a failure after it does
+  // not add a second document a reader cannot parse. Not set under a filter:
+  // error() writes nothing to stdout there anyway.
+  private wroteData = false;
+
   // The payload of a command. In JSON mode it is the only thing on stdout, and
   // with a filter it is what the filter makes of it.
   data(value: Json): void {
@@ -79,6 +84,7 @@ export class Writer {
     }
     if (!this.mode.json) return;
     writeSync(1, line(value));
+    this.wroteData = true;
   }
 
   // Human-readable payload, suppressed in JSON mode so that data stays the sole
@@ -101,7 +107,9 @@ export class Writer {
 
   // A failure. stderr always gets the readable form; JSON mode also puts a
   // machine-readable object on stdout, so a script sees it without having to
-  // read stderr as well.
+  // read stderr as well — unless the payload is already there. A command that
+  // reports and then fails (api-check, task import) leaves its report as the one
+  // document, carrying the failure in its own fields, with exit 1.
   //
   // With a filter, stdout stays empty, as gh --jq leaves it. A caller of
   // `--jq .number` reads stdout as the number, so an error object there would
@@ -109,6 +117,6 @@ export class Writer {
   // it would be no better.
   error(message: string): void {
     writeSync(2, `Error: ${sanitizeControl(message)}\n`);
-    if (this.mode.json && this.filter === undefined) writeSync(1, line({ error: message }));
+    if (this.mode.json && this.filter === undefined && !this.wroteData) writeSync(1, line({ error: message }));
   }
 }

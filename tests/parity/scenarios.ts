@@ -94,6 +94,8 @@ export type Scenario = {
   commentReplyWithoutId?: boolean;
   // The fake's OpenAPI document drifts from the pinned one in two request fields.
   driftedSpec?: boolean;
+  // The fake's OpenAPI document lacks createTask, an operation the client calls.
+  specWithoutOperation?: boolean;
   pageSize?: number;
   // A seed layered over SEED for this scenario alone, so one that needs a project
   // in the second workspace does not put it in every other scenario's goldens.
@@ -865,6 +867,8 @@ export const SCENARIOS: Scenario[] = [
 
   ...both("api-check", ["api-check"]),
   ...both("api-check request drift", ["api-check"]).map((s): Scenario => ({ ...s, driftedSpec: true })),
+  // A missing operation exits 1, and --json still prints one document.
+  ...both("api-check missing operation", ["api-check"]).map((s): Scenario => ({ ...s, specWithoutOperation: true })),
 
   { name: "no api key", env: { KANEO_API_KEY: "" }, steps: [["whoami"], ["task", "ls"]] },
   { name: "wrong api key", env: { KANEO_API_KEY: "nope" }, steps: [["whoami", "--json"], ["task", "ls", "--json"]] },

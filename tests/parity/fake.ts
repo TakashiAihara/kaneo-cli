@@ -105,6 +105,8 @@ export type FakeOptions = {
   // Kaneo 2.20 does, and createTask without customFields, the request drift
   // api-check reports.
   driftedSpec?: boolean;
+  // Serves the pinned document without createTask, an operation the client calls.
+  specWithoutOperation?: boolean;
 };
 
 export function startFake(seed: Seed, opts: FakeOptions = {}) {
@@ -453,11 +455,19 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     let p: Groups | null;
 
     if (req.method === "GET" && path === "/openapi") {
-      if (!opts.driftedSpec) return new Response(Bun.file(SPEC_PATH));
+      if (!opts.driftedSpec && !opts.specWithoutOperation) return new Response(Bun.file(SPEC_PATH));
       const doc = JSON.parse(readFileSync(SPEC_PATH, "utf8"));
       const body = (p: string, m: string) => doc.paths[p][m].requestBody.content["application/json"].schema;
-      delete body("/task/{projectId}", "post").properties.customFields;
-      body("/activity/create", "post").required.push("userId");
+      if (opts.driftedSpec) {
+        delete body("/task/{projectId}", "post").properties.customFields;
+        body("/activity/create", "post").required.push("userId");
+      }
+      if (opts.specWithoutOperation) {
+        // The operation alone, so another method a later pin adds to the path
+        // stays served; the path goes too once nothing is left on it.
+        delete doc.paths["/task/{projectId}"].post;
+        if (Object.keys(doc.paths["/task/{projectId}"]).length === 0) delete doc.paths["/task/{projectId}"];
+      }
       return Response.json(doc);
     }
     if (req.method === "GET" && path === "/auth/organization/list") return ok(z.array(M.Organization), workspaces);

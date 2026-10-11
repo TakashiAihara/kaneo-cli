@@ -19,7 +19,7 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"total\": 3,\n  \"successful\": 2,\n  \"failed\": 1,\n  \"tasks\": [\n    {\n      \"success\": true,\n      \"id\": \"task0004\",\n      \"number\": 6,\n      \"title\": \"Imported\",\n      \"error\": \"\",\n      \"warnings\": []\n    },\n    {\n      \"success\": true,\n      \"id\": \"task0005\",\n      \"number\": 7,\n      \"title\": \"Planned on purpose\",\n      \"error\": \"\",\n      \"warnings\": []\n    },\n    {\n      \"success\": false,\n      \"id\": \"\",\n      \"number\": 0,\n      \"title\": \"Stranger\",\n      \"error\": \"Assignee is not a member of this workspace\",\n      \"warnings\": []\n    }\n  ]\n}\n{\n  \"error\": \"1 of 3 task(s) were not imported\"\n}\n",
+      "stdout": "{\n  \"total\": 3,\n  \"successful\": 2,\n  \"failed\": 1,\n  \"tasks\": [\n    {\n      \"success\": true,\n      \"id\": \"task0004\",\n      \"number\": 6,\n      \"title\": \"Imported\",\n      \"error\": \"\",\n      \"warnings\": []\n    },\n    {\n      \"success\": true,\n      \"id\": \"task0005\",\n      \"number\": 7,\n      \"title\": \"Planned on purpose\",\n      \"error\": \"\",\n      \"warnings\": []\n    },\n    {\n      \"success\": false,\n      \"id\": \"\",\n      \"number\": 0,\n      \"title\": \"Stranger\",\n      \"error\": \"Assignee is not a member of this workspace\",\n      \"warnings\": []\n    }\n  ]\n}\n",
       "stderr": "Error: 1 of 3 task(s) were not imported\n"
     },
     {

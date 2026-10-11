@@ -20,6 +20,15 @@ test("every golden has a scenario", () => {
   expect(orphans).toEqual([]);
 });
 
+const parsesAsOne = (text: string): boolean => {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 describe("parity with the recorded goldens", () => {
   for (const s of SCENARIOS) {
     test(s.name, async () => {
@@ -35,6 +44,13 @@ describe("parity with the recorded goldens", () => {
         expect({ at, exit: g.exit }).toEqual({ at, exit: w.exit });
         expect({ at, stdout: g.stdout }).toEqual({ at, stdout: w.stdout });
         expect({ at, stderr: g.stderr }).toEqual({ at, stderr: w.stderr });
+        // JSON mode (--json, or the pipe these runs write to) promises one
+        // document on stdout, failure or not, so a second one appended after the
+        // payload is caught whichever command adds it. Help, completion and
+        // --version print text, and start with neither bracket.
+        if (!w.args.includes("--human") && !w.args.includes("--jq") && /^[[{]/.test(g.stdout)) {
+          expect({ at, parses: parsesAsOne(g.stdout) }).toEqual({ at, parses: true });
+        }
       }
       expect(got.requests).toEqual(want.requests);
       expect(got.files).toEqual(want.files);

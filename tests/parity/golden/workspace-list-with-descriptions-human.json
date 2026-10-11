@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workspace",
+        "list",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ws-main  Main  Work for clients and more\nws-other  Other  Kept in metadata\nws-plain  Plain\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

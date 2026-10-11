@@ -10,7 +10,9 @@ import * as zod from 'zod';
 export const Organization = zod.object({
   "id": zod.string(),
   "name": zod.string(),
-  "slug": zod.string()
+  "slug": zod.string(),
+  "description": zod.string().nullish(),
+  "metadata": zod.unknown().optional()
 })
 
 export type Organization = zod.input<typeof Organization>;

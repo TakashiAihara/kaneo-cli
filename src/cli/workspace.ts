@@ -21,7 +21,10 @@ export const workspaceCommand = {
       run: async ({ app }: { app: App }) => {
         apiKey(app);
         const workspaces = await listWorkspaces();
-        for (const workspace of workspaces) app.out.human(`${workspace.id}  ${workspace.name}`);
+        for (const workspace of workspaces) {
+          const about = workspace.description.trim() === "" ? "" : `  ${workspace.description.trim().replaceAll("\n", " ")}`;
+          app.out.human(`${workspace.id}  ${workspace.name}${about}`);
+        }
         app.out.data(workspaces as Json);
       },
     },

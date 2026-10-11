@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 // of the same scenario (the Go reference and the TS build) see the same bytes.
 
 export type Seed = {
-  workspaces: { id: string; name: string; slug: string }[];
+  workspaces: { id: string; name: string; slug: string; description?: string | null; metadata?: unknown }[];
   projects: { id: string; workspaceId: string; name: string; slug: string; archived?: boolean }[];
   columns?: { slug: string; name: string; isFinal?: boolean }[];
   tasks: {

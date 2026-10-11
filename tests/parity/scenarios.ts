@@ -123,6 +123,20 @@ export const SCENARIOS: Scenario[] = [
   ...both("whoami", ["whoami"]),
   ...both("context", ["context"]),
   ...both("workspace list", ["workspace", "list"]),
+  // The column first, then a description an older workspace kept in metadata,
+  // as Kaneo's settings page reads them.
+  ...both("workspace list with descriptions", ["workspace", "list"]).map(
+    (s): Scenario => ({
+      ...s,
+      seed: {
+        workspaces: [
+          { id: WS, name: "Main", slug: "main", description: "Work for clients\nand more" },
+          { id: "ws-other", name: "Other", slug: "other", description: null, metadata: { description: "Kept in metadata" } },
+          { id: "ws-plain", name: "Plain", slug: "plain", description: null, metadata: null },
+        ],
+      },
+    }),
+  ),
   { name: "workspace rename", steps: [["workspace", "rename", WS, "Renamed", "--json"], ["workspace", "ls", "--human"]] },
 
   ...both("project list", ["project", "list"]),

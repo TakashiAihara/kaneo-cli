@@ -10,6 +10,7 @@ import {
 import { KaneoApiError } from "../api/http";
 import { exactArgs, minimumArgs, noArgs, type FlagValues } from "./args";
 import { withProject } from "./lookup";
+import { shellWord } from "../output/output";
 
 // The columns of the resolved project, and the changes to them.
 export const columnCommand = {
@@ -132,7 +133,7 @@ export const columnCommand = {
         const deleted = await deleteColumn(found.id).catch((err: unknown) => {
           if (err instanceof KaneoApiError && err.statusCode === 409) {
             throw new Error(
-              `column ${found.slug} still holds tasks; move them out first (kaneo task ls -p ${projectId} --status ${found.slug} lists them)`,
+              `column ${found.slug} still holds tasks; move them out first (\`kaneo task ls -p ${shellWord(projectId)} --status ${shellWord(found.slug)}\` lists them)`,
             );
           }
           throw err;

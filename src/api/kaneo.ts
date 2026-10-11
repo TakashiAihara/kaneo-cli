@@ -203,7 +203,7 @@ const pathParam = (value: string): string =>
 
 // A Kaneo workspace. The server models it as a better-auth organization, which
 // is why the listing lives under /auth.
-export type Workspace = { id: string; name: string; slug: string };
+export type Workspace = { id: string; name: string; slug: string; description: string };
 
 // The workspaces the key can see.
 //
@@ -218,7 +218,28 @@ const workspace = (org: Organization): Workspace => ({
   id: org.id ?? "",
   name: org.name ?? "",
   slug: org.slug ?? "",
+  description: workspaceDescription(org),
 });
+
+// Read as Kaneo's settings page reads it (apps/web, settings/workspace/
+// general.tsx in v2.32.0): the column, which that page writes, then metadata,
+// which the create form writes. better-auth stores metadata as text, so it may
+// arrive as the JSON string rather than the object the page expects.
+const workspaceDescription = (org: Organization): string => {
+  if (typeof org.description === "string") return org.description;
+  let metadata = org.metadata;
+  if (typeof metadata === "string") {
+    try {
+      metadata = JSON.parse(metadata);
+    } catch {
+      return "";
+    }
+  }
+  if (typeof metadata === "object" && metadata !== null && "description" in metadata) {
+    return String((metadata as { description?: unknown }).description ?? "");
+  }
+  return "";
+};
 
 // Changes a workspace's display name. better-auth only touches the slug when
 // data.slug is sent, and Kaneo's own settings page sends the same name-only

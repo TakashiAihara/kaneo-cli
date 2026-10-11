@@ -21,7 +21,17 @@ export const workspaceCommand = {
       run: async ({ app }: { app: App }) => {
         apiKey(app);
         const workspaces = await listWorkspaces();
-        for (const workspace of workspaces) app.out.human(`${workspace.id}  ${workspace.name}`);
+        // The description is free text on one line, after ids and names padded
+        // to one width so it starts in the same column on every row.
+        const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
+        const idWidth = Math.max(0, ...workspaces.map((w) => w.id.length));
+        const nameWidth = Math.max(0, ...workspaces.map((w) => oneLine(w.name).length));
+        for (const workspace of workspaces) {
+          const name = oneLine(workspace.name);
+          const about = oneLine(workspace.description);
+          const head = `${workspace.id.padEnd(idWidth)}  ${name}`;
+          app.out.human(about === "" ? head.trimEnd() : `${head.padEnd(idWidth + 2 + nameWidth)}  ${about}`);
+        }
         app.out.data(workspaces as Json);
       },
     },

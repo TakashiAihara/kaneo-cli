@@ -6,7 +6,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>/api\",\n  \"workspaces\": [\n    {\n      \"id\": \"ws-main\",\n      \"name\": \"Main\",\n      \"slug\": \"main\"\n    },\n    {\n      \"id\": \"ws-other\",\n      \"name\": \"Other\",\n      \"slug\": \"other\"\n    }\n  ]\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>/api\",\n  \"workspaces\": [\n    {\n      \"id\": \"ws-main\",\n      \"name\": \"Main\",\n      \"slug\": \"main\",\n      \"description\": \"\"\n    },\n    {\n      \"id\": \"ws-other\",\n      \"name\": \"Other\",\n      \"slug\": \"other\",\n      \"description\": \"\"\n    }\n  ]\n}\n",
       "stderr": ""
     }
   ],

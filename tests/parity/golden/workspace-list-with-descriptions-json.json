@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workspace",
+        "list",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"ws-main\",\n    \"name\": \"Main\",\n    \"slug\": \"main\",\n    \"description\": \"  Work for clients\\r\\n\\tand more \"\n  },\n  {\n    \"id\": \"ws-other\",\n    \"name\": \"Other\",\n    \"slug\": \"other\",\n    \"description\": \"Kept in metadata\"\n  },\n  {\n    \"id\": \"ws-obj\",\n    \"name\": \"Object\",\n    \"slug\": \"obj\",\n    \"description\": \"Parsed already\"\n  },\n  {\n    \"id\": \"ws-both\",\n    \"name\": \"Both\",\n    \"slug\": \"both\",\n    \"description\": \"Column wins\"\n  },\n  {\n    \"id\": \"ws-plain\",\n    \"name\": \"Plain\",\n    \"slug\": \"plain\",\n    \"description\": \"\"\n  },\n  {\n    \"id\": \"ws-bad\",\n    \"name\": \"Bad\\tmeta\",\n    \"slug\": \"bad\",\n    \"description\": \"\"\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

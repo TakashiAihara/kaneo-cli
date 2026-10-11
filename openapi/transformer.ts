@@ -38,7 +38,15 @@ function correctOrganization(doc: Doc) {
   doc.components.schemas ??= {};
   doc.components.schemas.Organization = {
     type: "object",
-    properties: { id: { type: "string" }, name: { type: "string" }, slug: { type: "string" } },
+    // description is the column Kaneo's settings page writes; metadata is
+    // free-form, and where its create form puts the description.
+    properties: {
+      id: { type: "string" },
+      name: { type: "string" },
+      slug: { type: "string" },
+      description: { type: "string", nullable: true },
+      metadata: {},
+    },
     required: ["id", "name", "slug"],
   };
   const json = (path: string, method: "get" | "post") => {

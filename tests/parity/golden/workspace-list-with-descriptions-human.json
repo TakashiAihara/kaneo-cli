@@ -7,7 +7,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "ws-main   Main\nws-other  Other\n",
+      "stdout": "ws-main   Main      Work for clients and more\nws-other  Other     Kept in metadata\nws-obj    Object    Parsed already\nws-both   Both      Column wins\nws-plain  Plain\nws-bad    Bad meta\n",
       "stderr": ""
     }
   ],

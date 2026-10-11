@@ -1,5 +1,5 @@
 import { OPERATIONS, type Operation } from "./registry";
-import { requestDrift, requestShapes, type Drift, type RequestShape } from "./shape";
+import { requestDrift, requestShapes, serverOperations, type Drift, type RequestShape, type ServerOperation } from "./shape";
 import pinnedRequests from "./gen/requests.json";
 import { kaneoFetch, KaneoApiError } from "./http";
 import type { Json } from "../output/json";
@@ -1960,7 +1960,6 @@ type Document = {
   paths?: Record<string, Record<string, { operationId?: string; tags?: unknown } | undefined> | undefined>;
 };
 
-type ServerOperation = { id: string; method: string; path: string; tag: string };
 
 // The comparison between this client and a server. The document is served
 // without authentication, so this works before any key is configured; it goes
@@ -1968,18 +1967,8 @@ type ServerOperation = { id: string; method: string; path: string; tag: string }
 // site root answers 200 with the web app's HTML for any path.
 export const checkApi = async (): Promise<CheckResult> => {
   const document = zeroRecord(await kaneoFetch<Document>("/openapi", { method: "GET" }));
-  const seen = new Set<string>();
-  const onServer: ServerOperation[] = [];
-  for (const [path, methods] of Object.entries(document.paths ?? {})) {
-    for (const [method, operation] of Object.entries(methods ?? {})) {
-      const id = operation?.operationId;
-      if (id === undefined || id === "" || seen.has(id)) continue;
-      seen.add(id);
-      const tags = Array.isArray(operation?.tags) ? operation.tags : [];
-      onServer.push({ id, method: method.toUpperCase(), path, tag: typeof tags[0] === "string" ? tags[0] : "" });
-    }
-  }
-  onServer.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const onServer = serverOperations(document);
+  const seen = new Set(onServer.map((operation) => operation.id));
 
   const used = new Set(OPERATIONS.map((operation) => operation.id));
   return {

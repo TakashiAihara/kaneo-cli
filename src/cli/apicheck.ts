@@ -50,8 +50,8 @@ export const apiCheckCommand = {
       clientOperations: result.clientOperations,
       covered: result.covered.map(asReport),
       missing: result.missing.map(asReport),
-      // The shape covered and missing have, with the command left empty since
-      // nothing calls these yet, and the document's first tag.
+      // The keys covered and missing have, with Command always empty since
+      // nothing calls these yet, and Tag added: the document's first tag.
       newOnServer: result.newOnServer.map((o) => ({ ID: o.id, Method: o.method, Path: o.path, Command: "", Tag: o.tag })),
       requestDrift: result.requestDrift.map((d) => ({ ...d, command: commandOf(d.id) })),
     } as Json);

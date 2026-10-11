@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { SPEC_PATH } from "../../openapi/spec";
 import { OPERATIONS } from "../../src/api/registry";
-import { requestDrift, requestShapes } from "../../src/api/shape";
+import { requestDrift, requestShapes, serverOperations } from "../../src/api/shape";
 import pinned from "../../src/api/gen/requests.json";
 
 const op = (operationId: string, rest: object = {}) => ({ paths: { "/x": { put: { operationId, ...rest } } } });
@@ -109,5 +109,35 @@ describe("requestDrift", () => {
 
   test("the same document has no drift", () => {
     expect(requestDrift(pinned, pinned)).toEqual([]);
+  });
+});
+
+describe("serverOperations", () => {
+  test("lists each operation with its method, path and first tag, by id", () => {
+    const doc = {
+      paths: {
+        "/b": {
+          parameters: [{ name: "x", in: "query" }],
+          summary: "not an operation",
+          "x-internal": { operationId: "extension" },
+          get: { operationId: "listB", tags: ["Bee", "Second"] },
+        },
+        "/a/{id}": {
+          delete: { operationId: "removeA" },
+          put: { operationId: "putA", tags: "not a list" },
+          post: { operationId: "listB", tags: ["Again"] },
+          patch: { operationId: "" },
+        },
+      },
+    };
+    expect(serverOperations(doc)).toEqual([
+      { id: "listB", method: "GET", path: "/b", tag: "Bee" },
+      { id: "putA", method: "PUT", path: "/a/{id}", tag: "" },
+      { id: "removeA", method: "DELETE", path: "/a/{id}", tag: "" },
+    ]);
+  });
+
+  test("a document with no paths offers nothing", () => {
+    expect(serverOperations({})).toEqual([]);
   });
 });

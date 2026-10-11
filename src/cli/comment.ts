@@ -5,10 +5,11 @@ import { readInput } from "./input";
 import { resolveTask } from "./task";
 import { shellWord } from "../output/output";
 
-// A human line for one comment. The timestamp first and the text indented
-// beneath it, so a multi-line comment reads as belonging to one moment.
+// A human line for one comment. The timestamp first, then the id that comment
+// delete and edit take, and the text indented beneath it, so a multi-line
+// comment reads as belonging to one moment.
 const commentLine = (comment: Comment): string =>
-  `${comment.createdAt}  ${comment.content.replaceAll("\n", "\n  ")}`;
+  `${comment.createdAt}  ${comment.id}  ${comment.content.replaceAll("\n", "\n  ")}`;
 
 // The suggested command names the task by id: a number is resolved through the
 // project settings of whoever pastes it, which may pick another project's task.

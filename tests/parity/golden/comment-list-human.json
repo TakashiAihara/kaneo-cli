@@ -8,7 +8,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "2026-01-01T00:00:08.000Z  first comment\n",
+      "stdout": "2026-01-01T00:00:08.000Z  cmt0001  first comment\n",
       "stderr": ""
     }
   ],

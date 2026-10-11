@@ -124,7 +124,7 @@ export const SCENARIOS: Scenario[] = [
   ...both("whoami", ["whoami"]),
   ...both("context", ["context"]),
   ...both("workspace list", ["workspace", "list"]),
-  // A server before v2.29.2 has no /user/me: the key was accepted, and whoami
+  // A server before v2.28.0 has no /user/me: the key was accepted, and whoami
   // says why it still cannot say whose it is.
   { name: "whoami on a server without user me", noCurrentUser: true, steps: [["whoami", "--human"]] },
   // The column first, then a description the create form kept in metadata,

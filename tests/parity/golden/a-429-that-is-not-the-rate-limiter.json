@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workspace",
+        "ls",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/auth/organization/list: 429: {\"message\":\"Rate limit exceeded.\",\"code\":\"IMPORT_RUNNING\",\"details\":{\"tryAgainIn\":0}}\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

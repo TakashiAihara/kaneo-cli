@@ -35,6 +35,20 @@ const REDIRECT_STATUSES = [301, 302, 303, 307, 308];
 // A message is read on a terminal, so a long raw body is cut; the error keeps
 // the whole of it for whoever wants to look closer.
 const BODY_LIMIT = 200;
+// The wait a rate-limited request may spend in all: the window Kaneo gives new
+// API keys (60 s in apps/api/src/auth.ts, v2.32.0). A key created with a
+// longer window can ask for more, which is then reported rather than sat out.
+// The count stops a server that keeps answering a wait of 0 from being asked
+// forever.
+const RATE_LIMIT_BUDGET_MS = 60_000;
+const RATE_LIMIT_RETRIES = 3;
+
+// Whether a rate-limited request is waited out. Fail-open commands run from
+// hooks, which must stay quiet and quick, so they turn it off.
+let waitOutRateLimits = true;
+export const setRateLimitWaits = (on: boolean): void => {
+  waitOutRateLimits = on;
+};
 
 let settings: Settings = { baseUrl: "", apiKey: "", timeoutMs: DEFAULT_TIMEOUT_MS, debug: false };
 
@@ -175,62 +189,81 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // A --timeout of zero or less is not the default and not no timeout: it is a
   // budget that has already run out, so every request fails at once, which is
   // what a context.WithTimeout of no duration did.
-  const cap = settings.timeoutMs > 0 ? AbortSignal.timeout(settings.timeoutMs) : AbortSignal.abort();
-  const signal = cap;
-
   // The method the call was made with, before a 301, 302 or 303 rewrote it into
   // a GET. Failures name it together with served, the pair Go's send reported.
   // The operation is looked up by it as well, so a write turned into a GET is
   // still read as that write's reply, and a whitespace-only one fails to decode
   // as it does without the redirect.
   const called = method;
+  const start = { method, body, target, headers };
 
+  // A 429 from the API key's rate limiter says when to come back, and the
+  // request is sent again after that long. --timeout still bounds each attempt;
+  // the waits have a budget of their own, one limiter window, since a single
+  // wait is never longer than that. The limiter refuses before the route runs,
+  // so a write is not repeated by sending it again.
+  let waited = 0;
+  let retries = 0;
   let response: Response;
-  let location = "";
-  for (let hop = 0; ; hop++) {
-    // Go's http.Client reports this as it reports a request that got no answer:
-    // the call's method and the Location it refused to follow, as the header
-    // wrote it rather than resolved. send prefixes the call as for any failure.
-    if (hop >= MAX_REDIRECTS) {
-      throw new Error(
-        `${called} ${served}: ${goOp(called)} ${JSON.stringify(location)}: stopped after ${MAX_REDIRECTS} redirects`,
-      );
-    }
-    try {
-      // Followed by hand: only the transport knows whether the next hop may
-      // still carry the key, and fetch decides that on its own.
-      response = await fetch(target, { method, headers, body, signal, redirect: "manual" });
-    } catch (e) {
-      throw new Error(`${called} ${served}: ${urlError(called, target, e)}`, { cause: e });
-    }
-    const next = redirectTarget(response, target);
-    if (!next) break;
-    location = response.headers.get("location") ?? "";
-    // The key stays only where it would still be protected and where it was
-    // already meant to go; a hop to an insecure host, or to another one, goes
-    // on without it and the server decides.
-    headers = withoutCredential(headers, target, next);
-    // 301, 302 and 303 turn a write into a GET the way every other client
-    // does, or the write would be replayed against a route that does not take
-    // it. 307 and 308 keep the method and body, which is why the body has to
-    // be replayable: the generated client always sends a serialized string.
-    if (downgradeToGet(response.status, method)) {
-      method = "GET";
-      body = null;
-      headers.delete("content-type");
-    }
-    target = next;
-  }
-
   let bytes: ArrayBuffer;
-  try {
-    // Read as bytes, because both decisions made from the body are the Go
-    // build's: it judged an empty reply by its length in bytes and reported the
-    // length in bytes when a reply failed to decode, neither of which is what a
-    // string of the same reply would measure.
-    bytes = await response.arrayBuffer();
-  } catch (e) {
-    throw new Error(`${called} ${served}: read body: ${reason(e)}`, { cause: e });
+  for (;;) {
+    ({ method, body, target } = start);
+    // A copy, since following a redirect may edit the headers in place.
+    headers = new Headers(start.headers);
+    const cap = settings.timeoutMs > 0 ? AbortSignal.timeout(settings.timeoutMs) : AbortSignal.abort();
+    const signal = cap;
+
+    let location = "";
+    for (let hop = 0; ; hop++) {
+      // Go's http.Client reports this as it reports a request that got no answer:
+      // the call's method and the Location it refused to follow, as the header
+      // wrote it rather than resolved. send prefixes the call as for any failure.
+      if (hop >= MAX_REDIRECTS) {
+        throw new Error(
+          `${called} ${served}: ${goOp(called)} ${JSON.stringify(location)}: stopped after ${MAX_REDIRECTS} redirects`,
+        );
+      }
+      try {
+        // Followed by hand: only the transport knows whether the next hop may
+        // still carry the key, and fetch decides that on its own.
+        response = await fetch(target, { method, headers, body, signal, redirect: "manual" });
+      } catch (e) {
+        throw new Error(`${called} ${served}: ${urlError(called, target, e)}`, { cause: e });
+      }
+      const next = redirectTarget(response, target);
+      if (!next) break;
+      location = response.headers.get("location") ?? "";
+      // The key stays only where it would still be protected and where it was
+      // already meant to go; a hop to an insecure host, or to another one, goes
+      // on without it and the server decides.
+      headers = withoutCredential(headers, target, next);
+      // 301, 302 and 303 turn a write into a GET the way every other client
+      // does, or the write would be replayed against a route that does not take
+      // it. 307 and 308 keep the method and body, which is why the body has to
+      // be replayable: the generated client always sends a serialized string.
+      if (downgradeToGet(response.status, method)) {
+        method = "GET";
+        body = null;
+        headers.delete("content-type");
+      }
+      target = next;
+    }
+
+    try {
+      // Read as bytes, because both decisions made from the body are the Go
+      // build's: it judged an empty reply by its length in bytes and reported the
+      // length in bytes when a reply failed to decode, neither of which is what a
+      // string of the same reply would measure.
+      bytes = await response.arrayBuffer();
+    } catch (e) {
+      throw new Error(`${called} ${served}: read body: ${reason(e)}`, { cause: e });
+    }
+    const wait = response.status === 429 ? tryAgainIn(bytes) : undefined;
+    if (!waitOutRateLimits || wait === undefined || waited + wait > RATE_LIMIT_BUDGET_MS || retries >= RATE_LIMIT_RETRIES) break;
+    waited += wait;
+    retries++;
+    console.error(`kaneo: ${called} ${served}: rate limited, sending it again in ${wait}ms`);
+    await Bun.sleep(wait);
   }
   // ignoreBOM leaves a byte order mark in the string instead of dropping it. Go
   // read the first byte of the body as the start of a value, so a reply carrying
@@ -245,7 +278,16 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // server reports validation problems the second way, so the status alone is
   // not enough to judge the call.
   const reported = failure(called, served, response.status, text, trimmed);
-  if (reported) throw reported;
+  if (reported) {
+    const wait = response.status === 429 ? tryAgainIn(bytes) : undefined;
+    if (wait !== undefined && waitOutRateLimits) {
+      reported.message +=
+        retries >= RATE_LIMIT_RETRIES
+          ? `; still rate limited after ${retries} retries`
+          : `; waiting the ${wait}ms the server asks for would pass the ${RATE_LIMIT_BUDGET_MS / 1000}s spent on rate limits`;
+    }
+    throw reported;
+  }
 
   // Which of the Go build's two request paths this is, which its two parsers
   // were told apart by as well: a reply the generated client read is decoded and
@@ -521,4 +563,19 @@ const messageOf = (value: unknown): string => {
   if (value === null || typeof value !== "object") return "";
   const { message } = value as { message?: unknown };
   return typeof message === "string" ? message : "";
+};
+// The wait better-auth's rate limiter asks for, in milliseconds, from a 429's
+// body ({"code":"RATE_LIMITED","details":{"tryAgainIn":38153}}), or undefined
+// when the body does not say.
+const tryAgainIn = (bytes: ArrayBuffer): number | undefined => {
+  try {
+    const reply = JSON.parse(new TextDecoder().decode(bytes));
+    // Only the limiter's own answer: other 429s (a label being deleted, an
+    // import already running) are not a wait the request can sit out.
+    if (reply?.code !== "RATE_LIMITED") return undefined;
+    const wait = reply?.details?.tryAgainIn;
+    return typeof wait === "number" && Number.isFinite(wait) && wait >= 0 ? wait : undefined;
+  } catch {
+    return undefined;
+  }
 };

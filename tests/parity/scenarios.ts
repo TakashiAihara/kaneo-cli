@@ -850,6 +850,13 @@ export const SCENARIOS: Scenario[] = [
     failOn: "^GET /comment/task-a1$",
     steps: [["session", "close", "--task", "1"], ["session", "close", "--task", "1", "--strict"]],
   },
+  // The held task is gone from the server, so the marker cannot be written; the
+  // attachment is released anyway and the close says so even without --strict.
+  {
+    name: "session close releases a task the server no longer has",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [["session", "attach", "1", "--strict"], ["task", "rm", "1", "--yes", "--json"], ["session", "close"], ["session", "status", "--json"]],
+  },
   {
     name: "session status without a session id",
     env: { KANEO_SESSION_ID: "" },

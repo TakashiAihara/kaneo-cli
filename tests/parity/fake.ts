@@ -934,7 +934,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if ((p = m(/^\/comment\/([^/]+)$/)) && req.method !== "PUT") {
       const taskId = decodeURIComponent(p[1]);
-      if (!tasks.some((t) => t.id === taskId)) return fail(404, "Task not found");
+      // The workspace middleware finds no task before the controller runs, and
+      // its HTTPException is plain text.
+      if (!tasks.some((t) => t.id === taskId)) return failText(400, "Workspace ID could not be determined");
       if (req.method === "GET") {
         return ok(z.array(M.Comment), comments.filter((c) => c.taskId === taskId && !(dropped?.test(c.content) ?? false)));
       }

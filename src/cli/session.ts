@@ -7,6 +7,7 @@ import { CLOSED, RUNNING } from "../session/marker";
 import * as store from "../session/store";
 import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
+import { KaneoApiError } from "../api/http";
 
 const requireSessionId = (): string => {
   const id = store.currentId(env);
@@ -122,7 +123,14 @@ export const sessionCommand = {
 
         const marker = store.describe(env, cwd(), CLOSED);
         marker.nextStep = `Session ended. Resume with \`claude --resume ${sessionId}\`.`;
-        const posted = await postMarker(closed.taskId, marker);
+        // A held task the server no longer places (deleted, or its project moved
+        // to another workspace) can never take the marker, so the attachment is
+        // released here anyway; otherwise the session would stay attached to it
+        // with no way out but editing the file.
+        const posted = await postMarker(closed.taskId, marker).catch((e: unknown) => {
+          if (holds && taskGone(e)) return undefined;
+          throw e;
+        });
         // A task closed by name that the attachment does not hold has no board on
         // record here, so it is looked up as attach does, with the same best
         // effort. After the marker: the lookups only fill the history line, and
@@ -153,6 +161,9 @@ export const sessionCommand = {
         // running while this machine says closed; `session close --task <N>`
         // posts it again. Held back the other way, a close whose marker was lost
         // would leave the session attached to a task it has left.
+        if (posted === undefined) {
+          throw hard(`released #${closed.number} here, but the server no longer has its task, so no close marker was written`);
+        }
         await confirmMarker(closed.taskId, closed.number, posted, "fail-open");
 
         app.out.human(`closed: #${closed.number} ${closed.title}`);
@@ -217,3 +228,9 @@ const targetTask = async (app: App, ref: string): Promise<{ taskId: string; numb
   }
   return { taskId: attached.taskId, number: attached.number };
 };
+// The replies to a task the server no longer places: its workspace middleware
+// cannot find one for it, or the controller cannot find the task.
+const taskGone = (e: unknown): boolean =>
+  e instanceof KaneoApiError &&
+  ((e.statusCode === 400 && e.messages.includes("Workspace ID could not be determined")) ||
+    (e.statusCode === 404 && e.messages.includes("Task not found")));

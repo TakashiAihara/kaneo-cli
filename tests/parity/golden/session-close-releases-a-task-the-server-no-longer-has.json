@@ -1,0 +1,97 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "1",
+        "--strict"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"taskId\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"projectId\": \"proj-alpha\",\n  \"projectName\": \"Alpha\",\n  \"projectSlug\": \"ALP\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "rm",
+        "1",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "close"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"released #1 here, but the server no longer has its task, so no close marker was written\"\n}\n",
+      "stderr": "Error: released #1 here, but the server no longer has its task, so no close marker was written\n"
+    },
+    {
+      "args": [
+        "session",
+        "status",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"sessionId\": \"sess-test\",\n  \"attached\": null,\n  \"history\": [\n    {\n      \"event\": \"attach\",\n      \"at\": \"<TIME>Z\",\n      \"taskId\": \"task-a1\",\n      \"number\": 1,\n      \"title\": \"Write the parser\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\"\n    },\n    {\n      \"event\": \"close\",\n      \"at\": \"<TIME>Z\",\n      \"taskId\": \"task-a1\",\n      \"number\": 1,\n      \"title\": \"Write the parser\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-test`."
+      }
+    }
+  ],
+  "files": {
+    ".config/kaneo/sessions/sess-test.history.jsonl": "{\"event\":\"attach\",\"at\":\"<TIME>Z\",\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n{\"event\":\"close\",\"at\":\"<TIME>Z\",\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n"
+  }
+}

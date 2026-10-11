@@ -109,6 +109,72 @@
       "exit": 0,
       "stdout": "deleted column waiting\n",
       "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "rm",
+        "to-do",
+        "--yes",
+        "-p",
+        "BET",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"column to-do still holds tasks; move them out first (kaneo task ls -p proj-beta --status to-do lists them)\"\n}\n",
+      "stderr": "Error: column to-do still holds tasks; move them out first (kaneo task ls -p proj-beta --status to-do lists them)\n"
+    },
+    {
+      "args": [
+        "column",
+        "ls",
+        "-p",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
+    },
+    {
+      "args": [
+        "column",
+        "create",
+        "Waiting",
+        "-p",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: POST /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "ls",
+        "-p",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/workflow-rule/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/workflow-rule/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "set",
+        "github",
+        "pr_opened",
+        "done",
+        "-p",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
     }
   ],
   "requests": [
@@ -372,6 +438,120 @@
       "method": "DELETE",
       "path": "/column/col0010",
       "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/column/col0004",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/nope",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "POST",
+      "path": "/column/nope",
+      "query": "",
+      "body": {
+        "name": "Waiting",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/nope",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/column/nope",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
     }
   ],
   "files": {}

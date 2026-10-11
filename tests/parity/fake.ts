@@ -640,7 +640,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if ((p = m(/^\/column\/([^/]+)$/))) {
       const key = decodeURIComponent(p![1]);
       if (req.method === "GET" || req.method === "POST") {
-        if (!projects.some((x) => x.id === key)) return fail(404, "Project not found");
+        // The workspace middleware finds no project before the controller runs,
+        // and its HTTPException is plain text.
+        if (!projects.some((x) => x.id === key)) return failText(400, "Workspace ID could not be determined");
         if (req.method === "GET") return ok(z.array(M.Column), columnsOf(key));
         const wanted = (body ?? {}) as z.input<typeof M.CreateColumnBody>;
         // The slug comes from the name, and one this project already holds is
@@ -1011,7 +1013,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (i < 0) return fail(400, "Workspace ID could not be determined");
         return ok(M.WorkflowRuleRow, workflowRules.splice(i, 1)[0]!);
       }
-      if (!projects.some((x) => x.id === key)) return fail(400, "Workspace ID could not be determined");
+      if (!projects.some((x) => x.id === key)) return failText(400, "Workspace ID could not be determined");
       if (req.method === "GET") {
         return ok(
           z.array(M.WorkflowRule),

@@ -52,14 +52,13 @@ export const columnCommand = {
       ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const created = await withProject(project(app), (id) =>
-          createColumn(id, {
-            name: newName(args),
-            icon: String(flags.icon ?? ""),
-            color: String(flags.color ?? ""),
-            isFinal: flags.final === true,
-          }),
-        );
+        const column = {
+          name: newName(args),
+          icon: String(flags.icon ?? ""),
+          color: String(flags.color ?? ""),
+          isFinal: flags.final === true,
+        };
+        const created = await withProject(project(app), (id) => createColumn(id, column));
         app.out.human(`created column ${created.slug} ${created.name}`);
         app.out.data(created);
       },
@@ -93,7 +92,10 @@ export const columnCommand = {
       args: minimumArgs(1),
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
-        const [projectId, current] = await withProject(project(app), async (id) => [id, await listColumns(id)] as const);
+        const { projectId, current } = await withProject(project(app), async (projectId) => ({
+          projectId,
+          current: await listColumns(projectId),
+        }));
         const order = newOrder(current, args);
         const columns = await reorderColumns(
           projectId,
@@ -117,7 +119,10 @@ export const columnCommand = {
       flags: [{ name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" }],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const [projectId, found] = await withProject(project(app), async (id) => [id, await resolveColumn(id, args[0]!)] as const);
+        const { projectId, found } = await withProject(project(app), async (projectId) => ({
+          projectId,
+          found: await resolveColumn(projectId, args[0]!),
+        }));
         // Only an empty column can go, but its id and place on the board do not
         // come back: a column created again under the same name gets a new id
         // and the last position.

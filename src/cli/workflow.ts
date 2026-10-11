@@ -68,7 +68,10 @@ export const workflowCommand = {
         if (integrationType === "" || eventType === "") {
           throw new Error("an integration and an event are both needed");
         }
-        const [projectId, column] = await withProject(project(app), async (id) => [id, await resolveColumn(id, args.slice(2).join(" "))] as const);
+        const { projectId, column } = await withProject(project(app), async (projectId) => ({
+          projectId,
+          column: await resolveColumn(projectId, args.slice(2).join(" ")),
+        }));
         // The server's upsert looks for a rule the project already has for the
         // pair and moves its column, so setting a pair again is a move rather
         // than a second rule.

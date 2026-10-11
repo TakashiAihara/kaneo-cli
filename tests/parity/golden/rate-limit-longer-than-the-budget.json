@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workspace",
+        "ls",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/auth/organization/list: 429: {\"message\":\"Rate limit exceeded.\",\"code\":\"RATE_LIMITED\",\"details\":{\"tryAgainIn\":61000}}; waiting the 61000ms the server asks for would pass the 60s spent on rate limits\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

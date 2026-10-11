@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workspace",
+        "ls",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/auth/organization/list: 429: {\\\"message\\\":\\\"Rate limit exceeded.\\\",\\\"code\\\":\\\"RATE_LIMITED\\\",\\\"details\\\":{\\\"tryAgainIn\\\":0}}; still rate limited after 3 retries\"\n}\n",
+      "stderr": "kaneo: GET /api/auth/organization/list: rate limited, sending it again in 0ms\nkaneo: GET /api/auth/organization/list: rate limited, sending it again in 0ms\nkaneo: GET /api/auth/organization/list: rate limited, sending it again in 0ms\nError: GET /api/auth/organization/list: 429: {\"message\":\"Rate limit exceeded.\",\"code\":\"RATE_LIMITED\",\"details\":{\"tryAgainIn\":0}}; still rate limited after 3 retries\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

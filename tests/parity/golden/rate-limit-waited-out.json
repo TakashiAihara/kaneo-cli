@@ -1,0 +1,32 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workspace",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ws-main   Main\nws-other  Other\n",
+      "stderr": "kaneo: GET /api/auth/organization/list: rate limited, sending it again in 200ms\nkaneo: GET /api/auth/organization/list: rate limited, sending it again in 200ms\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

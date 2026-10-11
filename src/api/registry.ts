@@ -13,6 +13,7 @@ export type Operation = {
 export const OPERATIONS: Operation[] = [
   { id: "listOrganization", method: "GET", path: "/auth/organization/list", command: "kaneo whoami / workspace ls" },
   { id: "updateOrganization", method: "POST", path: "/auth/organization/update", command: "kaneo workspace rename" },
+  { id: "getCurrentUser", method: "GET", path: "/user/me", command: "kaneo whoami" },
   { id: "getWorkspaceMembers", method: "GET", path: "/workspace/{workspaceId}/members", command: "kaneo workspace members" },
   { id: "getInvitationDetails", method: "GET", path: "/invitation/{id}", command: "kaneo invitation get" },
   { id: "globalSearch", method: "GET", path: "/search", command: "kaneo search" },

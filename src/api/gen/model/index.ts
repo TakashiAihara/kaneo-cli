@@ -30,6 +30,7 @@ export * from './createTaskBody.zod';
 export * from './createTaskCommentBody.zod';
 export * from './createTaskRelationBody.zod';
 export * from './createTimeEntryBody.zod';
+export * from './currentUser.zod';
 export * from './exportedTask.zod';
 export * from './exportedTaskLabel.zod';
 export * from './externalLink.zod';

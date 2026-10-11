@@ -6,7 +6,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "api url    <URL>/api\napi key    accepted\nworkspaces 2\n  ws-main  Main\n  ws-other  Other\n",
+      "stdout": "api url    <URL>/api\napi key    accepted\nuser       Self <self@example.com> (user-self)\nworkspaces 2\n  ws-main  Main\n  ws-other  Other\n",
       "stderr": ""
     }
   ],
@@ -14,6 +14,11 @@
     {
       "method": "GET",
       "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
       "query": ""
     }
   ],

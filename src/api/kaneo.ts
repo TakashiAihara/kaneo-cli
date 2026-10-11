@@ -1960,7 +1960,7 @@ type Document = {
   paths?: Record<string, Record<string, { operationId?: string; tags?: unknown } | undefined> | undefined>;
 };
 
-export type ServerOperation = { id: string; method: string; path: string; tag: string };
+type ServerOperation = { id: string; method: string; path: string; tag: string };
 
 // The comparison between this client and a server. The document is served
 // without authentication, so this works before any key is configured; it goes

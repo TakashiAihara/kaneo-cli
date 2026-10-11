@@ -92,6 +92,10 @@ export type FakeOptions = {
   // How many matching requests are answered as usual before failOn starts, so
   // a scenario can set something up through the route it then breaks.
   failOnSkip?: number;
+  // Answers this many workspace listings with better-auth's 429, asking the
+  // caller to come back after rateLimitWaitMs.
+  rateLimitTimes?: number;
+  rateLimitWaitMs?: number;
   // Answers a matching PUT with the ordinary 200 while storing its title or
   // description with " (altered)" appended, so a client that reads the task
   // back finds something other than what it sent.
@@ -399,6 +403,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
   const failing = opts.failOn ? new RegExp(opts.failOn) : undefined;
   let skipped = 0;
+  let limited = 0;
   const misstoring = opts.misstoreOn ? new RegExp(opts.misstoreOn) : undefined;
 
   const route = async (req: Request): Promise<Response> => {
@@ -479,6 +484,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     // Kaneo sets the request's user from the key, so /user/me answers for it.
     if (req.method === "GET" && path === "/user/me" && !opts.noCurrentUser) {
       return ok(M.CurrentUser, { id: "user-self", name: "Self", email: "self@example.com", image: null, role: "user" });
+    }
+    if (req.method === "GET" && path === "/auth/organization/list" && limited < (opts.rateLimitTimes ?? 0)) {
+      limited++;
+      return Response.json(
+        { message: "Rate limit exceeded.", code: "RATE_LIMITED", details: { tryAgainIn: opts.rateLimitWaitMs ?? 0 } },
+        { status: 429 },
+      );
     }
     if (req.method === "GET" && path === "/auth/organization/list") return ok(z.array(M.Organization), workspaces);
     if (req.method === "POST" && path === "/auth/organization/update") {

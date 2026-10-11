@@ -134,11 +134,3 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
 // This source tree as the suite runs it: src/index.ts under the bun running the
 // suite, so a scenario that sets PATH to nowhere still starts.
 export const THIS_BUILD = [process.execPath, new URL("../../src/index.ts", import.meta.url).pathname];
-
-// Whether two results are the same under parity.test.ts's comparison: every
-// step's arguments, exit code and output, every request and every file.
-// Bun.deepEquals without its strict flag is what the suite's toEqual does: the
-// order of an object's keys does not count, so a request body that differs only
-// in key order is the same.
-export const sameResult = (want: ScenarioResult, got: ScenarioResult): boolean =>
-  Bun.deepEquals(want.steps, got.steps) && Bun.deepEquals(want.requests, got.requests) && Bun.deepEquals(want.files, got.files);

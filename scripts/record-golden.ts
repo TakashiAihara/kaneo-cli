@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
-import { runScenario, sameResult, THIS_BUILD, type ScenarioResult } from "../tests/parity/run";
+import { runScenario, THIS_BUILD } from "../tests/parity/run";
 import { SCENARIOS } from "../tests/parity/scenarios";
 
 // Records what a build does for every parity scenario into tests/parity/golden/.
@@ -15,9 +15,9 @@ import { SCENARIOS } from "../tests/parity/scenarios";
 // through a wrapper script matters: the scenarios that set PATH to a directory
 // that does not exist would not find `bun` from a wrapper, and their goldens
 // would record that failure instead.
-// Only differing goldens are rewritten, because a golden that already matches
-// under the suite's own comparison (request bodies compared as values, so key
-// order is free) would otherwise churn for nothing.
+// A golden is rewritten when its text differs, key order included. The suite
+// compares request bodies as values, so an order-only change would otherwise
+// sit unwritten until an unrelated change rewrote the file and showed it there.
 
 export function slug(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -51,11 +51,8 @@ async function record(bin: string | undefined) {
   for (const s of SCENARIOS) {
     const file = `${dir}${slug(s.name)}.json`;
     const result = await runScenario(bin === undefined ? THIS_BUILD : [bin], s);
-    if (bin === undefined && existsSync(file)) {
-      const want: ScenarioResult = JSON.parse(readFileSync(file, "utf8"));
-      if (sameResult(want, result)) continue;
-    }
     const text = JSON.stringify(result, null, 2) + "\n";
+    if (bin === undefined && existsSync(file) && readFileSync(file, "utf8") === text) continue;
     // The goldens are published with the repository. The recording machine's
     // name surviving normalisation means a new place prints it; stop rather
     // than publish it, and extend the normalisation in tests/parity/run.ts.

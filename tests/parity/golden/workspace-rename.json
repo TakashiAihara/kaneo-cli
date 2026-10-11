@@ -34,10 +34,10 @@
       "path": "/auth/organization/update",
       "query": "",
       "body": {
+        "organizationId": "ws-main",
         "data": {
           "name": "Renamed"
-        },
-        "organizationId": "ws-main"
+        }
       }
     },
     {

@@ -35,12 +35,20 @@ const REDIRECT_STATUSES = [301, 302, 303, 307, 308];
 // A message is read on a terminal, so a long raw body is cut; the error keeps
 // the whole of it for whoever wants to look closer.
 const BODY_LIMIT = 200;
-// The wait a rate-limited request may spend in all: the window of Kaneo's API
-// key limiter (60 s in apps/api/src/auth.ts, v2.32.0), which is the most one
-// tryAgainIn can ask for. The count stops a server that keeps answering a
-// wait of 0 from being asked forever.
+// The wait a rate-limited request may spend in all: the window Kaneo gives new
+// API keys (60 s in apps/api/src/auth.ts, v2.32.0). A key created with a
+// longer window can ask for more, which is then reported rather than sat out.
+// The count stops a server that keeps answering a wait of 0 from being asked
+// forever.
 const RATE_LIMIT_BUDGET_MS = 60_000;
 const RATE_LIMIT_RETRIES = 3;
+
+// Whether a rate-limited request is waited out. Fail-open commands run from
+// hooks, which must stay quiet and quick, so they turn it off.
+let waitOutRateLimits = true;
+export const setRateLimitWaits = (on: boolean): void => {
+  waitOutRateLimits = on;
+};
 
 let settings: Settings = { baseUrl: "", apiKey: "", timeoutMs: DEFAULT_TIMEOUT_MS, debug: false };
 
@@ -251,10 +259,10 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       throw new Error(`${called} ${served}: read body: ${reason(e)}`, { cause: e });
     }
     const wait = response.status === 429 ? tryAgainIn(bytes) : undefined;
-    if (wait === undefined || waited + wait > RATE_LIMIT_BUDGET_MS || retries >= RATE_LIMIT_RETRIES) break;
+    if (!waitOutRateLimits || wait === undefined || waited + wait > RATE_LIMIT_BUDGET_MS || retries >= RATE_LIMIT_RETRIES) break;
     waited += wait;
     retries++;
-    console.error(`kaneo: ${called} ${served}: rate limited, sending it again in ${(wait / 1000).toFixed(1)}s`);
+    console.error(`kaneo: ${called} ${served}: rate limited, sending it again in ${wait}ms`);
     await Bun.sleep(wait);
   }
   // ignoreBOM leaves a byte order mark in the string instead of dropping it. Go
@@ -272,8 +280,11 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   const reported = failure(called, served, response.status, text, trimmed);
   if (reported) {
     const wait = response.status === 429 ? tryAgainIn(bytes) : undefined;
-    if (wait !== undefined) {
-      reported.message += `; still rate limited after waiting ${(waited / 1000).toFixed(1)}s, and the server asks for ${(wait / 1000).toFixed(1)}s more`;
+    if (wait !== undefined && waitOutRateLimits) {
+      reported.message +=
+        retries >= RATE_LIMIT_RETRIES
+          ? `; still rate limited after ${retries} retries`
+          : `; waiting the ${wait}ms the server asks for would pass the ${RATE_LIMIT_BUDGET_MS / 1000}s spent on rate limits`;
     }
     throw reported;
   }

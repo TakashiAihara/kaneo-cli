@@ -853,6 +853,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "POST" && (p = m(/^\/task\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       if (!proj) return failText(400, "Workspace ID could not be determined");
+      // A date that does not parse is refused rather than stored, as the due date
+      // route does.
+      for (const field of ["startDate", "dueDate"]) {
+        const given = (body as any)?.[field];
+        if (!given) continue;
+        const at = parsedDate(given, field);
+        if (typeof at !== "string") return at;
+      }
       return ok(M.Task, addTask(proj.id, body as any));
     }
     if ((p = m(/^\/task\/(status|priority|assignee|move|title|description)\/([^/]+)$/)) && req.method === "PUT") {

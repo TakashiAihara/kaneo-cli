@@ -339,10 +339,11 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "task create with a start date",
     steps: [
-      ["task", "create", "Planned", "--start-date", "2026-02-01", "--due-date", "2026-02-10T00:00:00Z", "--json"],
+      ["task", "create", "Planned", "--start-date", "2026-01-01", "--due-date", "2026-01-01T12:00:00Z", "--json"],
       ["task", "get", "4", "--human"],
-      ["task", "create", "Late", "--start-date", "2026-03-01", "--due-date", "2026-02-10T00:00:00Z", "--json"],
+      ["task", "create", "Late", "--start-date", "2026-01-01T13:00:00+00:00", "--due-date", "2026-01-01T12:00:00Z", "--json"],
       ["task", "create", "Vague", "--start-date", "next week", "--json"],
+      ["task", "create", "Someday", "--due-date", "someday", "--json"],
       ["task", "ls", "--human"],
     ],
   },

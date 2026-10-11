@@ -81,7 +81,7 @@ Not every layer answers every setting:
 
 A project is sent as an id first, so an id costs no extra request; only when the server says it does not know the value is it looked up across every workspace the key can reach (one listing per workspace), which a slug kept in `.kaneo.json` or the repo map pays on every command. A workspace is matched against `workspace ls` before it is sent — one request — because an instance admin's key gets an empty project list, not an error, for a workspace that does not exist. That listing holds only the workspaces the key's user is a member of.
 
-That is what lets the two forms people actually type work: a slug is the prefix of every task reference, and `workspace ls` prints names next to their ids.
+That is what lets the two forms people actually type work: a slug is the prefix of every task reference, and `workspace ls` prints names next to their ids, followed by each workspace's description where it has one.
 
 ### `.kaneo.json`
 

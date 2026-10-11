@@ -221,14 +221,22 @@ const workspace = (org: Organization): Workspace => ({
   description: workspaceDescription(org),
 });
 
-// Read the way Kaneo's settings page reads it (apps/web, settings/workspace/
-// general.tsx in v2.32.0): the column, then a description kept in metadata.
+// Read as Kaneo's settings page reads it (apps/web, settings/workspace/
+// general.tsx in v2.32.0): the column, which that page writes, then metadata,
+// which the create form writes. better-auth stores metadata as text, so it may
+// arrive as the JSON string rather than the object the page expects.
 const workspaceDescription = (org: Organization): string => {
   if (typeof org.description === "string") return org.description;
-  const metadata = org.metadata;
+  let metadata = org.metadata;
+  if (typeof metadata === "string") {
+    try {
+      metadata = JSON.parse(metadata);
+    } catch {
+      return "";
+    }
+  }
   if (typeof metadata === "object" && metadata !== null && "description" in metadata) {
-    const kept = (metadata as { description?: unknown }).description;
-    return typeof kept === "string" ? kept : "";
+    return String((metadata as { description?: unknown }).description ?? "");
   }
   return "";
 };

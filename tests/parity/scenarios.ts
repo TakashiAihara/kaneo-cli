@@ -123,15 +123,17 @@ export const SCENARIOS: Scenario[] = [
   ...both("whoami", ["whoami"]),
   ...both("context", ["context"]),
   ...both("workspace list", ["workspace", "list"]),
-  // The column first, then a description an older workspace kept in metadata,
-  // as Kaneo's settings page reads them.
+  // The column first, then a description the create form kept in metadata,
+  // sent as better-auth's JSON text or already an object.
   ...both("workspace list with descriptions", ["workspace", "list"]).map(
     (s): Scenario => ({
       ...s,
       seed: {
         workspaces: [
-          { id: WS, name: "Main", slug: "main", description: "Work for clients\nand more" },
-          { id: "ws-other", name: "Other", slug: "other", description: null, metadata: { description: "Kept in metadata" } },
+          { id: WS, name: "Main", slug: "main", description: "  Work for clients\r\n\tand more " },
+          { id: "ws-other", name: "Other", slug: "other", description: null, metadata: '{"description":"Kept in metadata"}' },
+          { id: "ws-obj", name: "Object", slug: "obj", description: null, metadata: { description: "Parsed already" } },
+          { id: "ws-both", name: "Both", slug: "both", description: "Column wins", metadata: '{"description":"Metadata loses"}' },
           { id: "ws-plain", name: "Plain", slug: "plain", description: null, metadata: null },
         ],
       },

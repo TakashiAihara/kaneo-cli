@@ -19,7 +19,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "ws-main  Renamed\nws-other  Other\n",
+      "stdout": "ws-main   Renamed\nws-other  Other\n",
       "stderr": ""
     }
   ],

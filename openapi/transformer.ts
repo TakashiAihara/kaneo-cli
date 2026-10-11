@@ -38,8 +38,8 @@ function correctOrganization(doc: Doc) {
   doc.components.schemas ??= {};
   doc.components.schemas.Organization = {
     type: "object",
-    // description is the column Kaneo's settings page writes; metadata is where
-    // older workspaces kept it, and is free-form.
+    // description is the column Kaneo's settings page writes; metadata is
+    // free-form, and where its create form puts the description.
     properties: {
       id: { type: "string" },
       name: { type: "string" },

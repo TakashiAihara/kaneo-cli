@@ -7,7 +7,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "ws-main  Main\nws-other  Other\n",
+      "stdout": "ws-main   Main\nws-other  Other\n",
       "stderr": ""
     }
   ],

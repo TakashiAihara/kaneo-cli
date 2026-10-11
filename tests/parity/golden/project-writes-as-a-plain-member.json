@@ -8,8 +8,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"PUT /api/project/proj-beta/archive: 403: Insufficient permissions: archiving a project needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\"\n}\n",
-      "stderr": "Error: PUT /api/project/proj-beta/archive: 403: Insufficient permissions: archiving a project needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+      "stdout": "{\n  \"error\": \"PUT /api/project/proj-beta/archive: 403: Insufficient permissions: archiving a project needs the project update permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\"\n}\n",
+      "stderr": "Error: PUT /api/project/proj-beta/archive: 403: Insufficient permissions: archiving a project needs the project update permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
     },
     {
       "args": [
@@ -20,7 +20,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: PUT /api/project/proj-beta/unarchive: 403: Insufficient permissions: unarchiving a project needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+      "stderr": "Error: PUT /api/project/proj-beta/unarchive: 403: Insufficient permissions: unarchiving a project needs the project update permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
     },
     {
       "args": [
@@ -33,7 +33,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: PUT /api/project/proj-beta: 403: Insufficient permissions: updating a project needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+      "stderr": "Error: PUT /api/project/proj-beta: 403: Insufficient permissions: updating a project needs the project update permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
     },
     {
       "args": [
@@ -45,7 +45,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: DELETE /api/project/proj-beta: 403: Insufficient permissions: deleting a project needs the project delete permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+      "stderr": "Error: DELETE /api/project/proj-beta: 403: Insufficient permissions: deleting a project needs the project delete permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
     },
     {
       "args": [
@@ -57,7 +57,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: PUT /api/project/reorder: 403: Insufficient permissions: reordering projects needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+      "stderr": "Error: PUT /api/project/reorder: 403: Insufficient permissions: reordering projects needs the project update permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
     },
     {
       "args": [
@@ -72,7 +72,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: created project proj0002 but could not set its description: PUT /api/project/proj0002: 403: Insufficient permissions: setting a description needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+      "stderr": "Error: created project proj0002 but could not set its description: PUT /api/project/proj0002: 403: Insufficient permissions: setting a description needs the project update permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
     },
     {
       "args": [

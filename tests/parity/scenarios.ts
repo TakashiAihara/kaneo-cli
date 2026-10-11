@@ -201,6 +201,13 @@ export const SCENARIOS: Scenario[] = [
       ["project", "get", "BET", "--json"],
     ],
   },
+  // The role is best effort: without /user/me the line leaves it out.
+  {
+    name: "project write as a plain member whose role cannot be read",
+    plainMember: true,
+    noCurrentUser: true,
+    steps: [["project", "archive", "BET", "--human"]],
+  },
   { name: "project archive and unarchive", steps: [["project", "archive", P2, "--json"], ["project", "ls", "--human"], ["project", "unarchive", P2, "--human"], ["project", "ls", "--json"]] },
   { name: "project rm needs --yes", steps: [["project", "rm", P2, "--human"], ["project", "rm", "Beta", "--yes", "--json"], ["project", "ls", "--human"], ["project", "ls", "--archived", "--human"], ["task", "ls", "-p", P2, "--json"], ["project", "rm", "OLD", "--yes", "--human"]] },
   { name: "project rm unknown", steps: [["project", "rm", "nope", "--yes", "--json"]] },

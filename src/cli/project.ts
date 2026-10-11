@@ -389,12 +389,14 @@ const permissionHint = async (
   const role =
     workspaceId === ""
       ? ""
-      : await Promise.all([currentUser(), listMembers(workspaceId)])
-          .then(([me, members]) => members.find((m) => m.id === me.id)?.role ?? "")
-          .catch(() => "");
+      : // One after the other, so the requests go out in the same order every run.
+        await (async () => {
+          const me = await currentUser();
+          return (await listMembers(workspaceId)).find((m) => m.id === me.id)?.role ?? "";
+        })().catch(() => "");
   const yours = role === "" ? "" : `; your role there is ${role}`;
   const where = workspaceId === "" ? "kaneo workspace members" : `kaneo workspace members -w ${shellWord(workspaceId)}`;
-  return `${doing} needs the project ${permission} permission in the workspace, which the owner and admin roles have by default${yours}; \`${where}\` lists each member's role`;
+  return `${doing} needs the project ${permission} permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed${yours}; \`${where}\` lists each member's role`;
 };
 
 const refused =

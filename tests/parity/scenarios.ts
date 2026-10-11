@@ -1061,7 +1061,7 @@ export const SCENARIOS: Scenario[] = [
   // With no project configured, a hint naming the task by number would not
   // resolve at all; it names the task by id, and that command, as printed in
   // step 1, lists the task's comments with no project.
-  { name: "comment delete hint with no project configured", env: { KANEO_PROJECT: "", KANEO_WORKSPACE: "" }, steps: [["comment", "delete", "BET#1", "nope", "--json"], ["comment", "list", "task-b1", "--json"]] },
+  { name: "comment delete hint with no project configured", env: { KANEO_PROJECT: "", KANEO_WORKSPACE: "" }, steps: [["comment", "delete", "BET#1", "nope", "--json"], ["comment", "list", "task-b1", "--json"], ["comment", "list", "1", "--json"]] },
   { name: "project not found", steps: [["task", "ls", "-p", "nope", "--json"]] },
   { name: "task reference with a slug", steps: [["task", "get", "BET#1", "--json"], ["comment", "add", "ALP#2", "hi", "--human"]] },
   {

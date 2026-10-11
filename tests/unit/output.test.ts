@@ -232,14 +232,22 @@ describe("shellWord", () => {
     ["$(rm -rf ~)", "'$(rm -rf ~)'"],
     ["it's", `'it'\\''s'`],
     ["", "''"],
+    ["=ls", "'=ls'"],
+    ["~root", "'~root'"],
+    ["a#b", "'a#b'"],
+    ["a!b", "'a!b'"],
+    ["a\nb", "'a\nb'"],
   ])("%p", (value, want) => {
     expect(shellWord(value)).toBe(want);
   });
 
   test("round-trips through sh", () => {
-    for (const value of ["a b", "$(echo hi)", "it's", "`x`;|&"]) {
-      const out = Bun.spawnSync(["sh", "-c", `printf %s ${shellWord(value)}`]).stdout.toString();
-      expect(out).toBe(value);
+    // zsh too: it is the shell people paste into here, and expands more.
+    for (const shell of ["sh", "zsh"].filter((s) => Bun.which(s) !== null)) {
+      for (const value of ["a b", "$(echo hi)", "it's", "`x`;|&", "=ls", "~root", "a!b"]) {
+        const out = Bun.spawnSync([shell, "-c", `printf %s ${shellWord(value)}`]).stdout.toString();
+        expect({ shell, out }).toEqual({ shell, out: value });
+      }
     }
   });
 });

@@ -22,6 +22,17 @@
       "exit": 0,
       "stdout": "[]\n",
       "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
+        "list",
+        "1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"task #1 needs a project: pass --project or set KANEO_PROJECT\"\n}\n",
+      "stderr": "Error: task #1 needs a project: pass --project or set KANEO_PROJECT\n"
     }
   ],
   "requests": [

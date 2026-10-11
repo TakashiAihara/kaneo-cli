@@ -156,7 +156,12 @@ export const taskCommand = {
           usage: "start date: a date, or a date and time with an offset",
           defaultValue: "",
         },
-        { name: "due-date", type: "string" as const, usage: "due date", defaultValue: "" },
+        {
+          name: "due-date",
+          type: "string" as const,
+          usage: "due date: a date, or a date and time with an offset",
+          defaultValue: "",
+        },
         { name: "assignee", type: "string" as const, usage: "user id to assign", defaultValue: "" },
         {
           name: "attach",
@@ -184,12 +189,12 @@ export const taskCommand = {
           description: await descriptionOf(flags, changed),
           priority: String(flags.priority ?? ""),
           status: String(flags.status ?? ""),
-          startDate: String(flags["start-date"] ?? "") === "" ? "" : instant(String(flags["start-date"]), "--start-date"),
-          dueDate: String(flags["due-date"] ?? ""),
+          startDate: wantedStartDate(String(flags["start-date"] ?? "")) ?? "",
+          dueDate: String(flags["due-date"] ?? "") === "" ? "" : instant(String(flags["due-date"]), "--due-date"),
           assigneeId: String(flags.assignee ?? ""),
         };
         // As task update refuses it, before anything is written.
-        if (wanted.startDate !== "" && wanted.dueDate !== "" && Date.parse(wanted.startDate) > Date.parse(wanted.dueDate)) {
+        if (Date.parse(wanted.startDate) > Date.parse(wanted.dueDate)) {
           throw new Error(`--start-date ${wanted.startDate} is after --due-date ${wanted.dueDate}`);
         }
         const attach = flags.attach === true;

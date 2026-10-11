@@ -38,8 +38,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"--start-date 2026-01-01T13:00:00.000Z is after --due-date 2026-01-01T12:00:00Z\"\n}\n",
-      "stderr": "Error: --start-date 2026-01-01T13:00:00.000Z is after --due-date 2026-01-01T12:00:00Z\n"
+      "stdout": "{\n  \"error\": \"--start-date 2026-01-01T13:00:00.000Z is after --due-date 2026-01-01T12:00:00.000Z\"\n}\n",
+      "stderr": "Error: --start-date 2026-01-01T13:00:00.000Z is after --due-date 2026-01-01T12:00:00.000Z\n"
     },
     {
       "args": [
@@ -64,8 +64,23 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"POST /api/task/proj-alpha: 400: Invalid dueDate \\\"someday\\\"\"\n}\n",
-      "stderr": "Error: POST /api/task/proj-alpha: 400: Invalid dueDate \"someday\"\n"
+      "stdout": "{\n  \"error\": \"--due-date \\\"someday\\\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\"\n}\n",
+      "stderr": "Error: --due-date \"someday\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\n"
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "Same day",
+        "--start-date",
+        "2026-01-01T12:00:00Z",
+        "--due-date",
+        "2026-01-01T12:00:00Z",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created #5 Same day\n",
+      "stderr": ""
     },
     {
       "args": [
@@ -74,7 +89,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "#1    [high       ] to-do         Write the parser\n#4    [medium     ] to-do         Planned\n#2    [no-priority] in-progress   Ship it\n",
+      "stdout": "#1    [high       ] to-do         Write the parser\n#4    [medium     ] to-do         Planned\n#5    [medium     ] to-do         Same day\n#2    [no-priority] in-progress   Ship it\n",
       "stderr": ""
     }
   ],
@@ -92,7 +107,7 @@
         "title": "Planned",
         "description": "",
         "startDate": "2026-01-01T00:00:00.000Z",
-        "dueDate": "2026-01-01T12:00:00Z",
+        "dueDate": "2026-01-01T12:00:00.000Z",
         "priority": "medium",
         "status": "to-do"
       }
@@ -117,9 +132,10 @@
       "path": "/task/proj-alpha",
       "query": "",
       "body": {
-        "title": "Someday",
+        "title": "Same day",
         "description": "",
-        "dueDate": "someday",
+        "startDate": "2026-01-01T12:00:00.000Z",
+        "dueDate": "2026-01-01T12:00:00.000Z",
         "priority": "medium",
         "status": "to-do"
       }

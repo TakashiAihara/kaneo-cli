@@ -1,0 +1,373 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "archive",
+        "BET",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/project/proj-beta/archive: 403: Insufficient permissions: archiving a project needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\"\n}\n",
+      "stderr": "Error: PUT /api/project/proj-beta/archive: 403: Insufficient permissions: archiving a project needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+    },
+    {
+      "args": [
+        "project",
+        "unarchive",
+        "BET",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/project/proj-beta/unarchive: 403: Insufficient permissions: unarchiving a project needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+    },
+    {
+      "args": [
+        "project",
+        "update",
+        "BET",
+        "--name",
+        "Renamed",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/project/proj-beta: 403: Insufficient permissions: updating a project needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+    },
+    {
+      "args": [
+        "project",
+        "rm",
+        "BET",
+        "--yes",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: DELETE /api/project/proj-beta: 403: Insufficient permissions: deleting a project needs the project delete permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+    },
+    {
+      "args": [
+        "project",
+        "reorder",
+        "BET",
+        "ALP",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/project/reorder: 403: Insufficient permissions: reordering projects needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+    },
+    {
+      "args": [
+        "project",
+        "create",
+        "Gamma",
+        "--slug",
+        "GAM",
+        "-d",
+        "about",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: created project proj0002 but could not set its description: PUT /api/project/proj0002: 403: Insufficient permissions: setting a description needs the project update permission in the workspace, which the owner and admin roles have by default; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+    },
+    {
+      "args": [
+        "project",
+        "get",
+        "BET",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"proj-beta\",\n  \"name\": \"Beta\",\n  \"slug\": \"BET\",\n  \"icon\": \"Layout\",\n  \"description\": \"\",\n  \"workspaceId\": \"ws-main\",\n  \"isPublic\": false,\n  \"archivedAt\": null\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/project/BET/archive",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-beta/archive",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/BET/unarchive",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-beta/unarchive",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-beta",
+      "query": "",
+      "body": {
+        "name": "Renamed",
+        "icon": "Layout",
+        "slug": "BET",
+        "description": "",
+        "isPublic": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "PUT",
+      "path": "/project/reorder",
+      "query": "?workspaceId=ws-main",
+      "body": {
+        "projects": [
+          {
+            "id": "proj-beta",
+            "position": 0
+          },
+          {
+            "id": "proj-alpha",
+            "position": 1
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Gamma",
+        "workspaceId": "ws-main",
+        "icon": "Layers",
+        "slug": "GAM"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj0002",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj0002",
+      "query": "",
+      "body": {
+        "name": "Gamma",
+        "icon": "Layers",
+        "slug": "GAM",
+        "description": "about",
+        "isPublic": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

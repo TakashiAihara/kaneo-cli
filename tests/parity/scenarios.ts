@@ -81,6 +81,7 @@ export type Scenario = {
   // The fake answers matching "METHOD path" requests with a 500, having
   // changed nothing.
   failOn?: string;
+  plainMember?: boolean;
   noCurrentUser?: boolean;
   failOnSkip?: number;
   rateLimitTimes?: number;
@@ -183,6 +184,22 @@ export const SCENARIOS: Scenario[] = [
       tasks: [{ id: "task-o1", projectId: "p q$(x)", title: "Held" }],
     },
     steps: [["project", "rm", "ODD", "--human"], ["column", "rm", "to-do", "--yes", "-p", "ODD", "--human"]],
+  },
+  // A plain member is refused with a bare 403; the line says which permission the
+  // route checks and the caller's role there.
+  {
+    name: "project writes as a plain member",
+    plainMember: true,
+    seed: { members: [{ id: "user-self", name: "Self", email: "self@example.com", role: "member" }] },
+    steps: [
+      ["project", "archive", "BET", "--json"],
+      ["project", "unarchive", "BET", "--human"],
+      ["project", "update", "BET", "--name", "Renamed", "--human"],
+      ["project", "rm", "BET", "--yes", "--human"],
+      ["project", "reorder", "BET", "ALP", "--human"],
+      ["project", "create", "Gamma", "--slug", "GAM", "-d", "about", "--human"],
+      ["project", "get", "BET", "--json"],
+    ],
   },
   { name: "project archive and unarchive", steps: [["project", "archive", P2, "--json"], ["project", "ls", "--human"], ["project", "unarchive", P2, "--human"], ["project", "ls", "--json"]] },
   { name: "project rm needs --yes", steps: [["project", "rm", P2, "--human"], ["project", "rm", "Beta", "--yes", "--json"], ["project", "ls", "--human"], ["project", "ls", "--archived", "--human"], ["task", "ls", "-p", P2, "--json"], ["project", "rm", "OLD", "--yes", "--human"]] },

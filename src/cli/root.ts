@@ -13,7 +13,7 @@ import type { App } from "./app";
 import { resolveFromEnvironment, type Flags as ResolvedFlags } from "../config/resolve";
 import { isTTY, resolveMode, sanitizeControl, Writer } from "../output/output";
 import { loadFilter, JqFailure, type Filter } from "../output/jq";
-import { configureClient } from "../api/http";
+import { configureClient, setRateLimitWaits } from "../api/http";
 import { contextCommand } from "./context";
 import { whoamiCommand } from "./whoami";
 import { workspaceCommand } from "./workspace";
@@ -224,6 +224,9 @@ export const run = async (argv: string[]): Promise<number> => {
     // with its own timeout) puts one around the process.
     const app: App = { cfg, flags, global, out };
     configureClient({ baseUrl: cfg.apiUrl, apiKey: cfg.apiKey, timeoutMs: timeout });
+    // Reset for every run, since a fail-open command turns it off and run() can
+    // be called again in the same process.
+    setRateLimitWaits(true);
 
     await command.run({
       args: parsed.args,

@@ -197,8 +197,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       description: t.description ?? null,
       status: t.status ?? firstColumn,
       priority: t.priority ?? "no-priority",
-      startDate: null as string | null,
-      dueDate: null as string | null,
+      // Stored as the instants they parse to, as create-task's route does.
+      startDate: t.startDate ? new Date(t.startDate).toISOString() : (null as string | null),
+      dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : (null as string | null),
       createdAt: now(),
     };
     tasks.push(task);

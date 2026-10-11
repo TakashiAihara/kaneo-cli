@@ -139,8 +139,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"no label \\\"bug\\\" on #1; see `kaneo label list 1`\"\n}\n",
-      "stderr": "Error: no label \"bug\" on #1; see `kaneo label list 1`\n"
+      "stdout": "{\n  \"error\": \"no label \\\"bug\\\" on #1; see `kaneo label list task-a1`\"\n}\n",
+      "stderr": "Error: no label \"bug\" on #1; see `kaneo label list task-a1`\n"
     },
     {
       "args": [

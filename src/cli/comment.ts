@@ -9,10 +9,10 @@ import { resolveTask } from "./task";
 const commentLine = (comment: Comment): string =>
   `${comment.createdAt}  ${comment.content.replaceAll("\n", "\n  ")}`;
 
-// A number is only unique within a project, and the task may have been found
-// through -p or KANEO_PROJECT, so the suggested command names the project too.
+// The suggested command names the task by id: a number is resolved through the
+// project settings of whoever pastes it, which may pick another project's task.
 const noComment = (id: string, task: Task): string =>
-  `no comment ${JSON.stringify(id)} on #${task.number}; see \`kaneo comment list ${task.number} -p ${task.projectId} --json\``;
+  `no comment ${JSON.stringify(id)} on #${task.number}; see \`kaneo comment list ${task.id} --json\``;
 
 export const commentCommand = {
   name: "comment",

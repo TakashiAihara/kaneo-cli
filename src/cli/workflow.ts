@@ -8,6 +8,7 @@ import {
 import { KaneoApiError } from "../api/http";
 import { minimumArgs, noArgs, rangeArgs, type RunContext } from "./args";
 import { resolveColumn } from "./column";
+import { withProject } from "./lookup";
 
 // The integrations Kaneo ships a plugin for, and the events those plugins look a
 // column up by: upstream's plugins/*/utils/resolve-column.ts is the file their
@@ -38,7 +39,7 @@ export const workflowCommand = {
       args: noArgs("kaneo workflow list"),
       run: async ({ app }: RunContext<App>) => {
         apiKey(app);
-        const rules = await listWorkflowRules(project(app));
+        const rules = await withProject(project(app), (id) => listWorkflowRules(id));
         for (const rule of rules) app.out.human(ruleLine(rule));
         app.out.data(rules);
       },
@@ -67,8 +68,7 @@ export const workflowCommand = {
         if (integrationType === "" || eventType === "") {
           throw new Error("an integration and an event are both needed");
         }
-        const projectId = project(app);
-        const column = await resolveColumn(projectId, args.slice(2).join(" "));
+        const [projectId, column] = await withProject(project(app), async (id) => [id, await resolveColumn(id, args.slice(2).join(" "))] as const);
         // The server's upsert looks for a rule the project already has for the
         // pair and moves its column, so setting a pair again is a move rather
         // than a second rule.
@@ -102,7 +102,7 @@ export const workflowCommand = {
         if (second !== undefined) {
           const integrationType = first!.trim();
           const eventType = second.trim();
-          const rule = await ruleFor(project(app), integrationType, eventType);
+          const rule = await withProject(project(app), (id) => ruleFor(id, integrationType, eventType));
           const deleted = await deleteWorkflowRule(rule.id);
           // The pair this branch was given, which is what named the rule; the
           // reply carries the same two words.

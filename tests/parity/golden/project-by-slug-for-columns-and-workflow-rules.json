@@ -1,0 +1,378 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "ls",
+        "-p",
+        "BET",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "to-do        To Do\nin-progress  In Progress\ndone         Done  (final)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "create",
+        "Waiting",
+        "-p",
+        "bet",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created column waiting Waiting\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "rename",
+        "waiting",
+        "Held",
+        "-p",
+        "Beta",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "renamed column waiting Held\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "reorder",
+        "to-do",
+        "in-progress",
+        "waiting",
+        "done",
+        "-p",
+        "BET",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "to-do        To Do\nin-progress  In Progress\nwaiting      Held\ndone         Done  (final)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "set",
+        "github",
+        "pr_opened",
+        "Held",
+        "-p",
+        "BET",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "github pr_opened -> waiting\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "ls",
+        "-p",
+        "BET",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "github pr_opened -> waiting  (rule0002)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "workflow",
+        "rm",
+        "github",
+        "pr_opened",
+        "-p",
+        "BET",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "deleted workflow rule github pr_opened\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "rm",
+        "waiting",
+        "--yes",
+        "-p",
+        "BET",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "deleted column waiting\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/column/bet",
+      "query": "",
+      "body": {
+        "name": "Waiting",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "POST",
+      "path": "/column/proj-beta",
+      "query": "",
+      "body": {
+        "name": "Waiting",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/Beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/column/col0010",
+      "query": "",
+      "body": {
+        "name": "Held"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/column/reorder/proj-beta",
+      "query": "",
+      "body": {
+        "columns": [
+          {
+            "id": "col0004",
+            "position": 0
+          },
+          {
+            "id": "col0005",
+            "position": 1
+          },
+          {
+            "id": "col0010",
+            "position": 2
+          },
+          {
+            "id": "col0006",
+            "position": 3
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/workflow-rule/proj-beta",
+      "query": "",
+      "body": {
+        "integrationType": "github",
+        "eventType": "pr_opened",
+        "columnId": "col0010"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/workflow-rule/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/workflow-rule/rule0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/column/col0010",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -82,6 +82,8 @@ export type Scenario = {
   // changed nothing.
   failOn?: string;
   failOnSkip?: number;
+  rateLimitTimes?: number;
+  rateLimitWaitMs?: number;
   // The fake answers a matching PUT with a 200 while storing an altered title or
   // description, so a read-back finds something the client did not send.
   misstoreOn?: string;
@@ -971,6 +973,11 @@ export const SCENARIOS: Scenario[] = [
 
   { name: "server unreachable", env: { KANEO_API_URL: "http://127.0.0.1:9" }, steps: [["whoami", "--json"], ["task", "ls"], ["board"]] },
   { name: "request timeout", delayMs: 1500, steps: [["whoami", "--json", "--timeout", "300ms"], ["task", "ls", "--timeout", "300ms"]] },
+  // A 429 is waited out, up to three times and a minute of waiting, and is
+  // reported as it came past either.
+  { name: "rate limit waited out", rateLimitTimes: 2, rateLimitWaitMs: 200, steps: [["workspace", "ls", "--human"]] },
+  { name: "rate limit longer than the budget", rateLimitTimes: 1, rateLimitWaitMs: 61000, steps: [["workspace", "ls", "--human"]] },
+  { name: "rate limit past the retries", rateLimitTimes: 5, rateLimitWaitMs: 0, steps: [["workspace", "ls", "--json"]] },
   { name: "timeout zero or negative", steps: [["whoami", "--json", "--timeout", "0"], ["whoami", "--json", "--timeout", "-1s"], ["whoami", "--timeout", "nonsense"]] },
 
   { name: "config that is not JSON", env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" }, rawConfig: "{not json", steps: [["context", "--json"], ["task", "ls"]] },

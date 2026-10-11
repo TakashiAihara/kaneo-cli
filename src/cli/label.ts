@@ -13,6 +13,7 @@ import {
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, type FlagValues } from "./args";
 import { resolveTask } from "./task";
+import { shellWord } from "../output/output";
 
 const labelLine = (label: LabelRecord): string =>
   `${label.id}  ${label.name}  (${label.color})${label.deletionStartedAt === null ? "" : `  deleting; \`kaneo label rm ${label.id} --yes\` to finish`}`;
@@ -178,7 +179,7 @@ export const labelCommand = {
         const copies = await listTaskLabels(task.id);
         const byId = copies.some((c) => c.id === ref);
         const asWorkspaceLabel = byId || app.cfg.workspaceId === "" ? undefined : (await workspaceLabels(app)).find((l) => l.id === ref);
-        const copy = pick(copies, asWorkspaceLabel?.name ?? ref, `on #${task.number}`, `kaneo label list ${task.id}`);
+        const copy = pick(copies, asWorkspaceLabel?.name ?? ref, `on #${task.number}`, `kaneo label list ${shellWord(task.id)}`);
         const removed = await detachLabel(copy.id);
         app.out.human(`unlabeled #${task.number} ${copy.name}`);
         app.out.data(removed);

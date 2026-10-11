@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { resolveMode, sanitizeControl } from "../../src/output/output";
+import { resolveMode, sanitizeControl, shellWord } from "../../src/output/output";
 
 // Ported from the Go build's internal/output/output_test.go. The Writer talks
 // to fd 1 and 2 directly, so each Writer test runs it in a child process and
@@ -221,5 +221,25 @@ describe("sanitizeControl", () => {
     ["日本語はそのまま", "日本語はそのまま"],
   ])("TestSanitizeControl(%j)", (input, want) => {
     expect(sanitizeControl(input)).toBe(want);
+  });
+});
+
+// A pasted hint must reach the shell as the one id it names.
+describe("shellWord", () => {
+  test.each([
+    ["task-b1", "task-b1"],
+    ["a b", "'a b'"],
+    ["$(rm -rf ~)", "'$(rm -rf ~)'"],
+    ["it's", `'it'\\''s'`],
+    ["", "''"],
+  ])("%p", (value, want) => {
+    expect(shellWord(value)).toBe(want);
+  });
+
+  test("round-trips through sh", () => {
+    for (const value of ["a b", "$(echo hi)", "it's", "`x`;|&"]) {
+      const out = Bun.spawnSync(["sh", "-c", `printf %s ${shellWord(value)}`]).stdout.toString();
+      expect(out).toBe(value);
+    }
   });
 });

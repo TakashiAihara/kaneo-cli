@@ -3,6 +3,7 @@ import { addComment, deleteComment, editComment, listComments, type Comment, typ
 import { exactArgs, minimumArgs, type RunContext } from "./args";
 import { readInput } from "./input";
 import { resolveTask } from "./task";
+import { shellWord } from "../output/output";
 
 // A human line for one comment. The timestamp first and the text indented
 // beneath it, so a multi-line comment reads as belonging to one moment.
@@ -12,7 +13,7 @@ const commentLine = (comment: Comment): string =>
 // The suggested command names the task by id: a number is resolved through the
 // project settings of whoever pastes it, which may pick another project's task.
 const noComment = (id: string, task: Task): string =>
-  `no comment ${JSON.stringify(id)} on #${task.number}; see \`kaneo comment list ${task.id} --json\``;
+  `no comment ${JSON.stringify(id)} on #${task.number}; see \`kaneo comment list ${shellWord(task.id)} --json\``;
 
 export const commentCommand = {
   name: "comment",

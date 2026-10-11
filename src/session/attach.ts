@@ -4,6 +4,7 @@ import { hard } from "../cli/failopen";
 import { hookEnv, runHook } from "../cli/hook";
 import { format, RUNNING, type Marker } from "./marker";
 import * as store from "./store";
+import { shellWord } from "../output/output";
 import type { Attachment } from "./store";
 
 // Recording a session as working on a task. `session attach` and
@@ -123,7 +124,7 @@ export const confirmMarker = async (
   // from one that was looked for and is not there.
   if (posted.id === "") {
     throw hard(
-      `posted the marker on #${number} but the reply carried no id to confirm it by; check kaneo comment ls ${taskId} before retrying`,
+      `posted the marker on #${number} but the reply carried no id to confirm it by; check kaneo comment ls ${shellWord(taskId)} before retrying`,
     );
   }
   let listed: Comment[];
@@ -131,13 +132,13 @@ export const confirmMarker = async (
     listed = await listComments(taskId);
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
-    const message = `posted the marker on #${number} but could not list its comments to confirm it: ${reason}; check kaneo comment ls ${taskId} before retrying`;
+    const message = `posted the marker on #${number} but could not list its comments to confirm it: ${reason}; check kaneo comment ls ${shellWord(taskId)} before retrying`;
     if (listingFailure === "hard") throw hard(message);
     throw new Error(message);
   }
   if (!listed.some((comment) => comment.id === posted.id)) {
     throw hard(
-      `posted the marker on #${number} but it is not among its comments; check kaneo comment ls ${taskId} before retrying`,
+      `posted the marker on #${number} but it is not among its comments; check kaneo comment ls ${shellWord(taskId)} before retrying`,
     );
   }
 };

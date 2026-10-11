@@ -1058,9 +1058,10 @@ export const SCENARIOS: Scenario[] = [
   { name: "project by name", steps: [["task", "ls", "-p", "Beta", "--human"]] },
   // Columns and workflow rules take the same values as tasks do.
   { name: "project by slug for columns and workflow rules", steps: [["column", "ls", "-p", "BET", "--human"], ["column", "create", "Waiting", "-p", "bet", "--human"], ["column", "rename", "waiting", "Held", "-p", "Beta", "--human"], ["column", "reorder", "to-do", "in-progress", "waiting", "done", "-p", "BET", "--human"], ["workflow", "set", "github", "pr_opened", "Held", "-p", "BET", "--human"], ["workflow", "ls", "-p", "BET", "--human"], ["workflow", "rm", "github", "pr_opened", "-p", "BET", "--human"], ["column", "rm", "waiting", "--yes", "-p", "BET", "--human"], ["column", "rm", "to-do", "--yes", "-p", "BET", "--json"], ["column", "ls", "-p", "nope", "--json"], ["column", "create", "Waiting", "-p", "nope", "--json"], ["workflow", "ls", "-p", "nope", "--json"], ["workflow", "set", "github", "pr_opened", "done", "-p", "nope", "--json"]] },
-  // A task outside the configured project: the hint names it by id, and the
-  // command it suggests, pasted as is, lists that task's comments.
-  { name: "comment delete hint outside the configured project", steps: [["comment", "delete", "BET#1", "nope", "--json"], ["comment", "list", "task-b1", "--json"]] },
+  // With no project configured, a hint naming the task by number would not
+  // resolve at all; it names the task by id, and that command, as printed in
+  // step 1, lists the task's comments with no project.
+  { name: "comment delete hint with no project configured", env: { KANEO_PROJECT: "", KANEO_WORKSPACE: "" }, steps: [["comment", "delete", "BET#1", "nope", "--json"], ["comment", "list", "task-b1", "--json"]] },
   { name: "project not found", steps: [["task", "ls", "-p", "nope", "--json"]] },
   { name: "task reference with a slug", steps: [["task", "get", "BET#1", "--json"], ["comment", "add", "ALP#2", "hi", "--human"]] },
   {

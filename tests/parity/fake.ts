@@ -208,8 +208,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       description: t.description ?? null,
       status: t.status ?? firstColumn,
       priority: t.priority ?? "no-priority",
-      startDate: null as string | null,
-      dueDate: null as string | null,
+      // Stored as the instants they parse to, as create-task's route does.
+      startDate: t.startDate ? new Date(t.startDate).toISOString() : (null as string | null),
+      dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : (null as string | null),
       createdAt: now(),
     };
     tasks.push(task);
@@ -852,6 +853,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "POST" && (p = m(/^\/task\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       if (!proj) return failText(400, "Workspace ID could not be determined");
+      // A date that does not parse is refused rather than stored, as the due date
+      // route does.
+      for (const field of ["startDate", "dueDate"]) {
+        const given = (body as any)?.[field];
+        if (!given) continue;
+        const at = parsedDate(given, field);
+        if (typeof at !== "string") return at;
+      }
       return ok(M.Task, addTask(proj.id, body as any));
     }
     if ((p = m(/^\/task\/(status|priority|assignee|move|title|description)\/([^/]+)$/)) && req.method === "PUT") {

@@ -1,0 +1,150 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "create",
+        "Planned",
+        "--start-date",
+        "2026-01-01",
+        "--due-date",
+        "2026-01-01T12:00:00Z",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task0002\",\n  \"number\": 4,\n  \"title\": \"Planned\",\n  \"description\": \"\",\n  \"status\": \"to-do\",\n  \"priority\": \"medium\",\n  \"position\": 3,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": \"2026-01-01T00:00:00.000Z\",\n  \"dueDate\": \"2026-01-01T12:00:00.000Z\",\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"labels\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "4",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#4  Planned\nstatus    to-do\npriority  medium\nstart     2026-01-01T00:00:00.000Z\ndue       2026-01-01T12:00:00.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "Late",
+        "--start-date",
+        "2026-01-01T13:00:00+00:00",
+        "--due-date",
+        "2026-01-01T12:00:00Z",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--start-date 2026-01-01T13:00:00.000Z is after --due-date 2026-01-01T12:00:00.000Z\"\n}\n",
+      "stderr": "Error: --start-date 2026-01-01T13:00:00.000Z is after --due-date 2026-01-01T12:00:00.000Z\n"
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "Vague",
+        "--start-date",
+        "next week",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--start-date \\\"next week\\\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\"\n}\n",
+      "stderr": "Error: --start-date \"next week\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\n"
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "Someday",
+        "--due-date",
+        "someday",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--due-date \\\"someday\\\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\"\n}\n",
+      "stderr": "Error: --due-date \"someday\" is not a date (2026-10-31) or a date and time with an offset (2026-10-31T09:00+09:00)\n"
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "Same day",
+        "--start-date",
+        "2026-01-01T12:00:00Z",
+        "--due-date",
+        "2026-01-01T12:00:00Z",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created #5 Same day\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1    [high       ] to-do         Write the parser\n#4    [medium     ] to-do         Planned\n#5    [medium     ] to-do         Same day\n#2    [no-priority] in-progress   Ship it\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
+      "query": "",
+      "body": {
+        "title": "Planned",
+        "description": "",
+        "startDate": "2026-01-01T00:00:00.000Z",
+        "dueDate": "2026-01-01T12:00:00.000Z",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
+      "query": "",
+      "body": {
+        "title": "Same day",
+        "description": "",
+        "startDate": "2026-01-01T12:00:00.000Z",
+        "dueDate": "2026-01-01T12:00:00.000Z",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

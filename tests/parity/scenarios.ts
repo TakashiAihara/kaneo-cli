@@ -334,6 +334,20 @@ export const SCENARIOS: Scenario[] = [
   { name: "task create", steps: [["task", "create", "New one", "-d", "body", "--priority", "low", "--json"], ["task", "ls", "--human"]] },
   { name: "task create assigned", steps: [["task", "create", "Mine", "--assignee", "user-1", "--status", "in-progress", "--human"], ["task", "get", "4", "--json"]] },
   { name: "task create bad priority", steps: [["task", "create", "x", "--priority", "huge", "--json"]] },
+  // Taken as task update takes it, and refused before the create when it is not
+  // a date or comes after the due date.
+  {
+    name: "task create with a start date",
+    steps: [
+      ["task", "create", "Planned", "--start-date", "2026-01-01", "--due-date", "2026-01-01T12:00:00Z", "--json"],
+      ["task", "get", "4", "--human"],
+      ["task", "create", "Late", "--start-date", "2026-01-01T13:00:00+00:00", "--due-date", "2026-01-01T12:00:00Z", "--json"],
+      ["task", "create", "Vague", "--start-date", "next week", "--json"],
+      ["task", "create", "Someday", "--due-date", "someday", "--json"],
+      ["task", "create", "Same day", "--start-date", "2026-01-01T12:00:00Z", "--due-date", "2026-01-01T12:00:00Z", "--human"],
+      ["task", "ls", "--human"],
+    ],
+  },
   { name: "task update title and description", steps: [["task", "update", "1", "--title", "Renamed", "-d", "new body", "--json"], ["task", "get", "1", "--human"]] },
   { name: "task update status and priority", steps: [["task", "edit", "2", "--status", "done", "--priority", "low", "--human"], ["task", "ls", "--all", "--json"]] },
   { name: "task update clears the description", steps: [["task", "update", "1", "-d", "", "--json"]] },

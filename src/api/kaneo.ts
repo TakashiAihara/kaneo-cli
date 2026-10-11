@@ -1082,6 +1082,8 @@ export type NewTask = {
   description: string;
   priority: string;
   status: string;
+  // An ISO instant, or "" for none.
+  startDate: string;
   dueDate: string;
   assigneeId: string;
 };
@@ -1097,6 +1099,7 @@ export const createTask = async (projectId: string, wanted: NewTask): Promise<Ta
     await postTask(pathParam(projectId), {
       title: wanted.title,
       description: wanted.description,
+      ...(wanted.startDate === "" ? {} : { startDate: wanted.startDate }),
       ...(wanted.dueDate === "" ? {} : { dueDate: wanted.dueDate }),
       priority: unchecked<CreateTaskBody["priority"]>(wanted.priority === "" ? "medium" : wanted.priority),
       status: wanted.status === "" ? "to-do" : wanted.status,

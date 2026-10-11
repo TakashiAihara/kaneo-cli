@@ -90,3 +90,27 @@ export const requestDrift = (
   const key = (d: Drift) => `${d.id} ${d.field}`;
   return drift.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 };
+
+// An operation a server's document offers, where it is served and the first tag
+// the document gives it ("" when it has none).
+export type ServerOperation = { id: string; method: string; path: string; tag: string };
+
+const HTTP_METHODS = new Set(["get", "put", "post", "delete", "options", "head", "patch", "trace"]);
+
+// Every operation in a document, by id. Only the HTTP methods of a path item are
+// operations; its parameters, summary and extensions are not. An id the
+// document repeats is listed once, where it first appears.
+export const serverOperations = (doc: Node): ServerOperation[] => {
+  const seen = new Set<string>();
+  const found: ServerOperation[] = [];
+  for (const [path, item] of Object.entries((doc.paths ?? {}) as Node)) {
+    for (const [method, operation] of Object.entries((item ?? {}) as Node)) {
+      const id = operation?.operationId;
+      if (!HTTP_METHODS.has(method) || typeof id !== "string" || id === "" || seen.has(id)) continue;
+      seen.add(id);
+      const tags = Array.isArray(operation.tags) ? operation.tags : [];
+      found.push({ id, method: method.toUpperCase(), path, tag: typeof tags[0] === "string" ? tags[0] : "" });
+    }
+  }
+  return found.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+};

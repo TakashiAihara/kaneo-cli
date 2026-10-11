@@ -52,7 +52,7 @@ const columnReply = `{"id":"c1","projectId":"p1","name":"Waiting","slug":"waitin
 const ruleRow = (extra = "") =>
   `{"id":"rule1","projectId":"p1","integrationType":"github","eventType":"pr_opened","columnId":"c1","createdAt":"${TIME}","updatedAt":"${TIME}"${extra}}`;
 
-const emptyNewTask: api.NewTask = { title: "", description: "", priority: "", status: "", dueDate: "", assigneeId: "" };
+const emptyNewTask: api.NewTask = { title: "", description: "", priority: "", status: "", startDate: "", dueDate: "", assigneeId: "" };
 const newTask = (t: Partial<api.NewTask>): api.NewTask => ({ ...emptyNewTask, ...t });
 
 // The server's move route reads destinationProjectId. Sending anything else is

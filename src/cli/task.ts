@@ -150,6 +150,12 @@ export const taskCommand = {
           usage: "column slug to create the task in (default to-do)",
           defaultValue: "",
         },
+        {
+          name: "start-date",
+          type: "string" as const,
+          usage: "start date: a date, or a date and time with an offset",
+          defaultValue: "",
+        },
         { name: "due-date", type: "string" as const, usage: "due date", defaultValue: "" },
         { name: "assignee", type: "string" as const, usage: "user id to assign", defaultValue: "" },
         {
@@ -178,9 +184,14 @@ export const taskCommand = {
           description: await descriptionOf(flags, changed),
           priority: String(flags.priority ?? ""),
           status: String(flags.status ?? ""),
+          startDate: String(flags["start-date"] ?? "") === "" ? "" : instant(String(flags["start-date"]), "--start-date"),
           dueDate: String(flags["due-date"] ?? ""),
           assigneeId: String(flags.assignee ?? ""),
         };
+        // As task update refuses it, before anything is written.
+        if (wanted.startDate !== "" && wanted.dueDate !== "" && Date.parse(wanted.startDate) > Date.parse(wanted.dueDate)) {
+          throw new Error(`--start-date ${wanted.startDate} is after --due-date ${wanted.dueDate}`);
+        }
         const attach = flags.attach === true;
         // As typed, the way `session attach` takes its step: the same act has to
         // record the same text whichever command was reached for it.

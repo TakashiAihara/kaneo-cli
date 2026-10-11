@@ -7,7 +7,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: the API key was accepted, but this server has no /user/me to say whose it is (Kaneo before v2.29.2): GET /api/user/me: 404: no route: GET /user/me\n"
+      "stderr": "Error: the API key was accepted, but this server has no /user/me to say whose it is (Kaneo before v2.28.0): GET /api/user/me: 404: no route: GET /user/me\n"
     }
   ],
   "requests": [

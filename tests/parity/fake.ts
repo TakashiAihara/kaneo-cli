@@ -87,7 +87,7 @@ export type FakeOptions = {
   // Answers a request whose "METHOD path" matches with a 500, having changed
   // nothing, for a write that is refused or a read that fails.
   failOn?: string;
-  // A server older than v2.29.2, which has no /user/me.
+  // A server older than v2.28.0, which has no /user/me.
   noCurrentUser?: boolean;
   // How many matching requests are answered as usual before failOn starts, so
   // a scenario can set something up through the route it then breaks.

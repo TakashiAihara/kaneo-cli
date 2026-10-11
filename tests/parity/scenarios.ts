@@ -84,6 +84,7 @@ export type Scenario = {
   failOnSkip?: number;
   rateLimitTimes?: number;
   rateLimitWaitMs?: number;
+  rateLimitCode?: string;
   // The fake answers a matching PUT with a 200 while storing an altered title or
   // description, so a read-back finds something the client did not send.
   misstoreOn?: string;
@@ -978,6 +979,19 @@ export const SCENARIOS: Scenario[] = [
   { name: "rate limit waited out", rateLimitTimes: 2, rateLimitWaitMs: 200, steps: [["workspace", "ls", "--human"]] },
   { name: "rate limit longer than the budget", rateLimitTimes: 1, rateLimitWaitMs: 61000, steps: [["workspace", "ls", "--human"]] },
   { name: "rate limit past the retries", rateLimitTimes: 5, rateLimitWaitMs: 0, steps: [["workspace", "ls", "--json"]] },
+  // Each attempt gets a --timeout of its own: two 200 ms waits pass a 300 ms one.
+  { name: "rate limit waits outlast one timeout", rateLimitTimes: 2, rateLimitWaitMs: 200, steps: [["workspace", "ls", "--human", "--timeout", "300ms"]] },
+  // Only the limiter's own answer is waited for.
+  { name: "a 429 that is not the rate limiter", rateLimitTimes: 1, rateLimitWaitMs: 0, rateLimitCode: "IMPORT_RUNNING", steps: [["workspace", "ls", "--human"]] },
+  // A fail-open command run from a hook does not sit a rate limit out, and says
+  // nothing; --strict does wait.
+  {
+    name: "rate limit in a fail-open command",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    rateLimitTimes: 1,
+    rateLimitWaitMs: 0,
+    steps: [["session", "attach", "1"], ["session", "status", "--json"]],
+  },
   { name: "timeout zero or negative", steps: [["whoami", "--json", "--timeout", "0"], ["whoami", "--json", "--timeout", "-1s"], ["whoami", "--timeout", "nonsense"]] },
 
   { name: "config that is not JSON", env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" }, rawConfig: "{not json", steps: [["context", "--json"], ["task", "ls"]] },

@@ -4,7 +4,9 @@
       "args": [
         "workspace",
         "ls",
-        "--human"
+        "--human",
+        "--timeout",
+        "300ms"
       ],
       "exit": 0,
       "stdout": "ws-main   Main\nws-other  Other\n",

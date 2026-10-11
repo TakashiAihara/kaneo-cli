@@ -1,4 +1,5 @@
 import { debug } from "./app";
+import { setRateLimitWaits } from "../api/http";
 import type { Flag, RunContext } from "./args";
 import { JqFailure } from "../output/jq";
 
@@ -25,6 +26,9 @@ export const hard = (message: string): Error => new HardError(message);
 export const failOpen =
   <A>(run: (ctx: RunContext<A>) => Promise<void>) =>
   async (ctx: RunContext<A>): Promise<void> => {
+    // A hook waits on these, so a rate limit is a failure here, not a minute's
+    // pause with a line on stderr; --strict asks to sit it out like any command.
+    setRateLimitWaits(ctx.flags.strict === true);
     try {
       await run(ctx);
     } catch (e) {

@@ -94,6 +94,8 @@ export type FakeOptions = {
   // caller to come back after rateLimitWaitMs.
   rateLimitTimes?: number;
   rateLimitWaitMs?: number;
+  // The code the 429 carries, RATE_LIMITED unless a scenario wants another.
+  rateLimitCode?: string;
   // Answers a matching PUT with the ordinary 200 while storing its title or
   // description with " (altered)" appended, so a client that reads the task
   // back finds something other than what it sent.
@@ -482,7 +484,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "GET" && path === "/auth/organization/list" && limited < (opts.rateLimitTimes ?? 0)) {
       limited++;
       return Response.json(
-        { message: "Rate limit exceeded.", code: "RATE_LIMITED", details: { tryAgainIn: opts.rateLimitWaitMs ?? 0 } },
+        { message: "Rate limit exceeded.", code: opts.rateLimitCode ?? "RATE_LIMITED", details: { tryAgainIn: opts.rateLimitWaitMs ?? 0 } },
         { status: 429 },
       );
     }

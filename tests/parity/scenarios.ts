@@ -135,6 +135,7 @@ export const SCENARIOS: Scenario[] = [
           { id: "ws-obj", name: "Object", slug: "obj", description: null, metadata: { description: "Parsed already" } },
           { id: "ws-both", name: "Both", slug: "both", description: "Column wins", metadata: '{"description":"Metadata loses"}' },
           { id: "ws-plain", name: "Plain", slug: "plain", description: null, metadata: null },
+          { id: "ws-bad", name: "Bad\tmeta", slug: "bad", description: null, metadata: "{bad" },
         ],
       },
     }),

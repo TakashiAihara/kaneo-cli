@@ -259,6 +259,8 @@ The `session` commands are **fail-open**, `session status` excepted: it makes no
 
 A failure that already changed something elsewhere is reported regardless — `session attach` that wrote the comment but could not record it locally, for instance. Staying quiet there would leave `session next` believing nothing is attached.
 
+`session close` on a held task the server can no longer place (deleted, or out of the key's reach) releases the attachment anyway, runs the close hook, and exits 1 saying that no close marker was written. Any other failure of the marker keeps the attachment, so the close can be run again.
+
 Each of attach, next and close posts its marker and then confirms the server kept it, since a marker nobody can read would leave `session next` posting onto a board this session is not on. A marker the server took and did not keep is reported, naming `kaneo comment ls <task>` to look at before retrying — a blind retry posts a second marker. `session close` confirms last, after the attachment is cleared and the history written, so a close whose marker was lost is posted again with `session close --task <N>`; a listing that cannot be read is fail-open for next and close and fails attach.
 
 #### Hooks

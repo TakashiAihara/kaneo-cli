@@ -29,8 +29,8 @@
         "close"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"released #1 here, but the server no longer has its task, so no close marker was written\"\n}\n",
-      "stderr": "Error: released #1 here, but the server no longer has its task, so no close marker was written\n"
+      "stdout": "{\n  \"error\": \"released ALP#1 Write the parser here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written\"\n}\n",
+      "stderr": "Error: released ALP#1 Write the parser here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written\n"
     },
     {
       "args": [

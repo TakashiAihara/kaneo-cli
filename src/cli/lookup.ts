@@ -103,9 +103,12 @@ const NO_PLACE = "Workspace ID could not be determined";
 // A 403 is a different answer — the key cannot reach the project — and a lookup
 // would not change that.
 const unknownProject = (e: unknown): e is KaneoApiError =>
-  e instanceof KaneoApiError &&
-  ((e.statusCode === 400 && e.messages.includes(NO_PLACE)) ||
-    (e.statusCode === 404 && e.messages.includes("Project not found")));
+  placesNothing(e) || (e instanceof KaneoApiError && e.statusCode === 404 && e.messages.includes("Project not found"));
+
+// Whether the server could not place the id in the path in any workspace: it
+// does not exist, or not in one the key reaches.
+export const placesNothing = (e: unknown): e is KaneoApiError =>
+  e instanceof KaneoApiError && e.statusCode === 400 && e.messages.includes(NO_PLACE);
 
 // The projects a value names, by id, then by slug, then by name. An id is a
 // case-sensitive key; a slug or a name is tried exactly before ignoring case.

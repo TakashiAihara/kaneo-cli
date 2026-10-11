@@ -7,7 +7,7 @@ import { CLOSED, RUNNING } from "../session/marker";
 import * as store from "../session/store";
 import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
-import { KaneoApiError } from "../api/http";
+import { placesNothing } from "./lookup";
 
 const requireSessionId = (): string => {
   const id = store.currentId(env);
@@ -112,7 +112,10 @@ export const sessionCommand = {
         // A named task is allowed with no attachment: a session that attached,
         // re-attached elsewhere and now wants the first one released is the case
         // --task is for, so the attachment is not the gate.
-        const task = named === "" ? undefined : await resolveTask(app, named);
+        // The held task named the way the attachment knows it is taken as held
+        // without a lookup, which a task the server no longer has would fail.
+        const namesHeld = attached !== undefined && (named === attached.taskId || named === ref(attached.projectSlug, attached.number));
+        const task = named === "" || namesHeld ? undefined : await resolveTask(app, named);
         // What the marker is written against and what the attachment holds can
         // differ once one of several tasks is named, so the attachment is only
         // dropped for the task it actually names.
@@ -123,12 +126,14 @@ export const sessionCommand = {
 
         const marker = store.describe(env, cwd(), CLOSED);
         marker.nextStep = `Session ended. Resume with \`claude --resume ${sessionId}\`.`;
-        // A held task the server no longer places (deleted, or its project moved
-        // to another workspace) can never take the marker, so the attachment is
-        // released here anyway; otherwise the session would stay attached to it
-        // with no way out but editing the file.
+        // A held task the server can no longer place (deleted, or not in any
+        // workspace the key reaches) can never take the marker, so the
+        // attachment is released anyway rather than left for every later close
+        // to fail on. The marker is then never written, even if the task comes
+        // back. A task named but not held is not released: there is nothing of
+        // it here to release.
         const posted = await postMarker(closed.taskId, marker).catch((e: unknown) => {
-          if (holds && taskGone(e)) return undefined;
+          if (holds && placesNothing(e)) return undefined;
           throw e;
         });
         // A task closed by name that the attachment does not hold has no board on
@@ -161,8 +166,12 @@ export const sessionCommand = {
         // running while this machine says closed; `session close --task <N>`
         // posts it again. Held back the other way, a close whose marker was lost
         // would leave the session attached to a task it has left.
+        // After the hook: the session has let go of the task, which is what the
+        // hook follows. The exit is still 1, since the board was not told.
         if (posted === undefined) {
-          throw hard(`released #${closed.number} here, but the server no longer has its task, so no close marker was written`);
+          throw hard(
+            `released ${ref(closed.projectSlug, closed.number)} ${closed.title} here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written`,
+          );
         }
         await confirmMarker(closed.taskId, closed.number, posted, "fail-open");
 
@@ -228,9 +237,3 @@ const targetTask = async (app: App, ref: string): Promise<{ taskId: string; numb
   }
   return { taskId: attached.taskId, number: attached.number };
 };
-// The replies to a task the server no longer places: its workspace middleware
-// cannot find one for it, or the controller cannot find the task.
-const taskGone = (e: unknown): boolean =>
-  e instanceof KaneoApiError &&
-  ((e.statusCode === 400 && e.messages.includes("Workspace ID could not be determined")) ||
-    (e.statusCode === 404 && e.messages.includes("Task not found")));

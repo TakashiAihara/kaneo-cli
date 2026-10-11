@@ -81,6 +81,7 @@ export type Scenario = {
   // The fake answers matching "METHOD path" requests with a 500, having
   // changed nothing.
   failOn?: string;
+  failOnSkip?: number;
   // The fake answers a matching PUT with a 200 while storing an altered title or
   // description, so a read-back finds something the client did not send.
   misstoreOn?: string;
@@ -856,6 +857,30 @@ export const SCENARIOS: Scenario[] = [
     name: "session close releases a task the server no longer has",
     env: { KANEO_SESSION_ID: "sess-test" },
     steps: [["session", "attach", "1", "--strict"], ["task", "rm", "1", "--yes", "--json"], ["session", "close"], ["session", "status", "--json"]],
+  },
+  // Named the way the attachment knows it, a gone task is still released: by
+  // id, then as session status prints it.
+  {
+    name: "session close --task releases a held task the server no longer has",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["task", "rm", "1", "--yes", "--json"],
+      ["session", "close", "--task", "task-a1"],
+      ["session", "attach", "2", "--strict"],
+      ["task", "rm", "2", "--yes", "--json"],
+      ["session", "close", "--task", "ALP#2", "--json"],
+      ["session", "status", "--json"],
+    ],
+  },
+  // Any other failure of the marker keeps the attachment, so the close can be
+  // run again once the server answers.
+  {
+    name: "session close keeps the attachment when the marker post fails",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    failOn: "^POST /comment/task-a1$",
+    failOnSkip: 1,
+    steps: [["session", "attach", "1", "--strict"], ["session", "close"], ["session", "status", "--json"]],
   },
   {
     name: "session status without a session id",

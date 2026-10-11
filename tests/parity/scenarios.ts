@@ -81,6 +81,9 @@ export type Scenario = {
   // The fake answers matching "METHOD path" requests with a 500, having
   // changed nothing.
   failOn?: string;
+  // The key's user is a plain member, refused the project update and delete
+  // permissions.
+  plainMember?: boolean;
   // The fake answers a matching PUT with a 200 while storing an altered title or
   // description, so a read-back finds something the client did not send.
   misstoreOn?: string;
@@ -148,6 +151,8 @@ export const SCENARIOS: Scenario[] = [
     seed: { projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }] },
     steps: [["project", "update", "proj-noslug", "--name", "Has a name now", "--json"]],
   },
+  // A plain member is refused with a bare 403, and the line says what it needs.
+  { name: "project archive and rm as a plain member", plainMember: true, steps: [["project", "archive", P2, "--json"], ["project", "unarchive", P2, "--human"], ["project", "rm", P2, "--yes", "--human"], ["project", "get", P2, "--json"]] },
   { name: "project archive and unarchive", steps: [["project", "archive", P2, "--json"], ["project", "ls", "--human"], ["project", "unarchive", P2, "--human"], ["project", "ls", "--json"]] },
   { name: "project rm needs --yes", steps: [["project", "rm", P2, "--human"], ["project", "rm", "Beta", "--yes", "--json"], ["project", "ls", "--human"], ["project", "ls", "--archived", "--human"], ["task", "ls", "-p", P2, "--json"], ["project", "rm", "OLD", "--yes", "--human"]] },
   { name: "project rm unknown", steps: [["project", "rm", "nope", "--yes", "--json"]] },

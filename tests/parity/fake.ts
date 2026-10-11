@@ -87,6 +87,10 @@ export type FakeOptions = {
   // Answers a request whose "METHOD path" matches with a 500, having changed
   // nothing, for a write that is refused or a read that fails.
   failOn?: string;
+  // The key's user is a plain member of every workspace, so routes that need
+  // the project update or delete permission answer as Kaneo 2.32.0's
+  // requireWorkspacePermission does.
+  plainMember?: boolean;
   // Answers a matching PUT with the ordinary 200 while storing its title or
   // description with " (altered)" appended, so a client that reads the task
   // back finds something other than what it sent.
@@ -615,6 +619,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         Object.assign(proj, body);
         return ok(M.Project, proj);
       }
+      if (opts.plainMember && (p[3] !== undefined || req.method === "DELETE")) return failText(403, "Insufficient permissions");
       if (req.method === "PUT" && p[3] === "archive") return ok(M.Project, Object.assign(proj, { archivedAt: now() }));
       if (req.method === "PUT" && p[3] === "unarchive") return ok(M.Project, Object.assign(proj, { archivedAt: null }));
       // Everything in the project goes with it, as the database's cascades do.

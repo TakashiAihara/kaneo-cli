@@ -13,6 +13,7 @@ import {
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
 import { allProjects, firstMatch, resolveWorkspace, withProject, type ProjectIn } from "./lookup";
+import { KaneoApiError } from "../api/http";
 
 // `archive` and `unarchive` are the same request with the opposite verb, so they
 // are built from one place rather than written out twice.
@@ -33,7 +34,7 @@ const archiveCommand = (verb: "archive" | "unarchive") => {
       apiKey(app);
       const id = args[0] ?? project(app);
       const projectId = await withProject(id, async (projectId) => {
-        await setProjectArchived(projectId, archived);
+        await setProjectArchived(projectId, archived).catch(needsPermission(`${verb === "archive" ? "archiving" : "unarchiving"} a project`, "update"));
         return projectId;
       });
       app.out.human(`${archived ? "archived" : "unarchived"} ${id}`);
@@ -41,6 +42,20 @@ const archiveCommand = (verb: "archive" | "unarchive") => {
     },
   };
 };
+
+// Turns the server's bare 403 into what it means. The key carries no user, so
+// the caller's own role cannot be looked up; the line says which permission the
+// route checks and where the roles are listed.
+const needsPermission =
+  (doing: string, permission: "update" | "delete") =>
+  (e: unknown): never => {
+    if (e instanceof KaneoApiError && e.statusCode === 403 && e.messages.includes("Insufficient permissions")) {
+      throw new Error(
+        `${e.message}: ${doing} needs the project ${permission} permission in its workspace, which the owner and admin roles have by default; kaneo workspace members lists each member's role`,
+      );
+    }
+    throw e;
+  };
 
 // One project, named the way a listing prints it.
 //
@@ -320,7 +335,7 @@ export const projectCommand = {
             `refusing to delete project ${found.name} [${found.slug}] (${found.id}) without --yes; kaneo project archive ${found.id} keeps it`,
           );
         }
-        const deleted = await deleteProject(found.id);
+        const deleted = await deleteProject(found.id).catch(needsPermission("deleting a project", "delete"));
         // Named as it was read, since that is the project the confirmation spoke
         // for; the reply is the server's own record of what it removed, and that
         // is what the report carries.

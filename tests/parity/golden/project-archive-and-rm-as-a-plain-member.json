@@ -1,0 +1,79 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "archive",
+        "proj-beta",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/project/proj-beta/archive: 403: Insufficient permissions: archiving a project needs the project update permission in its workspace, which the owner and admin roles have by default; kaneo workspace members lists each member's role\"\n}\n",
+      "stderr": "Error: PUT /api/project/proj-beta/archive: 403: Insufficient permissions: archiving a project needs the project update permission in its workspace, which the owner and admin roles have by default; kaneo workspace members lists each member's role\n"
+    },
+    {
+      "args": [
+        "project",
+        "unarchive",
+        "proj-beta",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/project/proj-beta/unarchive: 403: Insufficient permissions: unarchiving a project needs the project update permission in its workspace, which the owner and admin roles have by default; kaneo workspace members lists each member's role\n"
+    },
+    {
+      "args": [
+        "project",
+        "rm",
+        "proj-beta",
+        "--yes",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: DELETE /api/project/proj-beta: 403: Insufficient permissions: deleting a project needs the project delete permission in its workspace, which the owner and admin roles have by default; kaneo workspace members lists each member's role\n"
+    },
+    {
+      "args": [
+        "project",
+        "get",
+        "proj-beta",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"proj-beta\",\n  \"name\": \"Beta\",\n  \"slug\": \"BET\",\n  \"icon\": \"Layout\",\n  \"description\": \"\",\n  \"workspaceId\": \"ws-main\",\n  \"isPublic\": false,\n  \"archivedAt\": null\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/project/proj-beta/archive",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-beta/unarchive",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

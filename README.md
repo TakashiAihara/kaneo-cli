@@ -140,7 +140,7 @@ export KANEO_API_KEY=...   # Settings -> Account -> Developer
 
 ```bash
 kaneo context                       # what did the settings resolve to, and from where
-kaneo whoami                        # is the key accepted, and what can it reach
+kaneo whoami                        # is the key accepted, whose is it, and what can it reach
 kaneo workspace ls
 kaneo workspace rename <workspace-id> <name>   # name only; slug and description unchanged
 kaneo workspace members         # the resolved workspace's members and their roles

@@ -84,6 +84,7 @@
     "query.limit": false
   },
   "getColumns": {},
+  "getCurrentUser": {},
   "getExternalLinksByTask": {},
   "getInvitationDetails": {},
   "getLabel": {},

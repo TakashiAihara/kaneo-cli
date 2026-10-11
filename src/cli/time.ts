@@ -137,10 +137,9 @@ export const timeCommand = {
         "everybody's, and the server lets anyone who can edit the task stop any of\n" +
         "them; `kaneo time ls <task>` shows whose each one is.",
       args: exactArgs(1),
-      // By task would be handier, but picking the caller's own timer needs the
-      // caller's user id. v2.29.2 has /user/me for that, the deployed server
-      // (checked 2026-10-04) does not, and get-active-member answers 400 for
-      // an API key.
+      // By task would be handier: the caller's own timer can be picked by the
+      // user id /user/me answers (currentUser in src/api/kaneo.ts), which this
+      // command does not use yet. get-active-member answers 400 for an API key.
       run: async ({ args, app }: RunContext<App>) => {
         const now = new Date().toISOString();
         apiKey(app);

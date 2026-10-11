@@ -1,0 +1,26 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: the API key was accepted, but this server has no /user/me to say whose it is (Kaneo before v2.29.2): GET /api/user/me: 404: no route: GET /user/me\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

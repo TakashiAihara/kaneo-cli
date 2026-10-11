@@ -10,7 +10,7 @@
         "test-key"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>/api\",\n  \"workspaces\": [\n    {\n      \"id\": \"ws-main\",\n      \"name\": \"Main\",\n      \"slug\": \"main\",\n      \"description\": \"\"\n    },\n    {\n      \"id\": \"ws-other\",\n      \"name\": \"Other\",\n      \"slug\": \"other\",\n      \"description\": \"\"\n    }\n  ]\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>/api\",\n  \"user\": {\n    \"id\": \"user-self\",\n    \"name\": \"Self\",\n    \"email\": \"self@example.com\"\n  },\n  \"workspaces\": [\n    {\n      \"id\": \"ws-main\",\n      \"name\": \"Main\",\n      \"slug\": \"main\",\n      \"description\": \"\"\n    },\n    {\n      \"id\": \"ws-other\",\n      \"name\": \"Other\",\n      \"slug\": \"other\",\n      \"description\": \"\"\n    }\n  ]\n}\n",
       "stderr": ""
     },
     {
@@ -29,6 +29,11 @@
     {
       "method": "GET",
       "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
       "query": ""
     }
   ],

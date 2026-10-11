@@ -9,6 +9,7 @@ import {
 } from "../api/kaneo";
 import { KaneoApiError } from "../api/http";
 import { exactArgs, minimumArgs, noArgs, type FlagValues } from "./args";
+import { withProject } from "./lookup";
 
 // The columns of the resolved project, and the changes to them.
 export const columnCommand = {
@@ -23,7 +24,7 @@ export const columnCommand = {
       args: noArgs("kaneo column list"),
       run: async ({ app }: { app: App }) => {
         apiKey(app);
-        const columns = await listColumns(project(app));
+        const columns = await withProject(project(app), (id) => listColumns(id));
         printColumns(app, columns);
         app.out.data(columns);
       },
@@ -51,12 +52,13 @@ export const columnCommand = {
       ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const created = await createColumn(project(app), {
+        const column = {
           name: newName(args),
           icon: String(flags.icon ?? ""),
           color: String(flags.color ?? ""),
           isFinal: flags.final === true,
-        });
+        };
+        const created = await withProject(project(app), (id) => createColumn(id, column));
         app.out.human(`created column ${created.slug} ${created.name}`);
         app.out.data(created);
       },
@@ -72,7 +74,7 @@ export const columnCommand = {
       args: minimumArgs(2),
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
-        const found = await resolveColumn(project(app), args[0]!);
+        const found = await withProject(project(app), (id) => resolveColumn(id, args[0]!));
         const renamed = await renameColumn(found.id, newName(args.slice(1)));
         app.out.human(`renamed column ${renamed.slug} ${renamed.name}`);
         app.out.data(renamed);
@@ -90,8 +92,11 @@ export const columnCommand = {
       args: minimumArgs(1),
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
-        const projectId = project(app);
-        const order = newOrder(await listColumns(projectId), args);
+        const { projectId, current } = await withProject(project(app), async (projectId) => ({
+          projectId,
+          current: await listColumns(projectId),
+        }));
+        const order = newOrder(current, args);
         const columns = await reorderColumns(
           projectId,
           order.map((column) => column.id),
@@ -114,8 +119,10 @@ export const columnCommand = {
       flags: [{ name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" }],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const projectId = project(app);
-        const found = await resolveColumn(projectId, args[0]!);
+        const { projectId, found } = await withProject(project(app), async (projectId) => ({
+          projectId,
+          found: await resolveColumn(projectId, args[0]!),
+        }));
         // Only an empty column can go, but its id and place on the board do not
         // come back: a column created again under the same name gets a new id
         // and the last position.

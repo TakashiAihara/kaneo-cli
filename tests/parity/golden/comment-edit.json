@@ -9,8 +9,8 @@
         "x"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"no comment \\\"cmt0001\\\" on #2; see `kaneo comment list 2 --json`\"\n}\n",
-      "stderr": "Error: no comment \"cmt0001\" on #2; see `kaneo comment list 2 --json`\n"
+      "stdout": "{\n  \"error\": \"no comment \\\"cmt0001\\\" on #2; see `kaneo comment list 2 -p proj-alpha --json`\"\n}\n",
+      "stderr": "Error: no comment \"cmt0001\" on #2; see `kaneo comment list 2 -p proj-alpha --json`\n"
     },
     {
       "args": [
@@ -21,8 +21,8 @@
         "x"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"no comment \\\"nope\\\" on #1; see `kaneo comment list 1 --json`\"\n}\n",
-      "stderr": "Error: no comment \"nope\" on #1; see `kaneo comment list 1 --json`\n"
+      "stdout": "{\n  \"error\": \"no comment \\\"nope\\\" on #1; see `kaneo comment list 1 -p proj-alpha --json`\"\n}\n",
+      "stderr": "Error: no comment \"nope\" on #1; see `kaneo comment list 1 -p proj-alpha --json`\n"
     },
     {
       "args": [

@@ -87,6 +87,8 @@ export type FakeOptions = {
   // Answers a request whose "METHOD path" matches with a 500, having changed
   // nothing, for a write that is refused or a read that fails.
   failOn?: string;
+  // A server older than v2.29.2, which has no /user/me.
+  noCurrentUser?: boolean;
   // How many matching requests are answered as usual before failOn starts, so
   // a scenario can set something up through the route it then breaks.
   failOnSkip?: number;
@@ -473,6 +475,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (Object.keys(doc.paths["/task/{projectId}"]).length === 0) delete doc.paths["/task/{projectId}"];
       }
       return Response.json(doc);
+    }
+    // Kaneo sets the request's user from the key, so /user/me answers for it.
+    if (req.method === "GET" && path === "/user/me" && !opts.noCurrentUser) {
+      return ok(M.CurrentUser, { id: "user-self", name: "Self", email: "self@example.com", image: null, role: "user" });
     }
     if (req.method === "GET" && path === "/auth/organization/list") return ok(z.array(M.Organization), workspaces);
     if (req.method === "POST" && path === "/auth/organization/update") {

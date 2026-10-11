@@ -16,6 +16,7 @@ import {
   Column,
   Comment,
   CreateNotification200,
+  CurrentUser,
   ExternalLink,
   InvitationDetails,
   Label,
@@ -2345,5 +2346,31 @@ export const getWorkspaceMembers = async (workspaceId: string, options?: Paramet
 
     ,
     schema: zod.array(WorkspaceMember)
+  }
+);}
+
+
+
+export const getGetCurrentUserUrl = () => {
+
+
+
+
+  return `/user/me`
+}
+
+/**
+ * Return the currently authenticated user.
+ * @summary Get current user
+ */
+export const getCurrentUser = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<CurrentUser> => {
+
+  return kaneoFetch<CurrentUser>(getGetCurrentUserUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: CurrentUser
   }
 );}

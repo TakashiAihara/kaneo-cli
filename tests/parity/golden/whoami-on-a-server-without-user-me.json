@@ -5,9 +5,9 @@
         "whoami",
         "--human"
       ],
-      "exit": 0,
-      "stdout": "api url    <URL>/api\napi key    accepted\nuser       Self <self@example.com> (user-self)\nworkspaces 2\n  ws-main  Main\n  ws-other  Other\n",
-      "stderr": ""
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: the API key was accepted, but this server has no /user/me to say whose it is (Kaneo before v2.29.2): GET /api/user/me: 404: no route: GET /user/me\n"
     }
   ],
   "requests": [

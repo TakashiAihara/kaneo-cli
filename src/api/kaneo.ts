@@ -1,5 +1,5 @@
 import { OPERATIONS, type Operation } from "./registry";
-import { requestDrift, requestShapes, type Drift, type RequestShape } from "./shape";
+import { requestDrift, requestShapes, serverOperations, type Drift, type RequestShape, type ServerOperation } from "./shape";
 import pinnedRequests from "./gen/requests.json";
 import { kaneoFetch, KaneoApiError } from "./http";
 import type { Json } from "../output/json";
@@ -1948,14 +1948,18 @@ export type CheckResult = {
   // What this client calls but the server does not offer. Each entry is a
   // command that will fail against this server.
   missing: Operation[];
-  // What the server offers and this client does not use yet.
-  newOnServer: string[];
+  // What the server offers and this client does not use yet, with where it is
+  // served and the first tag the document gives it.
+  newOnServer: ServerOperation[];
   // Request fields of a covered operation whose server definition differs from
   // the pinned document's (see requestDrift). Reported, not a failure.
   requestDrift: Drift[];
 };
 
-type Document = { paths?: Record<string, Record<string, { operationId?: string } | undefined> | undefined> };
+type Document = {
+  paths?: Record<string, Record<string, { operationId?: string; tags?: unknown } | undefined> | undefined>;
+};
+
 
 // The comparison between this client and a server. The document is served
 // without authentication, so this works before any key is configured; it goes
@@ -1963,17 +1967,8 @@ type Document = { paths?: Record<string, Record<string, { operationId?: string }
 // site root answers 200 with the web app's HTML for any path.
 export const checkApi = async (): Promise<CheckResult> => {
   const document = zeroRecord(await kaneoFetch<Document>("/openapi", { method: "GET" }));
-  const seen = new Set<string>();
-  const onServer: string[] = [];
-  for (const methods of Object.values(document.paths ?? {})) {
-    for (const operation of Object.values(methods ?? {})) {
-      const id = operation?.operationId;
-      if (id === undefined || id === "" || seen.has(id)) continue;
-      seen.add(id);
-      onServer.push(id);
-    }
-  }
-  onServer.sort();
+  const onServer = serverOperations(document);
+  const seen = new Set(onServer.map((operation) => operation.id));
 
   const used = new Set(OPERATIONS.map((operation) => operation.id));
   return {
@@ -1981,7 +1976,7 @@ export const checkApi = async (): Promise<CheckResult> => {
     clientOperations: OPERATIONS.length,
     covered: OPERATIONS.filter((operation) => seen.has(operation.id)),
     missing: OPERATIONS.filter((operation) => !seen.has(operation.id)),
-    newOnServer: onServer.filter((id) => !used.has(id)),
+    newOnServer: onServer.filter((operation) => !used.has(operation.id)),
     requestDrift: requestDrift(pinnedRequests as Record<string, RequestShape>, requestShapes(document, used)),
   };
 };

@@ -67,9 +67,14 @@ export class Writer {
     readonly terminal: boolean,
   ) {}
 
+  // Whether the payload is already on stdout, so a failure after it does not
+  // add a second JSON document a reader cannot parse.
+  private wroteData = false;
+
   // The payload of a command. In JSON mode it is the only thing on stdout, and
   // with a filter it is what the filter makes of it.
   data(value: Json): void {
+    this.wroteData = true;
     if (this.filter !== undefined) {
       const out = this.filter(line(value));
       // A string the filter picked out is printed raw, so on a terminal it gets
@@ -109,6 +114,6 @@ export class Writer {
   // it would be no better.
   error(message: string): void {
     writeSync(2, `Error: ${sanitizeControl(message)}\n`);
-    if (this.mode.json && this.filter === undefined) writeSync(1, line({ error: message }));
+    if (this.mode.json && this.filter === undefined && !this.wroteData) writeSync(1, line({ error: message }));
   }
 }

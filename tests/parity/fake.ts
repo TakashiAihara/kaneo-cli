@@ -105,6 +105,8 @@ export type FakeOptions = {
   // Kaneo 2.20 does, and createTask without customFields, the request drift
   // api-check reports.
   driftedSpec?: boolean;
+  // Serves the pinned document without createTask, an operation the client calls.
+  specWithoutOperation?: boolean;
 };
 
 export function startFake(seed: Seed, opts: FakeOptions = {}) {
@@ -453,8 +455,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     let p: Groups | null;
 
     if (req.method === "GET" && path === "/openapi") {
-      if (!opts.driftedSpec) return new Response(Bun.file(SPEC_PATH));
+      if (!opts.driftedSpec && !opts.specWithoutOperation) return new Response(Bun.file(SPEC_PATH));
       const doc = JSON.parse(readFileSync(SPEC_PATH, "utf8"));
+      if (opts.specWithoutOperation) {
+        delete doc.paths["/task/{projectId}"].post;
+        return Response.json(doc);
+      }
       const body = (p: string, m: string) => doc.paths[p][m].requestBody.content["application/json"].schema;
       delete body("/task/{projectId}", "post").properties.customFields;
       body("/activity/create", "post").required.push("userId");

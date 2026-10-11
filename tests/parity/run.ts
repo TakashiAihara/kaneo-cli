@@ -32,6 +32,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     writesNotKept: s.writesNotKept,
     commentReplyWithoutId: s.commentReplyWithoutId,
     driftedSpec: s.driftedSpec,
+    specWithoutOperation: s.specWithoutOperation,
   });
   const home = mkdtempSync(join(tmpdir(), "kaneo-parity-"));
   try {

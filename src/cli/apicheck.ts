@@ -45,7 +45,11 @@ export const apiCheckCommand = {
       `${result.covered.length} of ${result.clientOperations} client operations present; server offers ${result.serverOperations}`,
     );
 
+    const missing =
+      result.missing.length > 0 ? `${result.missing.length} operation(s) this client calls are missing from the server` : undefined;
+
     app.out.data({
+      ...(missing === undefined ? {} : { error: missing }),
       serverOperations: result.serverOperations,
       clientOperations: result.clientOperations,
       covered: result.covered.map(asReport),
@@ -54,9 +58,7 @@ export const apiCheckCommand = {
       requestDrift: result.requestDrift.map((d) => ({ ...d, command: commandOf(d.id) })),
     } as Json);
 
-    if (result.missing.length > 0) {
-      throw new Error(`${result.missing.length} operation(s) this client calls are missing from the server`);
-    }
+    if (missing !== undefined) throw new Error(missing);
   },
 };
 

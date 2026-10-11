@@ -87,6 +87,9 @@ export type FakeOptions = {
   // Answers a request whose "METHOD path" matches with a 500, having changed
   // nothing, for a write that is refused or a read that fails.
   failOn?: string;
+  // The key's user lacks the project update and delete permissions, so those
+  // routes answer as Kaneo 2.32.0's requireWorkspacePermission does.
+  plainMember?: boolean;
   // A server older than v2.28.0, which has no /user/me.
   noCurrentUser?: boolean;
   // How many matching requests are answered as usual before failOn starts, so
@@ -612,6 +615,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       projects.push(proj);
       return ok(M.Project, proj);
     }
+    if (req.method === "PUT" && path === "/project/reorder" && opts.plainMember) return failText(403, "Insufficient permissions");
     if (req.method === "PUT" && path === "/project/reorder") {
       // As upstream's reorder-projects.ts: the payload's positions only say an
       // order, a project left out keeps its rank, and the requested ones fill the
@@ -635,6 +639,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // the task routes below.
       if (!proj) return failText(400, "Workspace ID could not be determined");
       if (req.method === "GET" && !p[2]) return ok(M.Project, proj);
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
       if (req.method === "PUT" && !p[2]) {
         Object.assign(proj, body);
         return ok(M.Project, proj);

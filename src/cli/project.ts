@@ -2,8 +2,10 @@ import { apiKey, project, workspace, type App } from "./app";
 import {
   archived,
   createProject,
+  currentUser,
   deleteProject,
   getProject,
+  listMembers,
   listProjectsIn,
   reorderProjects,
   setProjectArchived,
@@ -14,6 +16,7 @@ import {
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
 import { allProjects, firstMatch, resolveWorkspace, withProject, type ProjectIn } from "./lookup";
 import { shellWord } from "../output/output";
+import { KaneoApiError } from "../api/http";
 
 // `archive` and `unarchive` are the same request with the opposite verb, so they
 // are built from one place rather than written out twice.
@@ -33,8 +36,9 @@ const archiveCommand = (verb: "archive" | "unarchive") => {
     run: async ({ args, app }: { args: string[]; app: App }) => {
       apiKey(app);
       const id = args[0] ?? project(app);
+      const doing = archived ? "archiving a project" : "unarchiving a project";
       const projectId = await withProject(id, async (projectId) => {
-        await setProjectArchived(projectId, archived);
+        await setProjectArchived(projectId, archived).catch(refused(doing, "update", () => projectWorkspace(projectId)));
         return projectId;
       });
       app.out.human(`${archived ? "archived" : "unarchived"} ${id}`);
@@ -99,8 +103,13 @@ const withDescription = async (created: Project, description: string): Promise<P
     const { after } = await updateProject(created.id, { description });
     return after;
   } catch (e) {
+    // A 403 here means project update would be refused the same way, so the
+    // line says why rather than suggesting it.
+    const why = await permissionHint(e, "setting a description", "update", async () => created.workspaceId);
     throw new Error(
-      `created project ${created.id} but could not set its description: ${(e as Error).message}; set it with \`kaneo project update ${shellWord(created.id)} -d TEXT\``,
+      why === undefined
+        ? `created project ${created.id} but could not set its description: ${(e as Error).message}; set it with \`kaneo project update ${shellWord(created.id)} -d TEXT\``
+        : `created project ${created.id} but could not set its description: ${(e as Error).message}: ${why}`,
     );
   }
 };
@@ -272,7 +281,9 @@ export const projectCommand = {
         // The read of the project comes first inside updateProject, so a value the
         // server does not know is retried before anything is written rather than
         // after.
-        const { before, after } = await withProject(args[0]!, (id) => updateProject(id, changes));
+        const { before, after } = await withProject(args[0]!, (id) =>
+          updateProject(id, changes).catch(refused("updating a project", "update", () => projectWorkspace(id))),
+        );
         app.out.human(`updated ${after.id}`);
         for (const [field, from, to] of [
           ["name", before.name, after.name],
@@ -321,7 +332,7 @@ export const projectCommand = {
             `refusing to delete project ${found.name} [${found.slug}] (${found.id}) without --yes; \`kaneo project archive ${shellWord(found.id)}\` keeps it`,
           );
         }
-        const deleted = await deleteProject(found.id);
+        const deleted = await deleteProject(found.id).catch(refused("deleting a project", "delete", async () => found.workspaceId));
         // Named as it was read, since that is the project the confirmation spoke
         // for; the reply is the server's own record of what it removed, and that
         // is what the report carries.
@@ -348,7 +359,10 @@ export const projectCommand = {
         // what it is rather than as a word the workspace does not hold: the
         // server would take its id, this command will not.
         const order = newProjectOrder(await listProjectsIn(workspaceId, true), args);
-        const reply = await reorderProjects(workspaceId, order.map((project) => project.id));
+        const reply = await reorderProjects(
+          workspaceId,
+          order.map((project) => project.id),
+        ).catch(refused("reordering projects", "update", async () => workspaceId));
         // The reply holds the whole workspace, archived projects included; the
         // ones that are on it are what this command changed the order of.
         for (const project of reply.filter((project) => !archived(project))) app.out.human(projectLine(project));
@@ -357,6 +371,43 @@ export const projectCommand = {
     },
   ],
 };
+
+// What the server's bare 403 "Insufficient permissions" means for a project
+// route: which permission it checks (Kaneo 2.32.0's requireWorkspacePermission),
+// which roles have it by default (packages/permissions), and the caller's own
+// role in the workspace, read from /user/me and the member list. undefined for
+// any other failure. The role is best effort: the 403 is the answer, so a role
+// that cannot be read is left out rather than replacing it.
+const permissionHint = async (
+  e: unknown,
+  doing: string,
+  permission: "update" | "delete",
+  workspaceOf: () => Promise<string>,
+): Promise<string | undefined> => {
+  if (!(e instanceof KaneoApiError && e.statusCode === 403 && e.messages.includes("Insufficient permissions"))) return undefined;
+  const workspaceId = await workspaceOf().catch(() => "");
+  const role =
+    workspaceId === ""
+      ? ""
+      : // One after the other, so the requests go out in the same order every run.
+        await (async () => {
+          const me = await currentUser();
+          return (await listMembers(workspaceId)).find((m) => m.id === me.id)?.role ?? "";
+        })().catch(() => "");
+  const yours = role === "" ? "" : `; your role there is ${role}`;
+  const where = workspaceId === "" ? "kaneo workspace members" : `kaneo workspace members -w ${shellWord(workspaceId)}`;
+  return `${doing} needs the project ${permission} permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed${yours}; \`${where}\` lists each member's role`;
+};
+
+const refused =
+  (doing: string, permission: "update" | "delete", workspaceOf: () => Promise<string>) =>
+  async (e: unknown): Promise<never> => {
+    const why = await permissionHint(e, doing, permission, workspaceOf);
+    if (why === undefined) throw e;
+    throw new Error(`${(e as Error).message}: ${why}`);
+  };
+
+const projectWorkspace = async (projectId: string): Promise<string> => (await getProject(projectId)).workspaceId;
 
 // The project a reference names, if any.
 //

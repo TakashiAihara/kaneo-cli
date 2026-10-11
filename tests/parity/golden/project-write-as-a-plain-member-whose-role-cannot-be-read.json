@@ -1,0 +1,55 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "archive",
+        "BET",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/project/proj-beta/archive: 403: Insufficient permissions: archiving a project needs the project update permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; `kaneo workspace members -w ws-main` lists each member's role\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/project/BET/archive",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-beta/archive",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

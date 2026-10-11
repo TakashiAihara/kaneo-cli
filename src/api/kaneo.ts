@@ -36,6 +36,7 @@ import {
   deleteWorkflowRule as removeRule,
   exportTasks as readExport,
   getColumns as readColumns,
+  getCurrentUser,
   getInvitationDetails,
   getWorkspaceMembers,
   globalSearch,
@@ -276,6 +277,17 @@ export const listMembers = async (workspaceId: string): Promise<Member[]> =>
     image: m.image ?? null,
     role: m.role ?? "",
   }));
+
+// The user the API key belongs to. The key's requests carry the user's id
+// (Kaneo's authenticate-api-request sets userId from the key), which /user/me
+// answers with from v2.28.0; the user's name and email are not on the request,
+// which is why routes that read those answer empty for a key.
+export type User = { id: string; name: string; email: string };
+
+export const currentUser = async (): Promise<User> => {
+  const me = zeroRecord(await getCurrentUser());
+  return { id: me.id ?? "", name: me.name ?? "", email: me.email ?? "" };
+};
 
 // What the server will say about one invitation.
 //

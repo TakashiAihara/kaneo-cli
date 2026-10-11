@@ -81,6 +81,7 @@ export type Scenario = {
   // The fake answers matching "METHOD path" requests with a 500, having
   // changed nothing.
   failOn?: string;
+  noCurrentUser?: boolean;
   failOnSkip?: number;
   // The fake answers a matching PUT with a 200 while storing an altered title or
   // description, so a read-back finds something the client did not send.
@@ -123,6 +124,9 @@ export const SCENARIOS: Scenario[] = [
   ...both("whoami", ["whoami"]),
   ...both("context", ["context"]),
   ...both("workspace list", ["workspace", "list"]),
+  // A server before v2.28.0 has no /user/me: the key was accepted, and whoami
+  // says why it still cannot say whose it is.
+  { name: "whoami on a server without user me", noCurrentUser: true, steps: [["whoami", "--human"]] },
   // The column first, then a description the create form kept in metadata,
   // sent as better-auth's JSON text or already an object.
   ...both("workspace list with descriptions", ["workspace", "list"]).map(

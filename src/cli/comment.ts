@@ -5,15 +5,16 @@ import { readInput } from "./input";
 import { resolveTask } from "./task";
 import { shellWord } from "../output/output";
 
-// A human line for one comment. The timestamp first and the text indented
-// beneath it, so a multi-line comment reads as belonging to one moment.
+// A human line for one comment. The id first, as the other listings print it and
+// as comment delete and edit take it, then the timestamp, and the text with its
+// later lines indented beneath, so a multi-line comment reads as one entry.
 const commentLine = (comment: Comment): string =>
-  `${comment.createdAt}  ${comment.content.replaceAll("\n", "\n  ")}`;
+  `${comment.id}  ${comment.createdAt}  ${comment.content.replaceAll("\n", "\n  ")}`.trimEnd();
 
 // The suggested command names the task by id: a number is resolved through the
 // project settings of whoever pastes it, which may pick another project's task.
 const noComment = (id: string, task: Task): string =>
-  `no comment ${JSON.stringify(id)} on #${task.number}; see \`kaneo comment list ${shellWord(task.id)} --json\``;
+  `no comment ${JSON.stringify(id)} on #${task.number}; see \`kaneo comment list ${shellWord(task.id)}\``;
 
 export const commentCommand = {
   name: "comment",
@@ -84,7 +85,7 @@ export const commentCommand = {
       short: "Delete a comment from a task",
       long:
         "Delete a comment from a task.\n\n" +
-        "The id is the comment's id from `kaneo comment list <task> --json`. The server\n" +
+        "The id is the comment's id, the first column of `kaneo comment list <task>`. The server\n" +
         "deletes only comments written by the account the API key belongs to.",
       // Unlike `task rm` there is no --yes: a task takes its comments with it,
       // while this removes the one comment named by a server-made random id,

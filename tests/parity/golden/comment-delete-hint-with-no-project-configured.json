@@ -9,8 +9,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"no comment \\\"nope\\\" on #1; see `kaneo comment list task-b1 --json`\"\n}\n",
-      "stderr": "Error: no comment \"nope\" on #1; see `kaneo comment list task-b1 --json`\n"
+      "stdout": "{\n  \"error\": \"no comment \\\"nope\\\" on #1; see `kaneo comment list task-b1`\"\n}\n",
+      "stderr": "Error: no comment \"nope\" on #1; see `kaneo comment list task-b1`\n"
     },
     {
       "args": [

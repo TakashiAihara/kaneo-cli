@@ -10,7 +10,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: no comment \"cmt0001\" on #2; see `kaneo comment list task-a2 --json`\n"
+      "stderr": "Error: no comment \"cmt0001\" on #2; see `kaneo comment list task-a2`\n"
     },
     {
       "args": [
@@ -21,8 +21,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"no comment \\\"nope\\\" on #1; see `kaneo comment list task-a1 --json`\"\n}\n",
-      "stderr": "Error: no comment \"nope\" on #1; see `kaneo comment list task-a1 --json`\n"
+      "stdout": "{\n  \"error\": \"no comment \\\"nope\\\" on #1; see `kaneo comment list task-a1`\"\n}\n",
+      "stderr": "Error: no comment \"nope\" on #1; see `kaneo comment list task-a1`\n"
     },
     {
       "args": [
@@ -58,7 +58,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: no comment \"cmt000\" on #1; see `kaneo comment list task-a1 --json`\n"
+      "stderr": "Error: no comment \"cmt000\" on #1; see `kaneo comment list task-a1`\n"
     },
     {
       "args": [
@@ -69,7 +69,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "deleted comment cmt0002 from #1\n2026-01-01T00:00:10.000Z  second\n",
+      "stdout": "deleted comment cmt0002 from #1\ncmt0002  2026-01-01T00:00:10.000Z  second\n",
       "stderr": ""
     },
     {
@@ -81,8 +81,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"no comment \\\"cmt0002\\\" on #1; see `kaneo comment list task-a1 --json`\"\n}\n",
-      "stderr": "Error: no comment \"cmt0002\" on #1; see `kaneo comment list task-a1 --json`\n"
+      "stdout": "{\n  \"error\": \"no comment \\\"cmt0002\\\" on #1; see `kaneo comment list task-a1`\"\n}\n",
+      "stderr": "Error: no comment \"cmt0002\" on #1; see `kaneo comment list task-a1`\n"
     },
     {
       "args": [

@@ -21,7 +21,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "2026-01-01T00:00:08.000Z  first comment\n2026-01-01T00:00:10.000Z  hello world\n",
+      "stdout": "cmt0001  2026-01-01T00:00:08.000Z  first comment\ncmt0002  2026-01-01T00:00:10.000Z  hello world\n",
       "stderr": ""
     }
   ],

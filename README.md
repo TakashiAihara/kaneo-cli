@@ -2,6 +2,8 @@
 
 Command-line client for [Kaneo](https://github.com/usekaneo/kaneo), the self-hostable project management tool.
 
+Tables on a terminal and JSON through a pipe, so scripts and coding agents read the same commands people type (see [Output](#output)). An agent session can attach itself to the task it is working on and leave its next step there (see [Agent sessions](#agent-sessions)).
+
 A single self-contained binary, no runtime to install. Ships for `linux/amd64`, `linux/arm64`, `darwin/arm64` and `darwin/amd64`; the Linux builds need glibc.
 
 ## Status

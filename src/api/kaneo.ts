@@ -549,7 +549,7 @@ export type ProjectChanges = {
 export const updateProject = async (
   projectId: string,
   changes: ProjectChanges,
-): Promise<{ before: Project; after: Project; unread: ("slug" | "description" | "icon")[] }> => {
+): Promise<{ before: Project; after: Project; unread: string[] }> => {
   const want: ProjectChanges = { ...changes };
   // The server accepts any string, but a blank name, slug or icon leaves a
   // project that cannot be read or linked to, so those are refused here.
@@ -589,8 +589,13 @@ export const updateProject = async (
     // lacks, and a flag for the other fields would not get it past.
     const stuck = identified && missing.includes("isPublic");
     const flags = identified && !stuck ? missing.map((field) => `--${field} TEXT`) : [];
+    // A field the reply sent as null is named apart from one it left out, so the
+    // refusal says which of the two the server did.
+    const nulled = missing.filter((field) => raw[field] === null);
+    const absent = missing.filter((field) => raw[field] !== null);
+    const lacks = `${absent.length > 0 ? `, without ${absent.join(", ")}` : ""}${nulled.length > 0 ? `, with ${nulled.join(", ")} null` : ""}`;
     throw new Error(
-      `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}${missing.length > 0 ? `, without ${missing.join(", ")}` : ""}; not writing${flags.length > 0 ? ` (pass ${flags.join(" ")} to write it yourself)` : ""}${stuck ? "; isPublic has no flag, so this project cannot be updated until the server returns it as a boolean" : ""}`,
+      `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}${lacks}; not writing${flags.length > 0 ? ` (pass ${flags.join(" ")} to write it yourself)` : ""}${stuck ? "; isPublic has no flag, so this project cannot be updated until the server returns it as a boolean" : ""}`,
     );
   }
 

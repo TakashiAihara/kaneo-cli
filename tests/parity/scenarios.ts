@@ -74,6 +74,8 @@ export type Scenario = {
   extraTasks?: Seed["tasks"];
   // The fake answers like a server older than the pinned document.
   legacy?: boolean;
+  // The fake leaves these fields out of a project read.
+  readWithout?: string[];
   // The fake holds every response back this long.
   delayMs?: number;
   // The fake answers matching "METHOD path" requests with whitespace only.
@@ -176,6 +178,18 @@ export const SCENARIOS: Scenario[] = [
     name: "project update with an empty slug",
     seed: { projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }] },
     steps: [["project", "update", "proj-noslug", "--name", "Has a name now", "--json"]],
+  },
+  {
+    // The read has no slug, so the line cannot say what it was.
+    name: "project update of a project whose read lacks the slug",
+    readWithout: ["slug"],
+    steps: [["project", "update", P1, "--slug", "AL2", "--human"]],
+  },
+  {
+    // Written back unchanged, a field the read lacked still gets its line.
+    name: "project update of a project whose read lacks the description",
+    readWithout: ["description"],
+    steps: [["project", "update", P1, "-d", "", "--human"]],
   },
   // A project whose id the shell would split or expand: the hints quote it.
   {

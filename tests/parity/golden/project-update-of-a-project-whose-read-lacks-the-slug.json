@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "update",
+        "proj-alpha",
+        "--slug",
+        "AL2",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated proj-alpha\n  slug  (not read) -> \"AL2\"\n  task identifiers may now start with AL2; the slug was not read, so whether it changed is unknown\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Alpha",
+        "icon": "Layout",
+        "slug": "AL2",
+        "description": "",
+        "isPublic": false
+      }
+    }
+  ],
+  "files": {}
+}

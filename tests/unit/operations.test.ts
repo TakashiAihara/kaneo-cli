@@ -1202,7 +1202,7 @@ test("TestUpdateProjectForeignReadStopsWithoutOfferingFlags", async () => {
   const seen: string[] = [];
   newServer((req) => {
     seen.push(req.method);
-    return new Response(`{"id":"other","name":"Board","slug":"x","description":"d","isPublic":true}`, {
+    return new Response(`{"id":"other","name":"Board","slug":"x","icon":"Box","description":"d"}`, {
       headers: { "content-type": "application/json" },
     });
   });
@@ -1253,6 +1253,8 @@ test("TestUpdateProjectNullIsPublicSaysBooleanIsWhatIsMissing", async () => {
   );
   const err = String(await failure(api.updateProject("p1", { name: "New" })));
   expect(err).toContain("until the server returns it as a boolean");
+  expect(err).toContain("with isPublic null");
+  expect(err).not.toContain("without isPublic");
 });
 
 test("TestUpdateProjectReportsAFieldItDidNotRead", async () => {
@@ -1270,6 +1272,11 @@ test("TestUpdateProjectReportsAFieldItDidNotRead", async () => {
   expect((await api.updateProject("p1", { name: "New" })).unread).toEqual([]);
 });
 
+test("TestUpdateProjectReadsNothingUnreadWhenTheReadHasTheFieldAndItIsPassed", async () => {
+  recorder(`{"id":"p1","name":"Board","slug":"y","icon":"Star","description":"e","isPublic":true}`);
+  expect((await api.updateProject("p1", { slug: "y", icon: "Star", description: "e" })).unread).toEqual([]);
+});
+
 test.each([
   ["icon", `{"id":"p1","name":"Board","slug":"x","icon":null,"description":"d","isPublic":true}`],
   ["isPublic", `{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d","isPublic":null}`],
@@ -1281,7 +1288,8 @@ test.each([
     return new Response(reply, { headers: { "content-type": "application/json" } });
   });
   const err = String(await failure(api.updateProject("p1", { name: "New" })));
-  expect(err).toContain(`, without ${field};`);
+  expect(err).toContain(`, with ${field} null;`);
+  expect(err).not.toContain("without");
   expect(seen).toEqual(["GET"]);
 });
 

@@ -1,0 +1,39 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "NOPE-1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/task/by-ticket-id/NOPE-1: 404: Task not found\"\n}\n",
+      "stderr": "Error: GET /api/task/by-ticket-id/NOPE-1: 404: Task not found\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "ALP-99",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/task/by-ticket-id/ALP-99: 404: Task not found\"\n}\n",
+      "stderr": "Error: GET /api/task/by-ticket-id/ALP-99: 404: Task not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/by-ticket-id/NOPE-1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/by-ticket-id/ALP-99",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

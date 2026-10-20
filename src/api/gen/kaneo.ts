@@ -29,6 +29,7 @@ import {
   ProjectListItem,
   SearchResponse,
   Task,
+  TaskByTicketId,
   TaskExport,
   TaskImportResult,
   TaskRelation,
@@ -54,6 +55,7 @@ import type {
   CreateTaskRelationBody,
   CreateTimeEntryBody,
   GetActivitiesParams,
+  GetTaskByTicketIdParams,
   GetTaskParams,
   GlobalSearchParams,
   ImportTasksBody,
@@ -528,6 +530,41 @@ return kaneoFetch<Task>(getCreateTaskUrl(projectId),
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createTaskBody),
     schema: Task
+  }
+);}
+
+
+
+export const getGetTaskByTicketIdUrl = (ticketId: string,
+    params?: GetTaskByTicketIdParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/task/by-ticket-id/${ticketId}?${stringifiedParams}` : `/task/by-ticket-id/${ticketId}`
+}
+
+/**
+ * Get a single task by its project key and number, such as KAN-12. A match in an active project takes precedence, then the most recently archived project. If the ticket ID still matches multiple accessible tasks, narrow the lookup to a workspace with workspaceId or workspaceSlug, or to a single project with projectId.
+ * @summary Get task by ticket ID
+ */
+export const getTaskByTicketId = async (ticketId: string,
+    params?: GetTaskByTicketIdParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<TaskByTicketId> => {
+
+  return kaneoFetch<TaskByTicketId>(getGetTaskByTicketIdUrl(ticketId,params),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: TaskByTicketId
   }
 );}
 

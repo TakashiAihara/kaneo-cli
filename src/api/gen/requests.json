@@ -93,6 +93,11 @@
   "getTask": {
     "query.view": false
   },
+  "getTaskByTicketId": {
+    "query.projectId": false,
+    "query.workspaceId": false,
+    "query.workspaceSlug": false
+  },
   "getTaskComments": {},
   "getTaskLabels": {},
   "getTaskRelations": {},

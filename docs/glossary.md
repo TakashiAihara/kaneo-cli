@@ -97,9 +97,11 @@ The integration is the one thing that tells them apart: `integrationId` and the 
 
 ### task reference
 
-What a task is named by on a command line: a task id, a number with or without a leading `#`, or `<project-slug>#<number>`.
+What a task is named by on a command line: a task id, a number with or without a leading `#`, `<project-slug>#<number>`, or `<project-slug>-<number>`.
 
 The last form names a board as well as a number, which is why it is the form a task reference is written in everywhere else — `KANEO_TASK_REF` and the `kaneo <project slug>#<number>` a session hook receives. The part before the `#` is resolved as a project by id, slug or name; the leading `kaneo ` is not part of what the commands take.
+
+The dash form (`BET-1`) is how the Kaneo server and UI write a task, and the server resolves it (`GET /task/by-ticket-id/{ticketId}`, v2.30.0 and later). The last dash splits it, as the server's `^(.+)-(\d+)$` does, so a slug may hold dashes; a task id is a cuid2 and holds none, so a value that fits is a reference and is not tried as an id. The server's answer is shown as it came: 404 when nothing matches, 409 when the slug names more than one project.
 
 ### operation
 

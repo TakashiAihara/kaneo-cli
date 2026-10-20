@@ -43,6 +43,7 @@ import {
   getExternalLinksByTask as readExternalLinks,
   getProject as readProject,
   getTask as readTask,
+  getTaskByTicketId as readTaskByTicketId,
   getTaskComments,
   getTaskRelations,
   listNotifications as getNotifications,
@@ -1073,6 +1074,14 @@ const toTask = (t: BoardTask): Task => {
 // of the reply, so they read as null.
 export const getTask = async (taskId: string): Promise<Task> => {
   const t = zeroRecord(await readTask(pathParam(taskId)));
+  return task(t, { assigneeId: t.assigneeId, assigneeName: t.assigneeName, labels: null });
+};
+
+// Fetches the task a `<slug>-<number>` ticket id names, in one request: the
+// server picks the project from the slug, so no board is read. Its errors (404,
+// 403, 409 when the slug names more than one project) are the caller's to show.
+export const getTaskByTicketId = async (ticketId: string): Promise<Task> => {
+  const t = zeroRecord(await readTaskByTicketId(pathParam(ticketId)));
   return task(t, { assigneeId: t.assigneeId, assigneeName: t.assigneeName, labels: null });
 };
 

@@ -1,5 +1,6 @@
 import { writeSync } from "node:fs";
 import { apiKey, project, taskProject, type App } from "./app";
+import { KaneoApiError } from "../api/http";
 import {
   bulkUpdate,
   createTask,
@@ -925,6 +926,23 @@ export const resolveTask = async (app: App, ref: string, slugs?: Map<string, str
     return numberOn(named.project, named.number, "the reference", slugs);
   }
 
+  const dashed = dashedReference(wanted);
+  if (dashed !== undefined) {
+    // A task id may hold a dash, so the value is an id first.
+    try {
+      return await getTask(wanted);
+    } catch (idError) {
+      if (!(idError instanceof KaneoApiError) || (idError.statusCode !== 404 && idError.statusCode !== 400)) throw idError;
+      try {
+        return await numberOn(dashed.project, dashed.number, "the reference", slugs);
+      } catch (refError) {
+        // A project that does not exist means the value was never a reference.
+        if (refError instanceof KaneoApiError) throw idError;
+        throw refError;
+      }
+    }
+  }
+
   const number = asNumber(wanted.startsWith("#") ? wanted.slice(1) : wanted);
   if (number === undefined) return getTask(wanted);
   const projectId = taskProject(app);
@@ -959,6 +977,16 @@ const namedReference = (wanted: string): { project: string; number: number } | u
   if (at < 1) return undefined;
   const number = asNumber(wanted.slice(at + 1));
   return number === undefined ? undefined : { project: wanted.slice(0, at), number };
+};
+
+// `<project>-<number>`: the form the Kaneo server and UI write a task as
+// (`BET-1`). The last dash splits it, because a slug may hold dashes.
+const dashedReference = (wanted: string): { project: string; number: number } | undefined => {
+  const at = wanted.lastIndexOf("-");
+  if (at < 1) return undefined;
+  const tail = wanted.slice(at + 1);
+  if (!/^\d+$/.test(tail)) return undefined;
+  return { project: wanted.slice(0, at), number: Number.parseInt(tail, 10) };
 };
 
 // The task a number names on one project's board.

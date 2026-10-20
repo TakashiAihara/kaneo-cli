@@ -509,6 +509,7 @@ export const SCENARIOS: Scenario[] = [
   { name: "task bulk empty value", steps: [["task", "bulk", "1", "--status", "", "--json"], ["task", "bulk", "1", "--assign", " ", "--json"]] },
   { name: "task bulk assigns only members", steps: [["task", "bulk", "1", "--assign", "user-nobody", "--json"]] },
   { name: "task bulk names a board three ways", steps: [["task", "bulk", "1", "ALP#2", "proj-alpha#3", "--priority", "low", "--json"]] },
+  { name: "task bulk names a board with a dash", steps: [["task", "bulk", "1", "ALP-2", "BET-1", "--priority", "low", "--json"], ["task", "bulk", "1", "NOPE-1", "--priority", "low", "--json"]] },
   { name: "task bulk delete counts each task once", steps: [["task", "bulk", "1", "ALP#1", "--delete", "--json"]] },
   ...both("task export", ["task", "export"]),
   { name: "task export piped", steps: [["task", "export"]] },

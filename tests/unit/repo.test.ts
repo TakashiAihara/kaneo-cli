@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,42 +6,31 @@ import { currentRepo, parseRepo } from "../../src/config/repo";
 
 const dirs: string[] = [];
 
+const tempDir = (prefix: string): string => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  dirs.push(dir);
+  return dir;
+};
+
 // A global or system `url.<base>.insteadOf` would rewrite the origin before
 // currentRepo reads it, so a row could pass without reaching the pattern it names.
-const GIT_ENV = ["GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "HOME"] as const;
-const savedEnv = new Map<string, string | undefined>();
-let isolatedHome = "";
+const isolatedEnv = (globalConfig = ""): Record<string, string | undefined> => {
+  const home = tempDir("kaneo-home-");
+  const config = join(home, "gitconfig");
+  writeFileSync(config, globalConfig);
+  return { ...process.env, GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: "1", HOME: home };
+};
 
-beforeAll(() => {
-  for (const key of GIT_ENV) savedEnv.set(key, process.env[key]);
-  isolatedHome = mkdtempSync(join(tmpdir(), "kaneo-home-"));
-  const emptyConfig = join(isolatedHome, "gitconfig");
-  writeFileSync(emptyConfig, "");
-  process.env.GIT_CONFIG_GLOBAL = emptyConfig;
-  process.env.GIT_CONFIG_NOSYSTEM = "1";
-  process.env.HOME = isolatedHome;
-});
-
-afterAll(() => {
-  for (const key of GIT_ENV) {
-    const value = savedEnv.get(key);
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
-  rmSync(isolatedHome, { recursive: true, force: true });
-});
-
-const repoWithOrigin = (origin: string): string => {
-  const dir = mkdtempSync(join(tmpdir(), "kaneo-repo-"));
-  dirs.push(dir);
+const repoWithOrigin = (origin: string, env: Record<string, string | undefined>): string => {
+  const dir = tempDir("kaneo-repo-");
   for (const args of [["init", "-q"], ["remote", "add", "origin", origin]]) {
-    const git = Bun.spawnSync(["git", ...args], { cwd: dir });
+    const git = Bun.spawnSync(["git", ...args], { cwd: dir, env });
     if (!git.success) throw new Error(`git ${args.join(" ")} failed`);
   }
   return dir;
 };
 
-afterEach(() => {
+afterAll(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -54,11 +43,21 @@ describe("currentRepo", () => {
     ["host:/acme/thing", "acme/thing"],
     ["https://github.com/acme/thing.git", "acme/thing"],
   ])("reads %s as %s", (origin, expected) => {
-    expect(currentRepo(repoWithOrigin(origin))).toBe(expected);
+    const env = isolatedEnv();
+    expect(currentRepo(repoWithOrigin(origin, env), env)).toBe(expected);
   });
 
-  test.each(["C:x/y", "/home/me/acme/thing", "./acme/thing", "host:thing"])("does not read %s as a repository", (origin) => {
-    expect(currentRepo(repoWithOrigin(origin))).toBe("");
+  test.each(["C:x/y", "C:/x/y", "/home/me/acme/thing", "./acme/thing", "./foo:acme/thing", "/srv/x:acme/thing", "host:thing"])(
+    "does not read %s as a repository",
+    (origin) => {
+      const env = isolatedEnv();
+      expect(currentRepo(repoWithOrigin(origin, env), env)).toBe("");
+    },
+  );
+
+  test("runs git with the env it is given", () => {
+    const env = isolatedEnv('[url "git@github.com:other/"]\n\tinsteadOf = host:acme/\n');
+    expect(currentRepo(repoWithOrigin("host:acme/thing", env), env)).toBe("other/thing");
   });
 });
 

@@ -3,8 +3,9 @@
 
 const SCP_LIKE = /^[^/@]+@[^/:]+:\/?([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 // No user, so `host:owner/name` as git prints it for a remote written that way.
-// git treats it as scp-style ssh whenever no `/` comes before the first `:`, so
-// a slash after the colon does not make it a path. A single-letter host is still
+// For a value without `://`, git treats it as scp-style ssh whenever no `/`
+// comes before the first `:`, so a slash after the colon does not make it a
+// path (a value with a scheme is taken by URL_LIKE first). A single-letter host is still
 // refused: only Git for Windows reads `C:x/y` as a drive, but a checkout made on
 // Windows should not have its drive path read as a repository.
 const SCP_NO_USER = /^[^/:]{2,}:\/?([^/:]+)\/([^/]+?)(?:\.git)?\/?$/;
@@ -33,8 +34,7 @@ const parseRemote = (remote: string, userless = false): string => {
 // Close to GitHub's charset, so a value that names no repository (`../x`,
 // `a@b/c`) is refused rather than looked up and reported as not registered,
 // which reads as an answer. A scp-style remote without a user (`host:owner/name`)
-// is refused for the same reason parseRemote refuses it: nothing tells it apart
-// from a host alias the maps know nothing about.
+// is refused here as #64 decided; whether to accept it is tracked in #336.
 const OWNER_REPO = /^([A-Za-z0-9_-][A-Za-z0-9._-]*)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/;
 
 // The owner/repo a caller named, or "" when the value names no repository.
@@ -60,11 +60,15 @@ const REMOTE_TIMEOUT_MS = 2000;
 // is the same everywhere. git's own complaint goes nowhere: a directory that is
 // not a repository is an ordinary answer here, not a failure, and a machine
 // with no git at all is the same answer.
-export const currentRepo = (dir: string): string => {
+//
+// env is what git runs with; a caller that changes the environment git should
+// see passes it, because Bun.spawnSync does not pick up later process.env edits.
+export const currentRepo = (dir: string, env: Record<string, string | undefined> = process.env): string => {
   let remote: string;
   try {
     const git = Bun.spawnSync(["git", "remote", "get-url", "origin"], {
       cwd: dir,
+      env,
       timeout: REMOTE_TIMEOUT_MS,
       stdout: "pipe",
       stderr: "ignore",

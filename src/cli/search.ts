@@ -74,8 +74,8 @@ export const searchCommand = {
     for (const [at, r] of found.results.entries()) {
       const status = r.status !== null ? `  (${r.status})` : "";
       // Slugs are unique only inside a workspace, so a reference from more than
-      // one has to say which, as `project ls -A` does. A workspace match is named
-      // by its own title.
+      // one has to say which, by the workspace name in parentheses (`project ls -A`
+      // spells it `(workspace: …)`). A workspace match is named by its own title.
       const where = acrossAll && r.type !== "workspace" ? `  (${r.workspaceName})` : "";
       app.out.human(`${r.type.padEnd(typeWidth)}  ${refs[at]!.padEnd(refWidth)}  ${r.title}${status}${where}`);
     }

@@ -49,11 +49,13 @@ const archiveCommand = (verb: "archive" | "unarchive") => {
 
 // One project, named the way a listing prints it.
 //
-// The slug is what -p and <slug>#N take, so every line carries it. Across
-// workspaces a project is only unique inside its own, so the workspace it is in
+// The slug is what -p and <slug>#N take, so every line carries it, except for a
+// project with none (the server takes an empty one), which has nothing to show.
+// Across workspaces a project is only unique inside its own, so the workspace it is in
 // follows, spelled out so it cannot be read as the archived marker.
 const projectLine = (project: Project, workspaceName = ""): string => {
-  const columns = [project.id, project.name, `[${project.slug}]`];
+  const columns = [project.id, project.name];
+  if (project.slug !== "") columns.push(`[${project.slug}]`);
   if (workspaceName !== "") columns.push(`(workspace: ${workspaceName})`);
   if (archived(project)) columns.push("(archived)");
   return columns.join("  ");
@@ -136,7 +138,7 @@ export const projectCommand = {
           name: "all-workspaces",
           shorthand: "A",
           type: "bool" as const,
-          usage: "list every workspace the key can reach, naming the workspace each project is in",
+          usage: "list every workspace the key can reach, naming the workspace each project is in; cannot be combined with -w",
           defaultValue: "false",
         },
       ],

@@ -1319,6 +1319,11 @@ export const SCENARIOS: Scenario[] = [
     steps: [["project", "ls", "-A", "--json"], ["project", "ls", "--all-workspaces", "--archived", "--human"]],
   },
   {
+    name: "project list with an empty slug",
+    seed: { projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }] },
+    steps: [["project", "ls", "--human"]],
+  },
+  {
     name: "project list across workspaces refuses a workspace",
     steps: [["project", "ls", "-A", "-w", "ws-main", "--human"]],
   },

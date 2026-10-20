@@ -78,6 +78,11 @@ export const taskCommand = {
         const board = await withProject(project(app), (id) => getBoard(id, { status, priority }));
         const tasks = filterTasks(projectTasks(board), status, priority, flags.all === true);
         for (const task of tasks) app.out.human(taskLine(task));
+        // The columns left out are not otherwise visible, so a count of the
+        // listing reads as a count of the project. On stderr and only for a
+        // person: the JSON stays the array it was.
+        const left = filterTasks(projectTasks(board), status, priority, true).length - tasks.length;
+        if (left > 0) app.out.status(`(${left} done / planned / archived ${left === 1 ? "task" : "tasks"} left out; --all for every task)`);
         app.out.data(tasks);
       },
     },

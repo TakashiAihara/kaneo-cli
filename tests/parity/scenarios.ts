@@ -308,6 +308,14 @@ export const SCENARIOS: Scenario[] = [
     ],
     steps: [["task", "ls", "--json"], ["task", "ls", "--all", "--human"], ["task", "ls", "--status", "planned", "--json"], ["task", "get", "5", "--json"], ["board", "--json"]],
   },
+  {
+    name: "task list says how many it left out",
+    extraTasks: [
+      { id: "task-a4", projectId: P1, title: "Next quarter", status: "planned" },
+      { id: "task-a5", projectId: P1, title: "Last year's plan", status: "archived" },
+    ],
+    steps: [["task", "ls", "--human"], ["task", "ls", "--all", "--human"], ["task", "ls", "--json"]],
+  },
   ...both("task get by number", ["task", "get", "1"]),
   // A description above 64 KiB is left out of the listing, so resolving the task
   // by number reads it from the task detail.

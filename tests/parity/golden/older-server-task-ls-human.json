@@ -8,7 +8,7 @@
       ],
       "exit": 0,
       "stdout": "#1    [high       ] to-do         Write the parser\n#2    [no-priority] in-progress   Ship it\n",
-      "stderr": ""
+      "stderr": "(1 done / planned / archived task left out; --all for every task)\n"
     }
   ],
   "requests": [

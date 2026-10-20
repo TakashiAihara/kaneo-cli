@@ -341,7 +341,7 @@ export const SCENARIOS: Scenario[] = [
       { id: "task-m1", projectId: P1, title: "Mine in alpha", userId: "user-self" },
       { id: "task-m2", projectId: P1, title: "Mine too", userId: "user-self" },
     ],
-    steps: [["task", "ls", "--mine", "--human"]],
+    steps: [["task", "ls", "--mine", "--human"], ["task", "ls", "--mine", "--json"]],
   },
   { name: "task list of my tasks refuses a filter", steps: [["task", "ls", "--mine", "--status", "done"], ["task", "ls", "--mine", "--priority", "high"], ["task", "ls", "--mine", "--all"]] },
   {

@@ -35,6 +35,7 @@ export const OPERATIONS: Operation[] = [
   { id: "deleteWorkflowRule", method: "DELETE", path: "/workflow-rule/{id}", command: "kaneo workflow rm" },
   { id: "listTasks", method: "GET", path: "/task/tasks/{projectId}", command: "kaneo task ls / board" },
   { id: "getTask", method: "GET", path: "/task/{id}", command: "kaneo task get" },
+  { id: "getTaskByTicketId", method: "GET", path: "/task/by-ticket-id/{ticketId}", command: "any task reference written <slug>-<number>" },
   { id: "createTask", method: "POST", path: "/task/{projectId}", command: "kaneo task create" },
   { id: "deleteTask", method: "DELETE", path: "/task/{id}", command: "kaneo task rm" },
   { id: "updateTaskStatus", method: "PUT", path: "/task/status/{id}", command: "kaneo task status" },

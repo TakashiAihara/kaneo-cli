@@ -1,6 +1,5 @@
 import { writeSync } from "node:fs";
 import { apiKey, project, taskProject, type App } from "./app";
-import { KaneoApiError } from "../api/http";
 import {
   bulkUpdate,
   createTask,
@@ -11,6 +10,7 @@ import {
   findTaskByNumber,
   getBoard,
   getTask,
+  getTaskByTicketId,
   importProjectTasks,
   listColumns,
   linkTasks,
@@ -911,10 +911,15 @@ const relationLine = (relation: Relation, taskId: string): string => {
 
 // Turns a reference into a task.
 //
-// A reference is a task id, a number with or without a leading '#', or a
-// project's id, slug or name followed by '#' and that number. The last form is
-// what follows `kaneo ` in KANEO_TASK_REF and in the references people write
-// (`kaneo kaneo-cli#3`), so one copied from there names its own board.
+// A reference is a task id, a number with or without a leading '#', a project's
+// id, slug or name followed by '#' and that number, or a project slug and a
+// number joined by a dash (`BET-1`). The '#' form is what follows `kaneo ` in
+// KANEO_TASK_REF and in the references people write (`kaneo kaneo-cli#3`), so
+// one copied from there names its own board. The dash form is how the Kaneo
+// server and UI write a task; the server resolves it, so it is one request and
+// its errors (404, 403, 409 for a slug that names more than one project) are
+// shown as the server wrote them. A server before v2.30.0 has no such route, and
+// the dash form is not tried another way there.
 //
 // Numbers are what a person reads off the board, so they have to work wherever an
 // id does — and a number is answered from the board rather than fetched as an id,
@@ -933,22 +938,7 @@ export const resolveTask = async (app: App, ref: string, slugs?: Map<string, str
     return numberOn(named.project, named.number, "the reference", slugs);
   }
 
-  const dashed = dashedReference(wanted);
-  if (dashed !== undefined) {
-    // A task id may hold a dash, so the value is an id first.
-    try {
-      return await getTask(wanted);
-    } catch (idError) {
-      if (!(idError instanceof KaneoApiError) || (idError.statusCode !== 404 && idError.statusCode !== 400)) throw idError;
-      try {
-        return await numberOn(dashed.project, dashed.number, "the reference", slugs);
-      } catch (refError) {
-        // A project that does not exist means the value was never a reference.
-        if (refError instanceof KaneoApiError) throw idError;
-        throw refError;
-      }
-    }
-  }
+  if (isTicketId(wanted)) return getTaskByTicketId(wanted);
 
   const number = asNumber(wanted.startsWith("#") ? wanted.slice(1) : wanted);
   if (number === undefined) return getTask(wanted);
@@ -986,14 +976,16 @@ const namedReference = (wanted: string): { project: string; number: number } | u
   return number === undefined ? undefined : { project: wanted.slice(0, at), number };
 };
 
-// `<project>-<number>`: the form the Kaneo server and UI write a task as
-// (`BET-1`). The last dash splits it, because a slug may hold dashes.
-const dashedReference = (wanted: string): { project: string; number: number } | undefined => {
+// `<slug>-<number>`: the form the Kaneo server and UI write a task as (`BET-1`),
+// which the server resolves itself (`GET /task/by-ticket-id/{ticketId}`).
+//
+// The last dash splits it, because a slug may hold dashes (`kaneo-cli-3`). That
+// is the server's own split, `^(.+)-(\d+)$`, so a value is a ticket id here
+// exactly when the server would read it as one. A task id is a cuid2 and holds
+// no dash, so a value that fits is never an id.
+const isTicketId = (wanted: string): boolean => {
   const at = wanted.lastIndexOf("-");
-  if (at < 1) return undefined;
-  const tail = wanted.slice(at + 1);
-  if (!/^\d+$/.test(tail)) return undefined;
-  return { project: wanted.slice(0, at), number: Number.parseInt(tail, 10) };
+  return at >= 1 && /^\d+$/.test(wanted.slice(at + 1));
 };
 
 // The task a number names on one project's board.

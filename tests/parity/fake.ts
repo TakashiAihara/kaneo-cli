@@ -850,6 +850,31 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         results: { total: results.length, successful: results.filter((r) => r.success).length, failed: results.filter((r) => !r.success).length, tasks: results },
       });
     }
+    // v2.32.0's get-task-by-ticket-id.ts: the key is whatever precedes the last
+    // dash, matched to a slug ignoring case; a match in an active project wins
+    // over an archived one, and a tie is a 409. Its HTTPException is plain text.
+    if (req.method === "GET" && (p = m(/^\/task\/by-ticket-id\/([^/]+)$/))) {
+      const match = decodeURIComponent(p[1]).normalize("NFKC").match(/^(.+)-(\d+)$/u);
+      const number = Number(match?.[2]);
+      if (!match || !Number.isSafeInteger(number) || number < 1 || number > 2_147_483_647) return failText(400, "Invalid task ticket ID");
+      const key = match[1]!.toLowerCase();
+      const found = tasks
+        .filter((t) => t.number === number)
+        .map((t) => ({ t, project: projects.find((x) => x.id === t.projectId)! }))
+        .filter(({ project }) => project.slug.normalize("NFKC").toLowerCase() === key);
+      if (found.length === 0) return failText(404, "Task not found");
+      const active = found.filter(({ project }) => project.archivedAt === null);
+      const pool = active.length > 0 ? active : found;
+      if (pool.length > 1) return failText(409, "Task ticket ID matches multiple accessible tasks");
+      const { t, project } = pool[0]!;
+      return ok(M.TaskByTicketId, {
+        ...t,
+        columnId: columnsOf(t.projectId).find((c) => c.slug === t.status)?.id ?? null,
+        workspaceId: project.workspaceId,
+        assigneeId: t.userId,
+        assigneeName: t.userId ? (users.get(t.userId) ?? null) : null,
+      });
+    }
     if (req.method === "POST" && (p = m(/^\/task\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       if (!proj) return failText(400, "Workspace ID could not be determined");

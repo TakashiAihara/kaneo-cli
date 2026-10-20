@@ -550,7 +550,39 @@ export const SCENARIOS: Scenario[] = [
   { name: "task bulk empty value", steps: [["task", "bulk", "1", "--status", "", "--json"], ["task", "bulk", "1", "--assign", " ", "--json"]] },
   { name: "task bulk assigns only members", steps: [["task", "bulk", "1", "--assign", "user-nobody", "--json"]] },
   { name: "task bulk names a board three ways", steps: [["task", "bulk", "1", "ALP#2", "proj-alpha#3", "--priority", "low", "--json"]] },
-  { name: "task bulk names a board with a dash", steps: [["task", "bulk", "1", "ALP-2", "BET-1", "--priority", "low", "--json"], ["task", "bulk", "1", "NOPE-1", "--priority", "low", "--json"]] },
+  { name: "task bulk names a board with a dash in the reference", steps: [["task", "bulk", "1", "ALP-2", "BET-1", "--priority", "low", "--json"], ["task", "bulk", "1", "NOPE-1", "--priority", "low", "--json"]] },
+  { name: "task get by a reference with a dash", steps: [["task", "get", "BET-1", "--json"], ["task", "get", "bet-1", "--json"], ["task", "get", "ALP-2", "--human"]] },
+  { name: "task get by a reference with a dash that is not on the board", steps: [["task", "get", "NOPE-1", "--json"], ["task", "get", "ALP-99", "--json"]] },
+  {
+    // The last dash splits the reference, so a slug that holds dashes is a slug.
+    name: "task get by a reference whose slug holds a dash",
+    seed: {
+      projects: [...SEED.projects, { id: "proj-kcli", workspaceId: WS, name: "Kaneo CLI", slug: "kaneo-cli" }],
+      tasks: [...SEED.tasks, { id: "task-k1", projectId: "proj-kcli", title: "Dashed" }],
+    },
+    steps: [["task", "get", "kaneo-cli-1", "--json"], ["task", "get", "KANEO-CLI-1", "--human"]],
+  },
+  {
+    // An active project answers before an archived namesake; two active ones
+    // are the server's 409, shown as it wrote it.
+    name: "task get by a reference with a dash two projects carry",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-alp-old", workspaceId: WS, name: "Alpha archived", slug: "ALP", archived: true },
+        { id: "proj-dup1", workspaceId: WS, name: "Dup one", slug: "DUP" },
+        { id: "proj-dup2", workspaceId: "ws-other", name: "Dup two", slug: "dup" },
+      ],
+      tasks: [
+        ...SEED.tasks,
+        { id: "task-old1", projectId: "proj-alp-old", title: "Archived namesake" },
+        { id: "task-dup1", projectId: "proj-dup1", title: "First dup" },
+        { id: "task-dup2", projectId: "proj-dup2", title: "Second dup" },
+      ],
+    },
+    steps: [["task", "get", "ALP-1", "--json"], ["task", "get", "DUP-1", "--json"]],
+  },
+  { name: "task get a dash without a slug is not a reference", steps: [["task", "get", "--json", "--", "-1"], ["task", "get", "BET--1", "--json"], ["task", "get", "BET-x", "--json"]] },
   { name: "task bulk delete counts each task once", steps: [["task", "bulk", "1", "ALP#1", "--delete", "--json"]] },
   ...both("task export", ["task", "export"]),
   { name: "task export piped", steps: [["task", "export"]] },

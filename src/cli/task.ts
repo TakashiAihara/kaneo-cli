@@ -77,8 +77,15 @@ export const taskCommand = {
         // Asked of the server, which filters before it pages, and of the answer
         // as well (see TaskFilters).
         const board = await withProject(project(app), (id) => getBoard(id, { status, priority }));
-        const tasks = filterTasks(projectTasks(board), status, priority, flags.all === true);
+        const everything = projectTasks(board);
+        const tasks = filterTasks(everything, status, priority, flags.all === true);
         for (const task of tasks) app.out.human(taskLine(task));
+        // The columns left out are not otherwise visible, so a count of the
+        // listing reads as a count of the project. On stderr in every mode, as
+        // warnSimilar does, so stdout stays the array it was; counted under the
+        // same --status and --priority, so it is the tasks --all would add.
+        const left = filterTasks(everything, status, priority, true).length - tasks.length;
+        if (left > 0) console.error(`(${left} done / planned / archived ${left === 1 ? "task" : "tasks"} left out; --all to include them)`);
         app.out.data(tasks);
       },
     },

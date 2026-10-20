@@ -14,11 +14,13 @@ const tempDir = (prefix: string): string => {
 
 // A global or system `url.<base>.insteadOf` would rewrite the origin before
 // currentRepo reads it, so a row could pass without reaching the pattern it names.
+// Only PATH is inherited: a GIT_DIR from a git hook would point the temp repo's
+// git init and remote add at another repository.
 const isolatedEnv = (globalConfig = ""): Record<string, string | undefined> => {
   const home = tempDir("kaneo-home-");
   const config = join(home, "gitconfig");
   writeFileSync(config, globalConfig);
-  return { ...process.env, GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: "1", HOME: home };
+  return { PATH: process.env.PATH, GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: "1", HOME: home };
 };
 
 const repoWithOrigin = (origin: string, env: Record<string, string | undefined>): string => {

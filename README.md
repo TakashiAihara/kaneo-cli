@@ -214,7 +214,7 @@ Long text is taken as it was written rather than as a shell passes it: `-` is st
 
 A project's slug is the prefix of its task identifiers. Without `--slug`, `project create` derives it the way the Kaneo web app does: the first three letters of a one-word name, or the initials of the first three words, upper case, in any script (`Alpha Beta Gamma` → `ABG`, `日本語だけ` → `日本語`). A name with no letter or number derives nothing, and a derived slug another project in the workspace already has is refused; both have to be given `--slug`.
 
-A task in no column at all — the server answers `planned` and `archived` tasks beside the columns — is read as a column of its own, and `task ls` leaves those out unless `--all` or an explicit `--status` asks for them. `board` shows neither.
+A task in no column at all — the server answers `planned` and `archived` tasks beside the columns — is read as a column of its own, and `task ls` leaves those out unless `--all` or an explicit `--status` asks for them, and says on stderr, in every output mode, how many it left out. `board` shows neither.
 
 Times are ISO 8601 with an offset (`2026-01-02T09:00:00Z`, `2026-01-02T18:00+09:00`); a time without one is refused rather than read in some zone. "Now" is this machine's clock.
 

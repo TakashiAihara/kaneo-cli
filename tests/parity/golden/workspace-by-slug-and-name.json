@@ -21,7 +21,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "proj-delta  Delta\n",
+      "stdout": "proj-delta  Delta  [DEL]\n",
       "stderr": ""
     },
     {
@@ -33,7 +33,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "proj-delta  Delta\n",
+      "stdout": "proj-delta  Delta  [DEL]\n",
       "stderr": ""
     }
   ],

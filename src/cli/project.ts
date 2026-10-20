@@ -49,12 +49,14 @@ const archiveCommand = (verb: "archive" | "unarchive") => {
 
 // One project, named the way a listing prints it.
 //
-// Across workspaces a project is only unique inside its own, so the slug and the
-// workspace it is in are what tell two of them apart; inside one workspace the
-// name already says enough and the line stays as it was.
+// The slug is what -p and <slug>#N take, so every line carries it, except for a
+// project with none (the server takes an empty one), which has nothing to show.
+// Across workspaces a project is only unique inside its own, so the workspace it is in
+// follows, spelled out so it cannot be read as the archived marker.
 const projectLine = (project: Project, workspaceName = ""): string => {
   const columns = [project.id, project.name];
-  if (workspaceName !== "") columns.push(`[${project.slug}]`, `(${workspaceName})`);
+  if (project.slug !== "") columns.push(`[${project.slug}]`);
+  if (workspaceName !== "") columns.push(`(workspace: ${workspaceName})`);
   if (archived(project)) columns.push("(archived)");
   return columns.join("  ");
 };
@@ -136,7 +138,7 @@ export const projectCommand = {
           name: "all-workspaces",
           shorthand: "A",
           type: "bool" as const,
-          usage: "list every workspace the key can reach, naming the workspace each project is in",
+          usage: "list every workspace the key can reach, naming the workspace each project is in; cannot be combined with -w",
           defaultValue: "false",
         },
       ],
@@ -144,6 +146,9 @@ export const projectCommand = {
         apiKey(app);
         const includeArchived = flags.archived === true;
         const acrossAll = flags["all-workspaces"] === true;
+        if (acrossAll && app.flags.workspaceId !== "") {
+          throw new Error("--all-workspaces lists every workspace, so it cannot be narrowed with --workspace");
+        }
         // One list either way. Only whether a workspace is part of each entry
         // differs, and it can only be named when the listing covers more than one.
         const found = acrossAll

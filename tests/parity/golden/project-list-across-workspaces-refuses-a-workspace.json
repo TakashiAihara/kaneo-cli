@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "ls",
+        "-A",
+        "-w",
+        "ws-main",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --all-workspaces lists every workspace, so it cannot be narrowed with --workspace\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

@@ -22,7 +22,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "proj-alpha  Alpha\nproj-beta  Beta\nproj0002  Gamma\n",
+      "stdout": "proj-alpha  Alpha  [ALP]\nproj-beta  Beta  [BET]\nproj0002  Gamma  [GAM]\n",
       "stderr": ""
     }
   ],

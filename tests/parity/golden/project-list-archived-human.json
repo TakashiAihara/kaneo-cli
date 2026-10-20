@@ -8,7 +8,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "proj-alpha  Alpha\nproj-beta  Beta\nproj-old  Old  (archived)\n",
+      "stdout": "proj-alpha  Alpha  [ALP]\nproj-beta  Beta  [BET]\nproj-old  Old  [OLD]  (archived)\n",
       "stderr": ""
     }
   ],

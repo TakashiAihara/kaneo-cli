@@ -9,8 +9,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"no workspace member is named \\\"Nobody\\\"; kaneo workspace members lists them\"\n}\n",
-      "stderr": "Error: no workspace member is named \"Nobody\"; kaneo workspace members lists them\n"
+      "stdout": "{\n  \"error\": \"no member of workspace ws-main has the id or name \\\"Nobody\\\"; `kaneo workspace members -w ws-main` lists them\"\n}\n",
+      "stderr": "Error: no member of workspace ws-main has the id or name \"Nobody\"; `kaneo workspace members -w ws-main` lists them\n"
     },
     {
       "args": [

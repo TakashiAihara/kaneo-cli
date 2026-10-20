@@ -83,6 +83,7 @@ export type Scenario = {
   // The fake answers matching "METHOD path" requests with a 500, having
   // changed nothing.
   failOn?: string;
+  failStatus?: number;
   plainMember?: boolean;
   noCurrentUser?: boolean;
   blankCurrentUserId?: boolean;
@@ -527,7 +528,10 @@ export const SCENARIOS: Scenario[] = [
     seed: { members: [...MEMBERS!, { id: "user-2", name: "Ada", email: "ada2@example.com", role: "member" }] },
     steps: [["task", "assign", "1", "Nobody", "--json"], ["task", "assign", "1", "ada", "--json"], ["task", "get", "1", "--json"]],
   },
-  { name: "task assign by id needs no workspace", env: { KANEO_WORKSPACE: "" }, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "user-1", "--human"], ["task", "get", "1", "--json"]] },
+  { name: "task assign by id needs no configured workspace", env: { KANEO_WORKSPACE: "" }, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "user-1", "--human"], ["task", "get", "1", "--json"]] },
+  { name: "task assign stops when the project read has no workspace", readWithout: ["workspaceId"], seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--json"]] },
+  { name: "task assign names the project read that failed", failOn: "^GET /project/proj-alpha$", failStatus: 403, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--json"]] },
+  { name: "task assign me on a server without user me", noCurrentUser: true, steps: [["task", "assign", "1", "me", "--json"]] },
   // The members are those of the workspace the task is in, not the configured one.
   {
     name: "task assign uses the workspace of the task",

@@ -1,0 +1,29 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "assign",
+        "1",
+        "me",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"`me` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead: GET /api/user/me: 404: no route: GET /user/me\"\n}\n",
+      "stderr": "Error: `me` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead: GET /api/user/me: 404: no route: GET /user/me\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -561,14 +561,34 @@ export const updateProject = async (
     want[field] = trimmed;
   }
 
-  const before = await getProject(projectId);
+  const raw = zeroRecord(await readProject(pathParam(projectId)));
+  const before = project(raw);
   // Every field of this read is written back, so a read that decoded to nothing
   // (a null reply, a different shape) would blank the project. An empty slug is
   // not that: it is a state a project can be in, and writing it back is the only
-  // way such a project can be changed at all.
-  if (before.id !== projectId || before.name === "") {
+  // way such a project can be changed at all. A field the reply left out, or
+  // sent as null, would be written back as "" or false and blank an icon or turn
+  // a public project private, so each one sent back has to have been read as its
+  // type. Only the description may be null: the server stores NULL there and
+  // this client writes it back as "". icon and isPublic are nullable upstream
+  // too, but a NULL there has no value to send back.
+  const present: Record<"slug" | "description" | "icon" | "isPublic", boolean> = {
+    slug: typeof raw.slug === "string",
+    description: typeof raw.description === "string" || raw.description === null,
+    icon: typeof raw.icon === "string",
+    isPublic: typeof raw.isPublic === "boolean",
+  };
+  const missing = (["slug", "description", "icon", "isPublic"] as const).filter(
+    (field) => !present[field] && (field === "isPublic" || changes[field] === undefined),
+  );
+  const identified = before.id === projectId && before.name !== "";
+  if (!identified || missing.length > 0) {
+    // The way past is offered only for a read that was this project: a flag does
+    // not get a null or foreign reply past the id and name check.
+    const flags = identified ? missing.filter((field) => field !== "isPublic").map((field) => `--${field} TEXT`) : [];
+    const stuck = identified && missing.includes("isPublic");
     throw new Error(
-      `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}; not writing`,
+      `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}${missing.length > 0 ? `, without ${missing.join(", ")}` : ""}; not writing${flags.length > 0 ? ` (pass ${flags.join(" ")} to write it yourself)` : ""}${stuck ? "; isPublic has no flag, so this project cannot be updated until the server returns it" : ""}`,
     );
   }
 

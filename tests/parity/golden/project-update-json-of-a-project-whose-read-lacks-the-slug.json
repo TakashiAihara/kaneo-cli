@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "update",
+        "proj-alpha",
+        "--slug",
+        "AL2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"from\": {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  \"to\": {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"AL2\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  \"unread\": [\n    \"slug\"\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Alpha",
+        "icon": "Layout",
+        "slug": "AL2",
+        "description": "",
+        "isPublic": false
+      }
+    }
+  ],
+  "files": {}
+}

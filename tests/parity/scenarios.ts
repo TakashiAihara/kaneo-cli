@@ -191,6 +191,16 @@ export const SCENARIOS: Scenario[] = [
     readWithout: ["description"],
     steps: [["project", "update", P1, "-d", "", "--human"]],
   },
+  {
+    name: "project update json of a project whose read lacks the slug",
+    readWithout: ["slug"],
+    steps: [["project", "update", P1, "--slug", "AL2", "--json"]],
+  },
+  {
+    name: "project update json of a project whose read lacks the description",
+    readWithout: ["description"],
+    steps: [["project", "update", P1, "-d", "", "--json"]],
+  },
   // A project whose id the shell would split or expand: the hints quote it.
   {
     name: "hints quote an id the shell would expand",

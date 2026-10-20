@@ -1,7 +1,9 @@
 import { writeSync } from "node:fs";
-import { apiKey, project, taskProject, type App } from "./app";
+import { apiKey, project, taskProject, workspace, type App } from "./app";
 import {
   bulkUpdate,
+  currentUser,
+  listMembers,
   createTask,
   deleteRelation,
   deleteTask,
@@ -41,10 +43,27 @@ import {
 import type { Json } from "../output/json";
 import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunContext } from "./args";
 import { readInput, sourceName } from "./input";
-import { withProject } from "./lookup";
+import { resolveWorkspace, withProject } from "./lookup";
 import { attachTask, currentSessionId } from "../session/attach";
 import { BAD_ID, validSessionId } from "../session/store";
 import { sharedReference, similarOpenTasks } from "./similar";
+
+// The user id a person's wording of an assignee stands for: `me`, a member's id
+// or a member's name. An id is tried before a name so a member named like
+// another's id cannot capture it.
+const resolveAssignee = async (app: App, given: string): Promise<string> => {
+  const value = given.trim();
+  if (value === "") throw new Error("the user is empty; give a member's id or name, `me`, or leave it out to clear the assignee");
+  if (value.toLowerCase() === "me") return (await currentUser()).id;
+  const members = await listMembers(await resolveWorkspace(workspace(app)));
+  if (members.some((m) => m.id === value)) return value;
+  const named = members.filter((m) => m.name.toLowerCase() === value.toLowerCase());
+  if (named.length === 0) throw new Error(`no workspace member is named ${JSON.stringify(value)}; kaneo workspace members lists them`);
+  if (named.length > 1) {
+    throw new Error(`${named.length} workspace members are named ${JSON.stringify(value)} (${named.map((m) => m.id).join(", ")}); give the id`);
+  }
+  return named[0]!.id;
+};
 
 export const taskCommand = {
   name: "task",
@@ -465,13 +484,18 @@ export const taskCommand = {
     },
     {
       name: "assign",
-      use: "assign <task> [user-id]",
+      use: "assign <task> [user]",
       short: "Assign a task, or clear the assignee when no user is given",
+      long:
+        "Assign a task, or clear the assignee when no user is given.\n\n" +
+        "The user is a member's id, a member's name (matched whole, ignoring case,\n" +
+        "against the resolved workspace's members) or `me` for the API key's own user.\n" +
+        "A name that matches no member or more than one is refused.",
       args: rangeArgs(1, 2),
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
-        const user = args[1] ?? "";
+        const user = args[1] === undefined ? "" : await resolveAssignee(app, args[1]);
         await setTaskAssignee(task.id, user);
         const after = await taskAfterWrite(task, user === "" ? "assignee was cleared" : "assignee was set");
         readBack("assignee", after.assigneeId, user);

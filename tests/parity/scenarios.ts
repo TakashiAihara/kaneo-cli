@@ -505,12 +505,19 @@ export const SCENARIOS: Scenario[] = [
   },
   { name: "task status", steps: [["task", "status", "1", "done", "--json"], ["task", "get", "1", "--human"]] },
   { name: "task priority", steps: [["task", "priority", "1", "urgent", "--human"], ["task", "get", "1", "--json"]] },
-  { name: "task assign and clear", steps: [["task", "assign", "1", "user-1", "--json"], ["task", "assign", "1", "--human"], ["task", "get", "1", "--json"]] },
+  { name: "task assign and clear", seed: { members: MEMBERS }, steps: [["task", "assign", "1", "user-1", "--json"], ["task", "assign", "1", "--human"], ["task", "get", "1", "--json"]] },
+  { name: "task assign by name and me", seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--human"], ["task", "assign", "1", "me", "--human"], ["task", "get", "1", "--json"]] },
+  {
+    name: "task assign refuses an unknown or shared name",
+    seed: { members: [...MEMBERS!, { id: "user-2", name: "Ada", email: "ada2@example.com", role: "member" }] },
+    steps: [["task", "assign", "1", "Nobody", "--json"], ["task", "assign", "1", "ada", "--json"], ["task", "get", "1", "--json"]],
+  },
   // Every write reads the task back and prints that, so a value the server did not
   // take cannot print as one it did. The assignment is read as a person reads it:
   // the name the server resolved the id to, rather than the id behind it.
   {
     name: "writes read back",
+    seed: { members: MEMBERS },
     steps: [["task", "status", "1", "in-progress", "--json"], ["task", "priority", "1", "low", "--human"], ["task", "assign", "1", "user-1", "--human"]],
   },
   // The labels of the task the write resolved come along with the read-back, since
@@ -527,6 +534,7 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "a write the server did not keep",
     writesNotKept: true,
+    seed: { members: MEMBERS },
     steps: [["task", "status", "1", "done", "--json"], ["task", "priority", "1", "low", "--human"], ["task", "assign", "1", "user-1", "--json"], ["task", "move", "1", "--to", P2, "--human"]],
   },
   // The read that confirms a write is the one that can fail after it landed.

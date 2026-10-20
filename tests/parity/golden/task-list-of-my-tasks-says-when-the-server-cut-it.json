@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "--mine",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ALP#4    [no-priority] to-do         Mine in alpha\n",
+      "stderr": "(showing 1 of 2 assigned tasks)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/assigned",
+      "query": "?workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

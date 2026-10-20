@@ -17,6 +17,18 @@
         "task",
         "ls",
         "--mine",
+        "--priority",
+        "high"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--priority cannot be combined with --mine\"\n}\n",
+      "stderr": "Error: --priority cannot be combined with --mine\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--mine",
         "--all"
       ],
       "exit": 1,

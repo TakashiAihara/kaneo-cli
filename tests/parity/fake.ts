@@ -88,6 +88,8 @@ export type FakeOptions = {
   // Answers the listing without applying status or priority, so what the CLI
   // prints is seen not to rest on the server having filtered.
   ignoreFilters?: boolean;
+  // The most tasks /task/assigned returns; total still counts them all.
+  assignedLimit?: number;
   // Answers a request whose "METHOD path" matches with a 500, having changed
   // nothing, for a write that is refused or a read that fails.
   failOn?: string;
@@ -786,7 +788,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         .filter(({ p }) => p.workspaceId === workspaceId && !p.archivedAt);
       return ok(M.AssignedTasks, {
         total: mine.length,
-        tasks: mine.map(({ t, p }) => ({
+        tasks: mine.slice(0, opts.assignedLimit ?? 100).map(({ t, p }) => ({
           id: t.id,
           projectId: t.projectId,
           number: t.number,

@@ -102,6 +102,12 @@ export const taskCommand = {
       name: "list",
       aliases: ["ls"],
       short: "List the tasks in a project",
+      long:
+        "List the tasks in a project.\n\n" +
+        "With --mine the listing is instead the open tasks assigned to you across the\n" +
+        "whole workspace: the project setting is not used, the server returns at most\n" +
+        "100 (stderr says when it cut the list), and --status, --priority and --all\n" +
+        "are refused because the server takes no filter for it.",
       args: noArgs("kaneo task list"),
       flags: [
         { name: "status", type: "string" as const, usage: "only tasks in this column", defaultValue: "" },
@@ -126,7 +132,7 @@ export const taskCommand = {
       run: async ({ flags, app }: { flags: FlagValues; app: App }) => {
         apiKey(app);
         if (flags.mine === true) {
-          // The server lists open tasks only and takes no filter, so a flag that
+          // The server lists open tasks only and takes no filter (as of v2.32.0), so a flag that
           // narrows or widens the listing would be accepted and do nothing.
           for (const name of ["status", "priority", "all"]) {
             if (flags[name] !== undefined && flags[name] !== "" && flags[name] !== false) {

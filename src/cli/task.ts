@@ -44,6 +44,8 @@ import {
 import type { Json } from "../output/json";
 import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunContext } from "./args";
 import { readInput, sourceName } from "./input";
+import { shellWord } from "../output/output";
+import { KaneoApiError } from "../api/http";
 import { withProject } from "./lookup";
 import { attachTask, currentSessionId } from "../session/attach";
 import { BAD_ID, validSessionId } from "../session/store";
@@ -57,14 +59,32 @@ const resolveAssignee = async (task: Task, given: string): Promise<string> => {
   const value = given.trim();
   if (value === "") throw new Error("the user is empty; give a member's id or name, `me`, or leave it out to clear the assignee");
   if (value.toLowerCase() === "me") {
-    const id = (await currentUser()).id;
+    const id = (
+      await currentUser().catch((e: unknown) => {
+        if (e instanceof KaneoApiError && e.statusCode === 404 && !e.messages.includes("User not found")) {
+          throw new Error(`${e.message}; \`me\` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead`);
+        }
+        throw e;
+      })
+    ).id;
     if (id === "") throw new Error("the server did not say which user the API key is; give a member's id or name instead");
     return id;
   }
-  const members = await listMembers((await getProject(task.projectId)).workspaceId);
+  const read = await getProject(task.projectId).catch((e: unknown) => {
+    throw new Error(`reading project ${task.projectId}, the project of task #${task.number}, to find its workspace: ${(e as Error).message}`);
+  });
+  const workspaceId = read.workspaceId;
+  if (workspaceId === "") {
+    throw new Error(`reading project ${task.projectId}, the project of task #${task.number}, did not say which workspace it is in, so its members cannot be listed`);
+  }
+  const members = await listMembers(workspaceId);
   if (members.some((m) => m.id === value)) return value;
   const named = members.filter((m) => m.name.toLowerCase() === value.toLowerCase());
-  if (named.length === 0) throw new Error(`no workspace member is named ${JSON.stringify(value)}; kaneo workspace members lists them`);
+  if (named.length === 0) {
+    throw new Error(
+      `no member of workspace ${workspaceId} has the id or name ${JSON.stringify(value)}; \`kaneo workspace members -w ${shellWord(workspaceId)}\` lists them`,
+    );
+  }
   if (named.length > 1) {
     throw new Error(`${named.length} workspace members are named ${JSON.stringify(value)} (${named.map((m) => m.id).join(", ")}); give the id`);
   }

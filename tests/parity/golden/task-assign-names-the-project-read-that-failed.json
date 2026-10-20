@@ -1,0 +1,29 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "assign",
+        "1",
+        "ada",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"reading project proj-alpha, the project of task #1, to find its workspace: GET /api/project/proj-alpha: 403: injected failure\"\n}\n",
+      "stderr": "Error: reading project proj-alpha, the project of task #1, to find its workspace: GET /api/project/proj-alpha: 403: injected failure\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

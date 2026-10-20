@@ -91,6 +91,8 @@ export type FakeOptions = {
   // Answers a request whose "METHOD path" matches with a 500, having changed
   // nothing, for a write that is refused or a read that fails.
   failOn?: string;
+  // The status failOn answers with, 500 unless a scenario wants another.
+  failStatus?: number;
   // The key's user lacks the project update and delete permissions, so those
   // routes answer as Kaneo 2.32.0's requireWorkspacePermission does.
   plainMember?: boolean;
@@ -425,7 +427,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (!url.pathname.startsWith("/api/")) return new Response("<html>app</html>", { headers: { "content-type": "text/html" } });
     if (req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
-    if (failing?.test(`${req.method} ${path}`) && skipped++ >= (opts.failOnSkip ?? 0)) return fail(500, "injected failure");
+    if (failing?.test(`${req.method} ${path}`) && skipped++ >= (opts.failOnSkip ?? 0)) return fail(opts.failStatus ?? 500, "injected failure");
 
     // The server validates request bodies against the same schemas the
     // document declares, and answers 400 with the first issue.

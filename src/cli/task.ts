@@ -62,7 +62,7 @@ const resolveAssignee = async (task: Task, given: string): Promise<string> => {
     const id = (
       await currentUser().catch((e: unknown) => {
         if (e instanceof KaneoApiError && e.statusCode === 404 && !e.messages.includes("User not found")) {
-          throw new Error(`\`me\` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead: ${e.message}`);
+          throw new Error(`${e.message}; \`me\` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead`);
         }
         throw e;
       })
@@ -75,7 +75,7 @@ const resolveAssignee = async (task: Task, given: string): Promise<string> => {
   });
   const workspaceId = read.workspaceId;
   if (workspaceId === "") {
-    throw new Error(`reading project ${task.projectId}, the project of task #${task.number}, did not say which workspace it is in; give the member's id`);
+    throw new Error(`reading project ${task.projectId}, the project of task #${task.number}, did not say which workspace it is in, so its members cannot be listed`);
   }
   const members = await listMembers(workspaceId);
   if (members.some((m) => m.id === value)) return value;

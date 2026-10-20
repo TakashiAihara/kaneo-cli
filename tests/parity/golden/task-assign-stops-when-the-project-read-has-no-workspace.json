@@ -9,8 +9,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"reading project proj-alpha, the project of task #1, did not say which workspace it is in; give the member's id\"\n}\n",
-      "stderr": "Error: reading project proj-alpha, the project of task #1, did not say which workspace it is in; give the member's id\n"
+      "stdout": "{\n  \"error\": \"reading project proj-alpha, the project of task #1, did not say which workspace it is in, so its members cannot be listed\"\n}\n",
+      "stderr": "Error: reading project proj-alpha, the project of task #1, did not say which workspace it is in, so its members cannot be listed\n"
     }
   ],
   "requests": [

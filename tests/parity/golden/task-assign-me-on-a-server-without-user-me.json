@@ -9,8 +9,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"`me` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead: GET /api/user/me: 404: no route: GET /user/me\"\n}\n",
-      "stderr": "Error: `me` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead: GET /api/user/me: 404: no route: GET /user/me\n"
+      "stdout": "{\n  \"error\": \"GET /api/user/me: 404: no route: GET /user/me; `me` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead\"\n}\n",
+      "stderr": "Error: GET /api/user/me: 404: no route: GET /user/me; `me` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead\n"
     }
   ],
   "requests": [

@@ -1198,6 +1198,59 @@ test("TestUpdateProjectRefusalNamesTheFlagsThatGetPast", async () => {
   expect(err).not.toContain("--icon");
 });
 
+test("TestUpdateProjectForeignReadStopsWithoutOfferingFlags", async () => {
+  const seen: string[] = [];
+  newServer((req) => {
+    seen.push(req.method);
+    return new Response(`{"id":"other","name":"Board","slug":"x","icon":"Box","description":"d","isPublic":true}`, {
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const err = String(await failure(api.updateProject("p1", { name: "New" })));
+  expect(err).toContain('got id "other"');
+  expect(err).not.toContain("to write it yourself");
+  expect(seen).toEqual(["GET"]);
+});
+
+test("TestUpdateProjectEmptyReadOffersNoFlags", async () => {
+  newServer(() => new Response("{}", { headers: { "content-type": "application/json" } }));
+  const err = String(await failure(api.updateProject("p1", { name: "New" })));
+  expect(err).not.toContain("to write it yourself");
+});
+
+test("TestUpdateProjectMissingIconOffersTheIconFlag", async () => {
+  newServer(
+    () => new Response(`{"id":"p1","name":"Board","slug":"x","description":"d","isPublic":true}`, { headers: { "content-type": "application/json" } }),
+  );
+  const err = String(await failure(api.updateProject("p1", { name: "New" })));
+  expect(err).toContain("(pass --icon TEXT to write it yourself)");
+});
+
+test("TestUpdateProjectMissingIsPublicOffersNoFlagAndSaysSo", async () => {
+  newServer(
+    () => new Response(`{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d"}`, { headers: { "content-type": "application/json" } }),
+  );
+  const err = String(await failure(api.updateProject("p1", { name: "New" })));
+  expect(err).not.toContain("--isPublic");
+  expect(err).not.toContain("to write it yourself");
+  expect(err).toContain("isPublic has no flag, so this project cannot be updated until the server returns it");
+});
+
+test.each([
+  ["icon", `{"id":"p1","name":"Board","slug":"x","icon":null,"description":"d","isPublic":true}`],
+  ["isPublic", `{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d","isPublic":null}`],
+  ["slug", `{"id":"p1","name":"Board","slug":null,"icon":"Box","description":"d","isPublic":true}`],
+])("TestUpdateProjectRefusesANull%sRead", async (field, reply) => {
+  const seen: string[] = [];
+  newServer((req) => {
+    seen.push(req.method);
+    return new Response(reply, { headers: { "content-type": "application/json" } });
+  });
+  const err = String(await failure(api.updateProject("p1", { name: "New" })));
+  expect(err).toContain(`, without ${field};`);
+  expect(seen).toEqual(["GET"]);
+});
+
 test("TestUpdateProjectReadWithNullDescriptionIsWritten", async () => {
   const seen = recorder(`{"id":"p1","name":"New","slug":"x","icon":"Box","description":null,"isPublic":true}`);
   await api.updateProject("p1", { name: "New" });

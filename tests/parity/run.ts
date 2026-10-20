@@ -22,6 +22,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     pageSize: s.pageSize,
     legacy: s.legacy,
     delayMs: s.delayMs,
+    readWithout: s.readWithout,
     whitespaceOn: s.whitespaceOn,
     growOnPage: s.growOnPage,
     growTimes: s.growTimes,

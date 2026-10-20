@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "update",
+        "proj-alpha",
+        "-d",
+        "",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated proj-alpha\n  description  (not read) -> \"\"\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Alpha",
+        "icon": "Layout",
+        "slug": "ALP",
+        "description": "",
+        "isPublic": false
+      }
+    }
+  ],
+  "files": {}
+}

@@ -286,7 +286,7 @@ export const projectCommand = {
         // The read of the project comes first inside updateProject, so a value the
         // server does not know is retried before anything is written rather than
         // after.
-        const { before, after } = await withProject(args[0]!, (id) =>
+        const { before, after, unread } = await withProject(args[0]!, (id) =>
           updateProject(id, changes).catch(refused("updating a project", "update", () => projectWorkspace(id))),
         );
         app.out.human(`updated ${after.id}`);
@@ -296,11 +296,17 @@ export const projectCommand = {
           ["description", before.description, after.description],
           ["icon", before.icon, after.icon],
         ] as const) {
-          if (from !== to) app.out.human(`  ${field}  ${JSON.stringify(from)} -> ${JSON.stringify(to)}`);
+          const notRead = unread.includes(field);
+          if (from === to && !notRead) continue;
+          const was = notRead ? "(not read)" : JSON.stringify(from);
+          app.out.human(`  ${field}  ${was} -> ${JSON.stringify(to)}`);
         }
         // The slug is the prefix of every task identifier, so changing it renames
         // them all and the reader has to be told.
-        if (before.slug !== after.slug) app.out.human(`  task identifiers now start with ${after.slug}`);
+        // A slug the read lacked leaves no before to compare with.
+        if (unread.includes("slug")) {
+          app.out.human(`  task identifiers may now start with ${after.slug}; the slug was not read, so whether it changed is unknown`);
+        } else if (before.slug !== after.slug) app.out.human(`  task identifiers now start with ${after.slug}`);
         // A map's keys come out sorted, which is the order the report has.
         app.out.data({ from: before, to: after });
       },

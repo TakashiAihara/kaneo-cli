@@ -2,6 +2,10 @@
 // owner/repo a caller names.
 
 const SCP_LIKE = /^[^/@]+@[^/:]+:\/?([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
+// No user, so `host:owner/name` as git prints it for a remote written that way.
+// A single-letter host is a Windows drive (`C:x/y`), and a leading slash after
+// the colon is a path; neither is a host.
+const SCP_NO_USER = /^[^/@:]{2,}:([^/:]+)\/([^/]+?)(?:\.git)?\/?$/;
 const URL_LIKE = /^(?:ssh|git|https?):\/\/(?:[^/@]+@)?[^/]+\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 
 // Only hosted forms are accepted: scp-style SSH, and ssh/git/http/https URLs.
@@ -9,10 +13,14 @@ const URL_LIKE = /^(?:ssh|git|https?):\/\/(?:[^/@]+@)?[^/]+\/([^/]+)\/([^/]+?)(?
 // trailing components look exactly like owner/repo — /home/me/acme/thing would
 // otherwise resolve to the acme workspace and send writes to a board that has
 // nothing to do with it.
-const parseRemote = (remote: string): string => {
+//
+// The user-less scp form is accepted only for the cwd's origin remote:
+// a value a person typed with it is indistinguishable from a host
+// alias the maps know nothing about, so parseRepo keeps refusing it.
+const parseRemote = (remote: string, userless = false): string => {
   const url = remote.trim();
   if (url === "") return "";
-  for (const pattern of [URL_LIKE, SCP_LIKE]) {
+  for (const pattern of userless ? [URL_LIKE, SCP_LIKE, SCP_NO_USER] : [URL_LIKE, SCP_LIKE]) {
     const match = pattern.exec(url);
     const owner = match?.[1];
     const repo = match?.[2];
@@ -68,5 +76,5 @@ export const currentRepo = (dir: string): string => {
     // it are still an answer and the command is still worth running.
     return "";
   }
-  return parseRemote(remote);
+  return parseRemote(remote, true);
 };

@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "update",
+        "proj-alpha",
+        "--icon",
+        "Star",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"from\": {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"ALP\",\n    \"icon\": \"\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  \"to\": {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"ALP\",\n    \"icon\": \"Star\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  \"unread\": [\n    \"icon\"\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Alpha",
+        "icon": "Star",
+        "slug": "ALP",
+        "description": "",
+        "isPublic": false
+      }
+    }
+  ],
+  "files": {}
+}

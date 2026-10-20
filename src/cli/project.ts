@@ -308,7 +308,7 @@ export const projectCommand = {
           app.out.human(`  task identifiers may now start with ${after.slug}; the slug was not read, so whether it changed is unknown`);
         } else if (before.slug !== after.slug) app.out.human(`  task identifiers now start with ${after.slug}`);
         // A map's keys come out sorted, which is the order the report has.
-        app.out.data({ from: before, to: after });
+        app.out.data({ from: before, to: after, unread });
       },
     },
     archiveCommand("archive"),

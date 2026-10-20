@@ -10,7 +10,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"from\": {\n    \"id\": \"proj-noslug\",\n    \"name\": \"No slug\",\n    \"slug\": \"\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  \"to\": {\n    \"id\": \"proj-noslug\",\n    \"name\": \"Has a name now\",\n    \"slug\": \"\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  }\n}\n",
+      "stdout": "{\n  \"from\": {\n    \"id\": \"proj-noslug\",\n    \"name\": \"No slug\",\n    \"slug\": \"\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  \"to\": {\n    \"id\": \"proj-noslug\",\n    \"name\": \"Has a name now\",\n    \"slug\": \"\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  \"unread\": []\n}\n",
       "stderr": ""
     }
   ],

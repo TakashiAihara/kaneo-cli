@@ -154,7 +154,7 @@ kaneo project ls [-A]           # each line carries the [slug] that -p takes; -A
 kaneo project find <text>       # substring match on name and slug, across every workspace
 kaneo project get [project-id]
 kaneo project create <name> [--slug SLUG] [-d TEXT] [--icon ICON]
-kaneo project update <project-id> [--name NAME] [--slug SLUG] [-d TEXT] [--icon ICON]   # only what is passed changes
+kaneo project update <project-id> [--name NAME] [--slug SLUG] [-d TEXT] [--icon ICON]   # only what is passed changes; --json adds "unread", the fields the read lacked (their "from" is "")
 kaneo project reorder <project>...   # the new order: every project not archived in the workspace, exactly once, by id, slug or name
 kaneo project rm <project> --yes   # permanent: everything in it goes — tasks, comments, columns, workflow rules, external links
 kaneo column ls                    # the resolved project's columns, in board order

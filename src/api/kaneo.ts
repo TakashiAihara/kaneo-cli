@@ -53,6 +53,7 @@ import {
   importTasks as postImport,
   listOrganization,
   listProjects,
+  listAssignedTasks,
   listTasks,
   markAllNotificationsAsRead,
   markNotificationAsRead,
@@ -820,6 +821,40 @@ export const PRIORITIES = ["urgent", "high", "medium", "low", "no-priority"];
 export const priorityRank = (priority: string): number => {
   const at = PRIORITIES.indexOf(priority);
   return at === -1 ? PRIORITIES.length : at;
+};
+
+// The open tasks assigned to the caller across one workspace, which is a
+// different shape from a project's board: each task names its project and
+// carries no description or assignee. The server returns at most 100 of them;
+// total counts them all, so a reader can tell the list was cut.
+export type AssignedTask = {
+  id: string;
+  projectId: string;
+  projectSlug: string;
+  number: number | null;
+  title: string;
+  status: string;
+  priority: string;
+  dueDate: string | null;
+};
+
+export type AssignedTasks = { tasks: AssignedTask[]; total: number };
+
+export const listMyTasks = async (workspaceId: string): Promise<AssignedTasks> => {
+  const reply = zeroRecord(await listAssignedTasks({ workspaceId }));
+  return {
+    tasks: zeroList(reply.tasks).map((t) => ({
+      id: t.id,
+      projectId: t.projectId,
+      projectSlug: t.projectSlug,
+      number: t.number,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      dueDate: t.dueDate,
+    })),
+    total: reply.total ?? 0,
+  };
 };
 
 export type Board = {

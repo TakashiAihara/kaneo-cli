@@ -1,5 +1,5 @@
 import { writeSync } from "node:fs";
-import { apiKey, project, taskProject, type App } from "./app";
+import { apiKey, project, taskProject, workspace, type App } from "./app";
 import {
   bulkUpdate,
   currentUser,
@@ -18,6 +18,7 @@ import {
   listColumns,
   linkTasks,
   listExternalLinks,
+  listMyTasks,
   listRelations,
   moveTask,
   PRIORITIES,
@@ -33,6 +34,7 @@ import {
   setTaskPriority,
   setTaskStatus,
   taskSummary,
+  type AssignedTask,
   type ExternalLink,
   type BulkOperation,
   type ImportedTask,
@@ -46,7 +48,7 @@ import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunCon
 import { readInput, sourceName } from "./input";
 import { shellWord } from "../output/output";
 import { KaneoApiError } from "../api/http";
-import { withProject } from "./lookup";
+import { resolveWorkspace, withProject } from "./lookup";
 import { attachTask, currentSessionId } from "../session/attach";
 import { BAD_ID, validSessionId } from "../session/store";
 import { sharedReference, similarOpenTasks } from "./similar";
@@ -105,6 +107,12 @@ export const taskCommand = {
         { name: "status", type: "string" as const, usage: "only tasks in this column", defaultValue: "" },
         { name: "priority", type: "string" as const, usage: "only tasks with this priority", defaultValue: "" },
         {
+          name: "mine",
+          type: "bool" as const,
+          usage: "the open tasks assigned to you across the workspace, whatever the project",
+          defaultValue: "false",
+        },
+        {
           name: "all",
           type: "bool" as const,
           // Finished and filed-away work accumulates without bound, and neither
@@ -117,6 +125,22 @@ export const taskCommand = {
       ],
       run: async ({ flags, app }: { flags: FlagValues; app: App }) => {
         apiKey(app);
+        if (flags.mine === true) {
+          // The server lists open tasks only and takes no filter, so a flag that
+          // narrows or widens the listing would be accepted and do nothing.
+          for (const name of ["status", "priority", "all"]) {
+            if (flags[name] !== undefined && flags[name] !== "" && flags[name] !== false) {
+              throw new Error(`--${name} cannot be combined with --mine`);
+            }
+          }
+          const mine = await listMyTasks(await resolveWorkspace(workspace(app)));
+          for (const task of mine.tasks) app.out.human(assignedLine(task));
+          if (mine.total > mine.tasks.length) {
+            console.error(`(showing ${mine.tasks.length} of ${mine.total} assigned tasks)`);
+          }
+          app.out.data(mine.tasks);
+          return;
+        }
         const status = String(flags.status ?? "");
         const priority = String(flags.priority ?? "");
         // Asked of the server, which filters before it pages, and of the answer
@@ -1204,6 +1228,9 @@ const filterTasks = (tasks: Task[], status: string, priority: string, all: boole
       (priority === "" || task.priority === priority) &&
       (all || status !== "" || !HIDDEN.includes(task.status)),
   );
+
+const assignedLine = (task: AssignedTask): string =>
+  `${task.projectSlug}#${String(task.number ?? "").padEnd(4)} [${task.priority.padEnd(11)}] ${task.status.padEnd(13)} ${task.title}`;
 
 const taskLine = (task: Task): string =>
   `#${String(task.number).padEnd(4)} [${task.priority.padEnd(11)}] ${task.status.padEnd(13)} ${task.title}`;

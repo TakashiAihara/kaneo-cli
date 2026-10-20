@@ -117,6 +117,10 @@
   "importTasks": {
     "body.tasks": true
   },
+  "listAssignedTasks": {
+    "query.countOnly": false,
+    "query.workspaceId": true
+  },
   "listNotifications": {
     "query.workspaceId": false
   },

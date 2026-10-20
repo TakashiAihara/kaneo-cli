@@ -1,0 +1,29 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "--mine",
+        "--status",
+        "done"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--status cannot be combined with --mine\"\n}\n",
+      "stderr": "Error: --status cannot be combined with --mine\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--mine",
+        "--all"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--all cannot be combined with --mine\"\n}\n",
+      "stderr": "Error: --all cannot be combined with --mine\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

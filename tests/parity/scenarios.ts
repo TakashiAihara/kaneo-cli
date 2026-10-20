@@ -201,6 +201,17 @@ export const SCENARIOS: Scenario[] = [
     readWithout: ["description"],
     steps: [["project", "update", P1, "-d", "", "--json"]],
   },
+  {
+    name: "project update json of a project whose read lacks the icon",
+    readWithout: ["icon"],
+    steps: [["project", "update", P1, "--icon", "Star", "--json"]],
+  },
+  {
+    // The order of unread is the order slug, description, icon.
+    name: "project update json of a project whose read lacks every optional field",
+    readWithout: ["slug", "description", "icon"],
+    steps: [["project", "update", P1, "--slug", "AL2", "-d", "", "--icon", "Star", "--json"]],
+  },
   // A project whose id the shell would split or expand: the hints quote it.
   {
     name: "hints quote an id the shell would expand",

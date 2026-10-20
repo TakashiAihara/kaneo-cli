@@ -1,0 +1,49 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "--mine",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ALP#4    [no-priority] to-do         Mine in alpha\n",
+      "stderr": "(showing 1 of 2 assigned tasks)\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--mine",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"task-m1\",\n    \"projectId\": \"proj-alpha\",\n    \"projectSlug\": \"ALP\",\n    \"number\": 4,\n    \"title\": \"Mine in alpha\",\n    \"status\": \"to-do\",\n    \"priority\": \"no-priority\",\n    \"dueDate\": null\n  }\n]\n",
+      "stderr": "(showing 1 of 2 assigned tasks)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/assigned",
+      "query": "?workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/assigned",
+      "query": "?workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

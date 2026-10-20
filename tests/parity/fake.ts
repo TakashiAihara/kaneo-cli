@@ -88,6 +88,8 @@ export type FakeOptions = {
   // Answers the listing without applying status or priority, so what the CLI
   // prints is seen not to rest on the server having filtered.
   ignoreFilters?: boolean;
+  // The most tasks /task/assigned returns; total still counts them all.
+  assignedLimit?: number;
   // Answers a request whose "METHOD path" matches with a 500, having changed
   // nothing, for a write that is refused or a read that fails.
   failOn?: string;
@@ -774,6 +776,34 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         t.dueDate = at;
       } else t.dueDate = null;
       return ok(M.Task, t);
+    }
+    // The caller's open tasks across a workspace's active projects; the
+    // caller is the key's user, "user-self".
+    if (req.method === "GET" && path === "/task/assigned") {
+      const workspaceId = url.searchParams.get("workspaceId") ?? "";
+      if (workspaceId === "") return failText(400, "Invalid workspace ID or query parameters");
+      const mine = tasks
+        .filter((t) => t.userId === "user-self" && t.status !== "done" && t.status !== "archived")
+        .map((t) => ({ t, p: projects.find((x) => x.id === t.projectId)! }))
+        .filter(({ p }) => p.workspaceId === workspaceId && !p.archivedAt);
+      return ok(M.AssignedTasks, {
+        total: mine.length,
+        tasks: mine.slice(0, opts.assignedLimit ?? 100).map(({ t, p }) => ({
+          id: t.id,
+          projectId: t.projectId,
+          number: t.number,
+          title: t.title,
+          status: t.status,
+          statusName: t.status,
+          statusIcon: null,
+          priority: t.priority,
+          dueDate: t.dueDate,
+          projectName: p.name,
+          projectSlug: p.slug,
+          projectIcon: null,
+          labels: [],
+        })),
+      });
     }
     if (req.method === "PATCH" && path === "/task/bulk") {
       const b = body as z.input<typeof M.BulkUpdateTasksBody>;

@@ -7,6 +7,8 @@
  */
 
 export * from './activity.zod';
+export * from './assignedTask.zod';
+export * from './assignedTasks.zod';
 export * from './attachLabelToTaskBody.zod';
 export * from './board.zod';
 export * from './boardColumn.zod';
@@ -42,6 +44,7 @@ export * from './globalSearchParams.zod';
 export * from './importTasksBody.zod';
 export * from './invitationDetails.zod';
 export * from './label.zod';
+export * from './listAssignedTasksParams.zod';
 export * from './listNotificationsParams.zod';
 export * from './listProjectsParams.zod';
 export * from './listTasksParams.zod';

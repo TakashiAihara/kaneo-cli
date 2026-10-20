@@ -117,6 +117,7 @@ export type Scenario = {
   growTimes?: number;
   // The fake answers the listing without applying status or priority.
   ignoreFilters?: boolean;
+  assignedLimit?: number;
   // Written to every step's stdin, for text a pipe carries.
   stdin?: string;
   // Written into the cwd before the first step, for text a flag names as a file.
@@ -345,6 +346,25 @@ export const SCENARIOS: Scenario[] = [
     ],
     steps: [["task", "ls", "--json"], ["task", "ls", "--all", "--human"], ["task", "ls", "--status", "planned", "--json"], ["task", "get", "5", "--json"], ["board", "--json"]],
   },
+  {
+    name: "task list of my tasks across projects",
+    extraTasks: [
+      { id: "task-m1", projectId: P1, title: "Mine in alpha", priority: "high", userId: "user-self" },
+      { id: "task-m2", projectId: "proj-beta", title: "Mine in beta", status: "in-progress", userId: "user-self" },
+      { id: "task-m3", projectId: P1, title: "Mine but done", status: "done", userId: "user-self" },
+    ],
+    steps: [["task", "ls", "--mine", "--json"], ["task", "ls", "--mine", "--human"]],
+  },
+  {
+    name: "task list of my tasks says when the server cut it",
+    assignedLimit: 1,
+    extraTasks: [
+      { id: "task-m1", projectId: P1, title: "Mine in alpha", userId: "user-self" },
+      { id: "task-m2", projectId: P1, title: "Mine too", userId: "user-self" },
+    ],
+    steps: [["task", "ls", "--mine", "--human"], ["task", "ls", "--mine", "--json"]],
+  },
+  { name: "task list of my tasks refuses a filter", steps: [["task", "ls", "--mine", "--status", "done"], ["task", "ls", "--mine", "--priority", "high"], ["task", "ls", "--mine", "--all"]] },
   {
     name: "task list says how many it left out",
     extraTasks: [

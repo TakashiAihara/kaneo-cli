@@ -11,6 +11,7 @@ import {
 
 import {
   Activity,
+  AssignedTasks,
   BoardResponse,
   BulkTaskResult,
   Column,
@@ -59,6 +60,7 @@ import type {
   GetTaskParams,
   GlobalSearchParams,
   ImportTasksBody,
+  ListAssignedTasksParams,
   ListNotificationsParams,
   ListProjectsParams,
   ListTasksParams,
@@ -414,6 +416,39 @@ export const unarchiveProject = async (id: string, options?: Parameters<typeof k
 
     ,
     schema: Project
+  }
+);}
+
+
+
+export const getListAssignedTasksUrl = (params: ListAssignedTasksParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/task/assigned?${stringifiedParams}` : `/task/assigned`
+}
+
+/**
+ * Get the open tasks assigned to the caller across a workspace's active projects. Completed and archived tasks are excluded. Ordered by due date (undated last), then priority. At most 100 tasks are returned; total counts all of them. Set countOnly=true to return just that total without loading task rows or labels.
+ * @summary List my assigned tasks
+ */
+export const listAssignedTasks = async (params: ListAssignedTasksParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<AssignedTasks> => {
+
+  return kaneoFetch<AssignedTasks>(getListAssignedTasksUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: AssignedTasks
   }
 );}
 

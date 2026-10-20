@@ -1,0 +1,24 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "--priority",
+        "high",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1    [high       ] to-do         Write the parser\n",
+      "stderr": "(1 done / planned / archived task left out; --all to include them)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": "?priority=high"
+    }
+  ],
+  "files": {}
+}

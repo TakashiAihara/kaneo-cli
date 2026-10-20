@@ -308,6 +308,47 @@ export const SCENARIOS: Scenario[] = [
     ],
     steps: [["task", "ls", "--json"], ["task", "ls", "--all", "--human"], ["task", "ls", "--status", "planned", "--json"], ["task", "get", "5", "--json"], ["board", "--json"]],
   },
+  {
+    name: "task list says how many it left out",
+    extraTasks: [
+      { id: "task-a4", projectId: P1, title: "Next quarter", status: "planned" },
+      { id: "task-a5", projectId: P1, title: "Last year's plan", status: "archived" },
+    ],
+    steps: [
+      ["task", "ls", "--human"],
+      ["task", "ls", "--all", "--human"],
+      ["task", "ls", "--json"],
+      ["task", "ls", "--jq", ".[].number"],
+      ["task", "ls", "--status", "planned", "--json"],
+    ],
+  },
+  // The count follows --priority: the seed's done task has no priority and
+  // is not counted, so high reads 2 and low reads 1.
+  {
+    name: "task list says how many it left out under a priority",
+    extraTasks: [
+      { id: "task-a4", projectId: P1, title: "Next quarter", status: "planned", priority: "high" },
+      { id: "task-a5", projectId: P1, title: "Last year's plan", status: "archived", priority: "high" },
+      { id: "task-a6", projectId: P1, title: "Shelved", status: "archived", priority: "low" },
+    ],
+    steps: [["task", "ls", "--priority", "high", "--human"], ["task", "ls", "--priority", "low", "--human"]],
+  },
+  // The server's filtering is not relied on for the count either: handed the
+  // whole board, only the high-priority hidden tasks are counted.
+  {
+    name: "task list counts under a priority the server did not apply",
+    ignoreFilters: true,
+    extraTasks: [
+      { id: "task-a4", projectId: P1, title: "Next quarter", status: "planned", priority: "high" },
+      { id: "task-a5", projectId: P1, title: "Shelved", status: "archived", priority: "low" },
+    ],
+    steps: [["task", "ls", "--priority", "high", "--human"]],
+  },
+  // Nothing hidden, nothing said.
+  {
+    name: "task list with nothing left out",
+    steps: [["task", "ls", "--status", "to-do", "--human"], ["task", "ls", "--priority", "high", "--json"]],
+  },
   ...both("task get by number", ["task", "get", "1"]),
   // A description above 64 KiB is left out of the listing, so resolving the task
   // by number reads it from the task detail.

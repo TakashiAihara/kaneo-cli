@@ -18,7 +18,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "proj-alpha  Alpha\n",
+      "stdout": "proj-alpha  Alpha  [ALP]\n",
       "stderr": ""
     },
     {

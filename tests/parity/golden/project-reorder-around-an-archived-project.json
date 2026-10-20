@@ -9,7 +9,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "proj-beta  Beta\nproj-alpha  Alpha\n",
+      "stdout": "proj-beta  Beta  [BET]\nproj-alpha  Alpha  [ALP]\n",
       "stderr": ""
     },
     {

@@ -19,7 +19,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "proj-old  Old  [OLD]  (Main)  (archived)\n",
+      "stdout": "proj-old  Old  [OLD]  (workspace: Main)  (archived)\n",
       "stderr": ""
     },
     {

@@ -20,7 +20,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "proj-alpha  Alpha  [ALP]  (Main)\nproj-beta  Beta  [BET]  (Main)\nproj-old  Old  [OLD]  (Main)  (archived)\nproj-gamma  Gamma  [GAM]  (Other)\n",
+      "stdout": "proj-alpha  Alpha  [ALP]  (workspace: Main)\nproj-beta  Beta  [BET]  (workspace: Main)\nproj-old  Old  [OLD]  (workspace: Main)  (archived)\nproj-gamma  Gamma  [GAM]  (workspace: Other)\n",
       "stderr": ""
     }
   ],

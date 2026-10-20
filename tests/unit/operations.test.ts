@@ -1173,6 +1173,32 @@ test("TestUpdateProjectEscapesTheID", async () => {
   expect(paths.join(", ")).toBe("GET /api/project/a%2Fb, PUT /api/project/a%2Fb");
 });
 
+// A reply without a slug field is not a project whose slug is empty.
+test("TestUpdateProjectRefusesAReadWithNoSlugField", async () => {
+  const seen: string[] = [];
+  newServer((req) => {
+    seen.push(req.method);
+    return new Response(`{"id":"p1","name":"Board","icon":"Box","description":"d"}`, {
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const err = await failure(api.updateProject("p1", { name: "New" }));
+  expect(String(err)).toContain("no slug field");
+  expect(seen).toEqual(["GET"]);
+});
+
+test("TestUpdateProjectWritesAnEmptySlugRead", async () => {
+  const seen = recorder(`{"id":"p1","name":"New","slug":"","icon":"Box","description":"d"}`);
+  await api.updateProject("p1", { name: "New" });
+  expect(JSON.parse(seen.body)).toMatchObject({ name: "New", slug: "" });
+});
+
+test("TestUpdateProjectGivenASlugNeedsNoSlugInTheRead", async () => {
+  const seen = recorder(`{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d"}`);
+  await api.updateProject("p1", { slug: "x" });
+  expect(JSON.parse(seen.body)).toMatchObject({ slug: "x" });
+});
+
 describe("time entries", () => {
   const entry = (id: string, extra = "") =>
     `{"id":"${id}","taskId":"t1","userId":"u1","description":"d","startTime":"${TIME}","endTime":null,"duration":null,"createdAt":"${TIME}","updatedAt":"${TIME}"${extra}}`;

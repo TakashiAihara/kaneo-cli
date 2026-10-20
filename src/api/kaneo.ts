@@ -561,11 +561,16 @@ export const updateProject = async (
     want[field] = trimmed;
   }
 
-  const before = await getProject(projectId);
+  const raw = zeroRecord(await readProject(pathParam(projectId)));
+  const before = project(raw);
   // Every field of this read is written back, so a read that decoded to nothing
   // (a null reply, a different shape) would blank the project. An empty slug is
   // not that: it is a state a project can be in, and writing it back is the only
-  // way such a project can be changed at all.
+  // way such a project can be changed at all. A reply with no slug field at all
+  // is that, though, and only matters when the slug is written back as read.
+  if (want.slug === undefined && typeof raw.slug !== "string") {
+    throw new Error(`reading project ${projectId} before the update got no slug field; not writing`);
+  }
   if (before.id !== projectId || before.name === "") {
     throw new Error(
       `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}; not writing`,

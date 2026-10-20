@@ -566,14 +566,17 @@ export const updateProject = async (
   // Every field of this read is written back, so a read that decoded to nothing
   // (a null reply, a different shape) would blank the project. An empty slug is
   // not that: it is a state a project can be in, and writing it back is the only
-  // way such a project can be changed at all. A reply with no slug field at all
-  // is that, though, and only matters when the slug is written back as read.
-  if (want.slug === undefined && typeof raw.slug !== "string") {
-    throw new Error(`reading project ${projectId} before the update got no slug field; not writing`);
-  }
-  if (before.id !== projectId || before.name === "") {
+  // way such a project can be changed at all. A field the reply left out reads as
+  // "" or false, so writing it back would blank a description or turn a public
+  // project private; each one sent back has to have been in the reply. A NULL
+  // description is in the reply, so it is not counted as left out.
+  const missing = (["slug", "description", "icon", "isPublic"] as const).filter(
+    (field) => raw[field] === undefined && (field === "isPublic" || changes[field] === undefined),
+  );
+  if (before.id !== projectId || before.name === "" || missing.length > 0) {
+    const flags = missing.filter((field) => field !== "isPublic").map((field) => `--${field} TEXT`);
     throw new Error(
-      `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}; not writing`,
+      `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}${missing.length > 0 ? `, without ${missing.join(", ")}` : ""}; not writing${flags.length > 0 ? ` (pass ${flags.join(" ")} to write it yourself)` : ""}`,
     );
   }
 

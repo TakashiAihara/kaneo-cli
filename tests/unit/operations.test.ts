@@ -1165,7 +1165,7 @@ test("TestUpdateProjectEscapesTheID", async () => {
   newServer((req) => {
     paths.push(`${req.method} ${new URL(req.url).pathname}`);
     return new Response(
-      `{"id":"a/b","name":"New","slug":"s","icon":"Box","description":"d","createdAt":"${TIME}","position":1,"lastTaskNumber":0}`,
+      `{"id":"a/b","name":"New","slug":"s","icon":"Box","description":"d","isPublic":false,"createdAt":"${TIME}","position":1,"lastTaskNumber":0}`,
       { headers: { "content-type": "application/json" } },
     );
   });
@@ -1173,30 +1173,63 @@ test("TestUpdateProjectEscapesTheID", async () => {
   expect(paths.join(", ")).toBe("GET /api/project/a%2Fb, PUT /api/project/a%2Fb");
 });
 
-// A reply without a slug field is not a project whose slug is empty.
-test("TestUpdateProjectRefusesAReadWithNoSlugField", async () => {
+// A reply without a field the update writes back is not a project whose field
+// is empty or false.
+test.each([
+  ["Slug", `{"id":"p1","name":"Board","icon":"Box","description":"d","isPublic":true}`, "without slug"],
+  ["IsPublic", `{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d"}`, "without isPublic"],
+  ["Description", `{"id":"p1","name":"Board","slug":"x","icon":"Box","isPublic":true}`, "without description"],
+  ["Icon", `{"id":"p1","name":"Board","slug":"x","description":"d","isPublic":true}`, "without icon"],
+])("TestUpdateProjectRefusesAReadWithNo%sField", async (_field, reply, text) => {
   const seen: string[] = [];
   newServer((req) => {
     seen.push(req.method);
-    return new Response(`{"id":"p1","name":"Board","icon":"Box","description":"d"}`, {
-      headers: { "content-type": "application/json" },
-    });
+    return new Response(reply, { headers: { "content-type": "application/json" } });
   });
   const err = await failure(api.updateProject("p1", { name: "New" }));
-  expect(String(err)).toContain("no slug field");
+  expect(String(err)).toContain(text);
   expect(seen).toEqual(["GET"]);
 });
 
+test("TestUpdateProjectRefusalNamesTheFlagsThatGetPast", async () => {
+  newServer(() => new Response(`{"id":"p1","name":"Board","icon":"Box","isPublic":true}`, { headers: { "content-type": "application/json" } }));
+  const err = String(await failure(api.updateProject("p1", { name: "New" })));
+  expect(err).toContain("--slug TEXT --description TEXT");
+  expect(err).not.toContain("--icon");
+});
+
+test("TestUpdateProjectReadWithNullDescriptionIsWritten", async () => {
+  const seen = recorder(`{"id":"p1","name":"New","slug":"x","icon":"Box","description":null,"isPublic":true}`);
+  await api.updateProject("p1", { name: "New" });
+  expect(JSON.parse(seen.body)).toMatchObject({ description: "", isPublic: true });
+});
+
+test("TestUpdateProjectEmptyReadReportsIdAndNameFirst", async () => {
+  newServer(() => new Response("{}", { headers: { "content-type": "application/json" } }));
+  const err = String(await failure(api.updateProject("p1", { name: "New" })));
+  expect(err).toContain('got id ""');
+});
+
 test("TestUpdateProjectWritesAnEmptySlugRead", async () => {
-  const seen = recorder(`{"id":"p1","name":"New","slug":"","icon":"Box","description":"d"}`);
+  const seen = recorder(`{"id":"p1","name":"New","slug":"","icon":"Box","description":"d","isPublic":false}`);
   await api.updateProject("p1", { name: "New" });
   expect(JSON.parse(seen.body)).toMatchObject({ name: "New", slug: "" });
 });
 
-test("TestUpdateProjectGivenASlugNeedsNoSlugInTheRead", async () => {
-  const seen = recorder(`{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d"}`);
-  await api.updateProject("p1", { slug: "x" });
-  expect(JSON.parse(seen.body)).toMatchObject({ slug: "x" });
+test("TestUpdateProjectGivenFieldsNeedNothingInTheRead", async () => {
+  const seen: { method: string; body: string }[] = [];
+  newServer(async (req) => {
+    seen.push({ method: req.method, body: await req.text() });
+    return new Response(
+      req.method === "GET"
+        ? `{"id":"p1","name":"Board","isPublic":true}`
+        : `{"id":"p1","name":"Board","slug":"x","icon":"Star","description":"dd","isPublic":true}`,
+      { headers: { "content-type": "application/json" } },
+    );
+  });
+  await api.updateProject("p1", { slug: "x", icon: "Star", description: "dd" });
+  expect(seen.map((r) => r.method)).toEqual(["GET", "PUT"]);
+  expect(JSON.parse(seen[1]!.body)).toMatchObject({ slug: "x", icon: "Star", description: "dd", isPublic: true });
 });
 
 describe("time entries", () => {

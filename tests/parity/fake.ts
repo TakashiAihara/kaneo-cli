@@ -35,7 +35,8 @@ export type Seed = {
   // The key's own notifications, oldest first.
   notifications?: { type: string; title?: string | null; content?: string | null; isRead?: boolean | null; eventData?: unknown }[];
   // Every workspace's members, as the members route lists them.
-  members?: { id: string; name: string; email: string; role: string }[];
+  // A member with a workspaceId belongs to that workspace alone; one without is in all.
+  members?: { id: string; name: string; email: string; role: string; workspaceId?: string }[];
   // Invitations the detail route can be asked about.
   invitations?: { id: string; workspaceId: string; inviterName: string; expiresAt: string; status?: string }[];
   // A rule names its column by slug here, since the seeded columns' ids are only
@@ -92,6 +93,7 @@ export type FakeOptions = {
   plainMember?: boolean;
   // A server older than v2.28.0, which has no /user/me.
   noCurrentUser?: boolean;
+  blankCurrentUserId?: boolean;
   // How many matching requests are answered as usual before failOn starts, so
   // a scenario can set something up through the route it then breaks.
   failOnSkip?: number;
@@ -489,7 +491,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     // Kaneo sets the request's user from the key, so /user/me answers for it.
     if (req.method === "GET" && path === "/user/me" && !opts.noCurrentUser) {
-      return ok(M.CurrentUser, { id: "user-self", name: "Self", email: "self@example.com", image: null, role: "user" });
+      return ok(M.CurrentUser, { id: opts.blankCurrentUserId ? "" : "user-self", name: "Self", email: "self@example.com", image: null, role: "user" });
     }
     if (req.method === "GET" && path === "/auth/organization/list" && limited < (opts.rateLimitTimes ?? 0)) {
       limited++;
@@ -509,7 +511,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "GET" && (p = m(/^\/workspace\/([^/]+)\/members$/))) {
       const ws = decodeURIComponent(p[1]);
       if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
-      return ok(z.array(M.WorkspaceMember), (seed.members ?? []).map((u) => ({ ...u, image: null })));
+      return ok(z.array(M.WorkspaceMember), (seed.members ?? []).filter((u) => u.workspaceId === undefined || u.workspaceId === ws).map(({ workspaceId: _, ...u }) => ({ ...u, image: null })));
     }
 
     // Expiry is judged at a fixed moment, so the outcome does not depend on when

@@ -43,7 +43,7 @@
     },
     {
       "method": "GET",
-      "path": "/auth/organization/list",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

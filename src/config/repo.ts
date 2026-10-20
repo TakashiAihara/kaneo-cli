@@ -3,9 +3,11 @@
 
 const SCP_LIKE = /^[^/@]+@[^/:]+:\/?([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 // No user, so `host:owner/name` as git prints it for a remote written that way.
-// A single-letter host is a Windows drive (`C:x/y`), and a leading slash after
-// the colon is a path; neither is a host.
-const SCP_NO_USER = /^[^/@:]{2,}:([^/:]+)\/([^/]+?)(?:\.git)?\/?$/;
+// git treats it as scp-style ssh whenever no `/` comes before the first `:`, so
+// a slash after the colon does not make it a path. A single-letter host is still
+// refused: only Git for Windows reads `C:x/y` as a drive, but a checkout made on
+// Windows should not have its drive path read as a repository.
+const SCP_NO_USER = /^[^/:]{2,}:\/?([^/:]+)\/([^/]+?)(?:\.git)?\/?$/;
 const URL_LIKE = /^(?:ssh|git|https?):\/\/(?:[^/@]+@)?[^/]+\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 
 // Only hosted forms are accepted: scp-style SSH, and ssh/git/http/https URLs.
@@ -14,9 +16,8 @@ const URL_LIKE = /^(?:ssh|git|https?):\/\/(?:[^/@]+@)?[^/]+\/([^/]+)\/([^/]+?)(?
 // otherwise resolve to the acme workspace and send writes to a board that has
 // nothing to do with it.
 //
-// The user-less scp form is accepted only for the cwd's origin remote:
-// a value a person typed with it is indistinguishable from a host
-// alias the maps know nothing about, so parseRepo keeps refusing it.
+// The user-less scp form is accepted only for the cwd's origin remote.
+// parseRepo keeps refusing it (#64); whether to accept it is tracked in #336.
 const parseRemote = (remote: string, userless = false): string => {
   const url = remote.trim();
   if (url === "") return "";

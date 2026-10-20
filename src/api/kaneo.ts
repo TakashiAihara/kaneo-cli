@@ -549,7 +549,7 @@ export type ProjectChanges = {
 export const updateProject = async (
   projectId: string,
   changes: ProjectChanges,
-): Promise<{ before: Project; after: Project }> => {
+): Promise<{ before: Project; after: Project; unread: ("slug" | "description" | "icon")[] }> => {
   const want: ProjectChanges = { ...changes };
   // The server accepts any string, but a blank name, slug or icon leaves a
   // project that cannot be read or linked to, so those are refused here.
@@ -585,10 +585,12 @@ export const updateProject = async (
   if (!identified || missing.length > 0) {
     // The way past is offered only for a read that was this project: a flag does
     // not get a null or foreign reply past the id and name check.
-    const flags = identified ? missing.filter((field) => field !== "isPublic").map((field) => `--${field} TEXT`) : [];
+    // isPublic has no flag, so a read that lacks it is stuck whatever else it
+    // lacks, and a flag for the other fields would not get it past.
     const stuck = identified && missing.includes("isPublic");
+    const flags = identified && !stuck ? missing.map((field) => `--${field} TEXT`) : [];
     throw new Error(
-      `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}${missing.length > 0 ? `, without ${missing.join(", ")}` : ""}; not writing${flags.length > 0 ? ` (pass ${flags.join(" ")} to write it yourself)` : ""}${stuck ? "; isPublic has no flag, so this project cannot be updated until the server returns it" : ""}`,
+      `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}${missing.length > 0 ? `, without ${missing.join(", ")}` : ""}; not writing${flags.length > 0 ? ` (pass ${flags.join(" ")} to write it yourself)` : ""}${stuck ? "; isPublic has no flag, so this project cannot be updated until the server returns it as a boolean" : ""}`,
     );
   }
 
@@ -620,7 +622,10 @@ export const updateProject = async (
   if (off.length > 0) {
     throw new Error(`/project/${projectId}: server did not echo the update: ${off.join("; ")}`);
   }
-  return { before, after };
+  // A field the read lacked and the caller supplied is "" in before, which would
+  // read as a project that had an empty value there.
+  const unread = (["slug", "description", "icon"] as const).filter((field) => !present[field]);
+  return { before, after, unread };
 };
 
 // Go's %q, which quotes whatever it is given rather than only its strings.

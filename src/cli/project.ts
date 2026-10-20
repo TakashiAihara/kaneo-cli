@@ -286,7 +286,7 @@ export const projectCommand = {
         // The read of the project comes first inside updateProject, so a value the
         // server does not know is retried before anything is written rather than
         // after.
-        const { before, after } = await withProject(args[0]!, (id) =>
+        const { before, after, unread } = await withProject(args[0]!, (id) =>
           updateProject(id, changes).catch(refused("updating a project", "update", () => projectWorkspace(id))),
         );
         app.out.human(`updated ${after.id}`);
@@ -296,7 +296,9 @@ export const projectCommand = {
           ["description", before.description, after.description],
           ["icon", before.icon, after.icon],
         ] as const) {
-          if (from !== to) app.out.human(`  ${field}  ${JSON.stringify(from)} -> ${JSON.stringify(to)}`);
+          if (from === to) continue;
+          const was = unread.includes(field as "slug" | "description" | "icon") ? "(not read)" : JSON.stringify(from);
+          app.out.human(`  ${field}  ${was} -> ${JSON.stringify(to)}`);
         }
         // The slug is the prefix of every task identifier, so changing it renames
         // them all and the reader has to be told.

@@ -1202,13 +1202,14 @@ test("TestUpdateProjectForeignReadStopsWithoutOfferingFlags", async () => {
   const seen: string[] = [];
   newServer((req) => {
     seen.push(req.method);
-    return new Response(`{"id":"other","name":"Board","slug":"x","icon":"Box","description":"d","isPublic":true}`, {
+    return new Response(`{"id":"other","name":"Board","slug":"x","description":"d","isPublic":true}`, {
       headers: { "content-type": "application/json" },
     });
   });
   const err = String(await failure(api.updateProject("p1", { name: "New" })));
   expect(err).toContain('got id "other"');
   expect(err).not.toContain("to write it yourself");
+  expect(err).not.toContain("isPublic has no flag");
   expect(seen).toEqual(["GET"]);
 });
 
@@ -1216,6 +1217,7 @@ test("TestUpdateProjectEmptyReadOffersNoFlags", async () => {
   newServer(() => new Response("{}", { headers: { "content-type": "application/json" } }));
   const err = String(await failure(api.updateProject("p1", { name: "New" })));
   expect(err).not.toContain("to write it yourself");
+  expect(err).not.toContain("isPublic has no flag");
 });
 
 test("TestUpdateProjectMissingIconOffersTheIconFlag", async () => {
@@ -1233,7 +1235,39 @@ test("TestUpdateProjectMissingIsPublicOffersNoFlagAndSaysSo", async () => {
   const err = String(await failure(api.updateProject("p1", { name: "New" })));
   expect(err).not.toContain("--isPublic");
   expect(err).not.toContain("to write it yourself");
-  expect(err).toContain("isPublic has no flag, so this project cannot be updated until the server returns it");
+  expect(err).toContain("isPublic has no flag, so this project cannot be updated until the server returns it as a boolean");
+});
+
+test("TestUpdateProjectMissingIsPublicAndIconOffersNoFlag", async () => {
+  newServer(() => new Response(`{"id":"p1","name":"Board","slug":"x","description":"d"}`, { headers: { "content-type": "application/json" } }));
+  const err = String(await failure(api.updateProject("p1", { name: "New" })));
+  expect(err).toContain("without icon, isPublic");
+  expect(err).not.toContain("--icon");
+  expect(err).not.toContain("to write it yourself");
+  expect(err).toContain("isPublic has no flag");
+});
+
+test("TestUpdateProjectNullIsPublicSaysBooleanIsWhatIsMissing", async () => {
+  newServer(
+    () => new Response(`{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d","isPublic":null}`, { headers: { "content-type": "application/json" } }),
+  );
+  const err = String(await failure(api.updateProject("p1", { name: "New" })));
+  expect(err).toContain("until the server returns it as a boolean");
+});
+
+test("TestUpdateProjectReportsAFieldItDidNotRead", async () => {
+  newServer((req) =>
+    new Response(
+      req.method === "GET"
+        ? `{"id":"p1","name":"Board","icon":"Box","description":"d","isPublic":true}`
+        : `{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d","isPublic":true}`,
+      { headers: { "content-type": "application/json" } },
+    ),
+  );
+  const done = await api.updateProject("p1", { slug: "x" });
+  expect(done.unread).toEqual(["slug"]);
+  recorder(`{"id":"p1","name":"New","slug":"x","icon":"Box","description":"d","isPublic":true}`);
+  expect((await api.updateProject("p1", { name: "New" })).unread).toEqual([]);
 });
 
 test.each([

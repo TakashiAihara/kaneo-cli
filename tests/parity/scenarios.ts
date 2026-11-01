@@ -1382,6 +1382,22 @@ export const SCENARIOS: Scenario[] = [
   },
   { name: "workspace not found", steps: [["project", "ls", "-w", "nope", "--json"]] },
   { name: "task lookup error names the project", steps: [["task", "get", "99", "--json"], ["task", "get", "#99", "--human"], ["task", "get", "BET#99", "--human"]] },
+  // A workspace's name where a project's belongs, for a task number (in a
+  // reference or by -p): the error says numbers are per project and names the
+  // projects that can hold the number. Elsewhere a value that names no project
+  // gets the plain message.
+  {
+    name: "task reference with a workspace name",
+    steps: [
+      ["task", "get", "Main#3", "--human"],
+      ["task", "get", "main#9", "--human"],
+      ["task", "get", "other#1", "--human"],
+      ["task", "get", "nowhere#1", "--human"],
+      ["task", "get", "3", "-p", "Main", "--human"],
+      ["project", "get", "Main", "--human"],
+    ],
+  },
+  { name: "task reference with a workspace name to an older server", legacy: true, steps: [["task", "get", "Main#2", "--human"]] },
   {
     // Slugs are not unique on the server, so one that two projects carry names
     // both rather than picking one; an exact-case match still wins over a folded one.

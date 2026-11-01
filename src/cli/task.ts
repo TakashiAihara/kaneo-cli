@@ -46,7 +46,7 @@ import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunCon
 import { readInput, sourceName } from "./input";
 import { shellWord } from "../output/output";
 import { KaneoApiError } from "../api/http";
-import { slugOr, withProject } from "./lookup";
+import { slugOr, withProject, workspaceInReference } from "./lookup";
 import { attachTask, currentSessionId } from "../session/attach";
 import { BAD_ID, validSessionId } from "../session/store";
 import { sharedReference, similarOpenTasks } from "./similar";
@@ -1073,7 +1073,7 @@ const numberOn = async (
   origin: string,
   slugs?: Map<string, string>,
 ): Promise<Task> => {
-  const { board, task: found } = await withProject(value, (id) => findTaskByNumber(id, number));
+  const { board, task: found } = await withProject(value, (id) => findTaskByNumber(id, number), () => workspaceInReference(value, number));
   slugs?.set(board.projectId, board.projectSlug);
   if (found === undefined) {
     // --project only steers a bare number; a reference names its board itself.

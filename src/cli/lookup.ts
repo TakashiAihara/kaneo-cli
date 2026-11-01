@@ -1,5 +1,5 @@
 import { KaneoApiError } from "../api/http";
-import { listProjectsIn, listWorkspaces, type Project, type Workspace } from "../api/kaneo";
+import { lastTaskNumbers, listProjectsIn, listWorkspaces, type Project, type Workspace } from "../api/kaneo";
 
 // Turning a value somebody typed into the id the API takes, so a slug or a name
 // works wherever an id does. A slug is what people and agents type: it is the
@@ -37,7 +37,9 @@ const resolved = new Map<string, string>();
 // writes anything: every op here either reads first or is a single request whose
 // project the server checks before acting on it. A new op has to keep that true —
 // its first request must be the one that carries the project.
-export const withProject = async <T>(value: string, op: (id: string) => Promise<T>): Promise<T> => {
+// explain adds to the error when the value names no project; a caller that
+// knows more about what the value was meant to be says it there.
+export const withProject = async <T>(value: string, op: (id: string) => Promise<T>, explain?: () => Promise<string>): Promise<T> => {
   if (value === "") return op(value);
   const known = resolved.get(value);
   if (known !== undefined) return op(known);
@@ -48,7 +50,7 @@ export const withProject = async <T>(value: string, op: (id: string) => Promise<
   } catch (e) {
     if (!unknownProject(e)) throw e;
     const found = projectsNamed(await lookingUp(e, () => allProjects(true)), value);
-    if (found.length === 0) throw new Error(`${e.message}: ${noProject(value)}`);
+    if (found.length === 0) throw new Error(`${e.message}: ${noProject(value)}${explain === undefined ? "" : await explain()}`);
     if (found.length > 1) throw new Error(severalProjects(value, found));
     const only = found[0]!.project;
     // The value already was this project's id and the request failed anyway, so
@@ -142,6 +144,26 @@ export const firstMatch = <T>(all: T[], value: string, id: (item: T) => string, 
 // the server holds an empty slug, so the message has no blank where the name
 // should be.
 export const slugOr = (slug: string, fallback: string): string => (slug === "" ? fallback : slug);
+
+// For a task number whose project is named by a workspace's name, in a
+// reference (`Private#6`) or by -p with a bare number: task numbers are per
+// project, so it names no task until a project is chosen, and the projects that
+// can hold #number are named. Read only on that failure path; any failure
+// while working the hint out leaves the plain message.
+export const workspaceInReference = async (value: string, number: number): Promise<string> => {
+  try {
+    const named = workspacesNamed(await listWorkspaces(), value);
+    if (named.length !== 1) return "";
+    const holding = (await lastTaskNumbers(named[0]!.id)).filter((p) => p.lastTaskNumber === null || p.lastTaskNumber >= number);
+    const listed =
+      holding.length === 0
+        ? `no active project in it has reached #${number}`
+        : `active projects in it that can hold #${number}: ${holding.map(({ project: p }) => `${slugOr(p.slug, p.id)} (${p.name})`).join(", ")}`;
+    return `; ${JSON.stringify(value)} is a workspace, and task numbers are per project: ${listed}`;
+  } catch {
+    return "";
+  }
+};
 
 const noProject = (value: string): string =>
   `no project has the id, slug or name ${JSON.stringify(value)} (kaneo project find <text> searches names and slugs)`;

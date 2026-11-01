@@ -331,15 +331,15 @@ export const taskCommand = {
         },
         { name: "status", type: "string" as const, usage: "column id to move the task to", defaultValue: "" },
         {
-          name: "assignee",
-          type: "string" as const,
-          usage: "member id, member name or `me`, as task assign takes it; empty clears it",
-          defaultValue: "",
-        },
-        {
           name: "priority",
           type: "string" as const,
           usage: `one of: ${PRIORITIES.join(", ")}`,
+          defaultValue: "",
+        },
+        {
+          name: "assignee",
+          type: "string" as const,
+          usage: "member id, member name or `me`, as task assign takes them; empty clears the assignee",
           defaultValue: "",
         },
         {

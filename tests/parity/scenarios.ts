@@ -447,7 +447,8 @@ export const SCENARIOS: Scenario[] = [
     seed: { members: MEMBERS },
     steps: [
       ["task", "update", "1", "--assignee", "ada", "--title", "Renamed", "--json"],
-      ["task", "update", "2", "--assignee", "", "--human"],
+      ["task", "update", "2", "--assignee", "", "--json"],
+      ["task", "update", "1", "--assignee", "  ", "--json"],
       ["task", "update", "1", "--assignee", "Nobody", "--title", "Other", "--json"],
       ["task", "get", "1", "--json"],
       ["task", "get", "2", "--json"],

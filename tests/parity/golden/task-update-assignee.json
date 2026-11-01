@@ -22,10 +22,23 @@
         "2",
         "--assignee",
         "",
-        "--human"
+        "--json"
       ],
       "exit": 0,
-      "stdout": "#2  Ship it\nstatus    in-progress\npriority  no-priority\n",
+      "stdout": "{\n  \"id\": \"task-a2\",\n  \"number\": 2,\n  \"title\": \"Ship it\",\n  \"description\": \"\",\n  \"status\": \"in-progress\",\n  \"priority\": \"no-priority\",\n  \"position\": 1,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n  \"labels\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "update",
+        "1",
+        "--assignee",
+        "  ",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Renamed\",\n  \"description\": \"multi\\nline\",\n  \"status\": \"to-do\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n  \"labels\": []\n}\n",
       "stderr": ""
     },
     {
@@ -51,7 +64,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Renamed\",\n  \"description\": \"multi\\nline\",\n  \"status\": \"to-do\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": \"user-1\",\n  \"assigneeName\": \"Ada\",\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n  \"labels\": [],\n  \"relations\": []\n}\n",
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Renamed\",\n  \"description\": \"multi\\nline\",\n  \"status\": \"to-do\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n  \"labels\": [],\n  \"relations\": []\n}\n",
       "stderr": ""
     },
     {
@@ -119,6 +132,24 @@
     {
       "method": "GET",
       "path": "/task/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/assignee/task-a1",
+      "query": "",
+      "body": {
+        "userId": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
       "query": ""
     },
     {

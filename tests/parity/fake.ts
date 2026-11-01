@@ -418,7 +418,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       : null;
 
   // Kaneo 2.32.0 refuses a project key another project in the workspace uses,
-  // archived ones included, comparing NFKC case-folded (project/utils.ts).
+  // archived ones included, comparing NFKC case-folded
+  // (apps/api/src/project/project-key.ts).
   const sameKey = (a: string, b: string) => a.normalize("NFKC").toLowerCase() === b.normalize("NFKC").toLowerCase();
   const keyTaken = (workspaceId: string, key: string, except?: string) =>
     projects.find((x) => x.workspaceId === workspaceId && x.id !== except && sameKey(x.slug, key));
@@ -667,6 +668,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       if (opts.plainMember) return failText(403, "Insufficient permissions");
       if (req.method === "PUT" && !p[2]) {
+        // Upstream's update body requires the slug; the CLI always sends it.
         const slug = (body as any).slug;
         const taken = typeof slug === "string" && !sameKey(slug, proj.slug) ? keyTaken(proj.workspaceId, slug, proj.id) : undefined;
         if (taken) return failText(409, keyTakenMessage(slug, taken.name));

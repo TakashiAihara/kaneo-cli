@@ -180,6 +180,12 @@ export const SCENARIOS: Scenario[] = [
     seed: { projects: [...SEED.projects, { id: "proj-old2", workspaceId: WS, name: "Old again", slug: "old" }] },
     steps: [
       ["project", "create", "Alpha two", "--slug", "alp", "--human"],
+      // A key the archived project holds (it is the one the reply names), and
+      // one in a compatibility form.
+      ["project", "create", "Older", "--slug", "OLD", "--human"],
+      ["project", "create", "Wide", "--slug", "ＡＬＰ", "--human"],
+      // Another workspace's projects do not count.
+      ["project", "create", "Elsewhere", "--slug", "ALP", "-w", "ws-other", "--human"],
       ["project", "update", P1, "--slug", "bet", "--human"],
       ["project", "update", P1, "--slug", "alp", "--json"],
       ["project", "unarchive", "proj-old", "--human"],

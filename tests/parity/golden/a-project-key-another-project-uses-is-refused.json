@@ -16,6 +16,47 @@
     {
       "args": [
         "project",
+        "create",
+        "Older",
+        "--slug",
+        "OLD",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/project: 409: This workspace already has a project using the key \"OLD\" (Old). Choose a different key.\n"
+    },
+    {
+      "args": [
+        "project",
+        "create",
+        "Wide",
+        "--slug",
+        "ＡＬＰ",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/project: 409: This workspace already has a project using the key \"ＡＬＰ\" (Alpha). Choose a different key.\n"
+    },
+    {
+      "args": [
+        "project",
+        "create",
+        "Elsewhere",
+        "--slug",
+        "ALP",
+        "-w",
+        "ws-other",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created proj0002  Elsewhere\n  task identifiers start with ALP\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
         "update",
         "proj-alpha",
         "--slug",
@@ -90,6 +131,54 @@
         "workspaceId": "ws-main",
         "icon": "Layers",
         "slug": "alp"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Older",
+        "workspaceId": "ws-main",
+        "icon": "Layers",
+        "slug": "OLD"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Wide",
+        "workspaceId": "ws-main",
+        "icon": "Layers",
+        "slug": "ＡＬＰ"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Elsewhere",
+        "workspaceId": "ws-other",
+        "icon": "Layers",
+        "slug": "ALP"
       }
     },
     {

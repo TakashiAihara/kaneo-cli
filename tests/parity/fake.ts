@@ -417,6 +417,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         }
       : null;
 
+  // Kaneo 2.32.0 refuses a project key another project in the workspace uses,
+  // archived ones included, comparing NFKC case-folded (project/utils.ts).
+  const sameKey = (a: string, b: string) => a.normalize("NFKC").toLowerCase() === b.normalize("NFKC").toLowerCase();
+  const keyTaken = (workspaceId: string, key: string, except?: string) =>
+    projects.find((x) => x.workspaceId === workspaceId && x.id !== except && sameKey(x.slug, key));
+  const keyTakenMessage = (key: string, name: string) =>
+    `This workspace already has a project using the key "${key}" (${name}). Choose a different key.`;
+
   const failing = opts.failOn ? new RegExp(opts.failOn) : undefined;
   let skipped = 0;
   let limited = 0;
@@ -622,6 +630,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "POST" && path === "/project") {
       const b = body as any;
+      const taken = keyTaken(b.workspaceId, b.slug);
+      if (taken) return failText(409, keyTakenMessage(b.slug, taken.name));
       const proj = { id: id("proj"), workspaceId: b.workspaceId, backgroundVersion: null, slug: b.slug, icon: b.icon, name: b.name, description: null, createdAt: now(), isPublic: false, archivedAt: null, position: projects.length, lastTaskNumber: 0 };
       projects.push(proj);
       return ok(M.Project, proj);
@@ -657,11 +667,20 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       if (opts.plainMember) return failText(403, "Insufficient permissions");
       if (req.method === "PUT" && !p[2]) {
+        const slug = (body as any).slug;
+        const taken = typeof slug === "string" && !sameKey(slug, proj.slug) ? keyTaken(proj.workspaceId, slug, proj.id) : undefined;
+        if (taken) return failText(409, keyTakenMessage(slug, taken.name));
         Object.assign(proj, body);
         return ok(M.Project, proj);
       }
       if (req.method === "PUT" && p[3] === "archive") return ok(M.Project, Object.assign(proj, { archivedAt: now() }));
-      if (req.method === "PUT" && p[3] === "unarchive") return ok(M.Project, Object.assign(proj, { archivedAt: null }));
+      if (req.method === "PUT" && p[3] === "unarchive") {
+        const taken = keyTaken(proj.workspaceId, proj.slug, proj.id);
+        if (taken) {
+          return failText(409, `This workspace already has a project using the key "${proj.slug}" (${taken.name}). Change one of the keys before unarchiving this project.`);
+        }
+        return ok(M.Project, Object.assign(proj, { archivedAt: null }));
+      }
       // Everything in the project goes with it, as the database's cascades do.
       if (req.method === "DELETE" && !p[2]) {
         const reply = ok(M.Project, proj);

@@ -1,0 +1,140 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "proj-noslug#1",
+        "--delete",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to delete 2 task(s) (ALP#1 proj-noslug#1) without --yes; this also removes their comments, where session history is kept\n"
+    },
+    {
+      "args": [
+        "column",
+        "create",
+        "Waiting",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0013\",\n  \"slug\": \"waiting\",\n  \"name\": \"Waiting\",\n  \"position\": 3,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "1",
+        "proj-noslug#1",
+        "--status",
+        "waiting",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: project proj-noslug (#1) has no column \"waiting\"; its columns are to-do, in-progress, done\n"
+    },
+    {
+      "args": [
+        "task",
+        "export",
+        "-p",
+        "proj-noslug",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"project\": {\n    \"name\": \"No slug\",\n    \"slug\": \"\",\n    \"description\": null,\n    \"exportedAt\": \"2026-01-01T00:00:13.000Z\"\n  },\n  \"tasks\": [\n    {\n      \"title\": \"Slugless\",\n      \"description\": \"\",\n      \"status\": \"to-do\",\n      \"priority\": \"no-priority\",\n      \"dueDate\": null,\n      \"startDate\": null,\n      \"userId\": null,\n      \"labels\": []\n    }\n  ]\n}\n",
+      "stderr": "exported 1 task(s) from No slug\n"
+    },
+    {
+      "args": [
+        "project",
+        "reorder",
+        "Alpha",
+        "Beta",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: every project in this workspace that is not archived has to be named exactly once: missing: proj-noslug\n"
+    },
+    {
+      "args": [
+        "project",
+        "ls",
+        "-w",
+        "Twin",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: \"Twin\" matches several workspaces: ws-twin, tw2 (ws-twin2); pass the id\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/column/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Waiting",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/export/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

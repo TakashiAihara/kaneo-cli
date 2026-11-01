@@ -46,7 +46,7 @@ import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunCon
 import { readInput, sourceName } from "./input";
 import { shellWord } from "../output/output";
 import { KaneoApiError } from "../api/http";
-import { withProject } from "./lookup";
+import { slugOr, withProject } from "./lookup";
 import { attachTask, currentSessionId } from "../session/attach";
 import { BAD_ID, validSessionId } from "../session/store";
 import { sharedReference, similarOpenTasks } from "./similar";
@@ -602,7 +602,7 @@ export const taskCommand = {
         // A number is only unique on its board, so tasks from several projects
         // are named with the project in front, by slug where a board was read.
         const several = new Set(named.map((t) => t.projectId)).size > 1;
-        const projectName = (id: string) => slugs.get(id) ?? id;
+        const projectName = (id: string) => slugOr(slugs.get(id) ?? "", id);
         const numbers = named.map((t) => `${several ? projectName(t.projectId) : ""}#${t.number}`).join(" ");
         if (operation === "delete" && flags.yes !== true) {
           throw new Error(
@@ -638,7 +638,7 @@ export const taskCommand = {
         if (app.out.mode.json || app.out.filter !== undefined) app.out.data(exported as Json);
         else if (app.out.terminal) app.out.human(JSON.stringify(exported, null, 2));
         else writeSync(1, `${JSON.stringify(exported, null, 2)}\n`);
-        app.out.status(`exported ${exported.tasks.length} task(s) from ${exported.project.slug}`);
+        app.out.status(`exported ${exported.tasks.length} task(s) from ${slugOr(exported.project.slug, exported.project.name)}`);
       },
     },
     {

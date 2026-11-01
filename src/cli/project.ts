@@ -14,7 +14,7 @@ import {
   type ProjectChanges,
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
-import { allProjects, firstMatch, resolveWorkspace, withProject, type ProjectIn } from "./lookup";
+import { allProjects, firstMatch, resolveWorkspace, slugOr, withProject, type ProjectIn } from "./lookup";
 import { shellWord } from "../output/output";
 import { KaneoApiError } from "../api/http";
 
@@ -476,7 +476,7 @@ const newProjectOrder = (projects: Project[], refs: string[]): Project[] => {
     }
   }
   // An archived project is not in the order at all, so it is not missing from it.
-  const missing = active.filter((project) => !taken.has(project.id)).map((project) => project.slug);
+  const missing = active.filter((project) => !taken.has(project.id)).map((project) => slugOr(project.slug, project.id));
   const wrong = [
     ...(unknown.length === 0 ? [] : [`unknown: ${unknown.join(", ")}`]),
     ...(kept.length === 0 ? [] : [`archived: ${kept.join(", ")} (it keeps its place)`]),

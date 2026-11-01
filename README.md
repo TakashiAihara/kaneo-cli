@@ -168,6 +168,7 @@ kaneo workflow rm <rule-id>       # or <integration> <event>, instead of the id;
 kaneo task ls [--status ...] [--priority ...] [--all]
 kaneo task get <task-id>                 # also lists the task's relations
 kaneo task create <title> [-d TEXT | --description-file PATH] [flags]
+kaneo task create --title <title> [flags]                      # the same, as task update takes the title; not both
 kaneo task create <title> --attach [--next <step>] [--force]   # attaches this session to the new task; --force creates beside one naming the same reference
 kaneo task update <task> [--title TEXT] [-d TEXT | --description-file PATH] [--status COL] [--priority P] [--start-date DATE] [--position N]   # only what is passed changes; --start-date "" clears
 kaneo task status <task-id> <status>

@@ -414,6 +414,14 @@ export const SCENARIOS: Scenario[] = [
   { name: "task create", steps: [["task", "create", "New one", "-d", "body", "--priority", "low", "--json"], ["task", "ls", "--human"]] },
   { name: "task create assigned", steps: [["task", "create", "Mine", "--assignee", "user-1", "--status", "in-progress", "--human"], ["task", "get", "4", "--json"]] },
   { name: "task create bad priority", steps: [["task", "create", "x", "--priority", "huge", "--json"]] },
+  // --title gives the title as task update takes it; given with words too, or
+  // with neither, the create is refused before anything is asked.
+  { name: "task create with --title", steps: [["task", "create", "--title", "Flagged one", "--json"], ["task", "ls", "--human"]] },
+  { name: "task create with --title and words", steps: [["task", "create", "Words", "--title", "Flagged", "--json"], ["task", "ls", "--human"]] },
+  { name: "task create with no title", steps: [["task", "create", "--json"]] },
+  // An empty --title is refused as task update refuses it, and an empty one
+  // beside words still counts as giving the title twice.
+  { name: "task create with an empty --title", steps: [["task", "create", "--title", " ", "--json"], ["task", "create", "--title", "", "--json"], ["task", "create", "Words", "--title", "", "--json"], ["task", "ls", "--human"]] },
   // Taken as task update takes it, and refused before the create when it is not
   // a date or comes after the due date.
   {

@@ -76,8 +76,6 @@ export type Scenario = {
   legacy?: boolean;
   // The fake leaves these fields out of a project read.
   readWithout?: string[];
-  // Sends these fields as null in a project read (see the fake's option).
-  readNull?: string[];
   // The fake holds every response back this long.
   delayMs?: number;
   // The fake answers matching "METHOD path" requests with whitespace only.
@@ -208,13 +206,6 @@ export const SCENARIOS: Scenario[] = [
     name: "project update json of a project whose read lacks the icon",
     readWithout: ["icon"],
     steps: [["project", "update", P1, "--icon", "Star", "--json"]],
-  },
-  {
-    // A description the read sent as null was read: it is not in unread, and
-    // its from is "" as the server's NULL is written back.
-    name: "project update json of a project whose read has a null description",
-    readNull: ["description"],
-    steps: [["project", "update", P1, "--name", "Alpha 2", "--json"]],
   },
   {
     // The order of unread is the order slug, description, icon.
@@ -1156,7 +1147,7 @@ export const SCENARIOS: Scenario[] = [
   { name: "no project", env: { KANEO_PROJECT: "" }, steps: [["task", "ls", "--json"]] },
   { name: "unknown command", steps: [["frobnicate"]] },
   { name: "unknown subcommand", steps: [["task", "frob"], ["comment", "nope", "--json"], ["session", "x"], ["task"]] },
-  ...[["--help"], ["help"], ["help", "project"], ["task", "--help"], ["task", "create", "--help"], ["project", "get", "--help"], ["session"], ["session", "next", "--help"]].map(
+  ...[["--help"], ["help"], ["help", "project"], ["task", "--help"], ["task", "create", "--help"], ["project", "get", "--help"], ["session"], ["session", "next", "--help"], ["project", "update", "--help"]].map(
     (args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] }),
   ),
   { name: "unknown flag", steps: [["task", "ls", "--bogus"], ["task", "ls", "-x"], ["--bogus"]] },

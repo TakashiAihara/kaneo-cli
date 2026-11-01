@@ -175,9 +175,10 @@ export const taskCommand = {
         "names refuses the create unless --force is given; a title merely worded like\n" +
         "one is created, with the tasks it resembles reported on stderr.",
       // Several words are one title: `task create fix the parser` is one task,
-      // not three.
-      args: minimumArgs(1),
+      // not three. --title is the other way to give it, as task update takes it,
+      // so the arguments are checked in run, where the flag can be seen.
       flags: [
+        { name: "title", type: "string" as const, usage: "task title, instead of the words after create", defaultValue: "" },
         {
           name: "description",
           shorthand: "d",
@@ -236,9 +237,11 @@ export const taskCommand = {
         },
       ],
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
+        if (changed.has("title") && args.length > 0) throw new Error("give the title once: as words after create or as --title, not both");
+        if (!changed.has("title")) minimumArgs(1)(args);
         apiKey(app);
         const wanted: NewTask = {
-          title: args.join(" "),
+          title: changed.has("title") ? String(flags.title) : args.join(" "),
           description: await descriptionOf(flags, changed),
           priority: String(flags.priority ?? ""),
           status: String(flags.status ?? ""),

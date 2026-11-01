@@ -12,16 +12,22 @@ const SCP_NO_USER = /^[^/:]{2,}:\/?([^/:]+)\/([^/]+?)(?:\.git)?\/?$/;
 const URL_LIKE = /^(?:ssh|git|https?):\/\/(?:[^/@]+@)?[^/]+\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 
 // Close to GitHub's charset, so a value that names no repository (`../x`,
-// `a@b/c`) is refused rather than looked up and reported as not registered,
-// which reads as an answer.
-const OWNER_REPO = /^([A-Za-z0-9_-][A-Za-z0-9._-]*)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/;
+// `x/..`, `a@b/c`) is refused rather than looked up and reported as not
+// registered, which reads as an answer. An owner may start with `~`: git
+// documents `host:~user/path`, and sourcehut names every repository that way.
+const OWNER = /^~?[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
+const REPO = /^(?!\.{1,2}$)[A-Za-z0-9._-]+$/;
+const OWNER_REPO = /^([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
+
+// owner/repo when both parts are in the charset above, or "".
+const named = (owner: string, repo: string): string => (OWNER.test(owner) && REPO.test(repo) ? `${owner}/${repo}` : "");
 
 // Only hosted forms are accepted: scp-style SSH, and ssh/git/http/https URLs.
 // A local path is rejected even though git accepts it as a remote, because its
 // trailing components look exactly like owner/repo — /home/me/acme/thing would
 // otherwise resolve to the acme workspace and send writes to a board that has
-// nothing to do with it. What a form leaves as owner/repo is held to OWNER_REPO
-// too, so `host:../x` or `host:~acme/thing` is not looked up as a repository.
+// nothing to do with it. What a form leaves as owner/repo is held to the same
+// charset as a typed one, so `host:../x` is not looked up as a repository.
 //
 // The host is dropped: the repo and owner maps are keyed by owner/repo alone,
 // so the user-less scp form is no harder to read than the others.
@@ -30,9 +36,9 @@ const parseRemote = (remote: string): string => {
   if (url === "") return "";
   for (const pattern of [URL_LIKE, SCP_LIKE, SCP_NO_USER]) {
     const match = pattern.exec(url);
-    if (match === null) continue;
-    const named = OWNER_REPO.exec(`${match[1]}/${match[2]}`);
-    return named === null ? "" : `${named[1]}/${named[2]}`;
+    // The forms do not overlap on a value that passes the charset, so the
+    // first one that matches decides.
+    if (match !== null) return named(match[1]!, match[2]!);
   }
   return "";
 };
@@ -46,7 +52,7 @@ export const parseRepo = (value: string): string => {
   const remote = parseRemote(value);
   if (remote !== "") return remote;
   const match = OWNER_REPO.exec(value.trim());
-  return match === null ? "" : `${match[1]}/${match[2]}`;
+  return match === null ? "" : named(match[1]!, match[2]!);
 };
 
 // Knowing the remote is a convenience for resolving a project, never worth

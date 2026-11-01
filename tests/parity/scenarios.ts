@@ -1301,7 +1301,7 @@ export const SCENARIOS: Scenario[] = [
       ["context", "--repo", "../x", "--json"],
       ["context", "--repo", "a@b/c", "--json"],
       ["context", "--repo", "host:../x", "--json"],
-      ["context", "--repo", "host:~acme/thing", "--json"],
+      ["context", "--repo", "host:acme/..", "--json"],
     ],
   },
   {

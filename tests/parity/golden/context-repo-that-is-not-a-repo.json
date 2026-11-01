@@ -70,12 +70,12 @@
       "args": [
         "context",
         "--repo",
-        "host:~acme/thing",
+        "host:acme/..",
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"--repo wants owner/name or a git remote URL, got \\\"host:~acme/thing\\\"\"\n}\n",
-      "stderr": "Error: --repo wants owner/name or a git remote URL, got \"host:~acme/thing\"\n"
+      "stdout": "{\n  \"error\": \"--repo wants owner/name or a git remote URL, got \\\"host:acme/..\\\"\"\n}\n",
+      "stderr": "Error: --repo wants owner/name or a git remote URL, got \"host:acme/..\"\n"
     }
   ],
   "requests": [],

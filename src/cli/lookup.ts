@@ -138,6 +138,11 @@ export const firstMatch = <T>(all: T[], value: string, id: (item: T) => string, 
   return [];
 };
 
+// What names a project in a message: its slug, or what stands in for one when
+// the server holds an empty slug, so the message has no blank where the name
+// should be.
+export const slugOr = (slug: string, fallback: string): string => (slug === "" ? fallback : slug);
+
 const noProject = (value: string): string =>
   `no project has the id, slug or name ${JSON.stringify(value)} (kaneo project find <text> searches names and slugs)`;
 
@@ -148,10 +153,10 @@ const noWorkspace = (value: string): string =>
 // a rule nobody stated, so they are all named and the id is what chooses.
 const severalProjects = (value: string, found: ProjectIn[]): string =>
   `${JSON.stringify(value)} matches several projects: ${found
-    .map((p) => `${p.project.slug} (${p.project.id}) in ${p.workspaceName}`)
+    .map((p) => `${p.project.slug === "" ? p.project.id : `${p.project.slug} (${p.project.id})`} in ${p.workspaceName}`)
     .join(", ")}; pass the id`;
 
 const severalWorkspaces = (value: string, found: Workspace[]): string =>
   `${JSON.stringify(value)} matches several workspaces: ${found
-    .map((w) => `${w.slug} (${w.id})`)
+    .map((w) => (w.slug === "" ? w.id : `${w.slug} (${w.id})`))
     .join(", ")}; pass the id`;

@@ -1396,7 +1396,39 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "project list with an empty slug",
     seed: { projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }] },
-    steps: [["project", "ls", "--human"]],
+    steps: [["project", "ls", "--human"], ["project", "ls", "-A", "--human"], ["project", "ls", "-A", "--json"]],
+  },
+  {
+    // A project with no slug is named without an empty [] or a leading blank,
+    // both in the refusal and among the projects a name matches.
+    name: "project rm and a name match with an empty slug",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-noslug", workspaceId: WS, name: "Twin", slug: "" },
+        { id: "proj-twin", workspaceId: WS, name: "Twin", slug: "TWN" },
+      ],
+    },
+    steps: [["project", "rm", "proj-noslug", "--human"], ["project", "rm", "Twin", "--human"]],
+  },
+  {
+    // The other messages that name a project or a workspace by its slug fall
+    // back to the id (or, in an export, the name) when the slug is empty.
+    name: "messages naming a project or workspace with an empty slug",
+    seed: {
+      workspaces: [...SEED.workspaces, { id: "ws-twin", name: "Twin", slug: "" }, { id: "ws-twin2", name: "Twin", slug: "tw2" }],
+      projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }],
+      tasks: [...SEED.tasks, { id: "task-n1", projectId: "proj-noslug", title: "Slugless" }],
+    },
+    steps: [
+      ["task", "bulk", "1", "proj-noslug#1", "--delete", "--human"],
+      ["column", "create", "Waiting", "--json"],
+      ["task", "bulk", "1", "proj-noslug#1", "--status", "waiting", "--human"],
+      ["task", "export", "-p", "proj-noslug", "--human"],
+      ["project", "reorder", "Alpha", "Beta", "--human"],
+      ["project", "ls", "-w", "Twin", "--human"],
+      ["task", "get", "proj-noslug#9", "--human"],
+    ],
   },
   {
     name: "project list across workspaces refuses a workspace",

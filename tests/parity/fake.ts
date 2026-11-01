@@ -74,6 +74,9 @@ export type FakeOptions = {
   // Leaves these fields out of a project read, as a server older than the
   // document does; the reply to a write is whole.
   readWithout?: string[];
+  // Sends these fields with these values in a project read (null, or a value
+  // of another type), as a server that does not follow the document might.
+  readAs?: Record<string, unknown>;
   // Holds every response back this long, for timeouts.
   delayMs?: number;
   // Answers a request whose "METHOD path" matches with a 200 holding only
@@ -661,9 +664,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // the task routes below.
       if (!proj) return failText(400, "Workspace ID could not be determined");
       if (req.method === "GET" && !p[2]) {
-        if (opts.readWithout === undefined) return ok(M.Project, proj);
-        const reply: Record<string, unknown> = { ...M.Project.parse(proj) };
-        for (const field of opts.readWithout) delete reply[field];
+        if (opts.readWithout === undefined && opts.readAs === undefined) return ok(M.Project, proj);
+        const reply: Record<string, unknown> = { ...M.Project.parse(proj), ...opts.readAs };
+        for (const field of opts.readWithout ?? []) delete reply[field];
         return Response.json(reply);
       }
       if (opts.plainMember) return failText(403, "Insufficient permissions");

@@ -1,0 +1,25 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "update",
+        "proj-alpha",
+        "--name",
+        "Alpha 2",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: reading project proj-alpha before the update got id \"proj-alpha\", name \"Alpha\", without isPublic, with icon null, with slug of another type; not writing; isPublic has no flag, so this project cannot be updated until the server returns it as a boolean\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

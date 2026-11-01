@@ -76,6 +76,8 @@ export type Scenario = {
   legacy?: boolean;
   // The fake leaves these fields out of a project read.
   readWithout?: string[];
+  // Sends these project fields with these values in a read (see the fake).
+  readAs?: Record<string, unknown>;
   // The fake holds every response back this long.
   delayMs?: number;
   // The fake answers matching "METHOD path" requests with whitespace only.
@@ -229,6 +231,14 @@ export const SCENARIOS: Scenario[] = [
     name: "project update json of a project whose read lacks the icon",
     readWithout: ["icon"],
     steps: [["project", "update", P1, "--icon", "Star", "--json"]],
+  },
+  {
+    // A field left out, one sent as null and one sent as another type are each
+    // named for what the server did.
+    name: "project update refuses a read that lacks, nulls and mistypes fields",
+    readWithout: ["isPublic"],
+    readAs: { icon: null, slug: 5 },
+    steps: [["project", "update", P1, "--name", "Alpha 2", "--human"]],
   },
   {
     // The order of unread is the order slug, description, icon.

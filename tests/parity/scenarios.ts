@@ -1147,7 +1147,7 @@ export const SCENARIOS: Scenario[] = [
   { name: "no project", env: { KANEO_PROJECT: "" }, steps: [["task", "ls", "--json"]] },
   { name: "unknown command", steps: [["frobnicate"]] },
   { name: "unknown subcommand", steps: [["task", "frob"], ["comment", "nope", "--json"], ["session", "x"], ["task"]] },
-  ...[["--help"], ["help"], ["help", "project"], ["task", "--help"], ["task", "create", "--help"], ["project", "get", "--help"], ["session"], ["session", "next", "--help"]].map(
+  ...[["--help"], ["help"], ["help", "project"], ["task", "--help"], ["task", "create", "--help"], ["project", "get", "--help"], ["session"], ["session", "next", "--help"], ["project", "update", "--help"]].map(
     (args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] }),
   ),
   { name: "unknown flag", steps: [["task", "ls", "--bogus"], ["task", "ls", "-x"], ["--bogus"]] },

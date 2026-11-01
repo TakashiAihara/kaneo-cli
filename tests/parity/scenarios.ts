@@ -582,6 +582,8 @@ export const SCENARIOS: Scenario[] = [
   // key's user, not a server without the route, so it is not called an old
   // server, and the refusal says what to give instead.
   { name: "task assign me says what to give when the server has no user for the key", failOn: "^GET /user/me$", failStatus: 404, failMessage: "User not found", steps: [["task", "assign", "1", "me", "--json"]] },
+  // Any other failure of /user/me is the server's own answer, passed on as it is.
+  { name: "task assign me passes on another failure of the user read", failOn: "^GET /user/me$", failStatus: 500, steps: [["task", "assign", "1", "me", "--json"]] },
   // The server's answer for a project it cannot place, beside the 403 above.
   {
     name: "task assign names the project read the server could not place",

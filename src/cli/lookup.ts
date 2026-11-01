@@ -148,7 +148,7 @@ const noWorkspace = (value: string): string =>
 // a rule nobody stated, so they are all named and the id is what chooses.
 const severalProjects = (value: string, found: ProjectIn[]): string =>
   `${JSON.stringify(value)} matches several projects: ${found
-    .map((p) => `${p.project.slug} (${p.project.id}) in ${p.workspaceName}`)
+    .map((p) => `${p.project.slug === "" ? p.project.id : `${p.project.slug} (${p.project.id})`} in ${p.workspaceName}`)
     .join(", ")}; pass the id`;
 
 const severalWorkspaces = (value: string, found: Workspace[]): string =>

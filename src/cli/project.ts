@@ -340,7 +340,7 @@ export const projectCommand = {
         // which project it resolved to rather than echoing the word typed.
         if (flags.yes !== true) {
           throw new Error(
-            `refusing to delete project ${found.name} [${found.slug}] (${found.id}) without --yes; \`kaneo project archive ${shellWord(found.id)}\` keeps it`,
+            `refusing to delete project ${found.name}${found.slug === "" ? "" : ` [${found.slug}]`} (${found.id}) without --yes; \`kaneo project archive ${shellWord(found.id)}\` keeps it`,
           );
         }
         const deleted = await deleteProject(found.id).catch(refused("deleting a project", "delete", async () => found.workspaceId));

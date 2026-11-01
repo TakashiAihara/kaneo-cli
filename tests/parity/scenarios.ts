@@ -1396,7 +1396,20 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "project list with an empty slug",
     seed: { projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }] },
-    steps: [["project", "ls", "--human"]],
+    steps: [["project", "ls", "--human"], ["project", "ls", "-A", "--human"], ["project", "ls", "-A", "--json"]],
+  },
+  {
+    // A project with no slug is named without an empty [] or a leading blank,
+    // both in the refusal and among the projects a name matches.
+    name: "project rm and a name match with an empty slug",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-noslug", workspaceId: WS, name: "Twin", slug: "" },
+        { id: "proj-twin", workspaceId: WS, name: "Twin", slug: "TWN" },
+      ],
+    },
+    steps: [["project", "rm", "proj-noslug", "--human"], ["project", "rm", "Twin", "--human"]],
   },
   {
     name: "project list across workspaces refuses a workspace",

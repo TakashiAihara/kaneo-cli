@@ -21,8 +21,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"2 workspace members are named \\\"ada\\\" (user-1, user-2); give the id\"\n}\n",
-      "stderr": "Error: 2 workspace members are named \"ada\" (user-1, user-2); give the id\n"
+      "stdout": "{\n  \"error\": \"2 members of workspace ws-main are named \\\"ada\\\" (user-1, user-2); give the id (`kaneo workspace members -w ws-main` lists them)\"\n}\n",
+      "stderr": "Error: 2 members of workspace ws-main are named \"ada\" (user-1, user-2); give the id (`kaneo workspace members -w ws-main` lists them)\n"
     },
     {
       "args": [

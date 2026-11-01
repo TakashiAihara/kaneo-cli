@@ -130,7 +130,7 @@ export class KaneoApiError extends Error {
     public readonly messages: string[] = [],
     public readonly body = "",
   ) {
-    super(describeFailure(method, path, statusCode, messages, body));
+    super(`${describeFailure(method, path, statusCode, messages, body)}${rateLimitHint(path, statusCode)}`);
   }
 
   // Reports whether the call failed because the key was rejected, which the
@@ -140,6 +140,17 @@ export class KaneoApiError extends Error {
     return this.statusCode === 401 || this.statusCode === 403;
   }
 }
+
+// Kaneo checks the key itself on every route outside /api/auth, and a key that
+// has hit its rate limit is answered there with the same 401 as a wrong one:
+// by default 100 requests are allowed until 60 seconds pass with none, and the
+// limit is set per key. Only better-auth's own routes say 429. The reply
+// cannot tell the cases apart, so the message says both are possible. It is
+// part of the message so a command that wraps the error keeps it.
+const rateLimitHint = (path: string, status: number): string =>
+  status === 401 && !/\/api\/auth\//.test(path)
+    ? "; Kaneo also answers 401 to a key that hit its rate limit (by default 100 requests with no 60-second pause), so if the key worked a moment ago, wait a minute and retry"
+    : "";
 
 const describeFailure = (
   method: string,

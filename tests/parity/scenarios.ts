@@ -298,6 +298,8 @@ export const SCENARIOS: Scenario[] = [
   { name: "column names refused", steps: [["column", "create", "Planned", "--json"], ["column", "create", "!!!", "--json"], ["column", "create", "To Do", "--json"], ["column", "create", " ", "--json"], ["column", "rename", "to-do", " ", "--json"], ["column", "rename", "in-progress", "To Do", "--json"], ["column", "rename", "To Do", "x", "--json"]] },
 
   ...both("search", ["search", "first"]),
+  // A task other than #1, so a number that only happened to be 1 is caught.
+  { name: "search gives a task match its number", steps: [["search", "Ship", "--type", "tasks", "--json"]] },
   { name: "search narrowed", steps: [["search", "first", "--in-project", "--json"], ["search", "first", "-p", "BET", "--human"], ["search", "first", "--in-project", "-p", "nope", "--human"], ["search", "a", "--in-project", "--type", "projects", "--human"], ["search", "e", "--type", "tasks", "--limit", "1", "--json"], ["search", "e", "--limit", "50", "--human"], ["search", "beta", "--type", "projects", "--human"], ["search", "e", "--limit", "2", "--human"], ["search", "x", "--type", "bogus", "--json"], ["search", " ", "--json"]] },
   { name: "search at the server's limit", seed: { tasks: Array.from({ length: 50 }, (_, i) => ({ id: `task-m${i}`, projectId: P1, title: `match ${i}` })) }, steps: [["search", "match", "--type", "tasks", "--limit", "50", "--human"], ["search", "match", "-A", "--type", "tasks", "--human"], ["search", "match", "-A", "--type", "tasks", "--limit", "50", "--human"]] },
   { name: "search and members need a workspace", env: { KANEO_WORKSPACE: "" }, steps: [["search", "first", "--json"], ["workspace", "members", "--json"]] },

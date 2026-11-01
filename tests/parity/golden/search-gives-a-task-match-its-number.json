@@ -1,0 +1,29 @@
+{
+  "steps": [
+    {
+      "args": [
+        "search",
+        "Ship",
+        "--type",
+        "tasks",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"Ship\",\n  \"totalCount\": 1,\n  \"results\": [\n    {\n      \"id\": \"task-a2\",\n      \"type\": \"task\",\n      \"title\": \"Ship it\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 2,\n      \"number\": 2,\n      \"priority\": \"no-priority\",\n      \"status\": \"in-progress\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=Ship&type=tasks&workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

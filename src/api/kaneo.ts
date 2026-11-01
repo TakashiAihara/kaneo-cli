@@ -351,6 +351,11 @@ export type SearchResult = {
   createdAt: string;
   relevanceScore: number;
   taskNumber: number | null;
+  // The task's number under the name task get and task list give it, so a
+  // script reads a task match the way it reads a task. Only a task match has
+  // one: on a comment or an activity, taskNumber is the number of the task it
+  // is on.
+  number: number | null;
   priority: string | null;
   status: string | null;
 };
@@ -414,6 +419,7 @@ export const search = async (wanted: SearchQuery): Promise<SearchPage> => {
       createdAt: isoTime("createdAt", r.createdAt),
       relevanceScore: r.relevanceScore ?? 0,
       taskNumber: r.taskNumber ?? null,
+      number: r.type === "task" ? (r.taskNumber ?? null) : null,
       priority: r.priority ?? null,
       status: r.status ?? null,
     })),

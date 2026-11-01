@@ -440,6 +440,20 @@ export const SCENARIOS: Scenario[] = [
   { name: "task update status and priority", steps: [["task", "edit", "2", "--status", "done", "--priority", "low", "--human"], ["task", "ls", "--all", "--json"]] },
   { name: "task update clears the description", steps: [["task", "update", "1", "-d", "", "--json"]] },
   { name: "task update with nothing to change", steps: [["task", "update", "1", "--json"]] },
+  // --assignee takes what task assign takes, an empty one clears it, and a name
+  // that matches no member is refused before any field is written.
+  {
+    name: "task update assignee",
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "update", "1", "--assignee", "ada", "--title", "Renamed", "--json"],
+      ["task", "update", "2", "--assignee", "", "--json"],
+      ["task", "update", "1", "--assignee", "  ", "--json"],
+      ["task", "update", "1", "--assignee", "Nobody", "--title", "Other", "--json"],
+      ["task", "get", "1", "--json"],
+      ["task", "get", "2", "--json"],
+    ],
+  },
   { name: "task update start date and position keep the rest", steps: [["task", "due", "2", "2026-11-01", "--json"], ["task", "update", "2", "--start-date", "2026-10-20", "--position", "5", "--json"], ["task", "get", "2", "--json"], ["task", "get", "2", "--human"], ["task", "update", "2", "--position", "6", "--human"], ["task", "update", "2", "--start-date", "", "--human"], ["task", "get", "2", "--json"]] },
   { name: "task update start after the due date changes nothing", steps: [["task", "due", "1", "2026-11-01", "--json"], ["task", "update", "1", "--title", "Renamed", "--start-date", "2026-11-02", "--json"], ["task", "get", "1", "--json"]] },
   // Dates on 2026-01-01, which the recorder leaves as they are, so the instant

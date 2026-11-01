@@ -312,7 +312,7 @@ export const taskCommand = {
       name: "update",
       aliases: ["edit"],
       use: "update <task>",
-      short: "Change a task's title, description, status, priority, start date or position; the rest is kept",
+      short: "Change a task's title, description, status, priority, assignee, start date or position; the rest is kept",
       args: exactArgs(1),
       flags: [
         { name: "title", type: "string" as const, usage: "new title", defaultValue: "" },
@@ -334,6 +334,12 @@ export const taskCommand = {
           name: "priority",
           type: "string" as const,
           usage: `one of: ${PRIORITIES.join(", ")}`,
+          defaultValue: "",
+        },
+        {
+          name: "assignee",
+          type: "string" as const,
+          usage: "member id, member name or `me`, as task assign takes them; empty clears the assignee",
           defaultValue: "",
         },
         {
@@ -359,11 +365,12 @@ export const taskCommand = {
           !wantsDescription &&
           !pass("priority") &&
           !pass("status") &&
+          !pass("assignee") &&
           !pass("start-date") &&
           !pass("position")
         ) {
           throw new Error(
-            "nothing to update: pass --title, --description, --description-file, --status, --priority, --start-date or --position",
+            "nothing to update: pass --title, --description, --description-file, --status, --priority, --assignee, --start-date or --position",
           );
         }
 
@@ -381,6 +388,10 @@ export const taskCommand = {
 
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
+        // Resolved before the first write, since a name that matches no member
+        // has to leave the task as it was.
+        const wantedAssignee = String(flags.assignee ?? "");
+        const assignee = !pass("assignee") ? undefined : wantedAssignee.trim() === "" ? "" : await resolveAssignee(task, wantedAssignee);
         // The server refuses a start after the due date on the full update, and
         // that update comes last, so its refusal would arrive after the other
         // fields of this command had landed. The start it would check is the one
@@ -425,6 +436,7 @@ export const taskCommand = {
         if (title !== undefined) await write("title", () => setTaskTitle(task.id, title));
         if (description !== undefined) await write("description", () => setTaskDescription(task.id, description));
         if (priority !== undefined) await write("priority", () => setTaskPriority(task.id, priority));
+        if (assignee !== undefined) await write("assignee", () => setTaskAssignee(task.id, assignee));
         // Last, so the full update it goes through reads the task with the writes
         // above already in it and sends them back rather than undoing them.
         if (startDate !== undefined || position !== undefined) {
@@ -470,6 +482,9 @@ export const taskCommand = {
                 : `${field} reads back as ${JSON.stringify(after[field])}, not ${JSON.stringify(sent)}`
             }`,
           );
+        }
+        if (assignee !== undefined && (after.assigneeId ?? "") !== assignee) {
+          throw new Error(`${landed()}, but task #${after.number} assignee reads back as ${JSON.stringify(after.assigneeId)}, not ${JSON.stringify(assignee)}`);
         }
         // The labels come from the task resolved above, since only the board
         // listing carries them and this report is shaped as `task get` shapes it.

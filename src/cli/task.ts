@@ -169,6 +169,8 @@ export const taskCommand = {
       short: "Create a task in a project",
       long:
         "Create a task in a project.\n\n" +
+        "The title is the words after create, or --title as task update takes it;\n" +
+        "not both.\n\n" +
         "With --attach this session is attached to the new task as `session attach`\n" +
         "would do it, which is what keeps the new number from having to be carried by\n" +
         "hand to the next command. A title naming a reference an open task already\n" +
@@ -241,7 +243,7 @@ export const taskCommand = {
         if (!changed.has("title")) minimumArgs(1)(args);
         apiKey(app);
         const wanted: NewTask = {
-          title: changed.has("title") ? String(flags.title) : args.join(" "),
+          title: changed.has("title") ? wantedTitle(String(flags.title ?? "")) : args.join(" "),
           description: await descriptionOf(flags, changed),
           priority: String(flags.priority ?? ""),
           status: String(flags.status ?? ""),

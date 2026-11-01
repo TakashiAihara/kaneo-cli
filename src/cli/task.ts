@@ -670,7 +670,8 @@ export const taskCommand = {
         "The file is what task export writes, or {\"tasks\": [...]}, or a bare array\n" +
         "of tasks. Each task needs a title and a status; description, priority,\n" +
         "startDate, dueDate and userId are optional. Labels are not imported: an\n" +
-        "export names them without the ids the server would need.\n\n" +
+        "export names them without the ids the server would need, and once the\n" +
+        "import has run, how many tasks had them is said on stderr.\n\n" +
         "A status the project has no column for, or a priority outside the fixed\n" +
         "list, is refused before anything is sent: the server would replace it, and\n" +
         "a task put in planned shows on no column. A task the server cannot create\n" +
@@ -687,7 +688,11 @@ export const taskCommand = {
           checkImport(tasks, await listColumns(id), args[0]!);
           return importProjectTasks(id, tasks);
         });
-        if (labelled > 0) app.out.status(`labels on ${labelled} task(s) were not imported`);
+        // On stderr in every mode, as task ls says what it left out: a script
+        // reading the JSON report would otherwise never learn the labels were
+        // dropped, since the report is the server's and does not name them; an
+        // entry added to its warnings would read as the server's own.
+        if (labelled > 0) console.error(`labels on ${labelled} task(s) were not imported`);
         for (const t of result.tasks) {
           if (t.success) app.out.human(`created  #${t.number} ${t.title}`);
           else app.out.human(`failed   ${t.title}: ${t.error}`);

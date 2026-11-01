@@ -236,8 +236,8 @@ export const SCENARIOS: Scenario[] = [
     // A field left out, one sent as null and one sent as another type are each
     // named for what the server did.
     name: "project update refuses a read that lacks, nulls and mistypes fields",
-    readWithout: ["isPublic"],
-    readAs: { icon: null, slug: 5 },
+    readWithout: ["description"],
+    readAs: { icon: null, slug: 5, isPublic: "true" },
     steps: [["project", "update", P1, "--name", "Alpha 2", "--human"]],
   },
   {

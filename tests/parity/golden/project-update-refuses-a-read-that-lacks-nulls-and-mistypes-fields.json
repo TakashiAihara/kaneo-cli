@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: reading project proj-alpha before the update got id \"proj-alpha\", name \"Alpha\", without isPublic, with icon null, with slug of another type; not writing; isPublic has no flag, so this project cannot be updated until the server returns it as a boolean\n"
+      "stderr": "Error: reading project proj-alpha before the update got id \"proj-alpha\", name \"Alpha\", without description, with icon null, with slug 5 where the document has a string, isPublic \"true\" where the document has a boolean; not writing; isPublic has no flag, so this project cannot be updated until the server returns it as a boolean\n"
     }
   ],
   "requests": [

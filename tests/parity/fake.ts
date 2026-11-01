@@ -75,7 +75,7 @@ export type FakeOptions = {
   // document does; the reply to a write is whole.
   readWithout?: string[];
   // Sends these fields with these values in a project read (null, or a value
-  // of another type), as a server that does not follow the document might.
+  // of another type): a fault to inject, not a reply Kaneo is known to send.
   readAs?: Record<string, unknown>;
   // Holds every response back this long, for timeouts.
   delayMs?: number;

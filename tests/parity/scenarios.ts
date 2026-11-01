@@ -1427,6 +1427,7 @@ export const SCENARIOS: Scenario[] = [
       ["task", "export", "-p", "proj-noslug", "--human"],
       ["project", "reorder", "Alpha", "Beta", "--human"],
       ["project", "ls", "-w", "Twin", "--human"],
+      ["task", "get", "proj-noslug#9", "--human"],
     ],
   },
   {

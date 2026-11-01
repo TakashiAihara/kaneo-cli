@@ -73,6 +73,17 @@
       "exit": 1,
       "stdout": "",
       "stderr": "Error: \"Twin\" matches several workspaces: ws-twin, tw2 (ws-twin2); pass the id\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "proj-noslug#9",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: no task #9 in project (proj-noslug, from the reference); check the number\n"
     }
   ],
   "requests": [
@@ -133,6 +144,11 @@
     {
       "method": "GET",
       "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-noslug",
       "query": ""
     }
   ],

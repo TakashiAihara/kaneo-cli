@@ -1063,7 +1063,7 @@ const numberOn = async (
   if (found === undefined) {
     // --project only steers a bare number; a reference names its board itself.
     const hint = origin === "the reference" ? "check the number" : "pass --project to look elsewhere";
-    throw new Error(`no task #${number} in project ${board.projectSlug} (${board.projectId}, from ${origin}); ${hint}`);
+    throw new Error(`no task #${number} in project ${board.projectSlug === "" ? "" : `${board.projectSlug} `}(${board.projectId}, from ${origin}); ${hint}`);
   }
   // The board listing does not always carry projectId on each task, but a task
   // found here is on this project by definition.

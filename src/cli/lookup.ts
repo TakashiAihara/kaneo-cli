@@ -138,9 +138,9 @@ export const firstMatch = <T>(all: T[], value: string, id: (item: T) => string, 
   return [];
 };
 
-// What names a project or a workspace in a message: its slug, or what stands
-// in for one when the server holds an empty slug, so the message has no blank
-// where the name should be.
+// What names a project in a message: its slug, or what stands in for one when
+// the server holds an empty slug, so the message has no blank where the name
+// should be.
 export const slugOr = (slug: string, fallback: string): string => (slug === "" ? fallback : slug);
 
 const noProject = (value: string): string =>

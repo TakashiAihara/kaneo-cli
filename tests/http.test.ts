@@ -314,7 +314,21 @@ describe("failures", () => {
     expect(e.statusCode).toBe(401);
     expect(e.unauthorized()).toBe(true);
     expect(e.path).toBe("/api/project");
-    expect(e.message).toBe("GET /api/project: 401: Unauthorized");
+    expect(e.message).toBe(
+      "GET /api/project: 401: Unauthorized; Kaneo also answers 401 to a key that hit its rate limit (by default 100 requests with no 60-second pause), so if the key worked a moment ago, wait a minute and retry",
+    );
+  });
+
+  // better-auth's routes answer a rate limit with 429, so their 401 is a key
+  // problem alone; and only a 401 is the key check's answer.
+  test.each([
+    ["/auth/organization/list", 401, "GET /api/auth/organization/list: 401: Unauthorized"],
+    ["/project", 403, "GET /api/project: 403: Forbidden"],
+  ])("%s answering %p gets no rate-limit hint", async (path, status, want) => {
+    const url = serve(() => new Response(status === 401 ? "Unauthorized" : "Forbidden", { status }));
+    configureClient({ baseUrl: url });
+    const e = (await failure(kaneoFetch(path, { method: "GET" }))) as KaneoApiError;
+    expect(e.message).toBe(want);
   });
 
   test.each([

@@ -360,10 +360,14 @@ export const SCENARIOS: Scenario[] = [
       ["task", "ls", "--json"],
       ["task", "ls", "--jq", ".[].number"],
       ["task", "ls", "--status", "planned", "--json"],
+      // A filter that fails at run time: the notice comes before jq's error.
+      ["task", "ls", "--jq", "error(\"boom\")"],
     ],
   },
-  // The count follows --priority: the seed's done task has no priority and
-  // is not counted, so high reads 2 and low reads 1.
+  // The count under --priority: the seed's done task has no priority and is
+  // not counted, so high reads 2 and low reads 1. The fake filters by priority
+  // before the CLI counts, so this does not show the CLI applying the filter
+  // itself; the ignoreFilters scenario below is what shows that.
   {
     name: "task list says how many it left out under a priority",
     extraTasks: [

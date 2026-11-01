@@ -53,6 +53,17 @@
       "exit": 0,
       "stdout": "[\n  {\n    \"id\": \"task-a4\",\n    \"number\": 4,\n    \"title\": \"Next quarter\",\n    \"description\": \"\",\n    \"status\": \"planned\",\n    \"priority\": \"no-priority\",\n    \"position\": 3,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:08.000Z\",\n    \"labels\": []\n  }\n]\n",
       "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--jq",
+        "error(\"boom\")"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "(3 done / planned / archived tasks left out; --all to include them)\nError: --jq: jq: error: boom\nthe command had already run when --jq failed; anything it changes has been changed\n"
     }
   ],
   "requests": [
@@ -80,6 +91,11 @@
       "method": "GET",
       "path": "/task/tasks/proj-alpha",
       "query": "?status=planned"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
     }
   ],
   "files": {}

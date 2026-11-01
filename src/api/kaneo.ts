@@ -443,6 +443,13 @@ export type Project = {
 
 export const archived = (project: Project): boolean => project.archivedAt !== null;
 
+// The active projects in a workspace with the highest task number each has
+// issued, which the listing carries and Project leaves out: it says whether a
+// number can be on a project's board without reading the board. null where the
+// server does not send it (before Kaneo 2.23.0).
+export const lastTaskNumbers = async (workspaceId: string): Promise<{ project: Project; lastTaskNumber: number | null }[]> =>
+  zeroList(await listProjects({ workspaceId })).map((item) => ({ project: project(item), lastTaskNumber: item.lastTaskNumber ?? null }));
+
 // The projects in a workspace. workspaceId is a required query parameter;
 // omitting it is a 400, not an unfiltered listing.
 //

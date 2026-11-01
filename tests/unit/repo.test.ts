@@ -53,13 +53,27 @@ describe("currentRepo", () => {
     expect(currentRepo(repoWithOrigin(origin, env), env)).toBe(expected);
   });
 
-  test.each(["C:x/y", "C:/x/y", "/home/me/acme/thing", "./acme/thing", "./foo:acme/thing", "/srv/x:acme/thing", "host:thing", "host:../x", "host:acme/..", "git@host:../x", "ssh://host/../x", "host:~/x"])(
+  test.each(["C:x/y", "C:/x/y", "/home/me/acme/thing", "./acme/thing", "./foo:acme/thing", "/srv/x:acme/thing", "host:thing", "host:../x", "host:acme/..", "git@host:../x", "ssh://host/../x", "host:~/x", "host:a:b/c", "ftp://host/acme/thing", "file:///acme/thing"])(
     "does not read %s as a repository",
     (origin) => {
       const env = isolatedEnv();
       expect(currentRepo(repoWithOrigin(origin, env), env)).toBe("");
     },
   );
+
+  test("runs git with the current process.env when given none", () => {
+    const env = isolatedEnv('[url "git@example.com:other/"]\n\tinsteadOf = host:acme/\n');
+    const dir = repoWithOrigin("host:acme/thing", env);
+    const saved = { ...process.env };
+    try {
+      for (const key of Object.keys(process.env)) delete process.env[key];
+      Object.assign(process.env, env);
+      expect(currentRepo(dir)).toBe("other/thing");
+    } finally {
+      for (const key of Object.keys(process.env)) delete process.env[key];
+      Object.assign(process.env, saved);
+    }
+  });
 
   test("runs git with the env it is given", () => {
     const env = isolatedEnv('[url "git@github.com:other/"]\n\tinsteadOf = host:acme/\n');

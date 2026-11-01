@@ -5,9 +5,11 @@ const SCP_LIKE = /^[^/@]+@[^/:]+:\/?([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 // No user, so `host:owner/name` as git prints it for a remote written that way.
 // For a value without `://`, git treats it as scp-style ssh whenever no `/`
 // comes before the first `:`, so a slash after the colon does not make it a
-// path (a value with a scheme is taken by URL_LIKE first). A single-letter host is still
-// refused: only Git for Windows reads `C:x/y` as a drive, but a checkout made on
-// Windows should not have its drive path read as a repository.
+// path. An ssh, git or http(s) URL is taken by URL_LIKE first; another scheme
+// (ftp://, file://) leaves a second `/` this form does not take, so it is
+// refused. A single-letter host is still refused: only Git for Windows reads
+// `C:x/y` as a drive, but a checkout made on Windows should not have its drive
+// path read as a repository.
 const SCP_NO_USER = /^[^/:]{2,}:\/?([^/:]+)\/([^/]+?)(?:\.git)?\/?$/;
 const URL_LIKE = /^(?:ssh|git|https?):\/\/(?:[^/@]+@)?[^/]+\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 
@@ -69,8 +71,8 @@ const REMOTE_TIMEOUT_MS = 2000;
 // not a repository is an ordinary answer here, not a failure, and a machine
 // with no git at all is the same answer.
 //
-// env is what git runs with; a caller that changes the environment git should
-// see passes it, because Bun.spawnSync does not pick up later process.env edits.
+// env is what git runs with, the current process.env unless a caller passes
+// another (Bun.spawnSync's own default is the environment at startup).
 export const currentRepo = (dir: string, env: Record<string, string | undefined> = process.env): string => {
   let remote: string;
   try {

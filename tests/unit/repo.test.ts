@@ -49,7 +49,7 @@ describe("currentRepo", () => {
     expect(currentRepo(repoWithOrigin(origin, env), env)).toBe(expected);
   });
 
-  test.each(["C:x/y", "C:/x/y", "/home/me/acme/thing", "./acme/thing", "./foo:acme/thing", "/srv/x:acme/thing", "host:thing"])(
+  test.each(["C:x/y", "C:/x/y", "/home/me/acme/thing", "./acme/thing", "./foo:acme/thing", "/srv/x:acme/thing", "host:thing", "host:../x", "host:~acme/thing", "git@host:../x", "ssh://host/../x"])(
     "does not read %s as a repository",
     (origin) => {
       const env = isolatedEnv();
@@ -64,8 +64,12 @@ describe("currentRepo", () => {
 });
 
 describe("parseRepo", () => {
-  test("still refuses a typed user-less scp form", () => {
-    expect(parseRepo("github.com:acme/thing")).toBe("");
+  test("takes a user-less scp form, as the origin remote is read", () => {
+    expect(parseRepo("github.com:acme/thing.git")).toBe("acme/thing");
+  });
+
+  test.each(["host:../x", "host:~acme/thing", "C:x/y"])("refuses %s", (value) => {
+    expect(parseRepo(value)).toBe("");
   });
 
   test("takes owner/name", () => {

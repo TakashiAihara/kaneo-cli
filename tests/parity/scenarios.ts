@@ -1300,8 +1300,17 @@ export const SCENARIOS: Scenario[] = [
       ["context", "--repo", "", "--json"],
       ["context", "--repo", "../x", "--json"],
       ["context", "--repo", "a@b/c", "--json"],
-      ["context", "--repo", "github.com:acme/thing", "--json"],
+      ["context", "--repo", "host:../x", "--json"],
+      ["context", "--repo", "host:~acme/thing", "--json"],
     ],
+  },
+  {
+    // The maps are keyed by owner/repo, so the host a user-less scp remote
+    // names is dropped as it is for the other forms.
+    name: "context --repo takes a user-less scp remote",
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
+    config: { owners: { acme: "ws-acme" }, repos: { "acme/thing": ["proj-x"] } },
+    steps: [["context", "--repo", "github.com:acme/thing", "--json"]],
   },
   {
     name: "--api-url and --api-key beat the environment",

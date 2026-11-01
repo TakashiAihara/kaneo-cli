@@ -11,31 +11,31 @@ const SCP_LIKE = /^[^/@]+@[^/:]+:\/?([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 const SCP_NO_USER = /^[^/:]{2,}:\/?([^/:]+)\/([^/]+?)(?:\.git)?\/?$/;
 const URL_LIKE = /^(?:ssh|git|https?):\/\/(?:[^/@]+@)?[^/]+\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 
+// Close to GitHub's charset, so a value that names no repository (`../x`,
+// `a@b/c`) is refused rather than looked up and reported as not registered,
+// which reads as an answer.
+const OWNER_REPO = /^([A-Za-z0-9_-][A-Za-z0-9._-]*)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/;
+
 // Only hosted forms are accepted: scp-style SSH, and ssh/git/http/https URLs.
 // A local path is rejected even though git accepts it as a remote, because its
 // trailing components look exactly like owner/repo — /home/me/acme/thing would
 // otherwise resolve to the acme workspace and send writes to a board that has
-// nothing to do with it.
+// nothing to do with it. What a form leaves as owner/repo is held to OWNER_REPO
+// too, so `host:../x` or `host:~acme/thing` is not looked up as a repository.
 //
-// The user-less scp form is accepted only for the cwd's origin remote.
-// parseRepo keeps refusing it (#64); whether to accept it is tracked in #336.
-const parseRemote = (remote: string, userless = false): string => {
+// The host is dropped: the repo and owner maps are keyed by owner/repo alone,
+// so the user-less scp form is no harder to read than the others.
+const parseRemote = (remote: string): string => {
   const url = remote.trim();
   if (url === "") return "";
-  for (const pattern of userless ? [URL_LIKE, SCP_LIKE, SCP_NO_USER] : [URL_LIKE, SCP_LIKE]) {
+  for (const pattern of [URL_LIKE, SCP_LIKE, SCP_NO_USER]) {
     const match = pattern.exec(url);
-    const owner = match?.[1];
-    const repo = match?.[2];
-    if (owner !== undefined && repo !== undefined && owner !== "" && repo !== "") return `${owner}/${repo}`;
+    if (match === null) continue;
+    const named = OWNER_REPO.exec(`${match[1]}/${match[2]}`);
+    return named === null ? "" : `${named[1]}/${named[2]}`;
   }
   return "";
 };
-
-// Close to GitHub's charset, so a value that names no repository (`../x`,
-// `a@b/c`) is refused rather than looked up and reported as not registered,
-// which reads as an answer. A scp-style remote without a user (`host:owner/name`)
-// is refused here as #64 decided; whether to accept it is tracked in #336.
-const OWNER_REPO = /^([A-Za-z0-9_-][A-Za-z0-9._-]*)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/;
 
 // The owner/repo a caller named, or "" when the value names no repository.
 //
@@ -81,5 +81,5 @@ export const currentRepo = (dir: string, env: Record<string, string | undefined>
     // it are still an answer and the command is still worth running.
     return "";
   }
-  return parseRemote(remote, true);
+  return parseRemote(remote);
 };

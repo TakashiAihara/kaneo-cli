@@ -15,6 +15,8 @@ const URL_LIKE = /^(?:ssh|git|https?):\/\/(?:[^/@]+@)?[^/]+\/([^/]+)\/([^/]+?)(?
 // `x/..`, `a@b/c`) is refused rather than looked up and reported as not
 // registered, which reads as an answer. An owner may start with `~`: git
 // documents `host:~user/path`, and sourcehut names every repository that way.
+// A `~` alone, a home directory, is still refused; `~acme` cannot be mistaken
+// for another host's owner, since no GitHub owner starts with `~`.
 const OWNER = /^~?[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
 const REPO = /^(?!\.{1,2}$)[A-Za-z0-9._-]+$/;
 const OWNER_REPO = /^([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
@@ -36,8 +38,8 @@ const parseRemote = (remote: string): string => {
   if (url === "") return "";
   for (const pattern of [URL_LIKE, SCP_LIKE, SCP_NO_USER]) {
     const match = pattern.exec(url);
-    // The forms do not overlap on a value that passes the charset, so the
-    // first one that matches decides.
+    // Where two forms match the same value they leave the same owner/repo, so
+    // the first one that matches decides.
     if (match !== null) return named(match[1]!, match[2]!);
   }
   return "";

@@ -46,13 +46,14 @@ describe("currentRepo", () => {
     ["host:~acme/thing", "~acme/thing"],
     ["https://git.sr.ht/~acme/thing", "~acme/thing"],
     ["host:acme/thing.git.git", "acme/thing.git"],
+    ["host:acme/.github", "acme/.github"],
     ["https://github.com/acme/thing.git", "acme/thing"],
   ])("reads %s as %s", (origin, expected) => {
     const env = isolatedEnv();
     expect(currentRepo(repoWithOrigin(origin, env), env)).toBe(expected);
   });
 
-  test.each(["C:x/y", "C:/x/y", "/home/me/acme/thing", "./acme/thing", "./foo:acme/thing", "/srv/x:acme/thing", "host:thing", "host:../x", "host:acme/..", "git@host:../x", "ssh://host/../x"])(
+  test.each(["C:x/y", "C:/x/y", "/home/me/acme/thing", "./acme/thing", "./foo:acme/thing", "/srv/x:acme/thing", "host:thing", "host:../x", "host:acme/..", "git@host:../x", "ssh://host/../x", "host:~/x"])(
     "does not read %s as a repository",
     (origin) => {
       const env = isolatedEnv();
@@ -71,12 +72,16 @@ describe("parseRepo", () => {
     expect(parseRepo("github.com:acme/thing.git")).toBe("acme/thing");
   });
 
-  test.each(["host:../x", "acme/..", "acme/.", "C:x/y"])("refuses %s", (value) => {
+  test.each(["host:../x", "acme/..", "acme/.", "C:x/y", "~/x"])("refuses %s", (value) => {
     expect(parseRepo(value)).toBe("");
   });
 
   test("takes owner/name", () => {
     expect(parseRepo("acme/thing")).toBe("acme/thing");
+  });
+
+  test("takes a ~user owner typed, as a remote names it", () => {
+    expect(parseRepo("~acme/thing")).toBe("~acme/thing");
   });
 
   test("strips one .git, as the remote forms do", () => {

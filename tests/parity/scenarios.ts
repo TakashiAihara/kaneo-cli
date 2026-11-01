@@ -173,6 +173,28 @@ export const SCENARIOS: Scenario[] = [
 
   { name: "project create with an underivable slug", steps: [["project", "create", "!!!", "--json"]] },
   { name: "project update", steps: [["project", "update", P1, "--name", "Alpha 2", "--slug", "AL2", "--json"], ["project", "get", P1, "--human"]] },
+  // Kaneo 2.32.0 refuses a key another project in the workspace uses, ignoring
+  // case and counting archived projects, with a 409 the CLI passes on.
+  {
+    name: "a project key another project uses is refused",
+    seed: { projects: [...SEED.projects, { id: "proj-old2", workspaceId: WS, name: "Old again", slug: "old" }] },
+    steps: [
+      ["project", "create", "Alpha two", "--slug", "alp", "--human"],
+      // A key the archived project holds (it is the one the reply names), and
+      // one in a compatibility form.
+      ["project", "create", "Older", "--slug", "OLD", "--human"],
+      ["project", "create", "Wide", "--slug", "ＡＬＰ", "--human"],
+      // Another workspace's projects do not count.
+      ["project", "create", "Elsewhere", "--slug", "ALP", "-w", "ws-other", "--human"],
+      ["project", "update", P1, "--slug", "bet", "--human"],
+      ["project", "update", P1, "--slug", "alp", "--json"],
+      ["project", "unarchive", "proj-old", "--human"],
+      // Its own key in another case is not checked, even with another project
+      // already holding the same key.
+      ["project", "update", "proj-old2", "--slug", "OLD", "--human"],
+      ["project", "ls", "--archived", "--human"],
+    ],
+  },
   { name: "project update clears description", steps: [["project", "update", P1, "-d", "", "--json"]] },
   {
     // The server takes an empty slug, and refusing to write such a project left

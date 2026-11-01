@@ -61,6 +61,20 @@ describe("currentRepo", () => {
     },
   );
 
+  test("runs git with the current process.env when given none", () => {
+    const env = isolatedEnv('[url "git@example.com:other/"]\n\tinsteadOf = host:acme/\n');
+    const dir = repoWithOrigin("host:acme/thing", env);
+    const saved = { ...process.env };
+    try {
+      for (const key of Object.keys(process.env)) delete process.env[key];
+      Object.assign(process.env, env);
+      expect(currentRepo(dir)).toBe("other/thing");
+    } finally {
+      for (const key of Object.keys(process.env)) delete process.env[key];
+      Object.assign(process.env, saved);
+    }
+  });
+
   test("runs git with the env it is given", () => {
     const env = isolatedEnv('[url "git@github.com:other/"]\n\tinsteadOf = host:acme/\n');
     expect(currentRepo(repoWithOrigin("host:acme/thing", env), env)).toBe("other/thing");

@@ -670,8 +670,8 @@ export const taskCommand = {
         "The file is what task export writes, or {\"tasks\": [...]}, or a bare array\n" +
         "of tasks. Each task needs a title and a status; description, priority,\n" +
         "startDate, dueDate and userId are optional. Labels are not imported: an\n" +
-        "export names them without the ids the server would need, and how many\n" +
-        "tasks had them is said on stderr.\n\n" +
+        "export names them without the ids the server would need, and once the\n" +
+        "import has run, how many tasks had them is said on stderr.\n\n" +
         "A status the project has no column for, or a priority outside the fixed\n" +
         "list, is refused before anything is sent: the server would replace it, and\n" +
         "a task put in planned shows on no column. A task the server cannot create\n" +

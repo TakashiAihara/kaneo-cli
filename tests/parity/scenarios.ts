@@ -604,6 +604,8 @@ export const SCENARIOS: Scenario[] = [
   { name: "task assign by id needs no configured workspace", env: { KANEO_WORKSPACE: "" }, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "user-1", "--human"], ["task", "get", "1", "--json"]] },
   { name: "task assign stops when the project read has no workspace", readWithout: ["workspaceId"], seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--json"]] },
   { name: "task assign names the project read that failed", failOn: "^GET /project/proj-alpha$", failStatus: 403, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--json"]] },
+  // A 401 a command wraps in its own words still says it may be the rate limit.
+  { name: "a wrapped 401 keeps the rate limit hint", failOn: "^GET /project/proj-alpha$", failStatus: 401, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--human"]] },
   { name: "task assign me on a server without user me", noCurrentUser: true, steps: [["task", "assign", "1", "me", "--json"]] },
   // A 404 that says the user is not found is the server answering about the
   // key's user, not a server without the route, so it is not called an old

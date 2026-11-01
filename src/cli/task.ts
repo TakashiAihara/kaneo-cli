@@ -687,7 +687,10 @@ export const taskCommand = {
           checkImport(tasks, await listColumns(id), args[0]!);
           return importProjectTasks(id, tasks);
         });
-        if (labelled > 0) app.out.status(`labels on ${labelled} task(s) were not imported`);
+        // On stderr in every mode, as task ls says what it left out: a script
+        // reading the JSON report would otherwise never learn the labels were
+        // dropped, since the report is the server's and does not name them.
+        if (labelled > 0) console.error(`labels on ${labelled} task(s) were not imported`);
         for (const t of result.tasks) {
           if (t.success) app.out.human(`created  #${t.number} ${t.title}`);
           else app.out.human(`failed   ${t.title}: ${t.error}`);

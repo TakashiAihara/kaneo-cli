@@ -28,6 +28,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     growTimes: s.growTimes,
     ignoreFilters: s.ignoreFilters,
     failOn: s.failOn,
+    failMessage: s.failMessage,
     failStatus: s.failStatus,
     plainMember: s.plainMember,
     noCurrentUser: s.noCurrentUser,

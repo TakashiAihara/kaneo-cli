@@ -86,7 +86,9 @@ const resolveAssignee = async (task: Task, given: string): Promise<string> => {
     );
   }
   if (named.length > 1) {
-    throw new Error(`${named.length} workspace members are named ${JSON.stringify(value)} (${named.map((m) => m.id).join(", ")}); give the id`);
+    throw new Error(
+      `${named.length} members of workspace ${workspaceId} are named ${JSON.stringify(value)} (${named.map((m) => m.id).join(", ")}); give the id (\`kaneo workspace members -w ${shellWord(workspaceId)}\` lists them)`,
+    );
   }
   return named[0]!.id;
 };

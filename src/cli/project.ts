@@ -250,6 +250,10 @@ export const projectCommand = {
       name: "update",
       use: "update <project-id>",
       short: "Change a project's name, slug, description or icon; the rest is kept",
+      long:
+        "Change a project's name, slug, description or icon; the rest is kept.\n\n" +
+        "With --json the report has from, to and unread: the fields the read before\n" +
+        "the write lacked, whose from is \"\". A field the read sent as null was read.",
       // The id is required rather than resolved like `project get`: resolution
       // falls back to .kaneo.json and the repos map, so an update typed inside a
       // checkout would quietly hit whichever project that repo maps to.

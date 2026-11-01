@@ -13,7 +13,7 @@ import type { App } from "./app";
 import { resolveFromEnvironment, type Flags as ResolvedFlags } from "../config/resolve";
 import { isTTY, resolveMode, sanitizeControl, Writer } from "../output/output";
 import { loadFilter, JqFailure, type Filter } from "../output/jq";
-import { configureClient, setRateLimitWaits } from "../api/http";
+import { configureClient, KaneoApiError, setRateLimitWaits } from "../api/http";
 import { contextCommand } from "./context";
 import { whoamiCommand } from "./whoami";
 import { workspaceCommand } from "./workspace";
@@ -237,7 +237,7 @@ export const run = async (argv: string[]): Promise<number> => {
     });
     return 0;
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const message = e instanceof Error ? `${e.message}${rateLimitHint(e)}` : String(e);
     // A failure of the expression is not the command's: there is no payload to
     // report it with, and the filter cannot be run over the object that says so.
     // A failure before the filter is loaded is reported the way the Writer would
@@ -251,3 +251,13 @@ export const run = async (argv: string[]): Promise<number> => {
     return 1;
   }
 };
+
+// Kaneo checks the key itself on every route outside /api/auth, and a key over
+// its rate limit (100 requests a minute unless the key was set otherwise) is
+// answered there with the same 401 as a key that is wrong; only better-auth's
+// own routes say 429. The reply cannot tell the two apart, so the message says
+// both are possible.
+const rateLimitHint = (e: Error): string =>
+  e instanceof KaneoApiError && e.statusCode === 401 && !e.path.startsWith("/api/auth/")
+    ? "; Kaneo also answers 401 to a key over its rate limit (100 requests a minute by default), so if the key worked a moment ago, wait a minute and retry"
+    : "";

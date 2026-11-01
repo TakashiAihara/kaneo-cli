@@ -353,7 +353,8 @@ export type SearchResult = {
   taskNumber: number | null;
   // The task's number under the name task get and task list give it, so a
   // script reads a task match the way it reads a task. Only a task match has
-  // one: on a comment, taskNumber is the number of the task it is on.
+  // one: on a comment or an activity, taskNumber is the number of the task it
+  // is on.
   number: number | null;
   priority: string | null;
   status: string | null;

@@ -9,8 +9,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/user/me: 404: User not found\"\n}\n",
-      "stderr": "Error: GET /api/user/me: 404: User not found\n"
+      "stdout": "{\n  \"error\": \"GET /api/user/me: 404: User not found; the server has no user for this API key; give a member's id or name instead\"\n}\n",
+      "stderr": "Error: GET /api/user/me: 404: User not found; the server has no user for this API key; give a member's id or name instead\n"
     }
   ],
   "requests": [

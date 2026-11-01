@@ -9,8 +9,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"reading project proj-alpha, the project of task #1, to find its workspace: GET /api/project/proj-alpha: 404: injected failure\"\n}\n",
-      "stderr": "Error: reading project proj-alpha, the project of task #1, to find its workspace: GET /api/project/proj-alpha: 404: injected failure\n"
+      "stdout": "{\n  \"error\": \"reading project proj-alpha, the project of task #1, to find its workspace: GET /api/project/proj-alpha: 400: Workspace ID could not be determined\"\n}\n",
+      "stderr": "Error: reading project proj-alpha, the project of task #1, to find its workspace: GET /api/project/proj-alpha: 400: Workspace ID could not be determined\n"
     }
   ],
   "requests": [

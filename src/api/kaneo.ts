@@ -581,7 +581,8 @@ export const updateProject = async (
   // not that: it is a state a project can be in, and writing it back is the only
   // way such a project can be changed at all. A field the reply left out, or
   // sent as null, would be written back as "" or false and blank an icon or turn
-  // a public project private, so each one sent back has to have been read as its
+  // a public project private, and one sent as another type would be written
+  // back as that value, so each one sent back has to have been read as its
   // type. Only the description may be null: the server stores NULL there and
   // this client writes it back as "". icon and isPublic are nullable upstream
   // too, but a NULL there has no value to send back.
@@ -602,11 +603,13 @@ export const updateProject = async (
     // lacks, and a flag for the other fields would not get it past.
     const stuck = identified && missing.includes("isPublic");
     const flags = identified && !stuck ? missing.map((field) => `--${field} TEXT`) : [];
-    // A field the reply sent as null is named apart from one it left out, so the
-    // refusal says which of the two the server did.
+    // A field the reply left out, sent as null, or sent as another type is
+    // named apart from the others, so the refusal says which the server did.
+    const absent = missing.filter((field) => raw[field] === undefined);
     const nulled = missing.filter((field) => raw[field] === null);
-    const absent = missing.filter((field) => raw[field] !== null);
-    const lacks = `${absent.length > 0 ? `, without ${absent.join(", ")}` : ""}${nulled.length > 0 ? `, with ${nulled.join(", ")} null` : ""}`;
+    const mistyped = missing.filter((field) => raw[field] !== undefined && raw[field] !== null);
+    const typed = mistyped.map((field) => `${field} ${JSON.stringify(raw[field])} where the document has ${field === "isPublic" ? "a boolean" : "a string"}`);
+    const lacks = `${absent.length > 0 ? `, without ${absent.join(", ")}` : ""}${nulled.length > 0 ? `, with ${nulled.join(", ")} null` : ""}${typed.length > 0 ? `, with ${typed.join(", ")}` : ""}`;
     throw new Error(
       `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}${lacks}; not writing${flags.length > 0 ? ` (pass ${flags.join(" ")} to write it yourself)` : ""}${stuck ? "; isPublic has no flag, so this project cannot be updated until the server returns it as a boolean" : ""}`,
     );

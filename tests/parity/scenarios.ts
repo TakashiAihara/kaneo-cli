@@ -1044,6 +1044,35 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    name: "notification preferences set ntfy token from stdin",
+    stdin: "tk_from_stdin_77\n",
+    steps: [
+      ["notification", "prefs", "set", "--ntfy", "--ntfy-server", "https://ntfy.example", "--ntfy-topic", "kaneo", "--ntfy-token", "-", "--json"],
+    ],
+  },
+  {
+    name: "notification preferences set webhook secret from stdin",
+    stdin: "whsec_from_stdin_88\r\n",
+    steps: [["notification", "prefs", "set", "--webhook-url", "https://example.com/hook", "--webhook-secret", "-", "--json"]],
+  },
+  { name: "notification preferences set gotify token from stdin", stdin: " gt_from_stdin_99 \n", steps: [["notification", "prefs", "set", "--gotify-token", "-", "--human"]] },
+  { name: "notification preferences set empty stdin", stdin: "\n", steps: [["notification", "prefs", "set", "--ntfy-token", "-", "--json"]] },
+  {
+    name: "notification preferences set only secrets read stdin",
+    stdin: "tk_unused\n",
+    steps: [["notification", "prefs", "set", "--ntfy-topic", "-", "--json"]],
+  },
+  {
+    name: "notification preferences set two secrets from stdin",
+    stdin: "tk_one\n",
+    steps: [["notification", "prefs", "set", "--ntfy-token", "-", "--webhook-secret", "-", "--json"]],
+  },
+  {
+    name: "notification preferences set one secret from stdin beside another",
+    stdin: "tk_one\n",
+    steps: [["notification", "prefs", "set", "--ntfy", "--ntfy-server", "https://ntfy.example", "--ntfy-topic", "kaneo", "--ntfy-token", "-", "--webhook-url", "https://example.com/hook", "--webhook-secret", "", "--json"]],
+  },
+  {
     name: "notification preferences carry into rules",
     steps: [
       ["notification", "prefs", "set", "--email", "--human"],

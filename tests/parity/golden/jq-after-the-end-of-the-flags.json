@@ -1,0 +1,18 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "--",
+        "--jq",
+        ".x"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"accepts 1 arg(s), received 2\"\n}\n",
+      "stderr": "Error: accepts 1 arg(s), received 2\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

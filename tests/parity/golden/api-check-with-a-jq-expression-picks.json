@@ -1,0 +1,21 @@
+{
+  "steps": [
+    {
+      "args": [
+        "api-check",
+        "--jq=.serverOperations"
+      ],
+      "exit": 0,
+      "stdout": "194\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/openapi",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

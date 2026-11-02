@@ -870,6 +870,24 @@ export const SCENARIOS: Scenario[] = [
   // Fail-open hides an unreachable server, not a broken expression.
   { name: "jq fails a fail-open command", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "1", "--jq", ".nope | tonumber"]] },
   { name: "jq empty means no filter", steps: [["task", "get", "1", "--jq", "", "--json"]] },
+  // The parser uses the last --jq, so a refused line is judged by that one: an
+  // empty last expression leaves the error where it would have been without the
+  // flag, a non-empty one keeps stdout empty.
+  { name: "jq last expression wins on a usage error", steps: [["task", "get", "--jq", "", "--jq", ".number"], ["task", "get", "--jq", ".x", "--jq", ""]] },
+  // The value of a string flag is not a flag, whatever it looks like.
+  { name: "jq as the value of another flag", steps: [["task", "create", "--description", "--jq"], ["task", "create", "--description", "--", "--jq", ".x"]] },
+  // Everything after "--" is an argument.
+  { name: "jq after the end of the flags", steps: [["task", "get", "--", "--jq", ".x"]] },
+  { name: "jq empty on a usage error", steps: [["task", "get", "--jq", ""], ["task", "get", "--jq="]] },
+  ...["--jq=.serverOperations", "--jq=.missing | tonumber"].map((flag, i): Scenario => ({
+    name: `api-check with a jq expression (${i === 0 ? "picks" : "fails"})`,
+    steps: [["api-check", flag]],
+  })),
+  {
+    name: "api-check missing operation with a jq expression that fails",
+    specWithoutOperation: true,
+    steps: [["api-check", "--jq=.covered | tonumber"], ["api-check", "--jq", ".missing | length"]],
+  },
 
   ...both("comment list", ["comment", "list", "1"]),
   { name: "comment add", steps: [["comment", "add", "1", "hello", "world", "--json"], ["comment", "ls", "1", "--human"]] },

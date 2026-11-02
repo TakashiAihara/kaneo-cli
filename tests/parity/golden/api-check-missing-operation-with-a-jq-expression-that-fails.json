@@ -1,0 +1,36 @@
+{
+  "steps": [
+    {
+      "args": [
+        "api-check",
+        "--jq=.covered | tonumber"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: 1 operation(s) this client calls are missing from the server\nError: --jq: jq: error: array ([{\"ID\":\"listOrganization\"...]) cannot be parsed as a number\nthe command had already run when --jq failed; anything it changes has been changed\n"
+    },
+    {
+      "args": [
+        "api-check",
+        "--jq",
+        ".missing | length"
+      ],
+      "exit": 1,
+      "stdout": "1\n",
+      "stderr": "Error: 1 operation(s) this client calls are missing from the server\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/openapi",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/openapi",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

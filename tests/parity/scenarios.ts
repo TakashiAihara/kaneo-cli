@@ -174,6 +174,16 @@ export const SCENARIOS: Scenario[] = [
   },
   { name: "project create with a derived slug already taken", steps: [["project", "create", "Alphabet", "--json"], ["project", "create", "Old Lake Docs", "--json"], ["project", "create", "Alphabet", "--slug", "ALP2", "--json"]] },
 
+  {
+    name: "project create with a derived slug taken in another case",
+    seed: { projects: [...SEED.projects, { id: "proj-lower", workspaceId: WS, name: "Lower", slug: "low" }] },
+    steps: [["project", "create", "Lowerworld", "--json"]],
+  },
+  {
+    name: "project create with a derived slug taken in full-width letters",
+    seed: { projects: [...SEED.projects, { id: "proj-wide", workspaceId: WS, name: "Wide", slug: "ＷＩＤ" }] },
+    steps: [["project", "create", "Wideworld", "--json"]],
+  },
   { name: "project create with an underivable slug", steps: [["project", "create", "!!!", "--json"]] },
   { name: "project update", steps: [["project", "update", P1, "--name", "Alpha 2", "--slug", "AL2", "--json"], ["project", "get", P1, "--human"]] },
   // Kaneo 2.32.0 refuses a key another project in the workspace uses, ignoring

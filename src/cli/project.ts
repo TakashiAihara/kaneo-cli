@@ -66,6 +66,10 @@ const projectLine = (project: Project, workspaceName = ""): string => {
 // belongs to at the end, where a reader looking for it will look last.
 const named = ({ project, workspaceName }: ProjectIn) => ({ ...project, workspaceName });
 
+// Kaneo compares project keys NFKC-normalised and lower-cased (project-key.ts
+// in the API), so the check made before a create has to fold them the same way.
+const keyOf = (slug: string): string => slug.normalize("NFKC").toLowerCase();
+
 // The key a name derives, by the rule the Kaneo web app uses for a project made
 // there (generateProjectSlug in apps/web/src/lib/generate-project-id.ts), so a
 // project made here gets the kind of key its users already see: the first three
@@ -226,7 +230,7 @@ export const projectCommand = {
         // easily (Alpha Beta, Apple Banana), and a server before v2.31 takes the
         // second without a word. A key the caller typed is theirs to answer for.
         if (given === "") {
-          const taken = (await listProjectsIn(workspaceId, true)).find((p) => p.slug === slug);
+          const taken = (await listProjectsIn(workspaceId, true)).find((p) => keyOf(p.slug) === keyOf(slug));
           if (taken !== undefined) {
             throw new Error(`the slug ${slug} derived from the name is used by project ${taken.id} (${taken.name}): pass --slug`);
           }

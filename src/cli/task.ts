@@ -1,4 +1,5 @@
 import { writeSync } from "node:fs";
+import { holding } from "../session/marker";
 import { apiKey, project, taskProject, workspace, type App } from "./app";
 import {
   bulkUpdate,
@@ -19,6 +20,7 @@ import {
   linkTasks,
   listExternalLinks,
   listMyTasks,
+  listComments,
   listRelations,
   moveTask,
   PRIORITIES,
@@ -186,6 +188,11 @@ export const taskCommand = {
         // that fails fails the command: a task whose links could not be read
         // looks exactly like a task that has none.
         const relations = await listRelations(task.id);
+        // The sessions holding the task are read the same way, and fail the
+        // command the same way: a task whose comments could not be read looks
+        // exactly like a task nobody holds, which is what a second session
+        // attaching to it would be told.
+        const sessions = await heldBy(task);
         app.out.human(`#${task.number}  ${task.title}`);
         app.out.human(`status    ${task.status}`);
         app.out.human(`priority  ${task.priority}`);
@@ -197,11 +204,18 @@ export const taskCommand = {
           const projects = await relatedProjects(relations, task.projectId);
           for (const relation of relations) app.out.human(`  ${relationLine(relation, task.id, projects)}`);
         }
+        if (sessions.length > 0) {
+          app.out.human("");
+          app.out.human("sessions");
+          for (const held of sessions) {
+            app.out.human(`  ${held.sessionId.slice(0, 8)} @${held.host} ${held.cwd} (${held.branch})`);
+          }
+        }
         if (task.description !== "") {
           app.out.human("");
           app.out.human(task.description);
         }
-        app.out.data({ ...task, relations });
+        app.out.data({ ...task, relations, sessions });
       },
     },
     {
@@ -967,10 +981,31 @@ const warnSimilar = (title: string, open: Task[]): void => {
 // so the work is recognisable the same way in both.
 const namedTasks = (tasks: Task[]): string => tasks.map((task) => `#${task.number} ${task.title}`).join("; ");
 
+// The sessions holding a task, as `board --json` reports them under sessions[]
+// but for the task fields, which the task around them already has. updatedAt is
+// the time of the session's newest marker, not of its first: a session that
+// attached, closed and attached again has no single attach time to give.
+const heldBy = async (task: Task) => {
+  let comments;
+  try {
+    comments = await listComments(task.id);
+  } catch (e) {
+    throw new Error(`comments for #${task.number}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  return holding(comments).map((marker) => ({
+    sessionId: marker.sessionId,
+    host: marker.host,
+    branch: marker.branch,
+    cwd: marker.cwd,
+    updatedAt: marker.createdAt,
+    ...(marker.nextStep === "" ? {} : { nextStep: marker.nextStep }),
+  }));
+};
+
 // The task a write left behind, read by id, carrying the labels of the task
 // resolved above: only the board listing has them, and this is shaped as
 // `task get` shapes it, so its JSON is what `task get --json` prints without the
-// relations. wrote is what the report says was written, named as a person reads
+// relations and sessions. wrote is what the report says was written, named as a person reads
 // the field off the board.
 //
 // A read that fails is reported with the write that has already landed, as `task

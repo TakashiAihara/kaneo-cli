@@ -8,7 +8,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"task-k1\",\n  \"number\": 1,\n  \"title\": \"Dashed\",\n  \"description\": \"\",\n  \"status\": \"to-do\",\n  \"priority\": \"no-priority\",\n  \"position\": 0,\n  \"projectId\": \"proj-kcli\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n  \"labels\": null,\n  \"relations\": []\n}\n",
+      "stdout": "{\n  \"id\": \"task-k1\",\n  \"number\": 1,\n  \"title\": \"Dashed\",\n  \"description\": \"\",\n  \"status\": \"to-do\",\n  \"priority\": \"no-priority\",\n  \"position\": 0,\n  \"projectId\": \"proj-kcli\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n  \"labels\": null,\n  \"relations\": [],\n  \"sessions\": []\n}\n",
       "stderr": ""
     },
     {
@@ -36,12 +36,22 @@
     },
     {
       "method": "GET",
+      "path": "/comment/task-k1",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/task/by-ticket-id/KANEO-CLI-1",
       "query": ""
     },
     {
       "method": "GET",
       "path": "/task-relation/task-k1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-k1",
       "query": ""
     }
   ],

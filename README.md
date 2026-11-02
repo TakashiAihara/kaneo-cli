@@ -168,7 +168,7 @@ kaneo workflow set <integration> <event> <column>   # one of the pairs listed be
 kaneo workflow rm <rule-id>       # or <integration> <event>, instead of the id; by id the rule is deleted wherever it is
 kaneo task ls [--status ...] [--priority ...] [--all]
 kaneo task ls --mine       # open tasks assigned to you across the workspace, at most 100
-kaneo task get <task-id>                 # also lists the task's relations
+kaneo task get <task-id>                 # also lists the task's relations and the sessions holding it
 kaneo task create <title> [-d TEXT | --description-file PATH] [flags]
 kaneo task create --title <title> [flags]                      # the same, as task update takes the title; not both
 kaneo task create <title> --attach [--next <step>] [--force]   # attaches this session to the new task; --force creates beside one naming the same reference

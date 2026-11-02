@@ -214,3 +214,11 @@ export const latestPerSession = (markers: Marker[]): Marker[] => {
 
 // Filters to the sessions still holding a task.
 export const running = (markers: Marker[]): Marker[] => markers.filter((m) => m.state === RUNNING);
+
+// The sessions holding a task, read off its comments: the newest marker of each
+// session, kept when that session is still running. A comment with no marker is
+// a human's and is passed over.
+export const holding = (comments: { content: string; createdAt: string }[]): Marker[] =>
+  running(
+    latestPerSession(comments.map((c) => parse(c.content, c.createdAt)).filter((marker) => marker !== undefined)),
+  );

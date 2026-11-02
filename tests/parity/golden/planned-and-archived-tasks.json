@@ -41,7 +41,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"task-a5\",\n  \"number\": 5,\n  \"title\": \"Last year's plan\",\n  \"description\": \"\",\n  \"status\": \"archived\",\n  \"priority\": \"no-priority\",\n  \"position\": 4,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n  \"labels\": [],\n  \"relations\": []\n}\n",
+      "stdout": "{\n  \"id\": \"task-a5\",\n  \"number\": 5,\n  \"title\": \"Last year's plan\",\n  \"description\": \"\",\n  \"status\": \"archived\",\n  \"priority\": \"no-priority\",\n  \"position\": 4,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n  \"labels\": [],\n  \"relations\": [],\n  \"sessions\": []\n}\n",
       "stderr": ""
     },
     {
@@ -78,6 +78,11 @@
     {
       "method": "GET",
       "path": "/task-relation/task-a5",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a5",
       "query": ""
     },
     {

@@ -1116,6 +1116,24 @@ export const SCENARIOS: Scenario[] = [
     env: { KANEO_SESSION_ID: "sess-test" },
     steps: [["session", "attach", "1", "write", "tests", "--strict"], ["session", "next", "ship", "--strict"], ["board", "--json"], ["board", "--human"], ["session", "close", "--strict"], ["board", "--json"]],
   },
+  // task get names the sessions holding the task, as board does: the running one
+  // is listed with its newest marker, the one that closed and the human comment
+  // are not, and a task nobody holds shows an empty list.
+  {
+    name: "task get names the sessions holding it",
+    seed: {
+      comments: [
+        { taskId: "task-a1", content: "<!-- kn:session id=sess-old host=h1 cwd=/work/old branch=b1 state=running enc=1 -->\nfirst step" },
+        { taskId: "task-a1", content: "<!-- kn:session id=sess-old host=h1 cwd=/work/old branch=b1 state=closed enc=1 -->" },
+        { taskId: "task-a1", content: "<!-- kn:session id=sess-live-0123 host=h2 cwd=/work/live%20dir branch=b2 state=running enc=1 -->\nwrite tests" },
+        { taskId: "task-a1", content: "<!-- kn:session id=sess-bare host=h3 cwd=/work/bare branch=b3 state=running enc=1 -->" },
+        { taskId: "task-a1", content: "a human comment" },
+      ],
+    },
+    steps: [["task", "get", "1", "--json"], ["task", "get", "1", "--human"], ["task", "get", "2", "--json"]],
+  },
+  // A task whose comments cannot be read is not reported as held by nobody.
+  { name: "task get stops when the comments cannot be read", failOn: "^GET /comment/task-a1$", steps: [["task", "get", "1", "--json"], ["task", "get", "1", "--human"]] },
   { name: "session attach fails quietly", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "99"]] },
   { name: "session attach strict reports", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "99", "--strict"]] },
   // The server takes the marker and its listing does not hold it. Reported without

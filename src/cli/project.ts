@@ -14,7 +14,7 @@ import {
   type ProjectChanges,
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
-import { allProjects, firstMatch, resolveWorkspace, slugOr, withProject, type ProjectIn } from "./lookup";
+import { allProjects, firstMatch, resolveWorkspace, slugOr, unlistedMessage, withProject, type ProjectIn, type Unlisted } from "./lookup";
 import { shellWord } from "../output/output";
 import { KaneoApiError } from "../api/http";
 
@@ -155,13 +155,20 @@ export const projectCommand = {
         }
         // One list either way. Only whether a workspace is part of each entry
         // differs, and it can only be named when the listing covers more than one.
-        const found = acrossAll
-          ? await allProjects(includeArchived)
-          : (await listProjectsIn(await resolveWorkspace(workspace(app)), includeArchived)).map(
-              (project) => ({ project, workspaceName: "" }),
-            );
+        let unlisted: Unlisted[] = [];
+        let found: ProjectIn[];
+        if (acrossAll) {
+          ({ found, unlisted } = await allProjects(includeArchived));
+        } else {
+          found = (await listProjectsIn(await resolveWorkspace(workspace(app)), includeArchived)).map(
+            (project) => ({ project, workspaceName: "" }),
+          );
+        }
         for (const { project, workspaceName } of found) app.out.human(projectLine(project, workspaceName));
         app.out.data(acrossAll ? found.map(named) : found.map((entry) => entry.project));
+        // After the listing, so what could be read is still printed; the exit
+        // status and stderr say that it is not all there is.
+        if (unlisted.length > 0) throw new Error(unlistedMessage(unlisted));
       },
     },
     {
@@ -176,13 +183,19 @@ export const projectCommand = {
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
         const wanted = args[0]!.toLowerCase();
-        const found = (await allProjects(true)).filter(
+        const everywhere = await allProjects(true);
+        const found = everywhere.found.filter(
           (p) =>
             p.project.name.toLowerCase().includes(wanted) || p.project.slug.toLowerCase().includes(wanted),
         );
-        if (found.length === 0) throw new Error(`no project matches ${JSON.stringify(args[0])}`);
+        const { unlisted } = everywhere;
+        if (found.length === 0) {
+          const none = `no project matches ${JSON.stringify(args[0])}`;
+          throw new Error(unlisted.length === 0 ? none : `${none} in the workspaces that could be listed; ${unlistedMessage(unlisted)}`);
+        }
         for (const { project, workspaceName } of found) app.out.human(projectLine(project, workspaceName));
         app.out.data(found.map(named));
+        if (unlisted.length > 0) throw new Error(unlistedMessage(unlisted));
       },
     },
     {

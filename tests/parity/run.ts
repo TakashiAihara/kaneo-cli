@@ -31,6 +31,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     assignedLimit: s.assignedLimit,
     failOn: s.failOn,
     failMessage: s.failMessage,
+    failOnQuery: s.failOnQuery,
     failStatus: s.failStatus,
     plainMember: s.plainMember,
     noCurrentUser: s.noCurrentUser,

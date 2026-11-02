@@ -1,0 +1,59 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "find",
+        "be",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "proj-beta  Beta  [BET]  (workspace: Main)\n",
+      "stderr": "Error: could not list the projects of workspace \"Other\": GET /api/project: 403: injected failure\n"
+    },
+    {
+      "args": [
+        "project",
+        "find",
+        "gam",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: no project matches \"gam\" in the workspaces that could be listed; could not list the projects of workspace \"Other\": GET /api/project: 403: injected failure\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    }
+  ],
+  "files": {}
+}

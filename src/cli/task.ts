@@ -772,8 +772,7 @@ export const taskCommand = {
             await moveTask(task.id, id);
             return id;
           },
-          undefined,
-          task.projectId,
+          { sameWorkspaceAs: task.projectId },
         );
         const after = await taskAfterWrite(task, "project was set");
         readBack("project", after.projectId, projectId);
@@ -1160,7 +1159,7 @@ const numberOn = async (
   origin: string,
   slugs?: Map<string, string>,
 ): Promise<Task> => {
-  const { board, task: found } = await withProject(value, (id) => findTaskByNumber(id, number), () => workspaceInReference(value, number));
+  const { board, task: found } = await withProject(value, (id) => findTaskByNumber(id, number), { explain: () => workspaceInReference(value, number) });
   slugs?.set(board.projectId, board.projectSlug);
   if (found === undefined) {
     // --project only steers a bare number; a reference names its board itself.

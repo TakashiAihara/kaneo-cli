@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: PUT /api/task/move/task-a1: 404: Project not found: \"GAM\" names no project in this task's workspace, only GAM (proj-gamma) in workspace \"Other\"; the server moves a task only within its own workspace\n"
+      "stderr": "Error: PUT /api/task/move/task-a1: 404: Project not found: \"GAM\" names no project in this task's workspace \"Main\", only GAM (proj-gamma) in workspace \"Other\"; the server moves a task only within its own workspace\n"
     },
     {
       "args": [
@@ -24,7 +24,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: PUT /api/task/move/task-a1: 404: Project not found: \"proj-gamma\" names no project in this task's workspace, only GAM (proj-gamma) in workspace \"Other\"; the server moves a task only within its own workspace\n"
+      "stderr": "Error: PUT /api/task/move/task-a1: 404: Project not found: \"proj-gamma\" names no project in this task's workspace \"Main\", only GAM (proj-gamma) in workspace \"Other\"; the server moves a task only within its own workspace\n"
     }
   ],
   "requests": [

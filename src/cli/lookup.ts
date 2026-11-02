@@ -66,41 +66,60 @@ const resolved = new Map<string, string>();
 // knows more about what the value was meant to be says it there.
 // sameWorkspaceAs is the id of a project whose workspace is the only one the
 // value may name a project in, for an op the server refuses across workspaces
-// (`task move`): the lookup then ignores the other workspaces' projects and says
-// so when the value names one of them.
+// (`task move`). The value is still tried as an id first, since the server
+// answers an id from another workspace with the same 404 and the lookup then
+// explains it. The lookup ignores the other workspaces' projects and says so
+// when the value names one of them. Where that workspace cannot be told, it
+// fails rather than widening to every workspace. The cache of resolved values
+// is not used, as it is keyed by value alone and the answer depends on the
+// workspace.
 export const withProject = async <T>(
   value: string,
   op: (id: string) => Promise<T>,
-  explain?: () => Promise<string>,
-  sameWorkspaceAs?: string,
+  opts: { explain?: () => Promise<string>; sameWorkspaceAs?: string } = {},
 ): Promise<T> => {
+  const { explain, sameWorkspaceAs } = opts;
   if (value === "") return op(value);
-  const known = resolved.get(value);
+  const scoped = sameWorkspaceAs !== undefined;
+  const known = scoped ? undefined : resolved.get(value);
   if (known !== undefined) return op(known);
   try {
     const result = await op(value);
-    resolved.set(value, value);
+    if (!scoped) resolved.set(value, value);
     return result;
   } catch (e) {
     if (!unknownProject(e)) throw e;
     const everywhere = await lookingUp(e, () => allProjects(true));
-    const home = sameWorkspaceAs === undefined ? undefined : everywhere.found.find((f) => f.project.id === sameWorkspaceAs)?.project.workspaceId;
-    const inHome = home === undefined ? everywhere.found : everywhere.found.filter((f) => f.project.workspaceId === home);
-    const found = projectsNamed(inHome, value);
-    // Checked before the unlisted-workspace hedge: a project that is there and
-    // cannot be used is a fact, where a miss is only what could be listed.
+    let candidates = everywhere.found;
+    let unlisted = everywhere.unlisted;
+    let home: ProjectIn | undefined;
+    if (scoped) {
+      home = everywhere.found.find((f) => f.project.id === sameWorkspaceAs);
+      if (home === undefined) {
+        throw new Error(
+          `${e.message}: could not tell which workspace the task is in, so the destination cannot be looked up${
+            everywhere.unlisted.length > 0 ? `; ${unlistedMessage(everywhere.unlisted)}` : ""
+          }`,
+        );
+      }
+      const homeId = home.project.workspaceId;
+      candidates = everywhere.found.filter((f) => f.project.workspaceId === homeId);
+      // Only the task's own workspace can hold the destination, and it was listed.
+      unlisted = [];
+    }
+    const found = projectsNamed(candidates, value);
     if (home !== undefined && found.length === 0) {
       const elsewhere = projectsNamed(
-        everywhere.found.filter((f) => f.project.workspaceId !== home),
+        everywhere.found.filter((f) => f.project.workspaceId !== home!.project.workspaceId),
         value,
       );
-      if (elsewhere.length > 0) throw new Error(`${e.message}: ${onlyElsewhere(value, elsewhere)}`);
+      if (elsewhere.length > 0) throw new Error(`${e.message}: ${onlyElsewhere(value, elsewhere, home.workspaceName)}${explain === undefined ? "" : await explain()}`);
     }
     // A miss proves nothing while a workspace could not be listed: the project
     // may be in it. Saying it does not exist would send the reader to look for
     // a typo that is not there.
-    if (found.length === 0 && everywhere.unlisted.length > 0) {
-      throw new Error(`${e.message}: ${noProject(value)} in the workspaces that could be listed; ${unlistedMessage(everywhere.unlisted)}`);
+    if (found.length === 0 && unlisted.length > 0) {
+      throw new Error(`${e.message}: ${noProject(value)} in the workspaces that could be listed; ${unlistedMessage(unlisted)}`);
     }
     if (found.length === 0) throw new Error(`${e.message}: ${noProject(value)}${explain === undefined ? "" : await explain()}`);
     if (found.length > 1) throw new Error(severalProjects(value, found));
@@ -108,7 +127,7 @@ export const withProject = async <T>(
     // The value already was this project's id and the request failed anyway, so
     // the server's own answer is the report.
     if (only.id === value) throw e;
-    resolved.set(value, only.id);
+    if (!scoped) resolved.set(value, only.id);
     return op(only.id);
   }
 };
@@ -217,9 +236,9 @@ export const workspaceInReference = async (value: string, number: number): Promi
   }
 };
 
-const onlyElsewhere = (value: string, found: ProjectIn[]): string =>
-  `${JSON.stringify(value)} names no project in this task's workspace, only ${found
-    .map((p) => `${slugOr(p.project.slug, p.project.id)} (${p.project.id}) in workspace ${JSON.stringify(p.workspaceName)}`)
+const onlyElsewhere = (value: string, found: ProjectIn[], homeName: string): string =>
+  `${JSON.stringify(value)} names no project in this task's workspace ${JSON.stringify(homeName)}, only ${found
+    .map((p) => `${p.project.slug === "" ? p.project.id : `${p.project.slug} (${p.project.id})`} in workspace ${JSON.stringify(p.workspaceName)}`)
     .join(", ")}; the server moves a task only within its own workspace`;
 
 const noProject = (value: string): string =>

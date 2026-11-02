@@ -1,0 +1,48 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "Main#3",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/task/tasks/Main: 400: Workspace ID could not be determined: no project has the id, slug or name \"Main\" (kaneo project find <text> searches names and slugs) in the workspaces that could be listed; could not list the projects of workspace \"Other\" (403: injected failure); \"Main\" is a workspace, and task numbers are per project: active projects in it that can hold #3: ALP (Alpha)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/Main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

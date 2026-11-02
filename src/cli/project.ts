@@ -168,7 +168,7 @@ export const projectCommand = {
         app.out.data(acrossAll ? found.map(named) : found.map((entry) => entry.project));
         // After the listing, so what could be read is still printed; the exit
         // status and stderr say that it is not all there is.
-        if (unlisted.length > 0) throw new Error(unlistedMessage(unlisted));
+        if (unlisted.length > 0) throw new Error(`the projects listed above are incomplete: ${unlistedMessage(unlisted)}`);
       },
     },
     {
@@ -195,7 +195,7 @@ export const projectCommand = {
         }
         for (const { project, workspaceName } of found) app.out.human(projectLine(project, workspaceName));
         app.out.data(found.map(named));
-        if (unlisted.length > 0) throw new Error(unlistedMessage(unlisted));
+        if (unlisted.length > 0) throw new Error(`the projects listed above are incomplete: ${unlistedMessage(unlisted)}`);
       },
     },
     {

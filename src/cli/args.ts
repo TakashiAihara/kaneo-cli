@@ -434,7 +434,12 @@ const available = <A>(command: Command<A>): Command<A>[] =>
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
 export const unknownCommand = <A>(command: Command<A>, path: string, word: string): Error => {
-  const suggestions = available(command)
+  // A bare number is a task number typed without its verb, and every one- or
+  // two-character command name is within distance 2 of it, so "rm" would be
+  // offered for `kaneo task 7`.
+  const suggestions = /^\d+$/.test(word)
+    ? []
+    : available(command)
     .filter((child) => distance(word.toLowerCase(), child.name.toLowerCase()) <= 2 || child.name.toLowerCase().startsWith(word.toLowerCase()))
     .map((child) => child.name);
   const hint =

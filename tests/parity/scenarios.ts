@@ -480,6 +480,10 @@ export const SCENARIOS: Scenario[] = [
   // An empty --title is refused as task update refuses it, and an empty one
   // beside words still counts as giving the title twice.
   { name: "task create with an empty --title", steps: [["task", "create", "--title", " ", "--json"], ["task", "create", "--title", "", "--json"], ["task", "create", "Words", "--title", "", "--json"], ["task", "ls", "--human"]] },
+  // Words that are blank make a blank title, refused as --title is. A title
+  // refused is said before a missing key, as task update says it.
+  { name: "task create with blank words", steps: [["task", "create", " ", "--json"], ["task", "create", "", "--json"], ["task", "create", "a", "b", "--json"], ["task", "ls", "--human"]] },
+  { name: "task create with an empty --title and no key", env: { KANEO_API_KEY: "" }, steps: [["task", "create", "--title", "", "--json"], ["task", "create", " ", "--json"], ["task", "create", "Words", "--json"]] },
   // Taken as task update takes it, and refused before the create when it is not
   // a date or comes after the due date.
   {

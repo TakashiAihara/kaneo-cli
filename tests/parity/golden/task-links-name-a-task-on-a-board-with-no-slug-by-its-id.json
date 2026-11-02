@@ -1,0 +1,67 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "link",
+        "1",
+        "task-n1",
+        "--type",
+        "related",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"rel0002\",\n  \"sourceTaskId\": \"task-a1\",\n  \"targetTaskId\": \"task-n1\",\n  \"relationType\": \"related\",\n  \"sourceTask\": {\n    \"id\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"status\": \"to-do\",\n    \"projectId\": \"proj-alpha\"\n  },\n  \"targetTask\": {\n    \"id\": \"task-n1\",\n    \"number\": 1,\n    \"title\": \"Unslugged\",\n    \"status\": \"to-do\",\n    \"projectId\": \"proj-noslug\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "links",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "related     proj-noslug#1  Unslugged\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-n1",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task-relation",
+      "query": "",
+      "body": {
+        "sourceTaskId": "task-a1",
+        "targetTaskId": "task-n1",
+        "relationType": "related"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-noslug",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,5 +1,5 @@
 import { apiKey, type App } from "./app";
-import { addComment, deleteComment, editComment, listComments, type Comment, type Task } from "../api/kaneo";
+import { addComment, afterWrite, deleteComment, editComment, listComments, type Comment, type Task } from "../api/kaneo";
 import { exactArgs, minimumArgs, type RunContext } from "./args";
 import { readInput } from "./input";
 import { resolveTask } from "./task";
@@ -73,7 +73,7 @@ export const commentCommand = {
         if (content.trim() === "") throw new Error("empty comment");
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
-        const comment = await addComment(task.id, content);
+        const comment = await afterWrite(`commented on #${task.number}`, `\`kaneo comment ls ${task.number}\` shows it`, addComment(task.id, content));
         app.out.human(`commented on #${task.number}`);
         app.out.data(comment);
       },

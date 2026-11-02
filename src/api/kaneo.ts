@@ -1,7 +1,7 @@
 import { OPERATIONS, type Operation } from "./registry";
 import { requestDrift, requestShapes, serverOperations, type Drift, type RequestShape, type ServerOperation } from "./shape";
 import pinnedRequests from "./gen/requests.json";
-import { kaneoFetch, KaneoApiError } from "./http";
+import { kaneoFetch, KaneoApiError, originOf } from "./http";
 import type { Json } from "../output/json";
 import { shellWord } from "../output/output";
 import {
@@ -142,14 +142,49 @@ const zeroRecord = <T>(reply: T | undefined): T => reply ?? ({} as T);
 // one-digit hour, an offset of +24:00); those are refused here, as the design
 // document records. The value is cut in the message, since the reply decides
 // how long it is.
-const isoTime = (field: string, value: unknown): string => {
+export const isoTime = (owner: object, field: string): string => {
+  const value = (owner as Record<string, unknown>)[field];
   if (value === null || value === undefined) return ZERO_TIME;
   const at = typeof value === "string" && isRfc3339(value) ? Date.parse(value) : Number.NaN;
   if (!Number.isNaN(at)) return new Date(at).toISOString();
   const shown = Array.from(JSON.stringify(value));
-  throw new Error(
-    `${field} ${shown.length > VALUE_LIMIT ? `${shown.slice(0, VALUE_LIMIT).join("")}...` : shown.join("")} is not a timestamp`,
+  const request = originOf(owner);
+  // Every object a mapper reads came out of a decoded reply, which the transport
+  // has recorded. One that did not is a mapping fed something else, and naming
+  // no request would hide that.
+  if (request === undefined) {
+    throw new TimestampError(`${field} is not a timestamp, and no request is recorded for the object that holds it`);
+  }
+  throw new TimestampError(
+    `${request}: ${field} ${shown.length > VALUE_LIMIT ? `${shown.slice(0, VALUE_LIMIT).join("")}...` : shown.join("")} is not a timestamp`,
   );
+};
+
+// A reply whose time cannot be read. It is its own type because the call it
+// belongs to may be a write that already happened, and a caller that needs to say
+// so has to tell this apart from a request that never got through.
+export class TimestampError extends Error {}
+
+// Runs a write whose reply is mapped here, and says so when the mapping fails:
+// the server has already done what was asked, so a caller who runs it again
+// repeats the write. `look` says where to see what was written.
+//
+// Only task create and comment add are wrapped so far. The other writes whose
+// reply is mapped (addActivity, addTimeEntry, createLabel, createProject,
+// createColumn, linkTasks, createNotification, setWorkflowRule, ...) still report
+// the bare timestamp error, which does not say the write happened.
+export const afterWrite = async <T>(done: string, look: string, write: Promise<T>): Promise<T> => {
+  try {
+    return await write;
+  } catch (e) {
+    if (e instanceof TimestampError) {
+      throw new TimestampError(
+        `${done} on the server, but its reply could not be read (${e.message}); do not run it again, that would repeat the write; ${look}`,
+        { cause: e },
+      );
+    }
+    throw e;
+  }
 };
 
 // time.RFC3339 with any fraction of a second: upper-case T and Z, and an offset
@@ -173,8 +208,10 @@ const ZERO_TIME = "0001-01-01T00:00:00.000Z";
 // The same, for a field that is a timestamp or nothing at all. An absent one
 // stays absent rather than becoming an empty string, because a task with no due
 // date and a task due at the epoch are not the same fact.
-const isoTimePtr = (field: string, value: unknown): string | null =>
-  value === null || value === undefined ? null : isoTime(field, value);
+const isoTimePtr = (owner: object, field: string): string | null => {
+  const value = (owner as Record<string, unknown>)[field];
+  return value === null || value === undefined ? null : isoTime(owner, field);
+};
 
 // A value the document types as a closed list, handed to the server unchanged so
 // it can answer 400 for one it does not accept. That message names the field and
@@ -324,7 +361,7 @@ export const getInvitation = async (invitationId: string): Promise<InvitationDet
             email: i.email ?? "",
             workspaceName: i.workspaceName ?? "",
             inviterName: i.inviterName ?? "",
-            expiresAt: isoTime("expiresAt", i.expiresAt),
+            expiresAt: isoTime(i, "expiresAt"),
             status: i.status ?? "",
             expired: i.expired ?? false,
           },
@@ -417,7 +454,7 @@ export const search = async (wanted: SearchQuery): Promise<SearchPage> => {
       workspaceName: r.workspaceName ?? null,
       userId: r.userId ?? null,
       userName: r.userName ?? null,
-      createdAt: isoTime("createdAt", r.createdAt),
+      createdAt: isoTime(r, "createdAt"),
       relevanceScore: r.relevanceScore ?? 0,
       taskNumber: r.taskNumber ?? null,
       number: r.type === "task" ? (r.taskNumber ?? null) : null,
@@ -480,7 +517,7 @@ const project = (item: ProjectFields): Project => ({
   description: item.description ?? "",
   workspaceId: item.workspaceId ?? "",
   isPublic: item.isPublic ?? false,
-  archivedAt: isoTimePtr("archivedAt", item.archivedAt),
+  archivedAt: isoTimePtr(item, "archivedAt"),
 });
 
 // Fetches one project by id. Every request is bounded by the transport's own
@@ -763,8 +800,8 @@ const rule = (r: GenWorkflowRule): WorkflowRule => ({
   columnId: r.columnId ?? "",
   columnName: r.columnName ?? null,
   columnSlug: r.columnSlug ?? null,
-  createdAt: isoTime("createdAt", r.createdAt),
-  updatedAt: isoTime("updatedAt", r.updatedAt),
+  createdAt: isoTime(r, "createdAt"),
+  updatedAt: isoTime(r, "updatedAt"),
 });
 
 // A project's workflow rules.
@@ -790,8 +827,8 @@ const ruleRow = (r: GenWorkflowRuleRow): WorkflowRuleRow => ({
   integrationType: r.integrationType ?? "",
   eventType: r.eventType ?? "",
   columnId: r.columnId ?? "",
-  createdAt: isoTime("createdAt", r.createdAt),
-  updatedAt: isoTime("updatedAt", r.updatedAt),
+  createdAt: isoTime(r, "createdAt"),
+  updatedAt: isoTime(r, "updatedAt"),
 });
 
 // Points an integration event at a column, inserting the rule when the project
@@ -1128,9 +1165,9 @@ const task = (from: TaskFields, extra: Pick<Task, "assigneeId" | "assigneeName" 
   projectId: from.projectId ?? "",
   assigneeId: extra.assigneeId ?? null,
   assigneeName: extra.assigneeName ?? null,
-  startDate: isoTimePtr("startDate", from.startDate),
-  dueDate: isoTimePtr("dueDate", from.dueDate),
-  createdAt: isoTime("createdAt", from.createdAt),
+  startDate: isoTimePtr(from, "startDate"),
+  dueDate: isoTimePtr(from, "dueDate"),
+  createdAt: isoTime(from, "createdAt"),
   labels: extra.labels,
 });
 
@@ -1469,7 +1506,7 @@ export const listComments = async (taskId: string): Promise<Comment[]> =>
     content: c.content ?? "",
     userId: c.userId ?? "",
     userName: c.user?.name ?? "",
-    createdAt: isoTime("createdAt", c.createdAt),
+    createdAt: isoTime(c, "createdAt"),
   }));
 
 // Posts a comment on a task. The server answers with the stored activity row,
@@ -1482,7 +1519,7 @@ export const addComment = async (taskId: string, content: string): Promise<Comme
     content: a.content ?? "",
     userId: a.userId ?? "",
     userName: "",
-    createdAt: isoTime("createdAt", a.createdAt),
+    createdAt: isoTime(a, "createdAt"),
   };
 };
 
@@ -1525,7 +1562,7 @@ const activity = (a: GenActivity): Activity => ({
   // It came off the wire as JSON, so it is JSON.
   eventData: (a.eventData ?? null) as Json,
   userId: a.userId ?? "",
-  createdAt: isoTime("createdAt", a.createdAt),
+  createdAt: isoTime(a, "createdAt"),
 });
 
 // A task's history, oldest first like its comments. The server sends it newest
@@ -1575,8 +1612,8 @@ const timeEntry = (t: GenTimeEntry): TimeEntry => ({
   taskId: t.taskId ?? "",
   userId: t.userId ?? null,
   description: t.description ?? "",
-  startTime: isoTime("startTime", t.startTime),
-  endTime: isoTimePtr("endTime", t.endTime),
+  startTime: isoTime(t, "startTime"),
+  endTime: isoTimePtr(t, "endTime"),
   duration: t.duration ?? null,
 });
 
@@ -1805,7 +1842,7 @@ const notification = (n: GenNotification): Notification => ({
   isRead: n.isRead === true,
   resourceType: n.resourceType ?? null,
   resourceId: n.resourceId ?? null,
-  createdAt: isoTime("createdAt", n.createdAt),
+  createdAt: isoTime(n, "createdAt"),
 });
 
 // The newest 50 notifications, read and unread, newest first: the server caps
@@ -1890,9 +1927,9 @@ const labelRecord = (l: GenLabel): LabelRecord => ({
   color: l.color ?? "",
   taskId: l.taskId ?? null,
   workspaceId: l.workspaceId ?? null,
-  createdAt: isoTime("createdAt", l.createdAt),
-  updatedAt: isoTime("updatedAt", l.updatedAt),
-  deletionStartedAt: isoTimePtr("deletionStartedAt", l.deletionStartedAt),
+  createdAt: isoTime(l, "createdAt"),
+  updatedAt: isoTime(l, "updatedAt"),
+  deletionStartedAt: isoTimePtr(l, "deletionStartedAt"),
 });
 
 // Every label row in a workspace, the task copies included; the caller picks
@@ -2037,8 +2074,8 @@ const externalLink = (l: GenExternalLink): ExternalLink => ({
   url: l.url ?? "",
   title: l.title ?? null,
   integrationType: l.integration?.type ?? null,
-  createdAt: isoTime("createdAt", l.createdAt),
-  updatedAt: isoTime("updatedAt", l.updatedAt),
+  createdAt: isoTime(l, "createdAt"),
+  updatedAt: isoTime(l, "updatedAt"),
 });
 
 // The links a task holds, both the ones an integration brought in and the ones

@@ -6,6 +6,7 @@ import {
   currentUser,
   getProject,
   listMembers,
+  afterWrite,
   createTask,
   deleteRelation,
   deleteTask,
@@ -349,7 +350,7 @@ export const taskCommand = {
             open = projectTasks(await getBoard(id));
             refuseDuplicate(wanted.title, open);
           }
-          return createTask(id, wanted);
+          return afterWrite(`created ${JSON.stringify(wanted.title)}`, "`kaneo task ls` shows it", createTask(id, wanted));
         });
         // After the create, since the warning is about a task that now exists.
         if (!force) warnSimilar(wanted.title, open);

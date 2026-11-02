@@ -117,12 +117,27 @@ export const labelCommand = {
         if (changed.has("name")) changes.name = String(flags.name);
         if (changed.has("color")) changes.color = String(flags.color);
         if (changes.name === undefined && changes.color === undefined) throw new Error("nothing to change: pass --name or --color");
-        const labels = await workspaceLabels(app);
+        const all = await listWorkspaceLabels(workspace(app));
+        const labels = all.filter((l) => l.taskId === null);
         const label = pick(labels, args[0]!, "in this workspace", "kaneo label list");
         // A workspace keeps one label per name, and the server reports the
         // collision as an internal error, so a taken name is refused here.
         const taken = labels.find((l) => l.id !== label.id && l.name === changes.name?.trim());
         if (taken !== undefined) throw new Error(`label ${JSON.stringify(taken.name)} already exists (${taken.id}); pick another name`);
+        // The taken-name check above already ruled out a workspace label of the
+        // new name. The server renames every copy of the old name in one
+        // transaction and answers 500 when a task also carries a copy of the new
+        // name (the issue's observed behaviour), so name those tasks first.
+        const newName = changes.name?.trim();
+        if (newName !== undefined && newName !== label.name) {
+          const hasNew = new Set(all.filter((l) => l.name === newName).map((l) => l.taskId));
+          const clash = [...new Set(all.filter((l) => l.name === label.name && hasNew.has(l.taskId)).map((l) => l.taskId))];
+          if (clash.length > 0) {
+            throw new Error(
+              `cannot rename ${JSON.stringify(label.name)} to ${JSON.stringify(newName)}: task${clash.length === 1 ? "" : "s"} ${clash.join(", ")} carr${clash.length === 1 ? "ies" : "y"} both labels; run \`kaneo label detach <task> <label>\` for one of them first`,
+            );
+          }
+        }
         const { after } = await updateLabel(label.id, changes);
         app.out.human(`updated ${labelLine(after)}`);
         app.out.data(after);

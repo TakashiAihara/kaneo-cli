@@ -1,0 +1,162 @@
+{
+  "steps": [
+    {
+      "args": [
+        "label",
+        "create",
+        "bug",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"lbl0008\",\n  \"name\": \"bug\",\n  \"color\": \"gray\",\n  \"taskId\": null,\n  \"workspaceId\": \"ws-main\",\n  \"createdAt\": \"2026-01-01T00:00:19.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:19.000Z\",\n  \"deletionStartedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "update",
+        "bug",
+        "--name",
+        " defect ",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: cannot rename \"bug\" to \"defect\": tasks task-a4, task-a6 carry both labels; run `kaneo label detach <task> <label>` for one of them first\n"
+    },
+    {
+      "args": [
+        "label",
+        "update",
+        "bug",
+        "--color",
+        "red",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated lbl0008  bug  (red)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "update",
+        "bug",
+        "--name",
+        "bug",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated lbl0008  bug  (red)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "update",
+        "bug",
+        "--name",
+        "other",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated lbl0008  other  (red)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "lbl0008  other  (red)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/label",
+      "query": "",
+      "body": {
+        "name": "bug",
+        "color": "gray",
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/lbl0008",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/label/lbl0008",
+      "query": "",
+      "body": {
+        "name": "bug",
+        "color": "red"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/lbl0008",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/label/lbl0008",
+      "query": "",
+      "body": {
+        "name": "bug",
+        "color": "red"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/lbl0008",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/label/lbl0008",
+      "query": "",
+      "body": {
+        "name": "other",
+        "color": "red"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

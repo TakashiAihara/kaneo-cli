@@ -915,6 +915,32 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    name: "label rename onto a task copy of the new name",
+    extraTasks: [
+      { id: "task-a4", projectId: P1, title: "Needs triage" },
+      { id: "task-a5", projectId: P1, title: "Only old" },
+      { id: "task-a6", projectId: P1, title: "Both too" },
+    ],
+    seed: {
+      labels: [
+        { taskId: "task-a4", name: "bug" },
+        { taskId: "task-a4", name: "defect" },
+        { taskId: "task-a5", name: "bug" },
+        { taskId: "task-a1", name: "defect" },
+        { taskId: "task-a6", name: "bug" },
+        { taskId: "task-a6", name: "defect" },
+      ],
+    },
+    steps: [
+      ["label", "create", "bug", "--json"],
+      ["label", "update", "bug", "--name", " defect ", "--human"],
+      ["label", "update", "bug", "--color", "red", "--human"],
+      ["label", "update", "bug", "--name", "bug", "--human"],
+      ["label", "update", "bug", "--name", "other", "--human"],
+      ["label", "ls", "--human"],
+    ],
+  },
+  {
     name: "label get",
     steps: [["label", "create", "bug", "--json"], ["label", "attach", "1", "bug", "--json"], ["label", "get", "bug", "--human"], ["label", "get", "lbl0003", "--json"], ["label", "get", "nope", "--json"]],
   },

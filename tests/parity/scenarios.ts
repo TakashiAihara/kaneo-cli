@@ -721,6 +721,63 @@ export const SCENARIOS: Scenario[] = [
   // than the id behind it.
   { name: "task move human", steps: [["task", "move", "1", "--to", "BET", "--human"]] },
   { name: "task move without --to", steps: [["task", "move", "1", "--json"]] },
+  // The server moves a task only within its own workspace, so a slug found only
+  // in another one is said to be there rather than left as a bare 404.
+  {
+    name: "task move to a project in another workspace",
+    seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
+    steps: [["task", "move", "1", "--to", "GAM", "--human"], ["task", "move", "1", "--to", "proj-gamma", "--human"]],
+  },
+  // A slug in both workspaces is the one in the task's own, not several.
+  {
+    name: "task move to a slug another workspace also carries",
+    seed: { projects: [...SEED.projects, { id: "proj-bet2", workspaceId: "ws-other", name: "Bet Two", slug: "BET" }] },
+    steps: [["task", "move", "1", "--to", "BET", "--human"]],
+  },
+  { name: "task move to the project it is in", steps: [["task", "move", "1", "--to", "ALP", "--human"], ["task", "move", "1", "--to", P1, "--human"]] },
+  // The task lives in the second workspace: the destination is looked up there,
+  // and a slug only the first workspace carries is said to be elsewhere.
+  {
+    name: "task move from the second workspace",
+    seed: {
+      projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }, { id: "proj-delta", workspaceId: "ws-other", name: "Delta", slug: "DEL" }],
+      tasks: [...SEED.tasks, { id: "task-g1", projectId: "proj-gamma", title: "Gamma first" }],
+    },
+    steps: [["task", "move", "task-g1", "--to", "ALP", "--human"], ["task", "move", "task-g1", "--to", "DEL", "--human"]],
+  },
+  // A name two workspaces carry is the one in the task's own workspace.
+  {
+    name: "task move to a name another workspace also carries",
+    seed: { projects: [...SEED.projects, { id: "proj-beta2", workspaceId: "ws-other", name: "Beta", slug: "BT2" }] },
+    steps: [["task", "move", "1", "--to", "Beta", "--human"]],
+  },
+  // The task's own workspace cannot be listed, so its workspace is unknown and
+  // the lookup stops rather than searching every workspace.
+  {
+    name: "task move when the task's workspace cannot be listed",
+    failOn: "^GET /project$",
+    failOnQuery: "workspaceId=ws-main",
+    steps: [["task", "move", "1", "--to", "GAM", "--human"]],
+  },
+  // Another workspace that cannot be listed could not hold the destination, so
+  // a miss is a miss and does not hedge about it.
+  {
+    name: "task move to a missing project while another workspace cannot be listed",
+    failOn: "^GET /project$",
+    failOnQuery: "workspaceId=ws-other",
+    steps: [["task", "move", "1", "--to", "NOPE", "--human"]],
+  },
+  // The lookup is what fails, so the report carries both the server's answer and
+  // the lookup's.
+  { name: "task move when the lookup fails", failOn: "^GET /auth/organization/list$", steps: [["task", "move", "1", "--to", "BET", "--human"]] },
+  // A 404 that does not say the project is missing is not a reason to look one up.
+  {
+    name: "task move refused with another 404",
+    failOn: "^PUT /task/move/",
+    failStatus: 404,
+    failMessage: "Workspace not found",
+    steps: [["task", "move", "1", "--to", "BET", "--human"]],
+  },
   { name: "task due set and clear", steps: [["task", "due", "1", "2026-10-31", "--json"], ["task", "get", "1", "--json"], ["task", "due", "1", "--human"], ["task", "get", "1", "--json"]] },
   { name: "task due refuses a bad date", steps: [["task", "due", "1", "someday", "--json"], ["task", "due", "1", "", "--json"], ["task", "due", "1", " 2026-10-31 ", "--human"], ["task", "get", "1", "--human"]] },
   { name: "task bulk status", steps: [["task", "bulk", "1", "2", "ALP#1", "--status", "done", "--human"], ["task", "ls", "--all", "--json"]] },

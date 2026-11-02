@@ -995,7 +995,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (!b?.destinationProjectId) return fail(400, 'Invalid key: Expected "destinationProjectId" but received undefined');
         const from = t.projectId;
         const dest = projects.find((x) => x.id === b.destinationProjectId);
-        if (!dest) return failText(404, "Project not found");
+        // A destination in another workspace is answered as not found, per issue
+        // #246; the status text of the same-project refusal is from there too.
+        if (!dest || dest.workspaceId !== projects.find((x) => x.id === from)?.workspaceId) return failText(404, "Project not found");
+        if (dest.id === from) return fail(400, "Task is already in that project");
         dest.lastTaskNumber += 1;
         Object.assign(t, { projectId: dest.id, number: dest.lastTaskNumber, status: b.destinationStatus ?? firstColumn });
         return ok(M.MoveTaskResult, { task: t, sourceProjectId: from, destinationProjectId: dest.id });

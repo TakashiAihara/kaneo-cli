@@ -780,10 +780,14 @@ export const taskCommand = {
         const task = await resolveTask(app, args[0]!);
         // The destination is resolved before the task is read back, so the two are
         // compared as what the server was given rather than as what was typed.
-        const projectId = await withProject(target, async (id) => {
-          await moveTask(task.id, id);
-          return id;
-        });
+        const projectId = await withProject(
+          target,
+          async (id) => {
+            await moveTask(task.id, id);
+            return id;
+          },
+          { sameWorkspaceAs: task.projectId },
+        );
         const after = await taskAfterWrite(task, "project was set");
         readBack("project", after.projectId, projectId);
         // The destination as it was typed: the read-back above has already
@@ -1190,7 +1194,7 @@ const numberOn = async (
   origin: string,
   slugs?: Map<string, string>,
 ): Promise<Task> => {
-  const { board, task: found } = await withProject(value, (id) => findTaskByNumber(id, number), () => workspaceInReference(value, number));
+  const { board, task: found } = await withProject(value, (id) => findTaskByNumber(id, number), { explain: () => workspaceInReference(value, number) });
   slugs?.set(board.projectId, board.projectSlug);
   if (found === undefined) {
     // --project only steers a bare number; a reference names its board itself.

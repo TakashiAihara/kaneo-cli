@@ -96,6 +96,9 @@ export type FakeOptions = {
   // Answers a request whose "METHOD path" matches with a 500, having changed
   // nothing, for a write that is refused or a read that fails.
   failOn?: string;
+  // Narrows failOn to requests whose query string matches, so one workspace's
+  // listing can fail while the others answer.
+  failOnQuery?: string;
   // The status failOn answers with, 500 unless a scenario wants another.
   failStatus?: number;
   // The error failOn answers with, for a branch that reads the server's words,
@@ -432,6 +435,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     `This workspace already has a project using the key "${key}" (${name}). Choose a different key.`;
 
   const failing = opts.failOn ? new RegExp(opts.failOn) : undefined;
+  const failingQuery = opts.failOnQuery ? new RegExp(opts.failOnQuery) : undefined;
   let skipped = 0;
   let limited = 0;
   const misstoring = opts.misstoreOn ? new RegExp(opts.misstoreOn) : undefined;
@@ -444,7 +448,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (!url.pathname.startsWith("/api/")) return new Response("<html>app</html>", { headers: { "content-type": "text/html" } });
     if (req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
-    if (failing?.test(`${req.method} ${path}`) && skipped++ >= (opts.failOnSkip ?? 0)) return opts.failMessage === undefined ? fail(opts.failStatus ?? 500, "injected failure") : failText(opts.failStatus ?? 500, opts.failMessage);
+    if (failing?.test(`${req.method} ${path}`) && (failingQuery?.test(url.search) ?? true) && skipped++ >= (opts.failOnSkip ?? 0)) return opts.failMessage === undefined ? fail(opts.failStatus ?? 500, "injected failure") : failText(opts.failStatus ?? 500, opts.failMessage);
 
     // The server validates request bodies against the same schemas the
     // document declares, and answers 400 with the first issue.

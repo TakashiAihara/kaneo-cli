@@ -11,19 +11,44 @@ import { lastTaskNumbers, listProjectsIn, listWorkspaces, type Project, type Wor
 // to say which workspace it is in.
 export type ProjectIn = { project: Project; workspaceName: string };
 
+// A workspace whose projects could not be listed, with what the server said.
+export type Unlisted = { workspaceName: string; message: string };
+
 // Every project the key can reach, each with the workspace it is in: one listing
-// per workspace. Archived projects are left out unless asked for, which is the
-// view every listing takes; a lookup asks for them, since an archived project is
-// one somebody still has to be able to name to unarchive it.
-export const allProjects = async (includeArchived: boolean): Promise<ProjectIn[]> => {
+// per workspace, all asked at once. Archived projects are left out unless asked
+// for, which is the view every listing takes; a lookup asks for them, since an
+// archived project is one somebody still has to be able to name to unarchive it.
+//
+// A workspace that refuses its listing (403, 5xx, a timeout) does not take the
+// rest with it: the projects of the others are returned, and the ones that
+// failed are returned beside them, because a caller that treats the list as
+// complete would otherwise report a project missing that was only unreachable.
+// Only the listing of the workspaces themselves has no partial answer.
+export const allProjects = async (includeArchived: boolean): Promise<{ found: ProjectIn[]; unlisted: Unlisted[] }> => {
+  const workspaces = await listWorkspaces();
+  const listings = await Promise.all(
+    workspaces.map(async (workspace) => {
+      try {
+        const projects = await listProjectsIn(workspace.id, includeArchived);
+        return { workspace, projects, failure: undefined };
+      } catch (e) {
+        return { workspace, projects: [] as Project[], failure: (e as Error).message };
+      }
+    }),
+  );
   const found: ProjectIn[] = [];
-  for (const workspace of await listWorkspaces()) {
-    for (const project of await listProjectsIn(workspace.id, includeArchived)) {
-      found.push({ project, workspaceName: workspace.name });
-    }
+  const unlisted: Unlisted[] = [];
+  for (const { workspace, projects, failure } of listings) {
+    if (failure !== undefined) unlisted.push({ workspaceName: workspace.name, message: failure });
+    for (const project of projects) found.push({ project, workspaceName: workspace.name });
   }
-  return found;
+  return { found, unlisted };
 };
+
+// The sentence for workspaces that could not be listed, for a listing that went
+// ahead without them and for a lookup that missed while they were out.
+export const unlistedMessage = (unlisted: Unlisted[]): string =>
+  unlisted.map((u) => `could not list the projects of workspace ${JSON.stringify(u.workspaceName)}: ${u.message}`).join("; ");
 
 // Values already turned into an id in this run, so a command that names the same
 // project twice (`board` reads the project, then its board) looks it up once.
@@ -49,7 +74,14 @@ export const withProject = async <T>(value: string, op: (id: string) => Promise<
     return result;
   } catch (e) {
     if (!unknownProject(e)) throw e;
-    const found = projectsNamed(await lookingUp(e, () => allProjects(true)), value);
+    const everywhere = await lookingUp(e, () => allProjects(true));
+    const found = projectsNamed(everywhere.found, value);
+    // A miss proves nothing while a workspace could not be listed: the project
+    // may be in it. Saying it does not exist would send the reader to look for
+    // a typo that is not there.
+    if (found.length === 0 && everywhere.unlisted.length > 0) {
+      throw new Error(`${e.message}: ${noProject(value)} in the workspaces that could be listed; ${unlistedMessage(everywhere.unlisted)}`);
+    }
     if (found.length === 0) throw new Error(`${e.message}: ${noProject(value)}${explain === undefined ? "" : await explain()}`);
     if (found.length > 1) throw new Error(severalProjects(value, found));
     const only = found[0]!.project;

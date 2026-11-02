@@ -85,6 +85,7 @@ export type Scenario = {
   // The fake answers matching "METHOD path" requests with a 500, having
   // changed nothing.
   failOn?: string;
+  failOnQuery?: string;
   failStatus?: number;
   failMessage?: string;
   plainMember?: boolean;
@@ -1608,6 +1609,34 @@ export const SCENARIOS: Scenario[] = [
       ["task", "rm", "1", "-p", "proj-noslug", "--yes", "--json"],
       ["session", "close"],
     ],
+  },
+  {
+    // One workspace refusing its listing leaves the other's projects printed and
+    // the failure on stderr with a non-zero exit, in both output modes.
+    name: "project list across workspaces with one workspace unlisted",
+    seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
+    failOn: "^GET /project$",
+    failOnQuery: "workspaceId=ws-other",
+    failStatus: 403,
+    steps: [["project", "ls", "-A", "--human"], ["project", "ls", "-A", "--json"]],
+  },
+  {
+    name: "project find with one workspace unlisted",
+    seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
+    failOn: "^GET /project$",
+    failOnQuery: "workspaceId=ws-other",
+    failStatus: 403,
+    steps: [["project", "find", "be", "--human"], ["project", "find", "gam", "--human"]],
+  },
+  {
+    // A slug that is found in a listed workspace still resolves; one that is
+    // not found says a workspace could not be listed instead of claiming no
+    // project has the name.
+    name: "project lookup with one workspace unlisted",
+    failOn: "^GET /project$",
+    failOnQuery: "workspaceId=ws-other",
+    failStatus: 403,
+    steps: [["task", "ls", "-p", "BET", "--human"], ["task", "ls", "-p", "nope", "--human"]],
   },
   {
     name: "project list across workspaces refuses a workspace",

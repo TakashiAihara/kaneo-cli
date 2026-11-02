@@ -1,0 +1,234 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "proj-noslug#1",
+        "--strict"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"taskId\": \"task-n1\",\n  \"number\": 1,\n  \"title\": \"Slugless\",\n  \"projectId\": \"proj-noslug\",\n  \"projectName\": \"No slug\",\n  \"projectSlug\": \"\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "status",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "attached: proj-noslug#1 Slugless\n<TIME>Z  attach proj-noslug#1 Slugless\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "task-n1",
+        "ALP#1",
+        "--delete",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to delete 2 task(s) (proj-noslug#1 ALP#1) without --yes; this also removes their comments, where session history is kept\n"
+    },
+    {
+      "args": [
+        "search",
+        "Slugless",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "task  proj-noslug#1  Slugless  (to-do)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "close",
+        "--strict"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"number\": 1,\n  \"taskId\": \"task-n1\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "status",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "attached: none\n<TIME>Z  attach proj-noslug#1 Slugless\n<TIME>Z  close  proj-noslug#1 Slugless\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "attach",
+        "proj-noslug#1",
+        "--strict"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"taskId\": \"task-n1\",\n  \"number\": 1,\n  \"title\": \"Slugless\",\n  \"projectId\": \"proj-noslug\",\n  \"projectName\": \"No slug\",\n  \"projectSlug\": \"\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "rm",
+        "1",
+        "-p",
+        "proj-noslug",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-n1\",\n  \"number\": 1\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "close"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"released proj-noslug#1 Slugless here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written\"\n}\n",
+      "stderr": "Error: released proj-noslug#1 Slugless here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-n1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-n1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-n1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=Slugless&workspaceId=ws-main"
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-n1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-test`."
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-n1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-n1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-n1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/task/task-n1",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-n1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-test`."
+      }
+    }
+  ],
+  "files": {
+    ".config/kaneo/sessions/sess-test.history.jsonl": "{\"event\":\"attach\",\"at\":\"<TIME>Z\",\"taskId\":\"task-n1\",\"number\":1,\"title\":\"Slugless\",\"projectId\":\"proj-noslug\",\"projectName\":\"No slug\",\"projectSlug\":\"\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n{\"event\":\"close\",\"at\":\"<TIME>Z\",\"taskId\":\"task-n1\",\"number\":1,\"title\":\"Slugless\",\"projectId\":\"proj-noslug\",\"projectName\":\"No slug\",\"projectSlug\":\"\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n{\"event\":\"attach\",\"at\":\"<TIME>Z\",\"taskId\":\"task-n1\",\"number\":1,\"title\":\"Slugless\",\"projectId\":\"proj-noslug\",\"projectName\":\"No slug\",\"projectSlug\":\"\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n{\"event\":\"close\",\"at\":\"<TIME>Z\",\"taskId\":\"task-n1\",\"number\":1,\"title\":\"Slugless\",\"projectId\":\"proj-noslug\",\"projectName\":\"No slug\",\"projectSlug\":\"\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n"
+  }
+}

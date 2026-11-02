@@ -1,7 +1,7 @@
 import { apiKey, project, workspace, type App } from "./app";
 import { getProject, listWorkspaces, search, type SearchQuery, type SearchResult } from "../api/kaneo";
 import { minimumArgs, type FlagValues } from "./args";
-import { resolveWorkspace, withProject } from "./lookup";
+import { resolveWorkspace, slugOr, withProject } from "./lookup";
 
 // The server's own bounds on limit (v2.29.2 search/schema.ts), which the
 // document does not state.
@@ -128,6 +128,8 @@ const searchEverywhere = async (wanted: SearchQuery, limit: number) => {
 // for anything on a task and the project's slug for a project. A workspace match
 // has none, since its title already is the workspace's name.
 const ref = (r: SearchResult): string => {
-  if (r.projectSlug !== null && r.taskNumber !== null) return `${r.projectSlug}#${r.taskNumber}`;
-  return r.projectSlug ?? "";
+  // A project whose slug is empty is named by its id.
+  const slug = r.projectSlug === null ? null : slugOr(r.projectSlug, r.projectId ?? "");
+  if (slug !== null && r.taskNumber !== null) return `${slug}#${r.taskNumber}`;
+  return slug ?? "";
 };

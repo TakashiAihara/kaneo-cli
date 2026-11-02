@@ -1585,6 +1585,29 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    // Every reference to a task of a project with no slug names the project by
+    // its id, so none of them reads as the current project's #N. The tasks
+    // named by id were found without reading a board, so bulk has no slug for
+    // them either.
+    name: "references to a project with an empty slug",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    seed: {
+      projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }],
+      tasks: [...SEED.tasks, { id: "task-n1", projectId: "proj-noslug", title: "Slugless" }],
+    },
+    steps: [
+      ["session", "attach", "proj-noslug#1", "--strict"],
+      ["session", "status", "--human"],
+      ["task", "bulk", "task-n1", "ALP#1", "--delete", "--human"],
+      ["search", "Slugless", "--human"],
+      ["session", "close", "--strict"],
+      ["session", "status", "--human"],
+      ["session", "attach", "proj-noslug#1", "--strict"],
+      ["task", "rm", "1", "-p", "proj-noslug", "--yes", "--json"],
+      ["session", "close"],
+    ],
+  },
+  {
     name: "project list across workspaces refuses a workspace",
     steps: [["project", "ls", "-A", "-w", "ws-main", "--human"]],
   },

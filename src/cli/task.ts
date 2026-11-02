@@ -683,7 +683,12 @@ export const taskCommand = {
       args: noArgs("kaneo task export"),
       run: async ({ app }: { app: App }) => {
         apiKey(app);
-        const exported = await withProject(project(app), (id) => exportProjectTasks(id));
+        // Named by id: two projects can share a name.
+        let projectId = "";
+        const exported = await withProject(project(app), (id) => {
+          projectId = id;
+          return exportProjectTasks(id);
+        });
         // The export is the payload in both modes: a human asking for it wants the
         // file, and a summary instead would leave nothing to redirect. Only a
         // terminal gets the text with control characters replaced; a file gets
@@ -691,7 +696,7 @@ export const taskCommand = {
         if (app.out.mode.json || app.out.filter !== undefined) app.out.data(exported as Json);
         else if (app.out.terminal) app.out.human(JSON.stringify(exported, null, 2));
         else writeSync(1, `${JSON.stringify(exported, null, 2)}\n`);
-        app.out.status(`exported ${exported.tasks.length} task(s) from ${slugOr(exported.project.slug, exported.project.name)}`);
+        app.out.status(`exported ${exported.tasks.length} task(s) from ${slugOr(exported.project.slug, projectId)}`);
       },
     },
     {

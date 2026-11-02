@@ -180,6 +180,7 @@ kaneo notification create <message> [--title T] [--type T]   # to yourself
 kaneo notification clear --yes                               # deletes every notification
 kaneo notification preferences get
 kaneo notification preferences set [--email=false] [--ntfy] [--ntfy-topic T] [--reminder-lead 2h] ...   # only what is passed changes
+kaneo notification preferences set --ntfy-token - < token.txt   # also --gotify-token - and --webhook-secret -; one per command; one trailing line ending is dropped; empty stdin is an error (clear with ''); a secret that is exactly - cannot be passed as a value
 kaneo notification preferences workspace set <workspace-id> [--active=false] [--webhook] [--projects id,id]
 kaneo notification preferences workspace rm <workspace-id>   # the workspace is then sent nothing outside the app
 kaneo task links <task>

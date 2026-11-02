@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--gotify-token",
+        "-",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/notification-preferences: 400: Gotify requires a server URL and app token\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "gotifyToken": " gt_from_stdin_99 "
+      }
+    }
+  ],
+  "files": {}
+}

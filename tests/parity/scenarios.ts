@@ -915,6 +915,17 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    name: "label rename onto an orphan copy",
+    extraTasks: [{ id: "task-a4", projectId: P1, title: "Needs triage" }],
+    seed: { labels: [{ taskId: "task-a4", name: "bug" }, { taskId: "task-a4", name: "defect" }, { taskId: "task-a1", name: "defect" }] },
+    steps: [
+      ["label", "create", "bug", "--json"],
+      ["label", "update", "bug", "--name", "defect", "--human"],
+      ["label", "update", "bug", "--name", "other", "--human"],
+      ["label", "ls", "--human"],
+    ],
+  },
+  {
     name: "label get",
     steps: [["label", "create", "bug", "--json"], ["label", "attach", "1", "bug", "--json"], ["label", "get", "bug", "--human"], ["label", "get", "lbl0003", "--json"], ["label", "get", "nope", "--json"]],
   },

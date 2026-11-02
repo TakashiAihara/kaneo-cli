@@ -1,0 +1,98 @@
+{
+  "steps": [
+    {
+      "args": [
+        "label",
+        "create",
+        "bug",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"lbl0005\",\n  \"name\": \"bug\",\n  \"color\": \"gray\",\n  \"taskId\": null,\n  \"workspaceId\": \"ws-main\",\n  \"createdAt\": \"2026-01-01T00:00:14.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:14.000Z\",\n  \"deletionStartedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "update",
+        "bug",
+        "--name",
+        "defect",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: renaming \"bug\" to \"defect\" would collide on task id task-a4, has both labels; detach one of them first\n"
+    },
+    {
+      "args": [
+        "label",
+        "update",
+        "bug",
+        "--name",
+        "other",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated lbl0005  other  (gray)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "lbl0005  other  (gray)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/label",
+      "query": "",
+      "body": {
+        "name": "bug",
+        "color": "gray",
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/lbl0005",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/label/lbl0005",
+      "query": "",
+      "body": {
+        "name": "other",
+        "color": "gray"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

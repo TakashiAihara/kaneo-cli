@@ -57,7 +57,12 @@ import { sharedReference, similarOpenTasks } from "./similar";
 // or a member's name. An id is tried before a name so a member named like
 // another's id cannot capture it. The members are those of the workspace the
 // task's own project is in, whatever workspace is configured.
-const resolveAssignee = async (task: Task, given: string): Promise<string> => {
+const resolveAssignee = (task: Task, given: string): Promise<string> =>
+  resolveAssigneeIn(task.projectId, `the project of task #${task.number}`, given);
+
+// The same for a project named by its id, where `of` says in words which project
+// that is, since a task create has no task yet to name it by.
+const resolveAssigneeIn = async (projectId: string, of: string, given: string): Promise<string> => {
   const value = given.trim();
   if (value === "") throw new Error("the user is empty; give a member's id or name, `me`, or leave it out to clear the assignee");
   if (value.toLowerCase() === "me") {
@@ -75,12 +80,12 @@ const resolveAssignee = async (task: Task, given: string): Promise<string> => {
     if (id === "") throw new Error("the server did not say which user the API key is; give a member's id or name instead");
     return id;
   }
-  const read = await getProject(task.projectId).catch((e: unknown) => {
-    throw new Error(`reading project ${task.projectId}, the project of task #${task.number}, to find its workspace: ${(e as Error).message}`);
+  const read = await getProject(projectId).catch((e: unknown) => {
+    throw new Error(`reading project ${projectId}, ${of}, to find its workspace: ${(e as Error).message}`);
   });
   const workspaceId = read.workspaceId;
   if (workspaceId === "") {
-    throw new Error(`reading project ${task.projectId}, the project of task #${task.number}, did not say which workspace it is in, so its members cannot be listed`);
+    throw new Error(`reading project ${projectId}, ${of}, did not say which workspace it is in, so its members cannot be listed`);
   }
   const members = await listMembers(workspaceId);
   if (members.some((m) => m.id === value)) return value;
@@ -254,7 +259,7 @@ export const taskCommand = {
           usage: "due date: a date, or a date and time with an offset",
           defaultValue: "",
         },
-        { name: "assignee", type: "string" as const, usage: "user id to assign", defaultValue: "" },
+        { name: "assignee", type: "string" as const, usage: "member id, member name or `me`, as task assign takes them", defaultValue: "" },
         {
           name: "attach",
           type: "bool" as const,
@@ -318,6 +323,9 @@ export const taskCommand = {
 
         let open: Task[] = [];
         const task = await withProject(project(app), async (id) => {
+          // Before anything is created, so a name that matches nobody leaves no
+          // task behind. An empty one is no assignee, as it was before names.
+          if (wanted.assigneeId !== "") wanted.assigneeId = await resolveAssigneeIn(id, `the project the task is created in`, wanted.assigneeId);
           // Inside the resolution because withProject needs its first request to
           // carry the project (see withProject in src/cli/lookup.ts), so the board
           // and the create are written as the one project a slug or a name
@@ -636,7 +644,7 @@ export const taskCommand = {
       flags: [
         { name: "status", type: "string" as const, usage: "move every task to this column", defaultValue: "" },
         { name: "priority", type: "string" as const, usage: `set the priority: ${PRIORITIES.join(", ")}`, defaultValue: "" },
-        { name: "assign", type: "string" as const, usage: "assign every task to this user id", defaultValue: "" },
+        { name: "assign", type: "string" as const, usage: "assign every task to this member (id, name or `me`, as task assign takes them)", defaultValue: "" },
         { name: "unassign", type: "bool" as const, usage: "clear every task's assignee", defaultValue: "false" },
         { name: "due", type: "string" as const, usage: "set the due date: 2026-10-31 or 2026-10-31T09:00+09:00", defaultValue: "" },
         { name: "clear-due", type: "bool" as const, usage: "clear every task's due date", defaultValue: "false" },
@@ -665,7 +673,10 @@ export const taskCommand = {
         }
         if (operation === "updateStatus") await checkStatus(named, value!, projectName);
         const ids = named.map((t) => t.id);
-        const updated = await bulkUpdate(ids, operation, value);
+        // Every task is in one workspace, so the first one's project says whose
+        // members are meant. Resolved before the request, which changes all or none.
+        const change = flag === "--assign" ? await resolveAssignee(named[0]!, value!) : value;
+        const updated = await bulkUpdate(ids, operation, change);
         app.out.human(
           `${flag}${value === null ? "" : ` ${value}`}: the server changed ${updated} of the ${ids.length} task(s) named (${numbers})`,
         );

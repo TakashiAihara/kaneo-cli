@@ -57,7 +57,7 @@ export const attachTask = async (
   // Confirmed before anything is written here, so a marker this machine has no
   // record of is one the server kept. A listing that could not be made is a hard
   // failure here, since it would leave the attachment to say what it cannot show.
-  const posted = await postMarker(task.id, marker);
+  const posted = await postMarker(task.id, marker, task.number, "nothing is recorded here for it");
   await confirmMarker(task.id, task.number, posted, "hard");
   try {
     store.save(store.sessionStore(), sessionId, attachment);
@@ -91,7 +91,11 @@ export const attachTask = async (
 // the caller's decision: `session close` has a local record to bring up to date
 // first, and confirming a marker before that record is written is what leaves
 // this machine holding a task the server has let go of.
-export const postMarker = async (taskId: string, marker: Marker): Promise<Comment> => {
+//
+// `held` is what the caller's machine is left holding when the reply cannot be
+// read, which differs between the commands and is what a person needs to know
+// before deciding what to run next.
+export const postMarker = async (taskId: string, marker: Marker, number: number, held: string): Promise<Comment> => {
   try {
     return await addComment(taskId, format(marker));
   } catch (e) {
@@ -99,7 +103,11 @@ export const postMarker = async (taskId: string, marker: Marker): Promise<Commen
     // time in the reply means the marker is already there. Staying quiet, as a
     // fail-open command does for a failed request, would leave a retry to post
     // a second one.
-    if (e instanceof TimestampError) throw hard(`posted the marker on the server, but could not read its reply: ${e.message}`);
+    if (e instanceof TimestampError) {
+      throw hard(
+        `posted the marker on #${number} on the server, but could not read its reply (${e.message}); ${held}; do not run it again, that would post a second marker; \`kaneo session status\` shows what is held here`,
+      );
+    }
     throw e;
   }
 };

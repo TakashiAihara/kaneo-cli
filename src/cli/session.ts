@@ -69,7 +69,7 @@ export const sessionCommand = {
         // `session next` keeps no local record of the marker, so there is nothing
         // here to disagree with the server over a listing that could not be made:
         // the write landed and an unreachable board is what fail-open is for.
-        const posted = await postMarker(taskId, marker);
+        const posted = await postMarker(taskId, marker, number, "this command keeps no local record, so nothing here is out of step");
         await confirmMarker(taskId, number, posted, "fail-open");
 
         app.out.human(`#${number} next: ${step}`);
@@ -132,7 +132,7 @@ export const sessionCommand = {
         // to fail on. The marker is then never written, even if the task comes
         // back. A task named but not held is not released: there is nothing of
         // it here to release.
-        const posted = await postMarker(closed.taskId, marker).catch((e: unknown) => {
+        const posted = await postMarker(closed.taskId, marker, closed.number, "the attachment and history here are unchanged").catch((e: unknown) => {
           if (holds && placesNothing(e)) return undefined;
           throw e;
         });

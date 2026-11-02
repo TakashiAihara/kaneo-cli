@@ -142,22 +142,42 @@ const zeroRecord = <T>(reply: T | undefined): T => reply ?? ({} as T);
 // one-digit hour, an offset of +24:00); those are refused here, as the design
 // document records. The value is cut in the message, since the reply decides
 // how long it is.
-const isoTime = (owner: object, field: string): string => {
+export const isoTime = (owner: object, field: string): string => {
   const value = (owner as Record<string, unknown>)[field];
   if (value === null || value === undefined) return ZERO_TIME;
   const at = typeof value === "string" && isRfc3339(value) ? Date.parse(value) : Number.NaN;
   if (!Number.isNaN(at)) return new Date(at).toISOString();
   const shown = Array.from(JSON.stringify(value));
   const request = originOf(owner);
+  // Every object a mapper reads came out of a decoded reply, which the transport
+  // has recorded. One that did not is a mapping fed something else, and naming
+  // no request would hide that.
+  if (request === undefined) throw new Error(`${field} is not a timestamp, and no request is recorded for the object that holds it`);
   throw new TimestampError(
-    `${request === undefined ? "" : `${request}: `}${field} ${shown.length > VALUE_LIMIT ? `${shown.slice(0, VALUE_LIMIT).join("")}...` : shown.join("")} is not a timestamp`,
+    `${request}: ${field} ${shown.length > VALUE_LIMIT ? `${shown.slice(0, VALUE_LIMIT).join("")}...` : shown.join("")} is not a timestamp`,
   );
 };
 
 // A reply whose time cannot be read. It is its own type because the call it
 // belongs to may be a write that already happened, and a caller that needs to say
 // so has to tell this apart from a request that never got through.
-export class TimestampError extends Error {}
+export class TimestampError extends Error {
+  override name = "TimestampError";
+}
+
+// Runs a write whose reply is mapped here, and says so when the mapping fails:
+// the server has already done what was asked, so a caller who runs it again
+// repeats the write.
+export const afterWrite = async <T>(done: string, write: Promise<T>): Promise<T> => {
+  try {
+    return await write;
+  } catch (e) {
+    if (e instanceof TimestampError) {
+      throw new TimestampError(`${done} on the server, but its reply could not be read (${e.message}); do not run it again, that would repeat the write`);
+    }
+    throw e;
+  }
+};
 
 // time.RFC3339 with any fraction of a second: upper-case T and Z, and an offset
 // that is always written. The day and the hour are checked here because

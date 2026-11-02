@@ -191,6 +191,49 @@ describe("a time that fails to read in the reply to a write", () => {
 
   test("is a TimestampError, which a caller can tell from a request that failed", async () => {
     answers(taskReply({ createdAt: "soon" }));
-    expect(await failure(api.getTask("t1"))).toBeInstanceOf(api.TimestampError);
+    const e = await failure(api.getTask("t1"));
+    expect(e).toBeInstanceOf(api.TimestampError);
+    expect((e as Error).name).toBe("TimestampError");
+  });
+
+  test("is passed on by afterWrite with the write named", async () => {
+    answers(JSON.stringify({ id: "c1", content: "x", userId: "u1", createdAt: "soon" }));
+    const e = (await failure(api.afterWrite("commented", api.addComment("t1", "x")))) as Error;
+    expect(e.message).toBe(
+      'commented on the server, but its reply could not be read (POST /api/comment/t1: createdAt "soon" is not a timestamp); do not run it again, that would repeat the write',
+    );
+  });
+
+  test("is not rewritten by afterWrite when the request itself failed", async () => {
+    answers("{}");
+    const e = (await failure(api.afterWrite("commented", Promise.reject(new Error("down"))))) as Error;
+    expect(e.message).toBe("down");
+  });
+
+  test("on an object no reply produced says so rather than naming no request", () => {
+    expect(() => api.isoTime({ createdAt: "soon" }, "createdAt")).toThrow(
+      "createdAt is not a timestamp, and no request is recorded for the object that holds it",
+    );
+  });
+});
+
+// Every mapper reads its times through the same helper, but each hands it the
+// object it was given, so each one is held to naming its request.
+describe("every resource that carries a time names its request when the time is unreadable", () => {
+  const BAD = "soon";
+  test.each([
+    ["an invitation", "GET /api/invitation/i1", { invitation: { id: "i1", expiresAt: BAD } }, () => api.getInvitation("i1"), "expiresAt"],
+    ["a search result", "GET /api/search", { results: [{ id: "r1", type: "task", createdAt: BAD }] }, () => api.search({ query: "q", workspaceId: "w", projectId: "", type: "", limit: "" }), "createdAt"],
+    ["a workflow rule", "GET /api/workflow-rule/p1", [{ id: "r1", createdAt: TIME, updatedAt: BAD }], () => api.listWorkflowRules("p1"), "updatedAt"],
+    ["a stored workflow rule", "PUT /api/workflow-rule/p1", { id: "r1", createdAt: BAD }, () => api.setWorkflowRule("p1", { integrationType: "github", eventType: "pr", columnId: "c" }), "createdAt"],
+    ["a time entry", "GET /api/time-entry/task/t1", [{ id: "e1", startTime: BAD }], () => api.listTimeEntries("t1"), "startTime"],
+    ["a time entry's end", "GET /api/time-entry/task/t1", [{ id: "e1", startTime: TIME, endTime: BAD }], () => api.listTimeEntries("t1"), "endTime"],
+    ["a notification", "GET /api/notification", [{ id: "n1", createdAt: BAD }], () => api.listNotifications(), "createdAt"],
+    ["a label", "GET /api/label/workspace/w1", [{ id: "l1", createdAt: TIME, updatedAt: TIME, deletionStartedAt: BAD }], () => api.listWorkspaceLabels("w1"), "deletionStartedAt"],
+    ["an external link", "GET /api/external-link/task/t1", [{ id: "x1", createdAt: BAD }], () => api.listExternalLinks("t1"), "createdAt"],
+  ] as const)("%s", async (_what, request, reply, call, field) => {
+    answers(JSON.stringify(reply));
+    const e = (await failure(call())) as Error;
+    expect(e.message).toBe(`${request}: ${field} "soon" is not a timestamp`);
   });
 });

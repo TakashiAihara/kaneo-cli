@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { configureClient } from "../../src/api/http";
+import { configureClient, setRateLimitWaits } from "../../src/api/http";
 import { failOpen } from "../../src/cli/failopen";
 import { postMarker } from "../../src/session/attach";
 import type { Marker } from "../../src/session/marker";
@@ -16,6 +16,8 @@ const marker: Marker = {
 
 const servers: { stop: (force?: boolean) => void }[] = [];
 afterEach(() => {
+  // failOpen turns rate-limit waiting off for the rest of the process.
+  setRateLimitWaits(true);
   while (servers.length) servers.pop()!.stop(true);
 });
 
@@ -28,14 +30,14 @@ const answers = (status: number, body: string) => {
 // What a fail-open session command does around the post.
 const underFailOpen = (strict = false) =>
   failOpen(async () => {
-    await postMarker("t1", marker);
+    await postMarker("t1", marker, 7, "kept nothing here");
   })({ flags: { strict }, args: [], changed: new Set(), calledAs: "", app: undefined });
 
 describe("posting a session marker", () => {
   test("whose reply has an unreadable time is reported even by a fail-open command", async () => {
     answers(200, JSON.stringify({ id: "c1", content: "x", userId: "u1", createdAt: "soon" }));
     await expect(underFailOpen()).rejects.toThrow(
-      'posted the marker on the server, but could not read its reply: POST /api/comment/t1: createdAt "soon" is not a timestamp',
+      'posted the marker on #7 on the server, but could not read its reply (POST /api/comment/t1: createdAt "soon" is not a timestamp); kept nothing here; do not run it again, that would post a second marker; `kaneo session status` shows what is held here',
     );
   });
 
@@ -44,13 +46,18 @@ describe("posting a session marker", () => {
     await expect(underFailOpen()).resolves.toBeUndefined();
   });
 
+  test("that the server refused is reported under --strict", async () => {
+    answers(500, '{"error":"down"}');
+    await expect(underFailOpen(true)).rejects.toThrow("POST /api/comment/t1: 500");
+  });
+
   test("that the server refused is still an error to a caller outside fail-open", async () => {
     answers(500, '{"error":"down"}');
-    await expect(postMarker("t1", marker)).rejects.toThrow("POST /api/comment/t1: 500");
+    await expect(postMarker("t1", marker, 7, "kept nothing here")).rejects.toThrow("POST /api/comment/t1: 500");
   });
 
   test("with a readable reply returns the comment", async () => {
     answers(200, JSON.stringify({ id: "c1", content: "x", userId: "u1", createdAt: "2026-09-30T00:00:00Z" }));
-    expect((await postMarker("t1", marker)).createdAt).toBe("2026-09-30T00:00:00.000Z");
+    expect((await postMarker("t1", marker, 7, "kept nothing here")).createdAt).toBe("2026-09-30T00:00:00.000Z");
   });
 });

@@ -189,7 +189,8 @@ export const taskCommand = {
         if (relations.length > 0) {
           app.out.human("");
           app.out.human("relations");
-          for (const relation of relations) app.out.human(`  ${relationLine(relation, task.id)}`);
+          const projects = await relatedProjects(relations, task.projectId);
+          for (const relation of relations) app.out.human(`  ${relationLine(relation, task.id, projects)}`);
         }
         if (task.description !== "") {
           app.out.human("");
@@ -890,7 +891,8 @@ export const taskCommand = {
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
         const relations = await listRelations(task.id);
-        for (const relation of relations) app.out.human(relationLine(relation, task.id));
+        const projects = await relatedProjects(relations, task.projectId);
+        for (const relation of relations) app.out.human(relationLine(relation, task.id, projects));
         app.out.data(relations);
       },
     },
@@ -1011,13 +1013,34 @@ const RELATION_WORD_WIDTH = Math.max(...Object.values(relationWords).flat().map(
 const relationWord = (relationType: string, fromSource: boolean): string =>
   relationWords[relationType]?.[fromSource ? 0 : 1] ?? relationType;
 
-const relationLine = (relation: Relation, taskId: string): string => {
+// How the other end of each link is named when it is on another board: the
+// project's slug, or its id when it has none, which a reference accepts as well.
+// Only projects other than the shown task's own are read.
+const relatedProjects = async (relations: Relation[], ownProjectId: string): Promise<Map<string, string>> => {
+  const names = new Map<string, string>();
+  for (const relation of relations) {
+    for (const end of [relation.sourceTask, relation.targetTask]) {
+      if (end === null || end.projectId === "" || end.projectId === ownProjectId || names.has(end.projectId)) continue;
+      const project = await getProject(end.projectId);
+      names.set(end.projectId, project.slug === "" ? end.projectId : project.slug);
+    }
+  }
+  return names;
+};
+
+const relationLine = (relation: Relation, taskId: string, projects: Map<string, string>): string => {
   const fromSource = relation.sourceTaskId === taskId;
   const other = fromSource ? relation.targetTask : relation.sourceTask;
   const otherId = fromSource ? relation.targetTaskId : relation.sourceTaskId;
   const word = relationWord(relation.relationType, fromSource);
   // A task the server gave no number would read as #0, so it is named by id.
-  return `${word.padEnd(RELATION_WORD_WIDTH)}  ${other === null || other.number === null ? otherId : `#${other.number}  ${other.title}`}`;
+  // One on another board carries that board in front, as a reference writes it,
+  // because a bare #N would open the task of that number on the current board.
+  const named =
+    other === null || other.number === null
+      ? otherId
+      : `${projects.get(other.projectId) ?? ""}#${other.number}  ${other.title}`;
+  return `${word.padEnd(RELATION_WORD_WIDTH)}  ${named}`;
 };
 
 // Turns a reference into a task.

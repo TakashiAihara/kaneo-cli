@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "create",
+        "Lowerworld",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"the slug LOW derived from the name is used by project proj-lower (Lower): pass --slug\"\n}\n",
+      "stderr": "Error: the slug LOW derived from the name is used by project proj-lower (Lower): pass --slug\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

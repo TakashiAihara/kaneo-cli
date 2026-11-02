@@ -75,6 +75,16 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    },
+    {
       "method": "PATCH",
       "path": "/task/bulk",
       "query": "",

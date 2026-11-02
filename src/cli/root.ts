@@ -84,7 +84,7 @@ const helpCommand: Command<App> = {
   },
 };
 
-const rootCommand = (): { root: Command<App> } => {
+export const rootCommand = (): { root: Command<App> } => {
   const root: Command<App> = {
     name: "kaneo",
     use: "kaneo",

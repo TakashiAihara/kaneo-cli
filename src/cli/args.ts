@@ -322,6 +322,52 @@ const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
   return { flags: values, args: positional, changed };
 };
 
+// The last value the arguments give a long flag, read the way parseFlags reads
+// them but without failing, for the report of a failure that parseFlags itself
+// raised: what the caller asked for is wanted even when the line is refused. The
+// last one wins, as it does in the parser; a value is never a flag, so the word
+// after a flag that takes one is skipped; "--" ends the search. Undefined when
+// the flag is not given. A flag the command does not know is stepped over
+// without its value, which is not knowable.
+export const lastFlagValue = (flags: Flag[], args: string[], name: string): string | undefined => {
+  const byName = new Map(flags.map((flag) => [flag.name, flag]));
+  const byShorthand = new Map(flags.flatMap((flag) => (flag.shorthand ? [[flag.shorthand, flag] as const] : [])));
+  let found: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const token = args[i]!;
+    if (token === "--") break;
+    if (!token.startsWith("-")) continue;
+    if (token.startsWith("--")) {
+      const spelled = token.slice(2);
+      const equals = spelled.indexOf("=");
+      const flag = byName.get(equals === -1 ? spelled : spelled.slice(0, equals));
+      if (flag === undefined) continue;
+      if (equals !== -1) {
+        if (flag.name === name) found = spelled.slice(equals + 1);
+      } else if (flag.type !== "bool") {
+        const value = args[++i];
+        if (flag.name === name) found = value ?? "";
+      }
+      continue;
+    }
+    let shorthands = token.slice(1);
+    while (shorthands !== "") {
+      const flag = byShorthand.get(shorthands[0]!);
+      if (flag === undefined) break;
+      const rest = shorthands.slice(1);
+      if (flag.type === "bool") {
+        shorthands = rest;
+        continue;
+      }
+      const inline = rest.length > 1 && rest[0] === "=" ? rest.slice(1) : rest;
+      const value = inline !== "" ? inline : args[++i];
+      if (flag.name === name) found = value ?? "";
+      break;
+    }
+  }
+  return found;
+};
+
 const hasNoValue = (flags: Flag[], name: string): boolean =>
   flags.some((flag) => flag.name === name && flag.type === "bool");
 const hasShorthandNoValue = (flags: Flag[], letter: string): boolean =>

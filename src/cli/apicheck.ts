@@ -45,20 +45,31 @@ export const apiCheckCommand = {
       `${result.covered.length} of ${result.clientOperations} client operations present; server offers ${result.serverOperations}`,
     );
 
-    app.out.data({
-      serverOperations: result.serverOperations,
-      clientOperations: result.clientOperations,
-      covered: result.covered.map(asReport),
-      missing: result.missing.map(asReport),
-      // The keys covered and missing have, with Command always empty since
-      // nothing calls these yet, and Tag added: the document's first tag.
-      newOnServer: result.newOnServer.map((o) => ({ ID: o.id, Method: o.method, Path: o.path, Command: "", Tag: o.tag })),
-      requestDrift: result.requestDrift.map((d) => ({ ...d, command: commandOf(d.id) })),
-    } as Json);
+    const missing =
+      result.missing.length > 0
+        ? new Error(`${result.missing.length} operation(s) this client calls are missing from the server`)
+        : undefined;
 
-    if (result.missing.length > 0) {
-      throw new Error(`${result.missing.length} operation(s) this client calls are missing from the server`);
+    try {
+      app.out.data({
+        serverOperations: result.serverOperations,
+        clientOperations: result.clientOperations,
+        covered: result.covered.map(asReport),
+        missing: result.missing.map(asReport),
+        // The keys covered and missing have, with Command always empty since
+        // nothing calls these yet, and Tag added: the document's first tag.
+        newOnServer: result.newOnServer.map((o) => ({ ID: o.id, Method: o.method, Path: o.path, Command: "", Tag: o.tag })),
+        requestDrift: result.requestDrift.map((d) => ({ ...d, command: commandOf(d.id) })),
+      } as Json);
+    } catch (e) {
+      // A failure to write the report (a filter that fails) ends the command in
+      // its own error, which would otherwise hide the finding this command
+      // exists to report.
+      if (missing !== undefined) app.out.error(missing.message);
+      throw e;
     }
+
+    if (missing !== undefined) throw missing;
   },
 };
 

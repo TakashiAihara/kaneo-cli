@@ -6,7 +6,7 @@
 // never pays to instantiate a module it will not run.
 
 import { writeSync } from "node:fs";
-import { isTTY, sanitizeControl } from "./output";
+import { sanitizeControl } from "./output";
 
 // A JSON document in, whatever the expression makes of it out.
 export type Filter = (json: string) => string;
@@ -49,7 +49,9 @@ const lines = (stdout: string): string =>
     .join("");
 
 // Loads jq once for the whole command and checks the expression against it.
-export const loadFilter = async (expression: string): Promise<Filter> => {
+// Whether stderr is a terminal is passed in, as it is to the Writer for stdout,
+// so that both ways of printing what jq says can be exercised.
+export const loadFilter = async (expression: string, stderrIsTerminal: boolean): Promise<Filter> => {
   const { loadJq } = await import("jq-wasm/inline");
   const jq = await loadJq();
   // jq compiles a program before it reads any input, and with no input at all it
@@ -64,7 +66,7 @@ export const loadFilter = async (expression: string): Promise<Filter> => {
     if (exitCode !== 0) throw failure(stderr, RAN);
     // What `debug` and `stderr` print, as jq itself would show it. It can carry
     // server text, so a terminal gets it with control characters neutralised.
-    if (stderr !== "") writeSync(2, `${isTTY(2) ? sanitizeControl(stderr) : stderr}\n`);
+    if (stderr !== "") writeSync(2, `${stderrIsTerminal ? sanitizeControl(stderr) : stderr}\n`);
     return lines(stdout);
   };
 };

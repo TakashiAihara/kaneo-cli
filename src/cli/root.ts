@@ -2,12 +2,14 @@ import { writeSync } from "node:fs";
 import {
   find,
   helpText,
+  lastFlagValue,
   parsingFlags,
   readFlags,
   unknownCommand,
   usageText,
   type Command,
   type Flag,
+  type Found,
 } from "./args";
 import type { App } from "./app";
 import { resolveFromEnvironment, type Flags as ResolvedFlags } from "../config/resolve";
@@ -122,7 +124,7 @@ export const rootCommand = (): { root: Command<App> } => {
 // a typo costs no request. An empty --jq is no expression at all: the output is
 // what it would have been without the flag.
 const maybeFilter = async (expression: string): Promise<Filter | undefined> =>
-  expression === "" ? undefined : loadFilter(expression);
+  expression === "" ? undefined : loadFilter(expression, isTTY(2));
 
 const env = (name: string): string => process.env[name] ?? "";
 const noColor = (): boolean => env("NO_COLOR") !== "";
@@ -152,16 +154,10 @@ const askedFor = (argv: string[], name: string): boolean => {
 
 // Whether the raw arguments carry a --jq expression, for a failure that comes
 // before the filter is loaded: its caller reads stdout as the answer, so the
-// error must not land there either. An empty expression is no filter at all.
-const askedForJq = (argv: string[]): boolean => {
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--") return false;
-    if (arg === "--jq") return (argv[i + 1] ?? "") !== "";
-    if (arg.startsWith("--jq=")) return arg !== "--jq=";
-  }
-  return false;
-};
+// error must not land there either. The expression is the one the parser would
+// have used, and an empty one is no filter at all.
+const askedForJq = (found: Found<App>): boolean =>
+  (lastFlagValue(parsingFlags(found.chain), found.rest, "jq") ?? "") !== "";
 
 // Runs one invocation and returns the exit code, so the entry point stays a
 // single line and the reporting can be checked without leaving the process.
@@ -242,7 +238,7 @@ export const run = async (argv: string[]): Promise<number> => {
     // report it with, and the filter cannot be run over the object that says so.
     // A failure before the filter is loaded is reported the way the Writer would
     // with one.
-    if (e instanceof JqFailure || (out === undefined && askedForJq(argv))) {
+    if (e instanceof JqFailure || (out === undefined && askedForJq(found))) {
       writeSync(2, `Error: ${sanitizeControl(message)}\n`);
       return 1;
     }

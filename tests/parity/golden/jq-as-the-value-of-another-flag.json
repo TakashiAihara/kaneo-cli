@@ -1,0 +1,30 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "create",
+        "--description",
+        "--jq"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"requires at least 1 arg(s), only received 0\"\n}\n",
+      "stderr": "Error: requires at least 1 arg(s), only received 0\n"
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "--description",
+        "--",
+        "--jq",
+        ".x"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: requires at least 1 arg(s), only received 0\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

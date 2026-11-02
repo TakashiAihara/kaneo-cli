@@ -26,12 +26,12 @@ const run = (json: boolean, body: string) => {
 
 // A --jq filter is compiled before the Writer is built, so the child loads it the
 // way the root does rather than being handed one.
-const runJq = (expression: string, body: string, terminal = false) => {
+const runJq = (expression: string, body: string, terminal = false, stderrTerminal = false) => {
   const p = Bun.spawnSync(
     [
       "bun",
       "-e",
-      `import { Writer } from ${JSON.stringify(OUTPUT)}; import { loadFilter } from ${JSON.stringify(JQ)}; const w = new Writer({ json: true, color: false }, await loadFilter(${JSON.stringify(expression)}), ${terminal}); ${body}`,
+      `import { Writer } from ${JSON.stringify(OUTPUT)}; import { loadFilter } from ${JSON.stringify(JQ)}; const w = new Writer({ json: true, color: false }, await loadFilter(${JSON.stringify(expression)}, ${stderrTerminal}), ${terminal}); ${body}`,
     ],
     { env: cleanEnv(), stdout: "pipe", stderr: "pipe", timeout: 10_000 },
   );
@@ -170,6 +170,16 @@ describe("Writer with a --jq filter", () => {
     expect(exit).toBe(0);
     expect(out).toBe("7\n");
     expect(err).toBe('["DEBUG:",7]\n');
+  });
+
+  // What stderr prints can carry server text, so a terminal on stderr gets it with
+  // control characters neutralised and a pipe gets the bytes.
+  test.each([
+    [true, 'a�[2Jb\n'],
+    [false, 'a\u001b[2Jb\n'],
+  ])("TestJQSanitizesDebugOnAStderrTerminal(%p)", (stderrTerminal, want) => {
+    const { err } = runJq(".title | stderr", `w.data({ title: "a\\x1b[2Jb" });`, false, stderrTerminal);
+    expect(err).toBe(want);
   });
 
   // The position jq names is a line of kaneo's own serialisation, not anything

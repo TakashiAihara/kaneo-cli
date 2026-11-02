@@ -1,0 +1,21 @@
+{
+  "steps": [
+    {
+      "args": [
+        "api-check",
+        "--jq=.missing | tonumber"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --jq: jq: error: array ([]) cannot be parsed as a number\nthe command had already run when --jq failed; anything it changes has been changed\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/openapi",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

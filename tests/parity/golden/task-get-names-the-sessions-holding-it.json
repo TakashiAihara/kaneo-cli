@@ -1,0 +1,85 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"description\": \"multi\\nline\",\n  \"status\": \"to-do\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n  \"labels\": [],\n  \"relations\": [],\n  \"sessions\": [\n    {\n      \"sessionId\": \"sess-live-0123\",\n      \"host\": \"h2\",\n      \"branch\": \"b2\",\n      \"cwd\": \"/work/live dir\",\n      \"updatedAt\": \"2026-01-01T00:00:10.000Z\",\n      \"nextStep\": \"write tests\"\n    },\n    {\n      \"sessionId\": \"sess-bare\",\n      \"host\": \"h3\",\n      \"branch\": \"b3\",\n      \"cwd\": \"/work/bare\",\n      \"updatedAt\": \"2026-01-01T00:00:11.000Z\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1  Write the parser\nstatus    to-do\npriority  high\n\nsessions\n  sess-liv @h2 /work/live dir (b2)\n  sess-bar @h3 /work/bare (b3)\n\nmulti\nline\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a2\",\n  \"number\": 2,\n  \"title\": \"Ship it\",\n  \"description\": \"\",\n  \"status\": \"in-progress\",\n  \"priority\": \"no-priority\",\n  \"position\": 1,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": \"user-1\",\n  \"assigneeName\": \"Ada\",\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n  \"labels\": [],\n  \"relations\": [],\n  \"sessions\": []\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

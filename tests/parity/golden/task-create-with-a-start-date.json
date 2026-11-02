@@ -124,6 +124,11 @@
     },
     {
       "method": "GET",
+      "path": "/comment/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/task/tasks/proj-alpha",
       "query": ""
     },

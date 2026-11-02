@@ -2,7 +2,7 @@ import { apiKey, projects, type App } from "./app";
 import { archived, boardTasks, getBoard, getProject, listComments, type Task } from "../api/kaneo";
 import { noArgs, type RunContext } from "./args";
 import { withProject } from "./lookup";
-import { latestPerSession, parse, running } from "../session/marker";
+import { holding } from "../session/marker";
 
 // One session's record on a task, as the board reports it. nextStep is left out
 // when there is none, the way an attachment leaves out what it does not know.
@@ -139,10 +139,7 @@ const collectSessions = async (tasks: Task[]): Promise<BoardSession[]> => {
     } catch (e) {
       throw new Error(`comments for #${task.number}: ${(e as Error).message}`);
     }
-    const markers = comments
-      .map((comment) => parse(comment.content, comment.createdAt))
-      .filter((marker) => marker !== undefined);
-    for (const marker of running(latestPerSession(markers))) {
+    for (const marker of holding(comments)) {
       out.push({
         taskNumber: task.number,
         taskTitle: task.title,

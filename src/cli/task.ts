@@ -276,9 +276,12 @@ export const taskCommand = {
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
         if (changed.has("title") && args.length > 0) throw new Error("give the title once: as words after create or as --title, not both");
         if (!changed.has("title")) minimumArgs(1)(args);
+        // As task update does, before the key is asked for: what is typed wrong
+        // is said before what is missing from the environment.
+        const title = changed.has("title") ? wantedTitle(String(flags.title ?? "")) : wantedTitle(args.join(" "), "empty title");
         apiKey(app);
         const wanted: NewTask = {
-          title: changed.has("title") ? wantedTitle(String(flags.title ?? "")) : args.join(" "),
+          title,
           description: await descriptionOf(flags, changed),
           priority: String(flags.priority ?? ""),
           status: String(flags.status ?? ""),
@@ -1152,9 +1155,10 @@ const knownPriority = (priority: string): string => {
 
 // A title as it was typed, refused only when it holds nothing to read. The
 // server takes whitespace, and a task whose title is one space is a task nobody
-// can pick out of a board listing.
-const wantedTitle = (title: string): string => {
-  if (title.trim() === "") throw new Error("empty --title");
+// can pick out of a board listing. The words after create are not --title, so
+// they are refused under their own name.
+const wantedTitle = (title: string, refusal = "empty --title"): string => {
+  if (title.trim() === "") throw new Error(refusal);
   return title;
 };
 

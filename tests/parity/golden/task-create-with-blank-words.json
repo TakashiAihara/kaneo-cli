@@ -1,0 +1,72 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "create",
+        " ",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty title\"\n}\n",
+      "stderr": "Error: empty title\n"
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty title\"\n}\n",
+      "stderr": "Error: empty title\n"
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "a",
+        "b",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task0002\",\n  \"number\": 4,\n  \"title\": \"a b\",\n  \"description\": \"\",\n  \"status\": \"to-do\",\n  \"priority\": \"medium\",\n  \"position\": 3,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"labels\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1    [high       ] to-do         Write the parser\n#4    [medium     ] to-do         a b\n#2    [no-priority] in-progress   Ship it\n",
+      "stderr": "(1 done / planned / archived task left out; --all to include them)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
+      "query": "",
+      "body": {
+        "title": "a b",
+        "description": "",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,40 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "create",
+        "--title",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty --title\"\n}\n",
+      "stderr": "Error: empty --title\n"
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        " ",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty title\"\n}\n",
+      "stderr": "Error: empty title\n"
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "Words",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no API key: set KANEO_API_KEY, or pass --api-key\"\n}\n",
+      "stderr": "Error: no API key: set KANEO_API_KEY, or pass --api-key\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

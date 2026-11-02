@@ -1058,9 +1058,26 @@ export const SCENARIOS: Scenario[] = [
   { name: "notification preferences set gotify token from stdin", stdin: " gt_from_stdin_99 \n", steps: [["notification", "prefs", "set", "--gotify-token", "-", "--human"]] },
   { name: "notification preferences set empty stdin", stdin: "\n", steps: [["notification", "prefs", "set", "--ntfy-token", "-", "--json"]] },
   {
-    name: "notification preferences set only secrets read stdin",
+    name: "notification preferences set topic dash stays literal",
     stdin: "tk_unused\n",
     steps: [["notification", "prefs", "set", "--ntfy-topic", "-", "--json"]],
+  },
+  { name: "notification preferences set truly empty stdin", stdin: "", steps: [["notification", "prefs", "set", "--ntfy-token", "-", "--json"]] },
+  {
+    name: "notification preferences set drops one line ending only",
+    stdin: "whsec_two\n\n",
+    steps: [["notification", "prefs", "set", "--webhook-url", "https://example.com/hook", "--webhook-secret", "-", "--json"]],
+  },
+  {
+    name: "notification preferences set keeps whitespace-only stdin",
+    stdin: "  ",
+    steps: [["notification", "prefs", "set", "--webhook-url", "https://example.com/hook", "--webhook-secret", "-", "--json"]],
+  },
+  // Empty stdin would be its own error if it were read first.
+  {
+    name: "notification preferences set two secrets refused before stdin is read",
+    stdin: "",
+    steps: [["notification", "prefs", "set", "--gotify-token", "-", "--webhook-secret", "-", "--json"]],
   },
   {
     name: "notification preferences set two secrets from stdin",

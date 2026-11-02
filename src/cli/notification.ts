@@ -90,16 +90,18 @@ const SETTINGS = [
 // A secret on the command line is visible in the process list and the shell
 // history, so a lone `-` takes it from stdin instead. Stdin is one stream, so
 // two flags asking for it would leave the second with nothing: that is refused
-// before anything is read.
+// before stdin is read. A secret that is exactly `-` therefore cannot be passed
+// as a value.
 const stdinFlags = (flags: FlagValues): string[] => [...CLEARABLE].filter((flag) => String(flags[flag] ?? "") === "-");
 
 // The secret as the pipe carried it, less the one line ending `echo` or a
 // heredoc adds: a token with a newline on the end is a different token, and
-// nobody types the newline as part of it. Nothing but that is taken off.
+// nobody types the newline as part of it. Apart from that and a leading BOM
+// (readInput's), the text is kept as it came, whitespace included.
 const secretFromStdin = async (flag: string): Promise<string> => {
   const text = (await readInput("-")).replace(/\r?\n$/, "");
-  // Empty would be read as a request to clear the secret, which `--${flag} ''`
-  // is for; a pipe that carried nothing is far more likely to be a mistake.
+  // Empty would be read as a request to clear the secret, which an empty
+  // value on the command line is for; a pipe that carried nothing is far more likely to be a mistake.
   if (text === "") throw new Error(`empty value for --${flag} from stdin; pass --${flag} '' to clear it`);
   return text;
 };
@@ -218,7 +220,8 @@ const preferencesCommand = {
         "topic cannot be cleared. A token or secret given as a flag is visible in the\n" +
         "process list and the shell history; --ntfy-token -, --gotify-token - and\n" +
         "--webhook-secret - read it from stdin instead (one of them per command), less\n" +
-        "the line ending the pipe adds.\n\n" +
+        "the one line ending the pipe adds. Empty stdin is refused, not a clear; a\n" +
+        "secret that is exactly - cannot be passed as a value.\n\n" +
         "The server carries a channel switch into the active workspace rules that have\n" +
         "a channel on: a channel turned off is turned off there, and one turned on from\n" +
         "off is turned on there. Inactive rules keep their channels.",
@@ -226,7 +229,7 @@ const preferencesCommand = {
       flags: [
         ...SWITCHES.map(([flag, , usage]) => boolFlag(flag, usage)),
         ...SETTINGS.map(([flag, , usage]) =>
-          stringFlag(flag, CLEARABLE.has(flag) ? `${usage}; - reads stdin, empty clears it` : usage),
+          stringFlag(flag, CLEARABLE.has(flag) ? `${usage}; - reads it from stdin, '' clears it` : usage),
         ),
         {
           name: "reminder-lead",

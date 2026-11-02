@@ -16,6 +16,21 @@ RELEASE_BASE=${KANEO_RELEASE_BASE:-https://github.com/$REPO/releases/download}
 die() { printf 'install.sh: %s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+tmp=
+staged=
+
+cleanup() {
+    # A failing rm must not replace the exit status the script is leaving with.
+    [ -z "$tmp" ] || rm -rf "$tmp" || :
+    [ -z "$staged" ] || rm -rf "$staged" || :
+}
+
+# A signal trap that only cleans up lets the script carry on with the next
+# command, so exit explicitly; the EXIT trap then runs cleanup.
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 detect_os() {
     case $(uname -s) in
         Linux) echo linux ;;
@@ -89,8 +104,6 @@ main() {
 
     name="kaneo_${os}_${arch}.tar.gz"
     tmp=$(mktemp -d)
-    # shellcheck disable=SC2064
-    trap "rm -rf '$tmp'" EXIT INT TERM
 
     printf 'downloading %s %s\n' "$name" "$version" >&2
     download "$RELEASE_BASE/$version/$name" "$tmp/$name"
@@ -106,8 +119,6 @@ main() {
     # the final path first would destroy a working kaneo whenever the new one
     # turns out not to run.
     staged=$INSTALL_DIR/.kaneo.incoming.$$
-    # shellcheck disable=SC2064
-    trap "rm -rf '$tmp' '$staged'" EXIT INT TERM
 
     cp "$tmp/kaneo" "$staged" || die "could not write to $INSTALL_DIR"
     chmod 0755 "$staged" || die "could not make $staged executable"

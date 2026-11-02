@@ -48,7 +48,7 @@
       ],
       "exit": 0,
       "stdout": "{\n  \"project\": {\n    \"name\": \"No slug\",\n    \"slug\": \"\",\n    \"description\": null,\n    \"exportedAt\": \"2026-01-01T00:00:13.000Z\"\n  },\n  \"tasks\": [\n    {\n      \"title\": \"Slugless\",\n      \"description\": \"\",\n      \"status\": \"to-do\",\n      \"priority\": \"no-priority\",\n      \"dueDate\": null,\n      \"startDate\": null,\n      \"userId\": null,\n      \"labels\": []\n    }\n  ]\n}\n",
-      "stderr": "exported 1 task(s) from No slug\n"
+      "stderr": "exported 1 task(s) from proj-noslug\n"
     },
     {
       "args": [

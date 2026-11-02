@@ -7,7 +7,7 @@ import { CLOSED, RUNNING } from "../session/marker";
 import * as store from "../session/store";
 import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
-import { placesNothing } from "./lookup";
+import { placesNothing, slugOr } from "./lookup";
 
 const requireSessionId = (): string => {
   const id = store.currentId(env);
@@ -170,7 +170,7 @@ export const sessionCommand = {
         // hook follows. The exit is still 1, since the board was not told.
         if (posted === undefined) {
           throw hard(
-            `released ${ref(closed.projectSlug, closed.number)} ${closed.title} here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written`,
+            `released ${ref(closed.projectSlug, closed.number, closed.projectId)} ${closed.title} here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written`,
           );
         }
         await confirmMarker(closed.taskId, closed.number, posted, "fail-open");
@@ -199,12 +199,12 @@ export const sessionCommand = {
         const { entries, skipped } = store.readHistory(sessions, sessionId);
 
         if (attached === null) app.out.human("attached: none");
-        else app.out.human(`attached: ${ref(attached.projectSlug, attached.number)} ${attached.title}`);
+        else app.out.human(`attached: ${ref(attached.projectSlug, attached.number, attached.projectId)} ${attached.title}`);
         for (const entry of entries) {
           const line = entry as Record<string, Json | undefined>;
           const slug = typeof line["projectSlug"] === "string" ? line["projectSlug"] : undefined;
           app.out.human(
-            `${String(line["at"] ?? "")}  ${String(line["event"] ?? "").padEnd(6)} ${ref(slug, String(line["number"] ?? ""))} ${String(line["title"] ?? "")}`,
+            `${String(line["at"] ?? "")}  ${String(line["event"] ?? "").padEnd(6)} ${ref(slug, String(line["number"] ?? ""), typeof line["projectId"] === "string" ? line["projectId"] : undefined)} ${String(line["title"] ?? "")}`,
           );
         }
         // Only where a person reads it: the JSON already carries every entry that
@@ -218,8 +218,11 @@ export const sessionCommand = {
 };
 
 // The task reference people write, "slug#number". A record written before the
-// slug was kept, or whose lookup failed, has only the number.
-const ref = (slug: string | undefined, number: number | string): string => `${slug ?? ""}#${number}`;
+// slug was kept, or whose lookup failed, has only the number. A board whose
+// slug is empty is named by its id, so the reference does not read as the
+// current project's task.
+const ref = (slug: string | undefined, number: number | string, projectId?: string): string =>
+  `${slug === undefined ? "" : slugOr(slug, projectId ?? "")}#${number}`;
 
 // Picks the task a command acts on: the one named explicitly, otherwise the one
 // this session attached to.

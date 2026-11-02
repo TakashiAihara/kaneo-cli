@@ -1439,3 +1439,36 @@ test("TestReorderProjectsSendsTheWorkspaceAndTheOrder", async () => {
   await api.reorderProjects("w/1", ["p2", "p1"]);
   expect(seen).toEqual([{ query: "?workspaceId=w%2F1", body: { projects: [{ id: "p2", position: 0 }, { id: "p1", position: 1 }] } }]);
 });
+
+test("listMyTasks asks for the workspace and keeps the total the server counted", async () => {
+  const seen = recorder(
+    JSON.stringify({
+      tasks: [
+        {
+          id: "t7",
+          projectId: "p9",
+          number: 41,
+          title: "Mine",
+          status: "in-progress",
+          statusName: "In Progress",
+          statusIcon: null,
+          priority: "urgent",
+          dueDate: null,
+          projectName: "Gamma",
+          projectSlug: "GAM",
+          projectIcon: null,
+          labels: [],
+        },
+      ],
+      total: 130,
+    }),
+  );
+  const mine = await api.listMyTasks("w/1");
+  expect(seen.method).toBe("GET");
+  expect(seen.path).toBe("/api/task/assigned");
+  expect(seen.query).toBe("workspaceId=w%2F1");
+  expect(mine.total).toBe(130);
+  expect(mine.tasks).toEqual([
+    { id: "t7", projectId: "p9", projectSlug: "GAM", number: 41, title: "Mine", status: "in-progress", priority: "urgent", dueDate: null },
+  ]);
+});

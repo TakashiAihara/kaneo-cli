@@ -1,4 +1,4 @@
-import { addComment, getProject, listComments, listWorkspaces, type Comment, type Task } from "../api/kaneo";
+import { addComment, getProject, listComments, listWorkspaces, TimestampError, type Comment, type Task } from "../api/kaneo";
 import { debug, type App } from "../cli/app";
 import { hard } from "../cli/failopen";
 import { hookEnv, runHook } from "../cli/hook";
@@ -91,8 +91,18 @@ export const attachTask = async (
 // the caller's decision: `session close` has a local record to bring up to date
 // first, and confirming a marker before that record is written is what leaves
 // this machine holding a task the server has let go of.
-export const postMarker = async (taskId: string, marker: Marker): Promise<Comment> =>
-  addComment(taskId, format(marker));
+export const postMarker = async (taskId: string, marker: Marker): Promise<Comment> => {
+  try {
+    return await addComment(taskId, format(marker));
+  } catch (e) {
+    // The server writes the comment before the reply is read, so an unreadable
+    // time in the reply means the marker is already there. Staying quiet, as a
+    // fail-open command does for a failed request, would leave a retry to post
+    // a second one.
+    if (e instanceof TimestampError) throw hard(`posted the marker on the server, but could not read its reply: ${e.message}`);
+    throw e;
+  }
+};
 
 // Whether a listing that could not be made fails the command outright, or is an
 // ordinary error a fail-open command swallows.

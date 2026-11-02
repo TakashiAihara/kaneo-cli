@@ -1,0 +1,35 @@
+{
+  "steps": [
+    {
+      "args": [
+        "label",
+        "create",
+        "Words",
+        "--name",
+        "Flagged",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"give the name once: as words after create or as --name, not both\"\n}\n",
+      "stderr": "Error: give the name once: as words after create or as --name, not both\n"
+    },
+    {
+      "args": [
+        "label",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

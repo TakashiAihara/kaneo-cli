@@ -164,6 +164,12 @@ export const SCENARIOS: Scenario[] = [
   ...both("project get", ["project", "get", P1]),
   ...both("project get from env", ["project", "get"]),
   { name: "project create", steps: [["project", "create", "Gamma", "--slug", "GAM", "-d", "third", "--json"], ["project", "ls", "--human"]] },
+  // --name gives the name as project update takes it; with words too, empty, or
+  // with neither, the create is refused before anything is asked.
+  { name: "project create with --name", steps: [["project", "create", "--name", "Flagged", "--slug", "FLG", "--json"], ["project", "ls", "--human"]] },
+  { name: "project create with --name and words", steps: [["project", "create", "Words", "--name", "Flagged", "--json"], ["project", "ls", "--human"]] },
+  { name: "project create with no name", steps: [["project", "create", "--json"]] },
+  { name: "project create with an empty --name", steps: [["project", "create", "--name", " ", "--json"], ["project", "create", "--name", "", "--json"], ["project", "create", "Words", "--name", "", "--json"], ["project", "ls", "--human"]] },
   { name: "project create derives the slug", steps: [["project", "create", "Gamma Ray!", "--human"]] },
   { name: "project create keeps the description", steps: [["project", "create", "Delta", "--slug", "DEL", "-d", "fourth", "--json"], ["project", "get", "proj0002", "--human"]] },
   {
@@ -899,6 +905,10 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
 
+  { name: "label create with --name", steps: [["label", "create", "--name", " flagged one ", "--color", "red", "--json"], ["label", "ls", "--human"]] },
+  { name: "label create with --name and words", steps: [["label", "create", "Words", "--name", "Flagged", "--json"], ["label", "ls", "--human"]] },
+  { name: "label create with no name", steps: [["label", "create", "--json"]] },
+  { name: "label create with an empty --name", steps: [["label", "create", "--name", " ", "--json"], ["label", "create", "--name", "", "--json"], ["label", "create", "Words", "--name", "", "--json"], ["label", "ls", "--human"]] },
   {
     name: "label create, attach, detach",
     steps: [

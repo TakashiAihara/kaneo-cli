@@ -215,12 +215,14 @@ export const projectCommand = {
     },
     {
       name: "create",
-      use: "create <name>",
+      use: "create <name | --name NAME>",
       short: "Create a project in a workspace",
       // Several words are one name: `project create Alpha Two` names the project
-      // "Alpha Two" rather than complaining about a second argument.
-      args: minimumArgs(1),
+      // "Alpha Two" rather than complaining about a second argument. --name is
+      // the other way to give it, as project update takes it, so the arguments
+      // are checked in run, where the flag can be seen.
       flags: [
+        { name: "name", type: "string" as const, usage: "project name, instead of the words after create", defaultValue: "" },
         { name: "icon", type: "string" as const, usage: "icon name (default Layers)", defaultValue: "" },
         {
           name: "slug",
@@ -230,9 +232,12 @@ export const projectCommand = {
         },
         { name: "description", shorthand: "d", type: "string" as const, usage: "project description", defaultValue: "" },
       ],
-      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
+      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+        if (changed.has("name") && args.length > 0) throw new Error("give the name once: as words after create or as --name, not both");
+        if (!changed.has("name")) minimumArgs(1)(args);
+        const name = changed.has("name") ? String(flags.name ?? "") : args.join(" ");
+        if (changed.has("name") && name.trim() === "") throw new Error("empty --name");
         apiKey(app);
-        const name = args.join(" ");
         const workspaceId = await resolveWorkspace(workspace(app));
         // A slug that was given is the caller's own spelling of the prefix every
         // task identifier will carry, so it is trimmed and sent as it was typed.

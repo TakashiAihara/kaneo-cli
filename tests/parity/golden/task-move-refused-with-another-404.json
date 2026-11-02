@@ -1,0 +1,33 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "BET",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/task/move/task-a1: 404: Workspace not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-a1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "BET"
+      }
+    }
+  ],
+  "files": {}
+}

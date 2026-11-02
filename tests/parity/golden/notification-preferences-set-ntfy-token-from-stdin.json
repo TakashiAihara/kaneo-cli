@@ -1,0 +1,36 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy",
+        "--ntfy-server",
+        "https://ntfy.example",
+        "--ntfy-topic",
+        "kaneo",
+        "--ntfy-token",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"emailAddress\": \"self@example.com\",\n  \"emailEnabled\": false,\n  \"ntfyEnabled\": true,\n  \"ntfyConfigured\": true,\n  \"ntfyServerUrl\": \"https://ntfy.example\",\n  \"ntfyTopic\": \"kaneo\",\n  \"ntfyTokenConfigured\": true,\n  \"maskedNtfyToken\": \"tk_f…n_77\",\n  \"gotifyEnabled\": false,\n  \"gotifyConfigured\": false,\n  \"gotifyServerUrl\": null,\n  \"gotifyTokenConfigured\": false,\n  \"maskedGotifyToken\": null,\n  \"webhookEnabled\": false,\n  \"webhookConfigured\": false,\n  \"webhookUrl\": null,\n  \"webhookSecretConfigured\": false,\n  \"maskedWebhookSecret\": null,\n  \"taskAssignmentEnabled\": true,\n  \"taskCommentEnabled\": true,\n  \"taskStatusChangeEnabled\": true,\n  \"dueDateReminderEnabled\": true,\n  \"dueDateReminderLeadTimeMinutes\": 1440,\n  \"workspaces\": [],\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "ntfyEnabled": true,
+        "ntfyServerUrl": "https://ntfy.example",
+        "ntfyTopic": "kaneo",
+        "ntfyToken": "tk_from_stdin_77"
+      }
+    }
+  ],
+  "files": {}
+}

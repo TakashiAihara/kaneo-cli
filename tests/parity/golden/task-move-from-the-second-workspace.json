@@ -1,0 +1,102 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "move",
+        "task-g1",
+        "--to",
+        "ALP",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/task/move/task-g1: 404: Project not found: \"ALP\" names no project in this task's workspace \"Other\", only ALP (proj-alpha) in workspace \"Main\"; the server moves a task only within its own workspace\n"
+    },
+    {
+      "args": [
+        "task",
+        "move",
+        "task-g1",
+        "--to",
+        "DEL",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1 moved to DEL\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/task-g1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-g1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "ALP"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-g1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-g1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "DEL"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-g1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "proj-delta"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-g1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

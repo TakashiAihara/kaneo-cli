@@ -1,0 +1,48 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "GAM",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/task/move/task-a1: 404: Project not found: could not tell which workspace the task is in, so the destination cannot be looked up; could not list the projects of workspace \"Main\": GET /api/project: 500: injected failure\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-a1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "GAM"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    }
+  ],
+  "files": {}
+}

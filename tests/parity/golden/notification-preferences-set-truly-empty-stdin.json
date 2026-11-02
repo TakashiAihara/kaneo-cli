@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy-token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty value for --ntfy-token from stdin; pass --ntfy-token '' to clear it\"\n}\n",
+      "stderr": "Error: empty value for --ntfy-token from stdin; pass --ntfy-token '' to clear it\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

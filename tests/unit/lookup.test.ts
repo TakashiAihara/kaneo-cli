@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { configureClient } from "../../src/api/http";
-import { allProjects } from "../../src/cli/lookup";
+import { KaneoApiError } from "../../src/api/http";
+import { allProjects, withProject } from "../../src/cli/lookup";
 
 const servers: { stop: (force?: boolean) => void }[] = [];
 afterEach(() => {
@@ -63,4 +64,30 @@ test("a workspace that cannot be listed is reported beside the projects of the o
   expect(unlisted).toHaveLength(1);
   expect(unlisted[0]!.workspaceName).toBe("name-w2");
   expect(unlisted[0]!.message).toContain("forbidden here");
+});
+
+const notFound = () => new KaneoApiError("PUT", "/api/task/move/t", 404, ["Project not found"]);
+// The cache of resolved values lives for the process, so each test uses a slug of its own.
+const byId = async (id: string) => {
+  if (id.startsWith("SAME")) throw notFound();
+  return id;
+};
+
+test("a destination resolved before is not reused for a task in another workspace", async () => {
+  let both = false;
+  serve((workspaceId) => json(workspaceId === "w3" || (workspaceId === "w2" && !both) ? [] : [{ ...project(`p-${workspaceId}`, workspaceId), slug: "SAME0" }]));
+  expect(await withProject("SAME0", byId)).toBe("p-w1");
+  both = true;
+  expect(await withProject("SAME0", byId, { sameWorkspaceAs: "p-w2" })).toBe("p-w2");
+});
+
+test("a destination resolved for one workspace is not kept for later lookups", async () => {
+  serve((workspaceId) => json(workspaceId === "w3" ? [] : [{ ...project(`p-${workspaceId}`, workspaceId), slug: "SAME1" }]));
+  expect(await withProject("SAME1", byId, { sameWorkspaceAs: "p-w1" })).toBe("p-w1");
+  await expect(withProject("SAME1", byId)).rejects.toThrow("matches several projects");
+});
+
+test("explain is added when the value names a project only in another workspace", async () => {
+  serve((workspaceId) => json(workspaceId === "w2" ? [{ ...project("p-w2", "w2"), slug: "SAME2" }] : [project("p-w1", "w1")]));
+  await expect(withProject("SAME2", byId, { sameWorkspaceAs: "p-w1", explain: async () => "; EXPLAINED" })).rejects.toThrow("only within its own workspace; EXPLAINED");
 });

@@ -1,0 +1,61 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "BET",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#2 moved to BET\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-a1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "BET"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-a1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "proj-beta"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

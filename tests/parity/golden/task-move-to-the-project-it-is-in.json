@@ -1,0 +1,82 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "ALP",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/task/move/task-a1: 400: Task is already in that project\n"
+    },
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "proj-alpha",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/task/move/task-a1: 400: Task is already in that project\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-a1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "ALP"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-a1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "proj-alpha"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task-a1",
+      "query": "",
+      "body": {
+        "destinationProjectId": "proj-alpha"
+      }
+    }
+  ],
+  "files": {}
+}

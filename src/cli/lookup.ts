@@ -64,7 +64,16 @@ const resolved = new Map<string, string>();
 // its first request must be the one that carries the project.
 // explain adds to the error when the value names no project; a caller that
 // knows more about what the value was meant to be says it there.
-export const withProject = async <T>(value: string, op: (id: string) => Promise<T>, explain?: () => Promise<string>): Promise<T> => {
+// sameWorkspaceAs is the id of a project whose workspace is the only one the
+// value may name a project in, for an op the server refuses across workspaces
+// (`task move`): the lookup then ignores the other workspaces' projects and says
+// so when the value names one of them.
+export const withProject = async <T>(
+  value: string,
+  op: (id: string) => Promise<T>,
+  explain?: () => Promise<string>,
+  sameWorkspaceAs?: string,
+): Promise<T> => {
   if (value === "") return op(value);
   const known = resolved.get(value);
   if (known !== undefined) return op(known);
@@ -75,7 +84,18 @@ export const withProject = async <T>(value: string, op: (id: string) => Promise<
   } catch (e) {
     if (!unknownProject(e)) throw e;
     const everywhere = await lookingUp(e, () => allProjects(true));
-    const found = projectsNamed(everywhere.found, value);
+    const home = sameWorkspaceAs === undefined ? undefined : everywhere.found.find((f) => f.project.id === sameWorkspaceAs)?.project.workspaceId;
+    const inHome = home === undefined ? everywhere.found : everywhere.found.filter((f) => f.project.workspaceId === home);
+    const found = projectsNamed(inHome, value);
+    // Checked before the unlisted-workspace hedge: a project that is there and
+    // cannot be used is a fact, where a miss is only what could be listed.
+    if (home !== undefined && found.length === 0) {
+      const elsewhere = projectsNamed(
+        everywhere.found.filter((f) => f.project.workspaceId !== home),
+        value,
+      );
+      if (elsewhere.length > 0) throw new Error(`${e.message}: ${onlyElsewhere(value, elsewhere)}`);
+    }
     // A miss proves nothing while a workspace could not be listed: the project
     // may be in it. Saying it does not exist would send the reader to look for
     // a typo that is not there.
@@ -196,6 +216,11 @@ export const workspaceInReference = async (value: string, number: number): Promi
     return "";
   }
 };
+
+const onlyElsewhere = (value: string, found: ProjectIn[]): string =>
+  `${JSON.stringify(value)} names no project in this task's workspace, only ${found
+    .map((p) => `${slugOr(p.project.slug, p.project.id)} (${p.project.id}) in workspace ${JSON.stringify(p.workspaceName)}`)
+    .join(", ")}; the server moves a task only within its own workspace`;
 
 const noProject = (value: string): string =>
   `no project has the id, slug or name ${JSON.stringify(value)} (kaneo project find <text> searches names and slugs)`;

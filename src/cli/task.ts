@@ -766,10 +766,15 @@ export const taskCommand = {
         const task = await resolveTask(app, args[0]!);
         // The destination is resolved before the task is read back, so the two are
         // compared as what the server was given rather than as what was typed.
-        const projectId = await withProject(target, async (id) => {
-          await moveTask(task.id, id);
-          return id;
-        });
+        const projectId = await withProject(
+          target,
+          async (id) => {
+            await moveTask(task.id, id);
+            return id;
+          },
+          undefined,
+          task.projectId,
+        );
         const after = await taskAfterWrite(task, "project was set");
         readBack("project", after.projectId, projectId);
         // The destination as it was typed: the read-back above has already

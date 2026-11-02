@@ -1,0 +1,35 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "create",
+        "Words",
+        "--title",
+        "Flagged",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"give the title once: as words after create or as --title, not both\"\n}\n",
+      "stderr": "Error: give the title once: as words after create or as --title, not both\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1    [high       ] to-do         Write the parser\n#2    [no-priority] in-progress   Ship it\n",
+      "stderr": "(1 done / planned / archived task left out; --all to include them)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

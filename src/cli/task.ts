@@ -48,7 +48,7 @@ import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunCon
 import { readInput, sourceName } from "./input";
 import { shellWord } from "../output/output";
 import { KaneoApiError } from "../api/http";
-import { resolveWorkspace, withProject } from "./lookup";
+import { resolveWorkspace, slugOr, withProject, workspaceInReference } from "./lookup";
 import { attachTask, currentSessionId } from "../session/attach";
 import { BAD_ID, validSessionId } from "../session/store";
 import { sharedReference, similarOpenTasks } from "./similar";
@@ -65,6 +65,9 @@ const resolveAssignee = async (task: Task, given: string): Promise<string> => {
       await currentUser().catch((e: unknown) => {
         if (e instanceof KaneoApiError && e.statusCode === 404 && !e.messages.includes("User not found")) {
           throw new Error(`${e.message}; \`me\` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead`);
+        }
+        if (e instanceof KaneoApiError && e.statusCode === 404) {
+          throw new Error(`${e.message}; the server has no user for this API key; give a member's id or name instead`);
         }
         throw e;
       })
@@ -88,7 +91,9 @@ const resolveAssignee = async (task: Task, given: string): Promise<string> => {
     );
   }
   if (named.length > 1) {
-    throw new Error(`${named.length} workspace members are named ${JSON.stringify(value)} (${named.map((m) => m.id).join(", ")}); give the id`);
+    throw new Error(
+      `${named.length} members of workspace ${workspaceId} are named ${JSON.stringify(value)} (${named.map((m) => m.id).join(", ")}); give the id (\`kaneo workspace members -w ${shellWord(workspaceId)}\` lists them)`,
+    );
   }
   return named[0]!.id;
 };
@@ -199,15 +204,18 @@ export const taskCommand = {
       short: "Create a task in a project",
       long:
         "Create a task in a project.\n\n" +
+        "The title is the words after create, or --title as task update takes it;\n" +
+        "not both.\n\n" +
         "With --attach this session is attached to the new task as `session attach`\n" +
         "would do it, which is what keeps the new number from having to be carried by\n" +
         "hand to the next command. A title naming a reference an open task already\n" +
         "names refuses the create unless --force is given; a title merely worded like\n" +
         "one is created, with the tasks it resembles reported on stderr.",
       // Several words are one title: `task create fix the parser` is one task,
-      // not three.
-      args: minimumArgs(1),
+      // not three. --title is the other way to give it, as task update takes it,
+      // so the arguments are checked in run, where the flag can be seen.
       flags: [
+        { name: "title", type: "string" as const, usage: "task title, instead of the words after create", defaultValue: "" },
         {
           name: "description",
           shorthand: "d",
@@ -266,9 +274,11 @@ export const taskCommand = {
         },
       ],
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
+        if (changed.has("title") && args.length > 0) throw new Error("give the title once: as words after create or as --title, not both");
+        if (!changed.has("title")) minimumArgs(1)(args);
         apiKey(app);
         const wanted: NewTask = {
-          title: args.join(" "),
+          title: changed.has("title") ? wantedTitle(String(flags.title ?? "")) : args.join(" "),
           description: await descriptionOf(flags, changed),
           priority: String(flags.priority ?? ""),
           status: String(flags.status ?? ""),
@@ -337,7 +347,7 @@ export const taskCommand = {
       name: "update",
       aliases: ["edit"],
       use: "update <task>",
-      short: "Change a task's title, description, status, priority, start date or position; the rest is kept",
+      short: "Change a task's title, description, status, priority, assignee, start date or position; the rest is kept",
       args: exactArgs(1),
       flags: [
         { name: "title", type: "string" as const, usage: "new title", defaultValue: "" },
@@ -359,6 +369,12 @@ export const taskCommand = {
           name: "priority",
           type: "string" as const,
           usage: `one of: ${PRIORITIES.join(", ")}`,
+          defaultValue: "",
+        },
+        {
+          name: "assignee",
+          type: "string" as const,
+          usage: "member id, member name or `me`, as task assign takes them; empty clears the assignee",
           defaultValue: "",
         },
         {
@@ -384,11 +400,12 @@ export const taskCommand = {
           !wantsDescription &&
           !pass("priority") &&
           !pass("status") &&
+          !pass("assignee") &&
           !pass("start-date") &&
           !pass("position")
         ) {
           throw new Error(
-            "nothing to update: pass --title, --description, --description-file, --status, --priority, --start-date or --position",
+            "nothing to update: pass --title, --description, --description-file, --status, --priority, --assignee, --start-date or --position",
           );
         }
 
@@ -406,6 +423,10 @@ export const taskCommand = {
 
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
+        // Resolved before the first write, since a name that matches no member
+        // has to leave the task as it was.
+        const wantedAssignee = String(flags.assignee ?? "");
+        const assignee = !pass("assignee") ? undefined : wantedAssignee.trim() === "" ? "" : await resolveAssignee(task, wantedAssignee);
         // The server refuses a start after the due date on the full update, and
         // that update comes last, so its refusal would arrive after the other
         // fields of this command had landed. The start it would check is the one
@@ -450,6 +471,7 @@ export const taskCommand = {
         if (title !== undefined) await write("title", () => setTaskTitle(task.id, title));
         if (description !== undefined) await write("description", () => setTaskDescription(task.id, description));
         if (priority !== undefined) await write("priority", () => setTaskPriority(task.id, priority));
+        if (assignee !== undefined) await write("assignee", () => setTaskAssignee(task.id, assignee));
         // Last, so the full update it goes through reads the task with the writes
         // above already in it and sends them back rather than undoing them.
         if (startDate !== undefined || position !== undefined) {
@@ -495,6 +517,9 @@ export const taskCommand = {
                 : `${field} reads back as ${JSON.stringify(after[field])}, not ${JSON.stringify(sent)}`
             }`,
           );
+        }
+        if (assignee !== undefined && (after.assigneeId ?? "") !== assignee) {
+          throw new Error(`${landed()}, but task #${after.number} assignee reads back as ${JSON.stringify(after.assigneeId)}, not ${JSON.stringify(assignee)}`);
         }
         // The labels come from the task resolved above, since only the board
         // listing carries them and this report is shaped as `task get` shapes it.
@@ -627,7 +652,7 @@ export const taskCommand = {
         // A number is only unique on its board, so tasks from several projects
         // are named with the project in front, by slug where a board was read.
         const several = new Set(named.map((t) => t.projectId)).size > 1;
-        const projectName = (id: string) => slugs.get(id) ?? id;
+        const projectName = (id: string) => slugOr(slugs.get(id) ?? "", id);
         const numbers = named.map((t) => `${several ? projectName(t.projectId) : ""}#${t.number}`).join(" ");
         if (operation === "delete" && flags.yes !== true) {
           throw new Error(
@@ -663,7 +688,7 @@ export const taskCommand = {
         if (app.out.mode.json || app.out.filter !== undefined) app.out.data(exported as Json);
         else if (app.out.terminal) app.out.human(JSON.stringify(exported, null, 2));
         else writeSync(1, `${JSON.stringify(exported, null, 2)}\n`);
-        app.out.status(`exported ${exported.tasks.length} task(s) from ${exported.project.slug}`);
+        app.out.status(`exported ${exported.tasks.length} task(s) from ${slugOr(exported.project.slug, exported.project.name)}`);
       },
     },
     {
@@ -675,7 +700,8 @@ export const taskCommand = {
         "The file is what task export writes, or {\"tasks\": [...]}, or a bare array\n" +
         "of tasks. Each task needs a title and a status; description, priority,\n" +
         "startDate, dueDate and userId are optional. Labels are not imported: an\n" +
-        "export names them without the ids the server would need.\n\n" +
+        "export names them without the ids the server would need, and once the\n" +
+        "import has run, how many tasks had them is said on stderr.\n\n" +
         "A status the project has no column for, or a priority outside the fixed\n" +
         "list, is refused before anything is sent: the server would replace it, and\n" +
         "a task put in planned shows on no column. A task the server cannot create\n" +
@@ -692,7 +718,11 @@ export const taskCommand = {
           checkImport(tasks, await listColumns(id), args[0]!);
           return importProjectTasks(id, tasks);
         });
-        if (labelled > 0) app.out.status(`labels on ${labelled} task(s) were not imported`);
+        // On stderr in every mode, as task ls says what it left out: a script
+        // reading the JSON report would otherwise never learn the labels were
+        // dropped, since the report is the server's and does not name them; an
+        // entry added to its warnings would read as the server's own.
+        if (labelled > 0) console.error(`labels on ${labelled} task(s) were not imported`);
         for (const t of result.tasks) {
           if (t.success) app.out.human(`created  #${t.number} ${t.title}`);
           else app.out.human(`failed   ${t.title}: ${t.error}`);
@@ -1083,12 +1113,12 @@ const numberOn = async (
   origin: string,
   slugs?: Map<string, string>,
 ): Promise<Task> => {
-  const { board, task: found } = await withProject(value, (id) => findTaskByNumber(id, number));
+  const { board, task: found } = await withProject(value, (id) => findTaskByNumber(id, number), () => workspaceInReference(value, number));
   slugs?.set(board.projectId, board.projectSlug);
   if (found === undefined) {
     // --project only steers a bare number; a reference names its board itself.
     const hint = origin === "the reference" ? "check the number" : "pass --project to look elsewhere";
-    throw new Error(`no task #${number} in project ${board.projectSlug} (${board.projectId}, from ${origin}); ${hint}`);
+    throw new Error(`no task #${number} in project ${board.projectSlug === "" ? "" : `${board.projectSlug} `}(${board.projectId}, from ${origin}); ${hint}`);
   }
   // The board listing does not always carry projectId on each task, but a task
   // found here is on this project by definition.

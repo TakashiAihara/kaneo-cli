@@ -76,6 +76,8 @@ export type Scenario = {
   legacy?: boolean;
   // The fake leaves these fields out of a project read.
   readWithout?: string[];
+  // Sends these project fields with these values in a read (see the fake).
+  readAs?: Record<string, unknown>;
   // The fake holds every response back this long.
   delayMs?: number;
   // The fake answers matching "METHOD path" requests with whitespace only.
@@ -84,6 +86,7 @@ export type Scenario = {
   // changed nothing.
   failOn?: string;
   failStatus?: number;
+  failMessage?: string;
   plainMember?: boolean;
   noCurrentUser?: boolean;
   blankCurrentUserId?: boolean;
@@ -173,6 +176,28 @@ export const SCENARIOS: Scenario[] = [
 
   { name: "project create with an underivable slug", steps: [["project", "create", "!!!", "--json"]] },
   { name: "project update", steps: [["project", "update", P1, "--name", "Alpha 2", "--slug", "AL2", "--json"], ["project", "get", P1, "--human"]] },
+  // Kaneo 2.32.0 refuses a key another project in the workspace uses, ignoring
+  // case and counting archived projects, with a 409 the CLI passes on.
+  {
+    name: "a project key another project uses is refused",
+    seed: { projects: [...SEED.projects, { id: "proj-old2", workspaceId: WS, name: "Old again", slug: "old" }] },
+    steps: [
+      ["project", "create", "Alpha two", "--slug", "alp", "--human"],
+      // A key the archived project holds (it is the one the reply names), and
+      // one in a compatibility form.
+      ["project", "create", "Older", "--slug", "OLD", "--human"],
+      ["project", "create", "Wide", "--slug", "ＡＬＰ", "--human"],
+      // Another workspace's projects do not count.
+      ["project", "create", "Elsewhere", "--slug", "ALP", "-w", "ws-other", "--human"],
+      ["project", "update", P1, "--slug", "bet", "--human"],
+      ["project", "update", P1, "--slug", "alp", "--json"],
+      ["project", "unarchive", "proj-old", "--human"],
+      // Its own key in another case is not checked, even with another project
+      // already holding the same key.
+      ["project", "update", "proj-old2", "--slug", "OLD", "--human"],
+      ["project", "ls", "--archived", "--human"],
+    ],
+  },
   { name: "project update clears description", steps: [["project", "update", P1, "-d", "", "--json"]] },
   {
     // The server takes an empty slug, and refusing to write such a project left
@@ -192,6 +217,35 @@ export const SCENARIOS: Scenario[] = [
     name: "project update of a project whose read lacks the description",
     readWithout: ["description"],
     steps: [["project", "update", P1, "-d", "", "--human"]],
+  },
+  {
+    name: "project update json of a project whose read lacks the slug",
+    readWithout: ["slug"],
+    steps: [["project", "update", P1, "--slug", "AL2", "--json"]],
+  },
+  {
+    name: "project update json of a project whose read lacks the description",
+    readWithout: ["description"],
+    steps: [["project", "update", P1, "-d", "", "--json"]],
+  },
+  {
+    name: "project update json of a project whose read lacks the icon",
+    readWithout: ["icon"],
+    steps: [["project", "update", P1, "--icon", "Star", "--json"]],
+  },
+  {
+    // A field left out, one sent as null and one sent as another type are each
+    // named for what the server did.
+    name: "project update refuses a read that lacks, nulls and mistypes fields",
+    readWithout: ["description"],
+    readAs: { icon: null, slug: 5, isPublic: "true" },
+    steps: [["project", "update", P1, "--name", "Alpha 2", "--human"]],
+  },
+  {
+    // The order of unread is the order slug, description, icon.
+    name: "project update json of a project whose read lacks every optional field",
+    readWithout: ["slug", "description", "icon"],
+    steps: [["project", "update", P1, "--slug", "AL2", "-d", "", "--icon", "Star", "--json"]],
   },
   // A project whose id the shell would split or expand: the hints quote it.
   {
@@ -278,6 +332,8 @@ export const SCENARIOS: Scenario[] = [
   { name: "column names refused", steps: [["column", "create", "Planned", "--json"], ["column", "create", "!!!", "--json"], ["column", "create", "To Do", "--json"], ["column", "create", " ", "--json"], ["column", "rename", "to-do", " ", "--json"], ["column", "rename", "in-progress", "To Do", "--json"], ["column", "rename", "To Do", "x", "--json"]] },
 
   ...both("search", ["search", "first"]),
+  // A task other than #1, so a number that only happened to be 1 is caught.
+  { name: "search gives a task match its number", steps: [["search", "Ship", "--type", "tasks", "--json"]] },
   { name: "search narrowed", steps: [["search", "first", "--in-project", "--json"], ["search", "first", "-p", "BET", "--human"], ["search", "first", "--in-project", "-p", "nope", "--human"], ["search", "a", "--in-project", "--type", "projects", "--human"], ["search", "e", "--type", "tasks", "--limit", "1", "--json"], ["search", "e", "--limit", "50", "--human"], ["search", "beta", "--type", "projects", "--human"], ["search", "e", "--limit", "2", "--human"], ["search", "x", "--type", "bogus", "--json"], ["search", " ", "--json"]] },
   { name: "search at the server's limit", seed: { tasks: Array.from({ length: 50 }, (_, i) => ({ id: `task-m${i}`, projectId: P1, title: `match ${i}` })) }, steps: [["search", "match", "--type", "tasks", "--limit", "50", "--human"], ["search", "match", "-A", "--type", "tasks", "--human"], ["search", "match", "-A", "--type", "tasks", "--limit", "50", "--human"]] },
   { name: "search and members need a workspace", env: { KANEO_WORKSPACE: "" }, steps: [["search", "first", "--json"], ["workspace", "members", "--json"]] },
@@ -356,10 +412,15 @@ export const SCENARIOS: Scenario[] = [
       ["task", "ls", "--json"],
       ["task", "ls", "--jq", ".[].number"],
       ["task", "ls", "--status", "planned", "--json"],
+      // A filter that fails at run time: the notice comes before jq's error.
+      ["task", "ls", "--jq", "error(\"boom\")"],
     ],
   },
-  // The count follows --priority: the seed's done task has no priority and
-  // is not counted, so high reads 2 and low reads 1.
+  // The count under --priority: the seed's done task has no priority and is
+  // not counted, so high reads 2 and low reads 1. The fake filters by priority
+  // before the CLI counts, so this does not show the CLI applying the filter
+  // itself; "counts under a priority the server did not apply" below is what
+  // shows that.
   {
     name: "task list says how many it left out under a priority",
     extraTasks: [
@@ -411,6 +472,14 @@ export const SCENARIOS: Scenario[] = [
   { name: "task create", steps: [["task", "create", "New one", "-d", "body", "--priority", "low", "--json"], ["task", "ls", "--human"]] },
   { name: "task create assigned", steps: [["task", "create", "Mine", "--assignee", "user-1", "--status", "in-progress", "--human"], ["task", "get", "4", "--json"]] },
   { name: "task create bad priority", steps: [["task", "create", "x", "--priority", "huge", "--json"]] },
+  // --title gives the title as task update takes it; given with words too, or
+  // with neither, the create is refused before anything is asked.
+  { name: "task create with --title", steps: [["task", "create", "--title", "Flagged one", "--json"], ["task", "ls", "--human"]] },
+  { name: "task create with --title and words", steps: [["task", "create", "Words", "--title", "Flagged", "--json"], ["task", "ls", "--human"]] },
+  { name: "task create with no title", steps: [["task", "create", "--json"]] },
+  // An empty --title is refused as task update refuses it, and an empty one
+  // beside words still counts as giving the title twice.
+  { name: "task create with an empty --title", steps: [["task", "create", "--title", " ", "--json"], ["task", "create", "--title", "", "--json"], ["task", "create", "Words", "--title", "", "--json"], ["task", "ls", "--human"]] },
   // Taken as task update takes it, and refused before the create when it is not
   // a date or comes after the due date.
   {
@@ -429,6 +498,20 @@ export const SCENARIOS: Scenario[] = [
   { name: "task update status and priority", steps: [["task", "edit", "2", "--status", "done", "--priority", "low", "--human"], ["task", "ls", "--all", "--json"]] },
   { name: "task update clears the description", steps: [["task", "update", "1", "-d", "", "--json"]] },
   { name: "task update with nothing to change", steps: [["task", "update", "1", "--json"]] },
+  // --assignee takes what task assign takes, an empty one clears it, and a name
+  // that matches no member is refused before any field is written.
+  {
+    name: "task update assignee",
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "update", "1", "--assignee", "ada", "--title", "Renamed", "--json"],
+      ["task", "update", "2", "--assignee", "", "--json"],
+      ["task", "update", "1", "--assignee", "  ", "--json"],
+      ["task", "update", "1", "--assignee", "Nobody", "--title", "Other", "--json"],
+      ["task", "get", "1", "--json"],
+      ["task", "get", "2", "--json"],
+    ],
+  },
   { name: "task update start date and position keep the rest", steps: [["task", "due", "2", "2026-11-01", "--json"], ["task", "update", "2", "--start-date", "2026-10-20", "--position", "5", "--json"], ["task", "get", "2", "--json"], ["task", "get", "2", "--human"], ["task", "update", "2", "--position", "6", "--human"], ["task", "update", "2", "--start-date", "", "--human"], ["task", "get", "2", "--json"]] },
   { name: "task update start after the due date changes nothing", steps: [["task", "due", "1", "2026-11-01", "--json"], ["task", "update", "1", "--title", "Renamed", "--start-date", "2026-11-02", "--json"], ["task", "get", "1", "--json"]] },
   // Dates on 2026-01-01, which the recorder leaves as they are, so the instant
@@ -551,7 +634,24 @@ export const SCENARIOS: Scenario[] = [
   { name: "task assign by id needs no configured workspace", env: { KANEO_WORKSPACE: "" }, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "user-1", "--human"], ["task", "get", "1", "--json"]] },
   { name: "task assign stops when the project read has no workspace", readWithout: ["workspaceId"], seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--json"]] },
   { name: "task assign names the project read that failed", failOn: "^GET /project/proj-alpha$", failStatus: 403, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--json"]] },
+  // A 401 a command wraps in its own words still says it may be the rate limit.
+  { name: "a wrapped 401 keeps the rate limit hint", failOn: "^GET /project/proj-alpha$", failStatus: 401, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--human"]] },
   { name: "task assign me on a server without user me", noCurrentUser: true, steps: [["task", "assign", "1", "me", "--json"]] },
+  // A 404 that says the user is not found is the server answering about the
+  // key's user, not a server without the route, so it is not called an old
+  // server, and the refusal says what to give instead.
+  { name: "task assign me says what to give when the server has no user for the key", failOn: "^GET /user/me$", failStatus: 404, failMessage: "User not found", steps: [["task", "assign", "1", "me", "--json"]] },
+  // Any other failure of /user/me is the server's own answer, passed on as it is.
+  { name: "task assign me passes on another failure of the user read", failOn: "^GET /user/me$", failStatus: 500, steps: [["task", "assign", "1", "me", "--json"]] },
+  // The server's answer for a project it cannot place, beside the 403 above.
+  {
+    name: "task assign names the project read the server could not place",
+    failOn: "^GET /project/proj-alpha$",
+    failStatus: 400,
+    failMessage: "Workspace ID could not be determined",
+    seed: { members: MEMBERS },
+    steps: [["task", "assign", "1", "ada", "--json"]],
+  },
   // The members are those of the workspace the task is in, not the configured one.
   {
     name: "task assign uses the workspace of the task",
@@ -1122,7 +1222,7 @@ export const SCENARIOS: Scenario[] = [
   { name: "no project", env: { KANEO_PROJECT: "" }, steps: [["task", "ls", "--json"]] },
   { name: "unknown command", steps: [["frobnicate"]] },
   { name: "unknown subcommand", steps: [["task", "frob"], ["comment", "nope", "--json"], ["session", "x"], ["task"]] },
-  ...[["--help"], ["help"], ["help", "project"], ["task", "--help"], ["task", "create", "--help"], ["project", "get", "--help"], ["session"], ["session", "next", "--help"]].map(
+  ...[["--help"], ["help"], ["help", "project"], ["task", "--help"], ["task", "create", "--help"], ["project", "get", "--help"], ["session"], ["session", "next", "--help"], ["project", "update", "--help"]].map(
     (args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] }),
   ),
   { name: "unknown flag", steps: [["task", "ls", "--bogus"], ["task", "ls", "-x"], ["--bogus"]] },
@@ -1289,8 +1389,17 @@ export const SCENARIOS: Scenario[] = [
       ["context", "--repo", "", "--json"],
       ["context", "--repo", "../x", "--json"],
       ["context", "--repo", "a@b/c", "--json"],
-      ["context", "--repo", "github.com:acme/thing", "--json"],
+      ["context", "--repo", "host:../x", "--json"],
+      ["context", "--repo", "host:acme/..", "--json"],
     ],
+  },
+  {
+    // The maps are keyed by owner/repo, so the host a user-less scp remote
+    // names is dropped as it is for the other forms.
+    name: "context --repo takes a user-less scp remote",
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
+    config: { owners: { acme: "ws-acme" }, repos: { "acme/thing": ["proj-x"] } },
+    steps: [["context", "--repo", "github.com:acme/thing", "--json"]],
   },
   {
     name: "--api-url and --api-key beat the environment",
@@ -1348,6 +1457,22 @@ export const SCENARIOS: Scenario[] = [
   },
   { name: "workspace not found", steps: [["project", "ls", "-w", "nope", "--json"]] },
   { name: "task lookup error names the project", steps: [["task", "get", "99", "--json"], ["task", "get", "#99", "--human"], ["task", "get", "BET#99", "--human"]] },
+  // A workspace's name where a project's belongs, for a task number (in a
+  // reference or by -p): the error says numbers are per project and names the
+  // projects that can hold the number. Elsewhere a value that names no project
+  // gets the plain message.
+  {
+    name: "task reference with a workspace name",
+    steps: [
+      ["task", "get", "Main#3", "--human"],
+      ["task", "get", "main#9", "--human"],
+      ["task", "get", "other#1", "--human"],
+      ["task", "get", "nowhere#1", "--human"],
+      ["task", "get", "3", "-p", "Main", "--human"],
+      ["project", "get", "Main", "--human"],
+    ],
+  },
+  { name: "task reference with a workspace name to an older server", legacy: true, steps: [["task", "get", "Main#2", "--human"]] },
   {
     // Slugs are not unique on the server, so one that two projects carry names
     // both rather than picking one; an exact-case match still wins over a folded one.
@@ -1385,7 +1510,39 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "project list with an empty slug",
     seed: { projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }] },
-    steps: [["project", "ls", "--human"]],
+    steps: [["project", "ls", "--human"], ["project", "ls", "-A", "--human"], ["project", "ls", "-A", "--json"]],
+  },
+  {
+    // A project with no slug is named without an empty [] or a leading blank,
+    // both in the refusal and among the projects a name matches.
+    name: "project rm and a name match with an empty slug",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-noslug", workspaceId: WS, name: "Twin", slug: "" },
+        { id: "proj-twin", workspaceId: WS, name: "Twin", slug: "TWN" },
+      ],
+    },
+    steps: [["project", "rm", "proj-noslug", "--human"], ["project", "rm", "Twin", "--human"]],
+  },
+  {
+    // The other messages that name a project or a workspace by its slug fall
+    // back to the id (or, in an export, the name) when the slug is empty.
+    name: "messages naming a project or workspace with an empty slug",
+    seed: {
+      workspaces: [...SEED.workspaces, { id: "ws-twin", name: "Twin", slug: "" }, { id: "ws-twin2", name: "Twin", slug: "tw2" }],
+      projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }],
+      tasks: [...SEED.tasks, { id: "task-n1", projectId: "proj-noslug", title: "Slugless" }],
+    },
+    steps: [
+      ["task", "bulk", "1", "proj-noslug#1", "--delete", "--human"],
+      ["column", "create", "Waiting", "--json"],
+      ["task", "bulk", "1", "proj-noslug#1", "--status", "waiting", "--human"],
+      ["task", "export", "-p", "proj-noslug", "--human"],
+      ["project", "reorder", "Alpha", "Beta", "--human"],
+      ["project", "ls", "-w", "Twin", "--human"],
+      ["task", "get", "proj-noslug#9", "--human"],
+    ],
   },
   {
     name: "project list across workspaces refuses a workspace",

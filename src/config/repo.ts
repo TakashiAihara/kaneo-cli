@@ -5,37 +5,47 @@ const SCP_LIKE = /^[^/@]+@[^/:]+:\/?([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 // No user, so `host:owner/name` as git prints it for a remote written that way.
 // For a value without `://`, git treats it as scp-style ssh whenever no `/`
 // comes before the first `:`, so a slash after the colon does not make it a
-// path (a value with a scheme is taken by URL_LIKE first). A single-letter host is still
-// refused: only Git for Windows reads `C:x/y` as a drive, but a checkout made on
-// Windows should not have its drive path read as a repository.
+// path. An ssh, git or http(s) URL is taken by URL_LIKE first; another scheme
+// (ftp://, file://) leaves a second `/` this form does not take, so it is
+// refused. A single-letter host is still refused: only Git for Windows reads
+// `C:x/y` as a drive, but a checkout made on Windows should not have its drive
+// path read as a repository.
 const SCP_NO_USER = /^[^/:]{2,}:\/?([^/:]+)\/([^/]+?)(?:\.git)?\/?$/;
 const URL_LIKE = /^(?:ssh|git|https?):\/\/(?:[^/@]+@)?[^/]+\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
+
+// Close to GitHub's charset, so a value that names no repository (`../x`,
+// `x/..`, `a@b/c`) is refused rather than looked up and reported as not
+// registered, which reads as an answer. An owner may start with `~`: git
+// documents `host:~user/path`, and sourcehut names every repository that way.
+// A `~` alone, a home directory, is still refused; `~acme` cannot be mistaken
+// for another host's owner, since no GitHub owner starts with `~`.
+const OWNER = /^~?[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
+const REPO = /^(?!\.{1,2}$)[A-Za-z0-9._-]+$/;
+const OWNER_REPO = /^([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
+
+// owner/repo when both parts are in the charset above, or "".
+const named = (owner: string, repo: string): string => (OWNER.test(owner) && REPO.test(repo) ? `${owner}/${repo}` : "");
 
 // Only hosted forms are accepted: scp-style SSH, and ssh/git/http/https URLs.
 // A local path is rejected even though git accepts it as a remote, because its
 // trailing components look exactly like owner/repo — /home/me/acme/thing would
 // otherwise resolve to the acme workspace and send writes to a board that has
-// nothing to do with it.
+// nothing to do with it. What a form leaves as owner/repo is held to the same
+// charset as a typed one, so `host:../x` is not looked up as a repository.
 //
-// The user-less scp form is accepted only for the cwd's origin remote.
-// parseRepo keeps refusing it (#64); whether to accept it is tracked in #336.
-const parseRemote = (remote: string, userless = false): string => {
+// The host is dropped: the repo and owner maps are keyed by owner/repo alone,
+// so the user-less scp form is no harder to read than the others.
+const parseRemote = (remote: string): string => {
   const url = remote.trim();
   if (url === "") return "";
-  for (const pattern of userless ? [URL_LIKE, SCP_LIKE, SCP_NO_USER] : [URL_LIKE, SCP_LIKE]) {
+  for (const pattern of [URL_LIKE, SCP_LIKE, SCP_NO_USER]) {
     const match = pattern.exec(url);
-    const owner = match?.[1];
-    const repo = match?.[2];
-    if (owner !== undefined && repo !== undefined && owner !== "" && repo !== "") return `${owner}/${repo}`;
+    // Where two forms match the same value they leave the same owner/repo, so
+    // the first one that matches decides.
+    if (match !== null) return named(match[1]!, match[2]!);
   }
   return "";
 };
-
-// Close to GitHub's charset, so a value that names no repository (`../x`,
-// `a@b/c`) is refused rather than looked up and reported as not registered,
-// which reads as an answer. A scp-style remote without a user (`host:owner/name`)
-// is refused here as #64 decided; whether to accept it is tracked in #336.
-const OWNER_REPO = /^([A-Za-z0-9_-][A-Za-z0-9._-]*)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/;
 
 // The owner/repo a caller named, or "" when the value names no repository.
 //
@@ -46,7 +56,7 @@ export const parseRepo = (value: string): string => {
   const remote = parseRemote(value);
   if (remote !== "") return remote;
   const match = OWNER_REPO.exec(value.trim());
-  return match === null ? "" : `${match[1]}/${match[2]}`;
+  return match === null ? "" : named(match[1]!, match[2]!);
 };
 
 // Knowing the remote is a convenience for resolving a project, never worth
@@ -61,8 +71,8 @@ const REMOTE_TIMEOUT_MS = 2000;
 // not a repository is an ordinary answer here, not a failure, and a machine
 // with no git at all is the same answer.
 //
-// env is what git runs with; a caller that changes the environment git should
-// see passes it, because Bun.spawnSync does not pick up later process.env edits.
+// env is what git runs with, the current process.env unless a caller passes
+// another (Bun.spawnSync's own default is the environment at startup).
 export const currentRepo = (dir: string, env: Record<string, string | undefined> = process.env): string => {
   let remote: string;
   try {
@@ -81,5 +91,5 @@ export const currentRepo = (dir: string, env: Record<string, string | undefined>
     // it are still an answer and the command is still worth running.
     return "";
   }
-  return parseRemote(remote, true);
+  return parseRemote(remote);
 };

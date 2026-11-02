@@ -74,6 +74,9 @@ export type FakeOptions = {
   // Leaves these fields out of a project read, as a server older than the
   // document does; the reply to a write is whole.
   readWithout?: string[];
+  // Sends these fields with these values in a project read (null, or a value
+  // of another type): a fault to inject, not a reply Kaneo is known to send.
+  readAs?: Record<string, unknown>;
   // Holds every response back this long, for timeouts.
   delayMs?: number;
   // Answers a request whose "METHOD path" matches with a 200 holding only
@@ -95,6 +98,9 @@ export type FakeOptions = {
   failOn?: string;
   // The status failOn answers with, 500 unless a scenario wants another.
   failStatus?: number;
+  // The error failOn answers with, for a branch that reads the server's words,
+  // sent as text/plain as the server sends an HTTPException.
+  failMessage?: string;
   // The key's user lacks the project update and delete permissions, so those
   // routes answer as Kaneo 2.32.0's requireWorkspacePermission does.
   plainMember?: boolean;
@@ -416,6 +422,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         }
       : null;
 
+  // Kaneo 2.32.0 refuses a project key another project in the workspace uses,
+  // archived ones included, comparing NFKC case-folded
+  // (apps/api/src/project/project-key.ts).
+  const sameKey = (a: string, b: string) => a.normalize("NFKC").toLowerCase() === b.normalize("NFKC").toLowerCase();
+  const keyTaken = (workspaceId: string, key: string, except?: string) =>
+    projects.find((x) => x.workspaceId === workspaceId && x.id !== except && sameKey(x.slug, key));
+  const keyTakenMessage = (key: string, name: string) =>
+    `This workspace already has a project using the key "${key}" (${name}). Choose a different key.`;
+
   const failing = opts.failOn ? new RegExp(opts.failOn) : undefined;
   let skipped = 0;
   let limited = 0;
@@ -429,7 +444,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (!url.pathname.startsWith("/api/")) return new Response("<html>app</html>", { headers: { "content-type": "text/html" } });
     if (req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
-    if (failing?.test(`${req.method} ${path}`) && skipped++ >= (opts.failOnSkip ?? 0)) return fail(opts.failStatus ?? 500, "injected failure");
+    if (failing?.test(`${req.method} ${path}`) && skipped++ >= (opts.failOnSkip ?? 0)) return opts.failMessage === undefined ? fail(opts.failStatus ?? 500, "injected failure") : failText(opts.failStatus ?? 500, opts.failMessage);
 
     // The server validates request bodies against the same schemas the
     // document declares, and answers 400 with the first issue.
@@ -621,6 +636,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "POST" && path === "/project") {
       const b = body as any;
+      const taken = keyTaken(b.workspaceId, b.slug);
+      if (taken) return failText(409, keyTakenMessage(b.slug, taken.name));
       const proj = { id: id("proj"), workspaceId: b.workspaceId, backgroundVersion: null, slug: b.slug, icon: b.icon, name: b.name, description: null, createdAt: now(), isPublic: false, archivedAt: null, position: projects.length, lastTaskNumber: 0 };
       projects.push(proj);
       return ok(M.Project, proj);
@@ -649,18 +666,28 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // the task routes below.
       if (!proj) return failText(400, "Workspace ID could not be determined");
       if (req.method === "GET" && !p[2]) {
-        if (opts.readWithout === undefined) return ok(M.Project, proj);
-        const reply: Record<string, unknown> = { ...M.Project.parse(proj) };
-        for (const field of opts.readWithout) delete reply[field];
+        if (opts.readWithout === undefined && opts.readAs === undefined) return ok(M.Project, proj);
+        const reply: Record<string, unknown> = { ...M.Project.parse(proj), ...opts.readAs };
+        for (const field of opts.readWithout ?? []) delete reply[field];
         return Response.json(reply);
       }
       if (opts.plainMember) return failText(403, "Insufficient permissions");
       if (req.method === "PUT" && !p[2]) {
+        // Upstream's update body requires the slug; the CLI always sends it.
+        const slug = (body as any).slug;
+        const taken = typeof slug === "string" && !sameKey(slug, proj.slug) ? keyTaken(proj.workspaceId, slug, proj.id) : undefined;
+        if (taken) return failText(409, keyTakenMessage(slug, taken.name));
         Object.assign(proj, body);
         return ok(M.Project, proj);
       }
       if (req.method === "PUT" && p[3] === "archive") return ok(M.Project, Object.assign(proj, { archivedAt: now() }));
-      if (req.method === "PUT" && p[3] === "unarchive") return ok(M.Project, Object.assign(proj, { archivedAt: null }));
+      if (req.method === "PUT" && p[3] === "unarchive") {
+        const taken = keyTaken(proj.workspaceId, proj.slug, proj.id);
+        if (taken) {
+          return failText(409, `This workspace already has a project using the key "${proj.slug}" (${taken.name}). Change one of the keys before unarchiving this project.`);
+        }
+        return ok(M.Project, Object.assign(proj, { archivedAt: null }));
+      }
       // Everything in the project goes with it, as the database's cascades do.
       if (req.method === "DELETE" && !p[2]) {
         const reply = ok(M.Project, proj);

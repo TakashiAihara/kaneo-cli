@@ -1,0 +1,240 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "Main#3",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/task/tasks/Main: 400: Workspace ID could not be determined: no project has the id, slug or name \"Main\" (kaneo project find <text> searches names and slugs); \"Main\" is a workspace, and task numbers are per project: active projects in it that can hold #3: ALP (Alpha)\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "main#9",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/task/tasks/main: 400: Workspace ID could not be determined: no project has the id, slug or name \"main\" (kaneo project find <text> searches names and slugs); \"main\" is a workspace, and task numbers are per project: no active project in it has reached #9\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "other#1",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/task/tasks/other: 400: Workspace ID could not be determined: no project has the id, slug or name \"other\" (kaneo project find <text> searches names and slugs); \"other\" is a workspace, and task numbers are per project: no active project in it has reached #1\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "nowhere#1",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/task/tasks/nowhere: 400: Workspace ID could not be determined: no project has the id, slug or name \"nowhere\" (kaneo project find <text> searches names and slugs)\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "3",
+        "-p",
+        "Main",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/task/tasks/Main: 400: Workspace ID could not be determined: no project has the id, slug or name \"Main\" (kaneo project find <text> searches names and slugs); \"Main\" is a workspace, and task numbers are per project: active projects in it that can hold #3: ALP (Alpha)\n"
+    },
+    {
+      "args": [
+        "project",
+        "get",
+        "Main",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/project/Main: 400: Workspace ID could not be determined: no project has the id, slug or name \"Main\" (kaneo project find <text> searches names and slugs)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/Main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/other",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/nowhere",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/Main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project/Main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    }
+  ],
+  "files": {}
+}

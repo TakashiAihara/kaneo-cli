@@ -43,19 +43,37 @@ describe("currentRepo", () => {
     ["github.com:acme/thing.git", "acme/thing"],
     ["gh:acme/thing.git", "acme/thing"],
     ["host:/acme/thing", "acme/thing"],
+    ["host:~acme/thing", "~acme/thing"],
+    ["https://git.sr.ht/~acme/thing", "~acme/thing"],
+    ["host:acme/thing.git.git", "acme/thing.git"],
+    ["host:acme/.github", "acme/.github"],
     ["https://github.com/acme/thing.git", "acme/thing"],
   ])("reads %s as %s", (origin, expected) => {
     const env = isolatedEnv();
     expect(currentRepo(repoWithOrigin(origin, env), env)).toBe(expected);
   });
 
-  test.each(["C:x/y", "C:/x/y", "/home/me/acme/thing", "./acme/thing", "./foo:acme/thing", "/srv/x:acme/thing", "host:thing"])(
+  test.each(["C:x/y", "C:/x/y", "/home/me/acme/thing", "./acme/thing", "./foo:acme/thing", "/srv/x:acme/thing", "host:thing", "host:../x", "host:acme/..", "git@host:../x", "ssh://host/../x", "host:~/x", "host:a:b/c", "ftp://host/acme/thing", "file:///acme/thing"])(
     "does not read %s as a repository",
     (origin) => {
       const env = isolatedEnv();
       expect(currentRepo(repoWithOrigin(origin, env), env)).toBe("");
     },
   );
+
+  test("runs git with the current process.env when given none", () => {
+    const env = isolatedEnv('[url "git@example.com:other/"]\n\tinsteadOf = host:acme/\n');
+    const dir = repoWithOrigin("host:acme/thing", env);
+    const saved = { ...process.env };
+    try {
+      for (const key of Object.keys(process.env)) delete process.env[key];
+      Object.assign(process.env, env);
+      expect(currentRepo(dir)).toBe("other/thing");
+    } finally {
+      for (const key of Object.keys(process.env)) delete process.env[key];
+      Object.assign(process.env, saved);
+    }
+  });
 
   test("runs git with the env it is given", () => {
     const env = isolatedEnv('[url "git@github.com:other/"]\n\tinsteadOf = host:acme/\n');
@@ -64,11 +82,23 @@ describe("currentRepo", () => {
 });
 
 describe("parseRepo", () => {
-  test("still refuses a typed user-less scp form", () => {
-    expect(parseRepo("github.com:acme/thing")).toBe("");
+  test("takes a user-less scp form, as the origin remote is read", () => {
+    expect(parseRepo("github.com:acme/thing.git")).toBe("acme/thing");
+  });
+
+  test.each(["host:../x", "acme/..", "acme/.", "C:x/y", "~/x"])("refuses %s", (value) => {
+    expect(parseRepo(value)).toBe("");
   });
 
   test("takes owner/name", () => {
     expect(parseRepo("acme/thing")).toBe("acme/thing");
+  });
+
+  test("takes a ~user owner typed, as a remote names it", () => {
+    expect(parseRepo("~acme/thing")).toBe("~acme/thing");
+  });
+
+  test("strips one .git, as the remote forms do", () => {
+    expect(parseRepo("acme/thing.git.git")).toBe("acme/thing.git");
   });
 });

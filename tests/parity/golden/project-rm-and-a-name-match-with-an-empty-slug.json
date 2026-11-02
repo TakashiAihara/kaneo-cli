@@ -1,0 +1,54 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "rm",
+        "proj-noslug",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to delete project Twin (proj-noslug) without --yes; `kaneo project archive proj-noslug` keeps it\n"
+    },
+    {
+      "args": [
+        "project",
+        "rm",
+        "Twin",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: \"Twin\" matches several projects: proj-noslug in Main, TWN (proj-twin) in Main; pass the id\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/Twin",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    }
+  ],
+  "files": {}
+}

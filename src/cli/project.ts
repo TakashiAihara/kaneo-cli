@@ -14,7 +14,7 @@ import {
   type ProjectChanges,
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
-import { allProjects, firstMatch, resolveWorkspace, withProject, type ProjectIn } from "./lookup";
+import { allProjects, firstMatch, resolveWorkspace, slugOr, withProject, type ProjectIn } from "./lookup";
 import { shellWord } from "../output/output";
 import { KaneoApiError } from "../api/http";
 
@@ -250,6 +250,11 @@ export const projectCommand = {
       name: "update",
       use: "update <project-id>",
       short: "Change a project's name, slug, description or icon; the rest is kept",
+      long:
+        "Change a project's name, slug, description or icon; the rest is kept.\n\n" +
+        "With --json the report has from, to and unread: the fields the read before\n" +
+        "the write lacked, whose from is \"\". A description the read sent as null was\n" +
+        "read, and is not among them.",
       // The id is required rather than resolved like `project get`: resolution
       // falls back to .kaneo.json and the repos map, so an update typed inside a
       // checkout would quietly hit whichever project that repo maps to.
@@ -308,7 +313,7 @@ export const projectCommand = {
           app.out.human(`  task identifiers may now start with ${after.slug}; the slug was not read, so whether it changed is unknown`);
         } else if (before.slug !== after.slug) app.out.human(`  task identifiers now start with ${after.slug}`);
         // A map's keys come out sorted, which is the order the report has.
-        app.out.data({ from: before, to: after });
+        app.out.data({ from: before, to: after, unread });
       },
     },
     archiveCommand("archive"),
@@ -340,7 +345,7 @@ export const projectCommand = {
         // which project it resolved to rather than echoing the word typed.
         if (flags.yes !== true) {
           throw new Error(
-            `refusing to delete project ${found.name} [${found.slug}] (${found.id}) without --yes; \`kaneo project archive ${shellWord(found.id)}\` keeps it`,
+            `refusing to delete project ${found.name}${found.slug === "" ? "" : ` [${found.slug}]`} (${found.id}) without --yes; \`kaneo project archive ${shellWord(found.id)}\` keeps it`,
           );
         }
         const deleted = await deleteProject(found.id).catch(refused("deleting a project", "delete", async () => found.workspaceId));
@@ -476,7 +481,7 @@ const newProjectOrder = (projects: Project[], refs: string[]): Project[] => {
     }
   }
   // An archived project is not in the order at all, so it is not missing from it.
-  const missing = active.filter((project) => !taken.has(project.id)).map((project) => project.slug);
+  const missing = active.filter((project) => !taken.has(project.id)).map((project) => slugOr(project.slug, project.id));
   const wrong = [
     ...(unknown.length === 0 ? [] : [`unknown: ${unknown.join(", ")}`]),
     ...(kept.length === 0 ? [] : [`archived: ${kept.join(", ")} (it keeps its place)`]),

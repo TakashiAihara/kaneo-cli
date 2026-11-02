@@ -1,0 +1,253 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "create",
+        "Alpha two",
+        "--slug",
+        "alp",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/project: 409: This workspace already has a project using the key \"alp\" (Alpha). Choose a different key.\n"
+    },
+    {
+      "args": [
+        "project",
+        "create",
+        "Older",
+        "--slug",
+        "OLD",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/project: 409: This workspace already has a project using the key \"OLD\" (Old). Choose a different key.\n"
+    },
+    {
+      "args": [
+        "project",
+        "create",
+        "Wide",
+        "--slug",
+        "ＡＬＰ",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/project: 409: This workspace already has a project using the key \"ＡＬＰ\" (Alpha). Choose a different key.\n"
+    },
+    {
+      "args": [
+        "project",
+        "create",
+        "Elsewhere",
+        "--slug",
+        "ALP",
+        "-w",
+        "ws-other",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created proj0002  Elsewhere\n  task identifiers start with ALP\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "update",
+        "proj-alpha",
+        "--slug",
+        "bet",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/project/proj-alpha: 409: This workspace already has a project using the key \"bet\" (Beta). Choose a different key.\n"
+    },
+    {
+      "args": [
+        "project",
+        "update",
+        "proj-alpha",
+        "--slug",
+        "alp",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"from\": {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"ALP\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  \"to\": {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"alp\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  \"unread\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "unarchive",
+        "proj-old",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PUT /api/project/proj-old/unarchive: 409: This workspace already has a project using the key \"OLD\" (Old again). Change one of the keys before unarchiving this project.\n"
+    },
+    {
+      "args": [
+        "project",
+        "update",
+        "proj-old2",
+        "--slug",
+        "OLD",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated proj-old2\n  slug  \"old\" -> \"OLD\"\n  task identifiers now start with OLD\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "ls",
+        "--archived",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha  [alp]\nproj-beta  Beta  [BET]\nproj-old  Old  [OLD]  (archived)\nproj-old2  Old again  [OLD]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Alpha two",
+        "workspaceId": "ws-main",
+        "icon": "Layers",
+        "slug": "alp"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Older",
+        "workspaceId": "ws-main",
+        "icon": "Layers",
+        "slug": "OLD"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Wide",
+        "workspaceId": "ws-main",
+        "icon": "Layers",
+        "slug": "ＡＬＰ"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Elsewhere",
+        "workspaceId": "ws-other",
+        "icon": "Layers",
+        "slug": "ALP"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Alpha",
+        "icon": "Layout",
+        "slug": "bet",
+        "description": "",
+        "isPublic": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Alpha",
+        "icon": "Layout",
+        "slug": "alp",
+        "description": "",
+        "isPublic": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-old/unarchive",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old2",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-old2",
+      "query": "",
+      "body": {
+        "name": "Old again",
+        "icon": "Layout",
+        "slug": "OLD",
+        "description": "",
+        "isPublic": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

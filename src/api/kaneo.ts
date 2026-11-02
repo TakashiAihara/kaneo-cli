@@ -152,7 +152,9 @@ export const isoTime = (owner: object, field: string): string => {
   // Every object a mapper reads came out of a decoded reply, which the transport
   // has recorded. One that did not is a mapping fed something else, and naming
   // no request would hide that.
-  if (request === undefined) throw new Error(`${field} is not a timestamp, and no request is recorded for the object that holds it`);
+  if (request === undefined) {
+    throw new TimestampError(`${field} is not a timestamp, and no request is recorded for the object that holds it`);
+  }
   throw new TimestampError(
     `${request}: ${field} ${shown.length > VALUE_LIMIT ? `${shown.slice(0, VALUE_LIMIT).join("")}...` : shown.join("")} is not a timestamp`,
   );
@@ -161,19 +163,25 @@ export const isoTime = (owner: object, field: string): string => {
 // A reply whose time cannot be read. It is its own type because the call it
 // belongs to may be a write that already happened, and a caller that needs to say
 // so has to tell this apart from a request that never got through.
-export class TimestampError extends Error {
-  override name = "TimestampError";
-}
+export class TimestampError extends Error {}
 
 // Runs a write whose reply is mapped here, and says so when the mapping fails:
 // the server has already done what was asked, so a caller who runs it again
-// repeats the write.
-export const afterWrite = async <T>(done: string, write: Promise<T>): Promise<T> => {
+// repeats the write. `look` says where to see what was written.
+//
+// Only task create and comment add are wrapped so far. The other writes whose
+// reply is mapped (addActivity, addTimeEntry, createLabel, createProject,
+// createColumn, linkTasks, createNotification, setWorkflowRule, ...) still report
+// the bare timestamp error, which does not say the write happened.
+export const afterWrite = async <T>(done: string, look: string, write: Promise<T>): Promise<T> => {
   try {
     return await write;
   } catch (e) {
     if (e instanceof TimestampError) {
-      throw new TimestampError(`${done} on the server, but its reply could not be read (${e.message}); do not run it again, that would repeat the write`);
+      throw new TimestampError(
+        `${done} on the server, but its reply could not be read (${e.message}); do not run it again, that would repeat the write; ${look}`,
+        { cause: e },
+      );
     }
     throw e;
   }

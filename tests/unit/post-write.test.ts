@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFake } from "../parity/fake";
@@ -73,6 +73,14 @@ const kaneo = async (...args: string[]) => {
   return { exit, stdout, stderr };
 };
 
+const history = () => {
+  const dir = join(config, "kaneo", "sessions");
+  return readdirSync(dir)
+    .sort()
+    .map((f) => `${f}\n${readFileSync(join(dir, f), "utf8")}`)
+    .join("\n");
+};
+
 const attachment = () => existsSync(join(config, "kaneo", "sessions", "s1.json"));
 
 describe("a write whose reply cannot be read", () => {
@@ -82,8 +90,8 @@ describe("a write whose reply cannot be read", () => {
     expect(r.exit).toBe(1);
     expect(r.stderr).toContain("posted the marker on #2 on the server");
     expect(r.stderr).toContain("nothing is recorded here for it");
-    expect(r.stderr).toContain("do not run it again, that would post a second marker");
-    expect(r.stderr).toContain("`kaneo session status`");
+    expect(r.stderr).toContain("`kaneo session attach 2` records it here, and posts a second marker");
+    expect(r.stderr).toContain("`kaneo session status` shows what is held here");
     expect(attachment()).toBe(false);
     expect(posts).toEqual(["/api/comment/task-a2"]);
   }, 30_000);
@@ -94,17 +102,23 @@ describe("a write whose reply cannot be read", () => {
     expect(r.exit).toBe(1);
     expect(r.stderr).toContain("posted the marker on #2 on the server");
     expect(r.stderr).toContain("this command keeps no local record");
+    expect(r.stderr).toContain("do not run it again, that would only post a second marker");
+    expect(posts).toEqual(["/api/comment/task-a2"]);
   }, 30_000);
 
   test("session close says the attachment here is unchanged", async () => {
     const attach = await kaneo("session", "attach", "2");
     expect(attach.exit, attach.stderr).toBe(0);
+    const before = history();
     spoil = true;
     const r = await kaneo("session", "close");
     expect(r.exit).toBe(1);
     expect(r.stderr).toContain("posted the marker on #2 on the server");
     expect(r.stderr).toContain("the attachment and history here are unchanged");
+    expect(r.stderr).toContain("`kaneo session close` again finishes closing here, and posts a second close marker");
     expect(attachment()).toBe(true);
+    expect(history()).toBe(before);
+    expect(posts).toEqual(["/api/comment/task-a2", "/api/comment/task-a2"]);
   }, 30_000);
 
   test("comment add says the comment was written", async () => {
@@ -112,15 +126,17 @@ describe("a write whose reply cannot be read", () => {
     const r = await kaneo("comment", "add", "2", "hello");
     expect(r.exit).toBe(1);
     expect(r.stderr).toContain("commented on #2 on the server, but its reply could not be read");
-    expect(r.stderr).toContain("do not run it again, that would repeat the write");
+    expect(r.stderr).toContain("do not run it again, that would repeat the write; `kaneo comment ls 2` shows it");
+    expect(posts).toEqual(["/api/comment/task-a2"]);
   }, 30_000);
 
   test("task create says the task was written", async () => {
     spoil = true;
     const r = await kaneo("task", "create", "New one");
     expect(r.exit).toBe(1);
-    expect(r.stderr).toContain("created the task on the server, but its reply could not be read");
-    expect(r.stderr).toContain("do not run it again, that would repeat the write");
+    expect(r.stderr).toContain('created "New one" on the server, but its reply could not be read');
+    expect(r.stderr).toContain("do not run it again, that would repeat the write; `kaneo task ls` shows it");
+    expect(posts).toEqual(["/api/task/proj-alpha"]);
   }, 30_000);
 
   test("a reply that can be read is not touched", async () => {

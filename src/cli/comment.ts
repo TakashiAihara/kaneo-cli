@@ -73,7 +73,7 @@ export const commentCommand = {
         if (content.trim() === "") throw new Error("empty comment");
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
-        const comment = await afterWrite(`commented on #${task.number}`, addComment(task.id, content));
+        const comment = await afterWrite(`commented on #${task.number}`, `\`kaneo comment ls ${task.number}\` shows it`, addComment(task.id, content));
         app.out.human(`commented on #${task.number}`);
         app.out.data(comment);
       },

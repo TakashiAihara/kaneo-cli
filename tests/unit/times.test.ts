@@ -191,22 +191,22 @@ describe("a time that fails to read in the reply to a write", () => {
 
   test("is a TimestampError, which a caller can tell from a request that failed", async () => {
     answers(taskReply({ createdAt: "soon" }));
-    const e = await failure(api.getTask("t1"));
-    expect(e).toBeInstanceOf(api.TimestampError);
-    expect((e as Error).name).toBe("TimestampError");
+    expect(await failure(api.getTask("t1"))).toBeInstanceOf(api.TimestampError);
   });
 
   test("is passed on by afterWrite with the write named", async () => {
     answers(JSON.stringify({ id: "c1", content: "x", userId: "u1", createdAt: "soon" }));
-    const e = (await failure(api.afterWrite("commented", api.addComment("t1", "x")))) as Error;
+    const e = (await failure(api.afterWrite("commented", "look there", api.addComment("t1", "x")))) as Error;
+    expect(e).toBeInstanceOf(api.TimestampError);
     expect(e.message).toBe(
-      'commented on the server, but its reply could not be read (POST /api/comment/t1: createdAt "soon" is not a timestamp); do not run it again, that would repeat the write',
+      'commented on the server, but its reply could not be read (POST /api/comment/t1: createdAt "soon" is not a timestamp); do not run it again, that would repeat the write; look there',
     );
+    expect((e.cause as Error).message).toBe('POST /api/comment/t1: createdAt "soon" is not a timestamp');
   });
 
   test("is not rewritten by afterWrite when the request itself failed", async () => {
     answers("{}");
-    const e = (await failure(api.afterWrite("commented", Promise.reject(new Error("down"))))) as Error;
+    const e = (await failure(api.afterWrite("commented", "look there", Promise.reject(new Error("down"))))) as Error;
     expect(e.message).toBe("down");
   });
 
@@ -214,6 +214,16 @@ describe("a time that fails to read in the reply to a write", () => {
     expect(() => api.isoTime({ createdAt: "soon" }, "createdAt")).toThrow(
       "createdAt is not a timestamp, and no request is recorded for the object that holds it",
     );
+  });
+
+  // The write guards test for TimestampError, so a failure to name the request
+  // must still be one or a write would go unreported.
+  test("on an object no reply produced is still reported as a write by afterWrite", async () => {
+    const e = (await failure(
+      api.afterWrite("did it", "look there", (async () => api.isoTime({ createdAt: "soon" }, "createdAt"))()),
+    )) as Error;
+    expect(e).toBeInstanceOf(api.TimestampError);
+    expect(e.message).toStartWith("did it on the server, but its reply could not be read (createdAt is not a timestamp");
   });
 });
 

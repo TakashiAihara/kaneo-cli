@@ -30,14 +30,14 @@ const answers = (status: number, body: string) => {
 // What a fail-open session command does around the post.
 const underFailOpen = (strict = false) =>
   failOpen(async () => {
-    await postMarker("t1", marker, 7, "kept nothing here");
+    await postMarker("t1", marker, 7, "kept nothing here", "run it again");
   })({ flags: { strict }, args: [], changed: new Set(), calledAs: "", app: undefined });
 
 describe("posting a session marker", () => {
   test("whose reply has an unreadable time is reported even by a fail-open command", async () => {
     answers(200, JSON.stringify({ id: "c1", content: "x", userId: "u1", createdAt: "soon" }));
     await expect(underFailOpen()).rejects.toThrow(
-      'posted the marker on #7 on the server, but could not read its reply (POST /api/comment/t1: createdAt "soon" is not a timestamp); kept nothing here; do not run it again, that would post a second marker; `kaneo session status` shows what is held here',
+      'posted the marker on #7 on the server, but could not read its reply (POST /api/comment/t1: createdAt "soon" is not a timestamp); kept nothing here; run it again',
     );
   });
 
@@ -53,11 +53,11 @@ describe("posting a session marker", () => {
 
   test("that the server refused is still an error to a caller outside fail-open", async () => {
     answers(500, '{"error":"down"}');
-    await expect(postMarker("t1", marker, 7, "kept nothing here")).rejects.toThrow("POST /api/comment/t1: 500");
+    await expect(postMarker("t1", marker, 7, "kept nothing here", "run it again")).rejects.toThrow("POST /api/comment/t1: 500");
   });
 
   test("with a readable reply returns the comment", async () => {
     answers(200, JSON.stringify({ id: "c1", content: "x", userId: "u1", createdAt: "2026-09-30T00:00:00Z" }));
-    expect((await postMarker("t1", marker, 7, "kept nothing here")).createdAt).toBe("2026-09-30T00:00:00.000Z");
+    expect((await postMarker("t1", marker, 7, "kept nothing here", "run it again")).createdAt).toBe("2026-09-30T00:00:00.000Z");
   });
 });

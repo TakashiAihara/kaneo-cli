@@ -57,7 +57,13 @@ export const attachTask = async (
   // Confirmed before anything is written here, so a marker this machine has no
   // record of is one the server kept. A listing that could not be made is a hard
   // failure here, since it would leave the attachment to say what it cannot show.
-  const posted = await postMarker(task.id, marker, task.number, "nothing is recorded here for it");
+  const posted = await postMarker(
+    task.id,
+    marker,
+    task.number,
+    "nothing is recorded here for it",
+    `\`kaneo session attach ${task.number}\` records it here, and posts a second marker; \`kaneo session status\` shows what is held here`,
+  );
   await confirmMarker(task.id, task.number, posted, "hard");
   try {
     store.save(store.sessionStore(), sessionId, attachment);
@@ -93,9 +99,16 @@ export const attachTask = async (
 // this machine holding a task the server has let go of.
 //
 // `held` is what the caller's machine is left holding when the reply cannot be
-// read, which differs between the commands and is what a person needs to know
-// before deciding what to run next.
-export const postMarker = async (taskId: string, marker: Marker, number: number, held: string): Promise<Comment> => {
+// read and `wayOut` what to run next, both of which differ between the commands.
+// A second marker is harmless to the board, which reads the newest one per
+// session, so the way out may be to post it again.
+export const postMarker = async (
+  taskId: string,
+  marker: Marker,
+  number: number,
+  held: string,
+  wayOut: string,
+): Promise<Comment> => {
   try {
     return await addComment(taskId, format(marker));
   } catch (e) {
@@ -105,7 +118,7 @@ export const postMarker = async (taskId: string, marker: Marker, number: number,
     // a second one.
     if (e instanceof TimestampError) {
       throw hard(
-        `posted the marker on #${number} on the server, but could not read its reply (${e.message}); ${held}; do not run it again, that would post a second marker; \`kaneo session status\` shows what is held here`,
+        `posted the marker on #${number} on the server, but could not read its reply (${e.message}); ${held}; ${wayOut}`,
       );
     }
     throw e;

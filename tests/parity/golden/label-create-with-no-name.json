@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "args": [
+        "label",
+        "create",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"requires at least 1 arg(s), only received 0\"\n}\n",
+      "stderr": "Error: requires at least 1 arg(s), only received 0\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

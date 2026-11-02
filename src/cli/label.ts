@@ -79,10 +79,10 @@ export const labelCommand = {
     },
     {
       name: "create",
-      use: "create <name...>",
+      use: "create <name... | --name NAME>",
       short: "Create a label in the workspace",
-      args: minimumArgs(1),
       flags: [
+        { name: "name", type: "string" as const, usage: "label name, instead of the words after create", defaultValue: "" },
         {
           name: "color",
           type: "string" as const,
@@ -90,12 +90,15 @@ export const labelCommand = {
           defaultValue: "gray",
         },
       ],
-      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
+      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+        if (changed.has("name") && args.length > 0) throw new Error("give the name once: as words after create or as --name, not both");
+        if (!changed.has("name")) minimumArgs(1)(args);
+        if (changed.has("name") && String(flags.name ?? "").trim() === "") throw new Error("empty --name");
         apiKey(app);
         // The server answers a taken name with the label already there and
         // leaves it as it was, which reads as success; the listing taken
         // before the write is what tells the two apart.
-        const name = args.join(" ").trim();
+        const name = (changed.has("name") ? String(flags.name ?? "") : args.join(" ")).trim();
         const existed = (await workspaceLabels(app)).some((l) => l.name === name);
         const label = await createLabel(workspace(app), name, String(flags.color ?? "gray"));
         app.out.human(existed ? `exists ${labelLine(label)}; use \`kaneo label update\` to change it` : `created ${labelLine(label)}`);

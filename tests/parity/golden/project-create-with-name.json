@@ -1,0 +1,57 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "create",
+        "--name",
+        "Flagged",
+        "--slug",
+        "FLG",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"proj0002\",\n  \"name\": \"Flagged\",\n  \"slug\": \"FLG\",\n  \"icon\": \"Layers\",\n  \"description\": \"\",\n  \"workspaceId\": \"ws-main\",\n  \"isPublic\": false,\n  \"archivedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha  [ALP]\nproj-beta  Beta  [BET]\nproj0002  Flagged  [FLG]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/project",
+      "query": "",
+      "body": {
+        "name": "Flagged",
+        "workspaceId": "ws-main",
+        "icon": "Layers",
+        "slug": "FLG"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

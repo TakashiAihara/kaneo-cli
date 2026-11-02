@@ -1,0 +1,51 @@
+{
+  "steps": [
+    {
+      "args": [
+        "label",
+        "create",
+        "--name",
+        " flagged one ",
+        "--color",
+        "red",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"lbl0002\",\n  \"name\": \"flagged one\",\n  \"color\": \"red\",\n  \"taskId\": null,\n  \"workspaceId\": \"ws-main\",\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:10.000Z\",\n  \"deletionStartedAt\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "label",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "lbl0002  flagged one  (red)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/label",
+      "query": "",
+      "body": {
+        "name": "flagged one",
+        "color": "red",
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -12,7 +12,7 @@ import { lastTaskNumbers, listProjectsIn, listWorkspaces, type Project, type Wor
 export type ProjectIn = { project: Project; workspaceName: string };
 
 // A workspace whose projects could not be listed, with what the server said.
-export type Unlisted = { workspaceName: string; message: string };
+export type Unlisted = { workspaceName: string; reason: string };
 
 // Every project the key can reach, each with the workspace it is in: one listing
 // per workspace, all asked at once. Archived projects are left out unless asked
@@ -32,23 +32,32 @@ export const allProjects = async (includeArchived: boolean): Promise<{ found: Pr
         const projects = await listProjectsIn(workspace.id, includeArchived);
         return { workspace, projects, failure: undefined };
       } catch (e) {
-        return { workspace, projects: [] as Project[], failure: (e as Error).message };
+        return { workspace, projects: [] as Project[], failure: reasonOf(e) };
       }
     }),
   );
   const found: ProjectIn[] = [];
   const unlisted: Unlisted[] = [];
   for (const { workspace, projects, failure } of listings) {
-    if (failure !== undefined) unlisted.push({ workspaceName: workspace.name, message: failure });
+    if (failure !== undefined) unlisted.push({ workspaceName: workspace.name, reason: failure });
     for (const project of projects) found.push({ project, workspaceName: workspace.name });
   }
   return { found, unlisted };
 };
 
-// The sentence for workspaces that could not be listed, for a listing that went
-// ahead without them and for a lookup that missed while they were out.
+// Why a listing failed: the status and the server's words, without the request
+// line a reader of a listing has no use for. A status stays, since 403 (not
+// yours to see) and 5xx (try again) call for different things.
+const reasonOf = (e: unknown): string => {
+  if (e instanceof KaneoApiError && e.messages.length > 0) return `${e.statusCode}: ${e.messages.join("; ")}`;
+  return e instanceof Error ? e.message : String(e);
+};
+
+// The one wording for workspaces that could not be listed, used by the listings
+// that went ahead without them and by the lookups that missed or matched while
+// they were out.
 export const unlistedMessage = (unlisted: Unlisted[]): string =>
-  unlisted.map((u) => `could not list the projects of workspace ${JSON.stringify(u.workspaceName)}: ${u.message}`).join("; ");
+  unlisted.map((u) => `could not list the projects of workspace ${JSON.stringify(u.workspaceName)} (${u.reason})`).join("; ");
 
 // Values already turned into an id in this run, so a command that names the same
 // project twice (`board` reads the project, then its board) looks it up once.
@@ -119,7 +128,9 @@ export const withProject = async <T>(
     // may be in it. Saying it does not exist would send the reader to look for
     // a typo that is not there.
     if (found.length === 0 && unlisted.length > 0) {
-      throw new Error(`${e.message}: ${noProject(value)} in the workspaces that could be listed; ${unlistedMessage(unlisted)}`);
+      throw new Error(
+        `${e.message}: ${noProject(value)} in the workspaces that could be listed; ${unlistedMessage(unlisted)}${explain === undefined ? "" : await explain()}`,
+      );
     }
     if (found.length === 0) throw new Error(`${e.message}: ${noProject(value)}${explain === undefined ? "" : await explain()}`);
     if (found.length > 1) throw new Error(severalProjects(value, found));
@@ -127,6 +138,14 @@ export const withProject = async <T>(
     // The value already was this project's id and the request failed anyway, so
     // the server's own answer is the report.
     if (only.id === value) throw e;
+    // An id is unique across the server, but a slug or a name is not, and the
+    // workspace that could not be listed may hold another project with it.
+    // Acting on the one that was found could write to the wrong board.
+    if (unlisted.length > 0) {
+      throw new Error(
+        `${JSON.stringify(value)} matches ${slugOr(only.slug, only.id)} (${only.id}) in ${found[0]!.workspaceName}, but ${unlistedMessage(unlisted)}, so it may not be the only project with that slug or name; pass the id`,
+      );
+    }
     if (!scoped) resolved.set(value, only.id);
     return op(only.id);
   }

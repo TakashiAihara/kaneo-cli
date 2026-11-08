@@ -63,7 +63,23 @@ test("a workspace that cannot be listed is reported beside the projects of the o
   expect(found.map((f) => f.project.id)).toEqual(["p-w1", "p-w3"]);
   expect(unlisted).toHaveLength(1);
   expect(unlisted[0]!.workspaceName).toBe("name-w2");
-  expect(unlisted[0]!.message).toContain("forbidden here");
+  expect(unlisted[0]!.reason).toContain("forbidden here");
+});
+
+test("two workspaces that cannot be listed are reported in workspace order", async () => {
+  serve((workspaceId) => (workspaceId === "w1" ? json({ success: false, error: "first" }, 403) : workspaceId === "w3" ? json({ success: false, error: "third" }, 500) : json([project("p-w2", "w2")])));
+  const { found, unlisted } = await allProjects(false);
+  expect(found.map((f) => f.project.id)).toEqual(["p-w2"]);
+  expect(unlisted.map((u) => u.workspaceName)).toEqual(["name-w1", "name-w3"]);
+  expect(unlisted[0]!.reason).toStartWith("403");
+  expect(unlisted[1]!.reason).toStartWith("500");
+});
+
+test("when the workspaces themselves cannot be listed there is no partial answer", async () => {
+  const s = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => json({ success: false, error: "no workspaces for you" }, 403) });
+  servers.push(s);
+  configureClient({ baseUrl: `http://127.0.0.1:${s.port}`, apiKey: "test-key" });
+  await expect(allProjects(false)).rejects.toThrow("no workspaces for you");
 });
 
 const notFound = () => new KaneoApiError("PUT", "/api/task/move/t", 404, ["Project not found"]);

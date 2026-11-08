@@ -9,7 +9,7 @@
       ],
       "exit": 1,
       "stdout": "proj-beta  Beta  [BET]  (workspace: Main)\n",
-      "stderr": "Error: could not list the projects of workspace \"Other\": GET /api/project: 403: injected failure\n"
+      "stderr": "Error: the projects listed above are incomplete: could not list the projects of workspace \"Other\" (403: injected failure)\n"
     },
     {
       "args": [
@@ -20,7 +20,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: no project matches \"gam\" in the workspaces that could be listed; could not list the projects of workspace \"Other\": GET /api/project: 403: injected failure\n"
+      "stderr": "Error: no project matches \"gam\" in the workspaces that could be listed; could not list the projects of workspace \"Other\" (403: injected failure)\n"
     }
   ],
   "requests": [

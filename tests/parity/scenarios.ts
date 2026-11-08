@@ -1788,7 +1788,16 @@ export const SCENARIOS: Scenario[] = [
     failOn: "^GET /project$",
     failOnQuery: "workspaceId=ws-other",
     failStatus: 403,
-    steps: [["task", "ls", "-p", "BET", "--human"], ["task", "ls", "-p", "nope", "--human"]],
+    steps: [["task", "ls", "-p", "BET", "--human"], ["task", "ls", "-p", "nope", "--human"], ["task", "ls", "-p", "Beta", "--human"], ["task", "ls", "-p", "proj-beta", "--human"]],
+  },
+  {
+    // The hint a caller adds to a value that names no project survives the
+    // lookup missing while a workspace is unlisted.
+    name: "task reference with a workspace name and one workspace unlisted",
+    failOn: "^GET /project$",
+    failOnQuery: "workspaceId=ws-other",
+    failStatus: 403,
+    steps: [["task", "get", "Main#3", "--human"]],
   },
   {
     name: "project list across workspaces refuses a workspace",

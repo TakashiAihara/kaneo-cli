@@ -135,7 +135,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     };
     if (existsSync(join(home, ".config"))) walk(join(home, ".config"));
 
-    const requests = JSON.parse(normalize(JSON.stringify(fake.requests))) as Recorded[];
+    const requests = settle(JSON.parse(normalize(JSON.stringify(fake.requests))) as Recorded[]);
     return { steps, requests, files };
   } finally {
     fake.stop();
@@ -146,3 +146,23 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
 // This source tree as the suite runs it: src/index.ts under the bun running the
 // suite, so a scenario that sets PATH to nowhere still starts.
 export const THIS_BUILD = [process.execPath, new URL("../../src/index.ts", import.meta.url).pathname];
+
+// Listings that are asked for together arrive in whatever order the sockets
+// connect, so a run of them is recorded by query rather than by arrival.
+const settle = (requests: Recorded[]): Recorded[] => {
+  const out: Recorded[] = [];
+  let run: Recorded[] = [];
+  const flush = () => {
+    out.push(...run.sort((a, b) => (a.query < b.query ? -1 : a.query > b.query ? 1 : 0)));
+    run = [];
+  };
+  for (const r of requests) {
+    if (r.method === "GET" && r.path === "/project") run.push(r);
+    else {
+      flush();
+      out.push(r);
+    }
+  }
+  flush();
+  return out;
+};

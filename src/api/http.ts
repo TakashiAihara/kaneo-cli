@@ -339,8 +339,27 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       reportMismatch(called, path, checked.error);
     }
   }
+  if (typeof decoded === "object" && decoded !== null) remember(decoded, `${called} ${served}`);
   return decoded as T;
 };
+
+// The request each object of a decoded reply came from, so a mapping done long
+// after the call (a time that does not parse) can still name it. Keyed by the
+// objects themselves rather than a "last request" variable, which would name
+// the wrong call when two replies are being read at once or a mapping runs
+// after a later request.
+const origins = new WeakMap<object, string>();
+
+const remember = (node: object, request: string): void => {
+  origins.set(node, request);
+  for (const child of Object.values(node)) {
+    if (typeof child === "object" && child !== null) remember(child, request);
+  }
+};
+
+// The `METHOD /api/path` of the request that produced this object of a reply, or
+// undefined for one that did not come from a reply.
+export const originOf = (node: object): string | undefined => origins.get(node);
 
 const reason = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 

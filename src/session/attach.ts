@@ -1,7 +1,8 @@
-import { addComment, getProject, listComments, listWorkspaces, type Comment, type Task } from "../api/kaneo";
+import { addComment, getProject, listComments, listWorkspaces, TimestampError, type Comment, type Task } from "../api/kaneo";
 import { debug, type App } from "../cli/app";
 import { hard } from "../cli/failopen";
 import { hookEnv, runHook } from "../cli/hook";
+import { taskRef } from "../cli/lookup";
 import { format, RUNNING, type Marker } from "./marker";
 import * as store from "./store";
 import { shellWord } from "../output/output";
@@ -57,7 +58,13 @@ export const attachTask = async (
   // Confirmed before anything is written here, so a marker this machine has no
   // record of is one the server kept. A listing that could not be made is a hard
   // failure here, since it would leave the attachment to say what it cannot show.
-  const posted = await postMarker(task.id, marker);
+  const posted = await postMarker(
+    task.id,
+    marker,
+    task.number,
+    "nothing is recorded here for it",
+    `\`kaneo session attach ${shellWord(taskRef(attachment.projectSlug, task.number, attachment.projectId))}\` records it here, and posts a second marker; \`kaneo session status\` shows what is held here`,
+  );
   await confirmMarker(task.id, task.number, posted, "hard");
   try {
     store.save(store.sessionStore(), sessionId, attachment);
@@ -91,8 +98,33 @@ export const attachTask = async (
 // the caller's decision: `session close` has a local record to bring up to date
 // first, and confirming a marker before that record is written is what leaves
 // this machine holding a task the server has let go of.
-export const postMarker = async (taskId: string, marker: Marker): Promise<Comment> =>
-  addComment(taskId, format(marker));
+//
+// `held` is what the caller's machine is left holding when the reply cannot be
+// read and `wayOut` what to run next, both of which differ between the commands.
+// A second marker is harmless to the board, which reads the newest one per
+// session, so the way out may be to post it again.
+export const postMarker = async (
+  taskId: string,
+  marker: Marker,
+  number: number,
+  held: string,
+  wayOut: string,
+): Promise<Comment> => {
+  try {
+    return await addComment(taskId, format(marker));
+  } catch (e) {
+    // The server writes the comment before the reply is read, so an unreadable
+    // time in the reply means the marker is already there. Staying quiet, as a
+    // fail-open command does for a failed request, would leave a retry to post
+    // a second one.
+    if (e instanceof TimestampError) {
+      throw hard(
+        `posted the marker on #${number} on the server, but could not read its reply (${e.message}); ${held}; ${wayOut}`,
+      );
+    }
+    throw e;
+  }
+};
 
 // Whether a listing that could not be made fails the command outright, or is an
 // ordinary error a fail-open command swallows.

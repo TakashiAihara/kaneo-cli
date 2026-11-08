@@ -1,8 +1,9 @@
 import { apiKey, type App } from "./app";
-import { addComment, deleteComment, editComment, listComments, type Comment, type Task } from "../api/kaneo";
+import { addComment, afterWrite, deleteComment, editComment, listComments, type Comment, type Task } from "../api/kaneo";
 import { exactArgs, minimumArgs, type RunContext } from "./args";
 import { readInput } from "./input";
 import { resolveTask } from "./task";
+import { taskRef } from "./lookup";
 import { shellWord } from "../output/output";
 
 // A human line for one comment. The id first, as the other listings print it and
@@ -72,8 +73,13 @@ export const commentCommand = {
         // and the arguments alone are enough to know it is empty.
         if (content.trim() === "") throw new Error("empty comment");
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
-        const comment = await addComment(task.id, content);
+        const slugs = new Map<string, string>();
+        const task = await resolveTask(app, args[0]!, slugs);
+        const comment = await afterWrite(
+          `commented on #${task.number}`,
+          `\`kaneo comment ls ${shellWord(taskRef(slugs.get(task.projectId), task.number, task.projectId))}\` shows it`,
+          addComment(task.id, content),
+        );
         app.out.human(`commented on #${task.number}`);
         app.out.data(comment);
       },

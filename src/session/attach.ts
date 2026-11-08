@@ -2,6 +2,7 @@ import { addComment, getProject, listComments, listWorkspaces, TimestampError, t
 import { debug, type App } from "../cli/app";
 import { hard } from "../cli/failopen";
 import { hookEnv, runHook } from "../cli/hook";
+import { taskRef } from "../cli/lookup";
 import { format, RUNNING, type Marker } from "./marker";
 import * as store from "./store";
 import { shellWord } from "../output/output";
@@ -62,7 +63,7 @@ export const attachTask = async (
     marker,
     task.number,
     "nothing is recorded here for it",
-    `\`kaneo session attach ${task.number}\` records it here, and posts a second marker; \`kaneo session status\` shows what is held here`,
+    `\`kaneo session attach ${shellWord(taskRef(attachment.projectSlug, task.number, attachment.projectId))}\` records it here, and posts a second marker; \`kaneo session status\` shows what is held here`,
   );
   await confirmMarker(task.id, task.number, posted, "hard");
   try {

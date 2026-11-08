@@ -7,7 +7,8 @@ import { CLOSED, RUNNING } from "../session/marker";
 import * as store from "../session/store";
 import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
-import { placesNothing, slugOr } from "./lookup";
+import { shellWord } from "../output/output";
+import { placesNothing, slugOr, taskRef } from "./lookup";
 
 const requireSessionId = (): string => {
   const id = store.currentId(env);
@@ -60,7 +61,7 @@ export const sessionCommand = {
       ],
       run: failOpen(async ({ args, flags, app }: RunContext<App>) => {
         apiKey(app);
-        const { taskId, number } = await targetTask(app, String(flags.task ?? ""));
+        const { taskId, number, reference } = await targetTask(app, String(flags.task ?? ""));
         const step = args.join(" ").trim();
         if (step === "") throw new Error("no next step given");
 
@@ -74,7 +75,7 @@ export const sessionCommand = {
           marker,
           number,
           "this command keeps no local record, so nothing here is out of step",
-          "do not run it again, that would only post a second marker",
+          `it can be run again, that would only post a second marker; \`kaneo comment ls ${shellWord(reference)}\` shows it`,
         );
         await confirmMarker(taskId, number, posted, "fail-open");
 
@@ -121,7 +122,8 @@ export const sessionCommand = {
         // The held task named the way the attachment knows it is taken as held
         // without a lookup, which a task the server no longer has would fail.
         const namesHeld = attached !== undefined && heldAs(app, attached, named);
-        const task = named === "" || namesHeld ? undefined : await resolveTask(app, named);
+        const slugs = new Map<string, string>();
+        const task = named === "" || namesHeld ? undefined : await resolveTask(app, named, slugs);
         // What the marker is written against and what the attachment holds can
         // differ once one of several tasks is named, so the attachment is only
         // dropped for the task it actually names.
@@ -129,6 +131,15 @@ export const sessionCommand = {
         // The close line is written from the attachment's record when the named
         // task is the one held, so it carries the board as an unnamed close does.
         const closed = holds ? attached! : attachmentOf(task!);
+        // The reference the retry hint names: the attachment's record for a
+        // held task, the lookup's for one named without it. --task is part of
+        // it, since a bare `session close` would close what is attached rather
+        // than post a second marker against the task this one went to.
+        const closing = taskRef(
+          closed.projectSlug ?? slugs.get(task?.projectId ?? ""),
+          closed.number,
+          closed.projectId ?? task?.projectId,
+        );
 
         const marker = store.describe(env, cwd(), CLOSED);
         marker.nextStep = `Session ended. Resume with \`claude --resume ${sessionId}\`.`;
@@ -143,7 +154,7 @@ export const sessionCommand = {
           marker,
           closed.number,
           "the attachment and history here are unchanged",
-          "`kaneo session close` again finishes closing here, and posts a second close marker",
+          `\`kaneo session close --task ${shellWord(closing)}\` again finishes closing here, and posts a second close marker`,
         ).catch((e: unknown) => {
           if (holds && placesNothing(e)) return undefined;
           throw e;
@@ -237,11 +248,18 @@ const ref = (slug: string | undefined, number: number | string, projectId?: stri
   `${slug === undefined ? "" : slugOr(slug, projectId ?? "")}#${number}`;
 
 // Picks the task a command acts on: the one named explicitly, otherwise the one
-// this session attached to.
-const targetTask = async (app: App, ref: string): Promise<{ taskId: string; number: number }> => {
+// this session attached to. reference is the task written the way a task
+// reference writes it — board and number — so a hint that asks the reader to
+// look at it or to run again names the board the write went to.
+const targetTask = async (app: App, ref: string): Promise<{ taskId: string; number: number; reference: string }> => {
   if (ref.trim() !== "") {
-    const named = await resolveTask(app, ref);
-    return { taskId: named.id, number: named.number };
+    const slugs = new Map<string, string>();
+    const named = await resolveTask(app, ref, slugs);
+    return {
+      taskId: named.id,
+      number: named.number,
+      reference: taskRef(slugs.get(named.projectId), named.number, named.projectId),
+    };
   }
   const sessionId = requireSessionId();
   const attached = store.load(store.sessionStore(), sessionId);
@@ -250,7 +268,11 @@ const targetTask = async (app: App, ref: string): Promise<{ taskId: string; numb
       "this session is not attached to a task; name one, or run 'kaneo session attach' first",
     );
   }
-  return { taskId: attached.taskId, number: attached.number };
+  return {
+    taskId: attached.taskId,
+    number: attached.number,
+    reference: taskRef(attached.projectSlug, attached.number, attached.projectId),
+  };
 };
 
 // Whether a --task value names the held task in a form close can recognise

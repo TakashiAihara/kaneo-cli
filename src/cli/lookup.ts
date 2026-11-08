@@ -216,6 +216,14 @@ export const firstMatch = <T>(all: T[], value: string, id: (item: T) => string, 
 // should be.
 export const slugOr = (slug: string, fallback: string): string => (slug === "" ? fallback : slug);
 
+// A task named the way a task reference writes it: <slug>#<number>, or the
+// project's id in the slug's place when no lookup found one. Either names the
+// board the task is on, so a command a hint suggests resolves there rather
+// than in whatever project the reader has configured — which is all a bare
+// number can say, and what this still is when neither is known.
+export const taskRef = (slug: string | undefined, number: number, projectId?: string): string =>
+  `${slugOr(slug ?? "", projectId ?? "")}#${number}`;
+
 // For a task number whose project is named by a workspace's name, in a
 // reference (`Private#6`) or by -p with a bare number: task numbers are per
 // project, so it names no task until a project is chosen, and the projects that

@@ -39,6 +39,10 @@ const fetchKey = (command: string): string | Error => {
       env: process.env,
       timeout: COMMAND_TIMEOUT_MS,
       maxBuffer: COMMAND_MAX_OUTPUT,
+      // The default SIGTERM can be ignored, and spawnSync then waits forever; the
+      // timeout is meant as a ceiling. shortcut: grandchildren the command
+      // backgrounded are not killed, upgrade to a process group if one lingers.
+      killSignal: "SIGKILL",
       stdin: "ignore",
       stdout: "pipe",
       stderr: "inherit",

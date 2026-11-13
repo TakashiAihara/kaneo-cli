@@ -129,6 +129,14 @@ kaneo board --archived                 # show them anyway
 
 Written with mode `0600`, since a profile may hold a key.
 
+A profile can name a command that prints the key instead of holding it, so the key stays in a secret manager and reaches only this process:
+
+```json
+{ "profiles": { "self": { "api_key_command": "pass show kaneo/api-key" } } }
+```
+
+The command runs through `sh -c` only when `--api-key`, `KANEO_API_KEY` and the profile's `api_key` are all empty, at most once per run and for up to 30 seconds. Its stdout, trimmed, is the key; its stderr is shown as is. A non-zero exit, empty output, or output with spaces or control characters stops the run without printing the value. `kaneo context` reports the key's origin as `command`.
+
 ### Self-hosted instances
 
 `--api-url` takes the site root; `/api` is appended for you.

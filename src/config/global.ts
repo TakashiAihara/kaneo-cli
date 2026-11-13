@@ -7,6 +7,7 @@ import { decode, parse, STRING, stringMap, type GoType } from "./json";
 export type Profile = {
   apiUrl?: string;
   apiKey?: string;
+  apiKeyCommand?: string;
   workspaceId?: string;
   projectId?: string;
 };
@@ -32,6 +33,7 @@ export type GlobalConfig = {
 type FileProfile = {
   api_url?: string;
   api_key?: string;
+  api_key_command?: string;
   workspace_id?: string;
   project_id?: string;
 };
@@ -52,6 +54,7 @@ const PROFILE: GoType = {
   fields: [
     { name: "api_url", type: STRING },
     { name: "api_key", type: STRING },
+    { name: "api_key_command", type: STRING },
     { name: "workspace_id", type: STRING },
     { name: "project_id", type: STRING },
   ],
@@ -120,6 +123,7 @@ export const loadGlobal = (path: string): GlobalConfig => {
         {
           apiUrl: p.api_url ?? undefined,
           apiKey: p.api_key ?? undefined,
+          apiKeyCommand: p.api_key_command ?? undefined,
           workspaceId: p.workspace_id ?? undefined,
           projectId: p.project_id ?? undefined,
         },

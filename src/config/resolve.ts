@@ -8,7 +8,43 @@ const DEFAULT_API_URL = "https://cloud.kaneo.app";
 
 // Which layer a resolved value came from, so `kaneo context` can explain itself
 // and a surprising value can be traced back to where it was written down.
-type Source = "flag" | "env" | "local" | "profile" | "repo-map" | "owner-map" | "default" | "unset";
+type Source = "flag" | "env" | "local" | "profile" | "command" | "repo-map" | "owner-map" | "default" | "unset";
+
+// api_key_command keeps the key out of the config file and out of the
+// environment of everything else the caller runs: the command (e.g.
+// `inf-run -- printenv KANEO_API_KEY`) is asked for the key only when no
+// stronger layer has one, and only once per process, because resolveForRepo
+// runs the chain again.
+const COMMAND_TIMEOUT_MS = 30_000;
+const commandKeys = new Map<string, string>();
+
+const runKeyCommand = (command: string): string => {
+  const cached = commandKeys.get(command);
+  if (cached !== undefined) return cached;
+
+  // stdin is not passed on: some commands read a secret or a document from it,
+  // and the key command must not consume it first. stderr is, so the command's
+  // own complaint reaches the user; only stdout carries the key.
+  const run = Bun.spawnSync(["sh", "-c", command], {
+    env: process.env,
+    timeout: COMMAND_TIMEOUT_MS,
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "inherit",
+  });
+  if (run.exitedDueToTimeout) throw new Error(`api_key_command timed out after ${COMMAND_TIMEOUT_MS / 1000}s`);
+  if (!run.success) throw new Error(`api_key_command failed (exit ${run.exitCode ?? "signal"})`);
+
+  const key = run.stdout.toString().trim();
+  if (key === "") throw new Error("api_key_command printed nothing");
+  // The value goes into an Authorization header, and an HTTP library quotes a
+  // header value it refuses in its error, so a bad one is refused here without
+  // being printed.
+  if (!/^[\x21-\x7e]+$/.test(key)) throw new Error("api_key_command printed a value that is not a single-line API key");
+
+  commandKeys.set(command, key);
+  return key;
+};
 
 export type Flags = { apiUrl: string; apiKey: string; workspaceId: string; projectId: string };
 
@@ -49,7 +85,7 @@ const NO_LOCAL: Local = { workspace: "", project: "", path: "" };
 // Not every layer answers every setting, so the chain is shorter for some:
 //
 //	api url    flag, environment, profile, default
-//	api key    flag, environment, profile
+//	api key    flag, environment, profile, profile's api_key_command
 //	workspace  flag, environment, .kaneo.json, profile, owner map
 //	project    flag, environment, .kaneo.json, profile, repo map
 //
@@ -67,8 +103,11 @@ const resolve = (input: Input): Resolved => {
   const fromRepoMap = projectsForRepo(input.global, input.repo);
 
   const origin: Record<string, Source> = {};
-  const pick = (field: string, candidates: [string, Source][]): string => {
-    for (const [value, source] of candidates) {
+  // A candidate given as a function is only evaluated when every stronger one
+  // was empty.
+  const pick = (field: string, candidates: [string | (() => string), Source][]): string => {
+    for (const [candidate, source] of candidates) {
+      const value = typeof candidate === "function" ? candidate() : candidate;
       if (value !== "") {
         origin[field] = source;
         return value;
@@ -100,6 +139,7 @@ const resolve = (input: Input): Resolved => {
       [input.flags.apiKey, "flag"],
       [env("KANEO_API_KEY"), "env"],
       [profile.apiKey ?? "", "profile"],
+      [() => (profile.apiKeyCommand ? runKeyCommand(profile.apiKeyCommand) : ""), "command"],
     ]),
     workspaceId: pick("workspace", [
       [input.flags.workspaceId, "flag"],

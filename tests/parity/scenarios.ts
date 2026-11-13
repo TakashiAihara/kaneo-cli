@@ -1602,6 +1602,40 @@ export const SCENARIOS: Scenario[] = [
     steps: [["whoami", "--json", "--api-url", "<URL>", "--api-key", "test-key"], ["context", "--json", "--api-url", "<URL>"]],
   },
   {
+    // The key comes from the command's stdout, trailing newline and all, and
+    // context names the command as the layer that answered.
+    name: "api_key_command supplies the key",
+    env: { KANEO_API_KEY: "" },
+    config: { profiles: { self: { api_key_command: "printf 'test-key\\n'" } } },
+    steps: [["whoami", "--json"], ["context", "--json"]],
+  },
+  {
+    // A stronger layer answers first, so the command never runs: if it did,
+    // its exit status would fail the run.
+    name: "api_key_command does not run when the environment has a key",
+    config: { profiles: { self: { api_key_command: "echo ran >&2; exit 7" } } },
+    steps: [["whoami", "--json"]],
+  },
+  {
+    name: "a failing api_key_command stops the run",
+    env: { KANEO_API_KEY: "" },
+    config: { profiles: { self: { api_key_command: "echo 'no secret here' >&2; exit 3" } } },
+    steps: [["whoami", "--json"]],
+  },
+  {
+    name: "api_key_command printing nothing",
+    env: { KANEO_API_KEY: "" },
+    config: { profiles: { self: { api_key_command: "true" } } },
+    steps: [["whoami", "--json"]],
+  },
+  {
+    // Refused without the value being echoed back.
+    name: "api_key_command printing a value with a space",
+    env: { KANEO_API_KEY: "" },
+    config: { profiles: { spaced: { api_key_command: "printf 'two words'" } } },
+    steps: [["whoami", "--json"]],
+  },
+  {
     name: "flag beats env beats profile",
     config: { default_profile: "self", profiles: { self: { workspace_id: "ws-other", project_id: P2 } } },
     steps: [["context", "--json"], ["context", "-p", "proj-old", "--json"]],

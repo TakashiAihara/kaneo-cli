@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"api_key_command failed (exit 3)\"\n}\n",
+      "stderr": "no secret here\nError: api_key_command failed (exit 3)\n"
+    }
+  ],
+  "requests": [],
+  "files": {
+    ".config/kaneo/config.json": "{\"profiles\":{\"self\":{\"api_key_command\":\"echo 'no secret here' >&2; exit 3\"}}}"
+  }
+}

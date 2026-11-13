@@ -16,7 +16,10 @@ export type KaneoInit<T = unknown> = RequestInit & { schema?: ZodType<T> | ZodTy
 
 type ClientConfig = {
   baseUrl: string;
-  apiKey?: string;
+  // A function is asked only when a request is about to be sent, so a key that
+  // has to be fetched (a profile's api_key_command) is not fetched by a run that
+  // sends none.
+  apiKey?: string | (() => string);
   // What --timeout bounds: one request, every request. Each page of a board gets
   // the whole of it, so a board's size does not decide whether it can be read.
   timeoutMs?: number;
@@ -26,7 +29,7 @@ type ClientConfig = {
   debug?: boolean;
 };
 
-type Settings = Required<ClientConfig>;
+type Settings = Required<Omit<ClientConfig, "apiKey">> & { apiKey: () => string };
 
 // Bounds a single request, as the Go build's DefaultTimeout did.
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -50,7 +53,7 @@ export const setRateLimitWaits = (on: boolean): void => {
   waitOutRateLimits = on;
 };
 
-let settings: Settings = { baseUrl: "", apiKey: "", timeoutMs: DEFAULT_TIMEOUT_MS, debug: false };
+let settings: Settings = { baseUrl: "", apiKey: () => "", timeoutMs: DEFAULT_TIMEOUT_MS, debug: false };
 
 // Called once per process, before the first generated call. The transport is a
 // module the generated client imports, so there is no other way to hand it the
@@ -58,7 +61,7 @@ let settings: Settings = { baseUrl: "", apiKey: "", timeoutMs: DEFAULT_TIMEOUT_M
 export const configureClient = (config: ClientConfig): void => {
   settings = {
     baseUrl: normalizeBaseUrl(config.baseUrl),
-    apiKey: config.apiKey ?? "",
+    apiKey: typeof config.apiKey === "function" ? config.apiKey : () => (config.apiKey as string | undefined) ?? "",
     timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     debug: config.debug ?? Boolean(process.env.KANEO_DEBUG),
   };
@@ -186,11 +189,12 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   const served = servedPath(target);
   let headers = new Headers(request.headers);
   headers.set("Accept", "application/json");
-  if (settings.apiKey !== "") {
+  const key = settings.apiKey();
+  if (key !== "") {
     if (!keepsCredential(target.href)) {
       throw new InsecureCredentialError(`${target.protocol}//${target.host}`);
     }
-    headers.set("Authorization", `Bearer ${settings.apiKey}`);
+    headers.set("Authorization", `Bearer ${key}`);
   }
 
   // The cap --timeout puts on the request is what cuts it short. The same cap

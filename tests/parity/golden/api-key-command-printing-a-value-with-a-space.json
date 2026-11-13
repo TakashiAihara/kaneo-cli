@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"api_key_command printed a value that is not a single-line API key\"\n}\n",
+      "stderr": "Error: api_key_command printed a value that is not a single-line API key\n"
+    }
+  ],
+  "requests": [],
+  "files": {
+    ".config/kaneo/config.json": "{\"profiles\":{\"spaced\":{\"api_key_command\":\"printf 'two words'\"}}}"
+  }
+}

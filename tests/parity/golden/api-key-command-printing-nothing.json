@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"api_key_command printed nothing\"\n}\n",
+      "stderr": "Error: api_key_command printed nothing\n"
+    }
+  ],
+  "requests": [],
+  "files": {
+    ".config/kaneo/config.json": "{\"profiles\":{\"self\":{\"api_key_command\":\"true\"}}}"
+  }
+}

@@ -8,7 +8,61 @@ const DEFAULT_API_URL = "https://cloud.kaneo.app";
 
 // Which layer a resolved value came from, so `kaneo context` can explain itself
 // and a surprising value can be traced back to where it was written down.
-type Source = "flag" | "env" | "local" | "profile" | "repo-map" | "owner-map" | "default" | "unset";
+type Source = "flag" | "env" | "local" | "profile" | "command" | "repo-map" | "owner-map" | "default" | "unset";
+
+// api_key_command keeps the key out of the config file and out of the
+// environment of everything else the caller runs: the command (e.g.
+// `pass show kaneo/api-key | head -n1`) is run only when no stronger layer has a
+// key and the key is actually read, and at most once per process, failure
+// included: resolveForRepo runs the chain again, and a key is read in more than
+// one place.
+const COMMAND_TIMEOUT_MS = 30_000;
+// A key is a few hundred bytes; past this the command is stopped rather than
+// read into memory.
+const COMMAND_MAX_OUTPUT = 64 * 1024;
+const commandKeys = new Map<string, string | Error>();
+
+const runKeyCommand = (command: string): string => {
+  const cached = commandKeys.get(command) ?? fetchKey(command);
+  commandKeys.set(command, cached);
+  if (cached instanceof Error) throw cached;
+  return cached;
+};
+
+const fetchKey = (command: string): string | Error => {
+  // stdin is not passed on: some commands read a secret or a document from it,
+  // and the key command must not consume it first. stderr is, so the command's
+  // own complaint reaches the user; only stdout carries the key.
+  let run: Bun.SyncSubprocess<"pipe", "inherit">;
+  try {
+    run = Bun.spawnSync(["sh", "-c", command], {
+      env: process.env,
+      timeout: COMMAND_TIMEOUT_MS,
+      maxBuffer: COMMAND_MAX_OUTPUT,
+      // The default SIGTERM can be ignored, and spawnSync then waits forever; the
+      // timeout is meant as a ceiling. shortcut: grandchildren the command
+      // backgrounded are not killed, upgrade to a process group if one lingers.
+      killSignal: "SIGKILL",
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "inherit",
+    });
+  } catch (e) {
+    return new Error(`api_key_command could not be started: ${(e as Error).message}`);
+  }
+  if (run.exitedDueToTimeout) return new Error(`api_key_command timed out after ${COMMAND_TIMEOUT_MS / 1000}s`);
+  if (run.stdout.length >= COMMAND_MAX_OUTPUT) return new Error(`api_key_command printed ${COMMAND_MAX_OUTPUT / 1024} KiB or more`);
+  if (!run.success) return new Error(`api_key_command failed (${run.exitCode === null ? run.signalCode : `exit ${run.exitCode}`})`);
+
+  const key = run.stdout.toString().trim();
+  if (key === "") return new Error("api_key_command printed nothing");
+  // A command's stdout is whatever the tool prints (a secret manager may add
+  // lines of metadata), unlike a key typed into a flag or a file, and it goes
+  // into an Authorization header, whose library quotes a value it refuses in
+  // its error. So it is checked here, without being printed.
+  if (!/^[\x21-\x7e]+$/.test(key)) return new Error("api_key_command printed a value that is not a single-line API key");
+  return key;
+};
 
 export type Flags = { apiUrl: string; apiKey: string; workspaceId: string; projectId: string };
 
@@ -49,7 +103,7 @@ const NO_LOCAL: Local = { workspace: "", project: "", path: "" };
 // Not every layer answers every setting, so the chain is shorter for some:
 //
 //	api url    flag, environment, profile, default
-//	api key    flag, environment, profile
+//	api key    flag, environment, profile, profile's api_key_command
 //	workspace  flag, environment, .kaneo.json, profile, owner map
 //	project    flag, environment, .kaneo.json, profile, repo map
 //
@@ -89,18 +143,26 @@ const resolve = (input: Input): Resolved => {
   };
   const one = (value: string): string[] => (value === "" ? [] : [value]);
 
-  return {
+  const key = pick("api_key", [
+    [input.flags.apiKey, "flag"],
+    [env("KANEO_API_KEY"), "env"],
+    [profile.apiKey ?? "", "profile"],
+  ]);
+  // The command layer is decided here but run only when the key is read, so a
+  // run that sends no key (completion, session status, a fail-open session
+  // command that stops early) does not spawn it, and its failure lands where the
+  // key is used, inside a fail-open command's own error handling.
+  const keyCommand = key === "" ? (profile.apiKeyCommand ?? "") : "";
+  if (keyCommand !== "") origin["api_key"] = "command";
+
+  const resolved = {
     apiUrl: pick("api_url", [
       [input.flags.apiUrl, "flag"],
       [env("KANEO_API_URL"), "env"],
       [profile.apiUrl ?? "", "profile"],
       [DEFAULT_API_URL, "default"],
     ]),
-    apiKey: pick("api_key", [
-      [input.flags.apiKey, "flag"],
-      [env("KANEO_API_KEY"), "env"],
-      [profile.apiKey ?? "", "profile"],
-    ]),
+    apiKey: key,
     workspaceId: pick("workspace", [
       [input.flags.workspaceId, "flag"],
       [env("KANEO_WORKSPACE"), "env"],
@@ -120,6 +182,10 @@ const resolve = (input: Input): Resolved => {
     localPath: local.path,
     repo: input.repo,
   };
+  if (keyCommand !== "") {
+    Object.defineProperty(resolved, "apiKey", { enumerable: true, get: () => runKeyCommand(keyCommand) });
+  }
+  return resolved;
 };
 
 // Reads the surroundings of this process and applies the chain.

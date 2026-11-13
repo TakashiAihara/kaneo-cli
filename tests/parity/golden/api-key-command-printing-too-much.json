@@ -6,8 +6,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"api_key_command printed more than 64 KiB\"\n}\n",
-      "stderr": "Error: api_key_command printed more than 64 KiB\n"
+      "stdout": "{\n  \"error\": \"api_key_command printed 64 KiB or more\"\n}\n",
+      "stderr": "Error: api_key_command printed 64 KiB or more\n"
     }
   ],
   "requests": [],

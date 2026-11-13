@@ -11,6 +11,16 @@
     },
     {
       "args": [
+        "__complete",
+        "task",
+        ""
+      ],
+      "exit": 0,
+      "stdout": "assign\tAssign a task, or clear the assignee when no user is given\nbulk\tApply one change to many tasks in one request\ncreate\tCreate a task in a project\ndue\tSet a task's due date, or clear it when no date is given\nexport\tWrite a project's tasks as JSON, in the form task import reads\nexternal-links\tList a task's external links\nget\tShow one task\nimport\tCreate tasks in a project from a JSON file (- reads stdin)\nlink\tRelate two tasks\nlinks\tList a task's relations\nlist\tList the tasks in a project\nmove\tMove a task to another project\npriority\tChange a task's priority\nrm\tDelete a task\nstatus\tMove a task to another column\nunlink\tRemove the link between two tasks\nupdate\tChange a task's title, description, status, priority, assignee, start date or position; the rest is kept\n:4\n",
+      "stderr": "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
+    },
+    {
+      "args": [
         "session",
         "status",
         "--json"
@@ -32,6 +42,24 @@
     {
       "args": [
         "context",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-alpha\"\n  ],\n  \"profile\": \"self\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"command\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"env\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "context",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "api url    <URL>  (env)\napi key    set  (command)\nworkspace  ws-main  (env)\nproject    proj-alpha  (env)\n\nrepo       -\nprofile    self\nlocal file -\nconfig     <HOME>/.config/kaneo/config.json\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "whoami",
         "--json"
       ],
       "exit": 1,

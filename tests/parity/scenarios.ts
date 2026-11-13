@@ -1609,7 +1609,7 @@ export const SCENARIOS: Scenario[] = [
     name: "api_key_command supplies the key",
     env: { KANEO_API_KEY: "" },
     config: { profiles: { self: { api_key_command: "echo ran >&2; printf 'test-key\\n'" } } },
-    steps: [["whoami", "--json"], ["context", "--json"]],
+    steps: [["whoami", "--json"], ["context", "--repo", "acme/thing", "--json"]],
   },
   {
     name: "the profile's api_key beats api_key_command",
@@ -1629,7 +1629,7 @@ export const SCENARIOS: Scenario[] = [
     name: "a failing api_key_command spares commands that send no key",
     env: { KANEO_API_KEY: "", KANEO_SESSION_ID: "sess-cmd" },
     config: { profiles: { self: { api_key_command: "echo ran >&2; exit 3" } } },
-    steps: [["completion", "bash"], ["session", "status", "--json"], ["session", "attach", "1"], ["context", "--json"]],
+    steps: [["completion", "bash"], ["__complete", "task", ""], ["session", "status", "--json"], ["session", "attach", "1"], ["context", "--json"], ["context", "--human"], ["whoami", "--json"]],
   },
   {
     name: "api_key_command printing too much",

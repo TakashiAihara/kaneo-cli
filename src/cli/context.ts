@@ -66,7 +66,11 @@ export const contextCommand = {
     };
 
     app.out.human(`api url    ${or(cfg.apiUrl, "-")}  (${origin.api_url})`);
-    app.out.human(`api key    ${cfg.apiKey === "" ? "not set" : "set"}  (${origin.api_key})`);
+    // Judged from the origin, not by reading the key: reading it runs a
+    // profile's api_key_command, and this report must stay readable when that
+    // command is what is broken.
+    const hasKey = origin.api_key !== "unset";
+    app.out.human(`api key    ${hasKey ? "set" : "not set"}  (${origin.api_key})`);
     app.out.human(`workspace  ${or(cfg.workspaceId, "-")}  (${origin.workspace})`);
     app.out.human(`project    ${or(cfg.projectIds?.join(", ") ?? "", "-")}  (${origin.project})`);
     app.out.human("");
@@ -83,7 +87,7 @@ export const contextCommand = {
       profile: omitted(cfg.profileName),
       local_file: omitted(cfg.localPath),
       config_file: omitted(app.global.path),
-      has_api_key: cfg.apiKey !== "",
+      has_api_key: hasKey,
       origin,
     };
     app.out.data(report);

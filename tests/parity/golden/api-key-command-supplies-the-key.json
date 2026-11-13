@@ -7,7 +7,7 @@
       ],
       "exit": 0,
       "stdout": "{\n  \"api_url\": \"<URL>/api\",\n  \"user\": {\n    \"id\": \"user-self\",\n    \"name\": \"Self\",\n    \"email\": \"self@example.com\"\n  },\n  \"workspaces\": [\n    {\n      \"id\": \"ws-main\",\n      \"name\": \"Main\",\n      \"slug\": \"main\",\n      \"description\": \"\"\n    },\n    {\n      \"id\": \"ws-other\",\n      \"name\": \"Other\",\n      \"slug\": \"other\",\n      \"description\": \"\"\n    }\n  ]\n}\n",
-      "stderr": ""
+      "stderr": "ran\n"
     },
     {
       "args": [
@@ -16,7 +16,7 @@
       ],
       "exit": 0,
       "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-alpha\"\n  ],\n  \"profile\": \"self\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"command\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"env\"\n  }\n}\n",
-      "stderr": ""
+      "stderr": "ran\n"
     }
   ],
   "requests": [
@@ -32,6 +32,6 @@
     }
   ],
   "files": {
-    ".config/kaneo/config.json": "{\"profiles\":{\"self\":{\"api_key_command\":\"printf 'test-key\\\\n'\"}}}"
+    ".config/kaneo/config.json": "{\"profiles\":{\"self\":{\"api_key_command\":\"echo ran >&2; printf 'test-key\\\\n'\"}}}"
   }
 }

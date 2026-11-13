@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"api_key_command printed more than 64 KiB\"\n}\n",
+      "stderr": "Error: api_key_command printed more than 64 KiB\n"
+    }
+  ],
+  "requests": [],
+  "files": {
+    ".config/kaneo/config.json": "{\"profiles\":{\"self\":{\"api_key_command\":\"head -c 70000 /dev/zero | tr '\\\\0' a\"}}}"
+  }
+}

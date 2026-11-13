@@ -12,37 +12,46 @@ type Source = "flag" | "env" | "local" | "profile" | "command" | "repo-map" | "o
 
 // api_key_command keeps the key out of the config file and out of the
 // environment of everything else the caller runs: the command (e.g.
-// `inf-run -- printenv KANEO_API_KEY`) is asked for the key only when no
-// stronger layer has one, and only once per process, because resolveForRepo
-// runs the chain again.
+// `inf-run -- printenv KANEO_API_KEY`) is run only when no stronger layer has a
+// key and the key is actually read, and at most once per process, failure
+// included: resolveForRepo runs the chain again, and a key is read in more than
+// one place.
 const COMMAND_TIMEOUT_MS = 30_000;
-const commandKeys = new Map<string, string>();
+// A key is a few hundred bytes; past this the command is stopped rather than
+// read into memory.
+const COMMAND_MAX_OUTPUT = 64 * 1024;
+const commandKeys = new Map<string, string | Error>();
 
 const runKeyCommand = (command: string): string => {
-  const cached = commandKeys.get(command);
-  if (cached !== undefined) return cached;
+  const cached = commandKeys.get(command) ?? fetchKey(command);
+  commandKeys.set(command, cached);
+  if (cached instanceof Error) throw cached;
+  return cached;
+};
 
+const fetchKey = (command: string): string | Error => {
   // stdin is not passed on: some commands read a secret or a document from it,
   // and the key command must not consume it first. stderr is, so the command's
   // own complaint reaches the user; only stdout carries the key.
   const run = Bun.spawnSync(["sh", "-c", command], {
     env: process.env,
     timeout: COMMAND_TIMEOUT_MS,
+    maxBuffer: COMMAND_MAX_OUTPUT,
     stdin: "ignore",
     stdout: "pipe",
     stderr: "inherit",
   });
-  if (run.exitedDueToTimeout) throw new Error(`api_key_command timed out after ${COMMAND_TIMEOUT_MS / 1000}s`);
-  if (!run.success) throw new Error(`api_key_command failed (exit ${run.exitCode ?? "signal"})`);
+  if (run.exitedDueToTimeout) return new Error(`api_key_command timed out after ${COMMAND_TIMEOUT_MS / 1000}s`);
+  if (run.stdout.length >= COMMAND_MAX_OUTPUT) return new Error(`api_key_command printed more than ${COMMAND_MAX_OUTPUT / 1024} KiB`);
+  if (!run.success) return new Error(`api_key_command failed (${run.exitCode === null ? run.signalCode : `exit ${run.exitCode}`})`);
 
   const key = run.stdout.toString().trim();
-  if (key === "") throw new Error("api_key_command printed nothing");
-  // The value goes into an Authorization header, and an HTTP library quotes a
-  // header value it refuses in its error, so a bad one is refused here without
-  // being printed.
-  if (!/^[\x21-\x7e]+$/.test(key)) throw new Error("api_key_command printed a value that is not a single-line API key");
-
-  commandKeys.set(command, key);
+  if (key === "") return new Error("api_key_command printed nothing");
+  // A command's stdout is whatever the tool prints (a secret manager may add
+  // lines of metadata), unlike a key typed into a flag or a file, and it goes
+  // into an Authorization header, whose library quotes a value it refuses in
+  // its error. So it is checked here, without being printed.
+  if (!/^[\x21-\x7e]+$/.test(key)) return new Error("api_key_command printed a value that is not a single-line API key");
   return key;
 };
 
@@ -103,11 +112,8 @@ const resolve = (input: Input): Resolved => {
   const fromRepoMap = projectsForRepo(input.global, input.repo);
 
   const origin: Record<string, Source> = {};
-  // A candidate given as a function is only evaluated when every stronger one
-  // was empty.
-  const pick = (field: string, candidates: [string | (() => string), Source][]): string => {
-    for (const [candidate, source] of candidates) {
-      const value = typeof candidate === "function" ? candidate() : candidate;
+  const pick = (field: string, candidates: [string, Source][]): string => {
+    for (const [value, source] of candidates) {
       if (value !== "") {
         origin[field] = source;
         return value;
@@ -128,19 +134,26 @@ const resolve = (input: Input): Resolved => {
   };
   const one = (value: string): string[] => (value === "" ? [] : [value]);
 
-  return {
+  const key = pick("api_key", [
+    [input.flags.apiKey, "flag"],
+    [env("KANEO_API_KEY"), "env"],
+    [profile.apiKey ?? "", "profile"],
+  ]);
+  // The command layer is decided here but run only when the key is read, so a
+  // run that sends no key (completion, session status, a fail-open session
+  // command that stops early) does not spawn it, and its failure lands where the
+  // key is used, inside a fail-open command's own error handling.
+  const keyCommand = key === "" ? (profile.apiKeyCommand ?? "") : "";
+  if (keyCommand !== "") origin["api_key"] = "command";
+
+  const resolved = {
     apiUrl: pick("api_url", [
       [input.flags.apiUrl, "flag"],
       [env("KANEO_API_URL"), "env"],
       [profile.apiUrl ?? "", "profile"],
       [DEFAULT_API_URL, "default"],
     ]),
-    apiKey: pick("api_key", [
-      [input.flags.apiKey, "flag"],
-      [env("KANEO_API_KEY"), "env"],
-      [profile.apiKey ?? "", "profile"],
-      [() => (profile.apiKeyCommand ? runKeyCommand(profile.apiKeyCommand) : ""), "command"],
-    ]),
+    apiKey: key,
     workspaceId: pick("workspace", [
       [input.flags.workspaceId, "flag"],
       [env("KANEO_WORKSPACE"), "env"],
@@ -160,6 +173,10 @@ const resolve = (input: Input): Resolved => {
     localPath: local.path,
     repo: input.repo,
   };
+  if (keyCommand !== "") {
+    Object.defineProperty(resolved, "apiKey", { enumerable: true, get: () => runKeyCommand(keyCommand) });
+  }
+  return resolved;
 };
 
 // Reads the surroundings of this process and applies the chain.

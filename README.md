@@ -66,7 +66,7 @@ Not every layer answers every setting:
 | setting | comes from |
 | --- | --- |
 | api url | flag, environment, profile, then the hosted default |
-| api key | flag, environment, profile |
+| api key | flag, environment, profile, profile's `api_key_command` |
 | workspace | flag, environment, `.kaneo.json`, profile, `owners` |
 | project | flag, environment, `.kaneo.json`, profile, `repos` |
 
@@ -132,10 +132,10 @@ Written with mode `0600`, since a profile may hold a key.
 A profile can name a command that prints the key instead of holding it, so the key stays in a secret manager and reaches only this process:
 
 ```json
-{ "profiles": { "self": { "api_key_command": "pass show kaneo/api-key" } } }
+{ "profiles": { "self": { "api_key_command": "pass show kaneo/api-key | head -n1" } } }
 ```
 
-The command runs through `sh -c` only when `--api-key`, `KANEO_API_KEY` and the profile's `api_key` are all empty, at most once per run and for up to 30 seconds. Its stdout, trimmed, is the key; its stderr is shown as is. A non-zero exit, empty output, or output with spaces or control characters stops the run without printing the value. `kaneo context` reports the key's origin as `command`.
+The command runs through `sh -c` only when `--api-key`, `KANEO_API_KEY` and the profile's `api_key` are all empty and a request is about to carry the key (`completion` and `session status` never run it), at most once per run and for up to 30 seconds. Its stdout, trimmed, is the key; its stderr is shown as is, so it must not print the key there. A non-zero exit, empty output, more than 64 KiB, or anything but printable ASCII without spaces stops the command that needed the key without printing the value; a fail-open `session` command still exits 0. `kaneo context` reports the key's origin as `command`.
 
 ### Self-hosted instances
 

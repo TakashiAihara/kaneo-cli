@@ -219,7 +219,7 @@ export const run = async (argv: string[]): Promise<number> => {
     // bounds the command as a whole; a caller that needs a ceiling on it (a hook
     // with its own timeout) puts one around the process.
     const app: App = { cfg, flags, global, out };
-    configureClient({ baseUrl: cfg.apiUrl, apiKey: cfg.apiKey, timeoutMs: timeout });
+    configureClient({ baseUrl: cfg.apiUrl, apiKey: () => cfg.apiKey, timeoutMs: timeout });
     // Reset for every run, since a fail-open command turns it off and run() can
     // be called again in the same process.
     setRateLimitWaits(true);

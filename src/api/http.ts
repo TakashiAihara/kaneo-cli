@@ -16,9 +16,9 @@ export type KaneoInit<T = unknown> = RequestInit & { schema?: ZodType<T> | ZodTy
 
 type ClientConfig = {
   baseUrl: string;
-  // A function is asked only when a request is about to carry the key, so a
-  // key that has to be fetched (a profile's api_key_command) is not fetched by a
-  // run that never sends one.
+  // A function is asked only when a request is about to be sent, so a key that
+  // has to be fetched (a profile's api_key_command) is not fetched by a run that
+  // sends none.
   apiKey?: string | (() => string);
   // What --timeout bounds: one request, every request. Each page of a board gets
   // the whole of it, so a board's size does not decide whether it can be read.

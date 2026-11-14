@@ -74,6 +74,22 @@ describe("requests", () => {
     expect(seen).toEqual({ path: "/api/project?workspaceId=ws", auth: "Bearer test-key" });
   });
 
+  test("marked anonymous neither ask for the key nor send it", async () => {
+    const auths: string[] = [];
+    const url = serve((req) => {
+      auths.push(req.headers.get("authorization") ?? "none");
+      return Response.json({});
+    });
+    let asked = 0;
+    configureClient({ baseUrl: url, apiKey: () => (asked++, "fetched-key") });
+    await kaneoFetch("/openapi", { method: "GET", anonymous: true });
+    expect({ asked, auths }).toEqual({ asked: 0, auths: ["none"] });
+
+    // The same transport, unmarked, does ask and send: the marker is what kept it out.
+    await kaneoFetch("/user/me", { method: "GET" });
+    expect({ asked, auths }).toEqual({ asked: 1, auths: ["none", "Bearer fetched-key"] });
+  });
+
   test("send the body the generated client built, unchanged", async () => {
     let got = { method: "", body: "" };
     const url = serve(async (req) => {

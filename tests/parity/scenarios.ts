@@ -1629,7 +1629,7 @@ export const SCENARIOS: Scenario[] = [
     name: "a failing api_key_command spares commands that send no key",
     env: { KANEO_API_KEY: "", KANEO_SESSION_ID: "sess-cmd" },
     config: { profiles: { self: { api_key_command: "echo ran >&2; exit 3" } } },
-    steps: [["completion", "bash"], ["__complete", "task", ""], ["session", "status", "--json"], ["session", "attach", "1"], ["context", "--json"], ["context", "--human"], ["whoami", "--json"]],
+    steps: [["completion", "bash"], ["__complete", "task", ""], ["session", "status", "--json"], ["session", "attach", "1"], ["context", "--json"], ["context", "--human"], ["api-check", "--json"], ["whoami", "--json"]],
   },
   {
     name: "api_key_command printing too much",

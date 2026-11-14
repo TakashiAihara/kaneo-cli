@@ -2108,7 +2108,7 @@ type Document = {
 // through the transport like every other call so it lands under /api, since the
 // site root answers 200 with the web app's HTML for any path.
 export const checkApi = async (): Promise<CheckResult> => {
-  const document = zeroRecord(await kaneoFetch<Document>("/openapi", { method: "GET" }));
+  const document = zeroRecord(await kaneoFetch<Document>("/openapi", { method: "GET", anonymous: true }));
   const onServer = serverOperations(document);
   const seen = new Set(onServer.map((operation) => operation.id));
 

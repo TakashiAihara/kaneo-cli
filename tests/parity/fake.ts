@@ -447,7 +447,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     requests.push({ method: req.method, path, query: url.search, body });
 
     if (!url.pathname.startsWith("/api/")) return new Response("<html>app</html>", { headers: { "content-type": "text/html" } });
-    if (req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
+    // The document is served without authentication, as the real server does.
+    if (!(req.method === "GET" && path === "/openapi") && req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
     if (failing?.test(`${req.method} ${path}`) && (failingQuery?.test(url.search) ?? true) && skipped++ >= (opts.failOnSkip ?? 0)) return opts.failMessage === undefined ? fail(opts.failStatus ?? 500, "injected failure") : failText(opts.failStatus ?? 500, opts.failMessage);
 
     // The server validates request bodies against the same schemas the

@@ -12,7 +12,10 @@ import { OPERATIONS, type Operation } from "./registry";
 // a schema only when the success type is a single schema (hasSchema in
 // @orval/fetch), with no setting to change that. REMOVE WHEN it passes one for
 // a union: then the schema can be tied to T again.
-export type KaneoInit<T = unknown> = RequestInit & { schema?: ZodType<T> | ZodType };
+// anonymous marks a route the server serves without authentication, so the key
+// is neither fetched nor sent: fetching it can run a profile's api_key_command,
+// whose failure must not stop a call that never needed a key.
+export type KaneoInit<T = unknown> = RequestInit & { schema?: ZodType<T> | ZodType; anonymous?: boolean };
 
 type ClientConfig = {
   baseUrl: string;
@@ -173,7 +176,7 @@ const describeFailure = (
 export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T> => {
   if (settings.baseUrl === "") throw new Error("no API URL configured");
 
-  const { schema, ...request } = init;
+  const { schema, anonymous, ...request } = init;
   // The endpoint as the generated client wrote it, query included: the spelling
   // the operation is looked up by, since reading it back first would split an id
   // that needed escaping into two segments of its own.
@@ -189,7 +192,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   const served = servedPath(target);
   let headers = new Headers(request.headers);
   headers.set("Accept", "application/json");
-  const key = settings.apiKey();
+  const key = anonymous ? "" : settings.apiKey();
   if (key !== "") {
     if (!keepsCredential(target.href)) {
       throw new InsecureCredentialError(`${target.protocol}//${target.host}`);

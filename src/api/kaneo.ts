@@ -2104,11 +2104,12 @@ type Document = {
 
 
 // The comparison between this client and a server. The document is served
-// without authentication, so this works before any key is configured; it goes
+// without authentication, so the call is anonymous and works before any key is
+// configured, or when a profile's api_key_command fails; it goes
 // through the transport like every other call so it lands under /api, since the
 // site root answers 200 with the web app's HTML for any path.
 export const checkApi = async (): Promise<CheckResult> => {
-  const document = zeroRecord(await kaneoFetch<Document>("/openapi", { method: "GET" }));
+  const document = zeroRecord(await kaneoFetch<Document>("/openapi", { method: "GET", anonymous: true }));
   const onServer = serverOperations(document);
   const seen = new Set(onServer.map((operation) => operation.id));
 

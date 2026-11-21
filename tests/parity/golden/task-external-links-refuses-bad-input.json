@@ -1,0 +1,120 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "external-links",
+        "1",
+        "--add",
+        "https://example.com/x",
+        "--rm",
+        "link0002",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"pass --add or --rm, not both\"\n}\n",
+      "stderr": "Error: pass --add or --rm, not both\n"
+    },
+    {
+      "args": [
+        "task",
+        "external-links",
+        "1",
+        "--title",
+        "Notes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--title only names a link --add creates\"\n}\n",
+      "stderr": "Error: --title only names a link --add creates\n"
+    },
+    {
+      "args": [
+        "task",
+        "external-links",
+        "1",
+        "--add",
+        "ftp://example.com/x",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--add \\\"ftp://example.com/x\\\" is not an http or https URL\"\n}\n",
+      "stderr": "Error: --add \"ftp://example.com/x\" is not an http or https URL\n"
+    },
+    {
+      "args": [
+        "task",
+        "external-links",
+        "1",
+        "--add",
+        "not a url",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--add \\\"not a url\\\" is not a URL\"\n}\n",
+      "stderr": "Error: --add \"not a url\" is not a URL\n"
+    },
+    {
+      "args": [
+        "task",
+        "external-links",
+        "1",
+        "--add",
+        "https://example.com/x",
+        "--title",
+        "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--title is longer than 200 characters\"\n}\n",
+      "stderr": "Error: --title is longer than 200 characters\n"
+    },
+    {
+      "args": [
+        "task",
+        "external-links",
+        "1",
+        "--add",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--add is empty\"\n}\n",
+      "stderr": "Error: --add is empty\n"
+    },
+    {
+      "args": [
+        "task",
+        "external-links",
+        "1",
+        "--rm",
+        " ",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--rm is empty\"\n}\n",
+      "stderr": "Error: --rm is empty\n"
+    },
+    {
+      "args": [
+        "task",
+        "external-links",
+        "99",
+        "--add",
+        "https://example.com/x",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no task #99 in project ALP (proj-alpha, from env); pass --project to look elsewhere\"\n}\n",
+      "stderr": "Error: no task #99 in project ALP (proj-alpha, from env); pass --project to look elsewhere\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

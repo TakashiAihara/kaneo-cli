@@ -1,0 +1,455 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, truncateSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { configureClient, putUpload } from "../../src/api/http";
+import type { App } from "../../src/cli/app";
+import type { FlagValues } from "../../src/cli/args";
+import { taskCommand } from "../../src/cli/task";
+import {
+  createExternalLink,
+  deleteExternalLink,
+  duplicateTask,
+  finalizeTaskImage,
+  findDeferredTaskDescriptions,
+  getTaskDescription,
+  stageTaskImage,
+} from "../../src/api/kaneo";
+
+// The batch-9 wrappers against a stub server: what each sends and what it
+// makes of the answer. The parity suite covers the same routes end to end;
+// these pin the paging, cursor and upload shapes a golden cannot isolate.
+
+const servers: { stop: (force?: boolean) => void }[] = [];
+afterEach(() => {
+  while (servers.length) servers.pop()!.stop(true);
+});
+const serve = (handler: (req: Request) => Response | Promise<Response>) => {
+  const s = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: handler });
+  servers.push(s);
+  return `http://127.0.0.1:${s.port}`;
+};
+const using = (url: string) => configureClient({ baseUrl: url, apiKey: "test-key" });
+
+const seen = (req: Request) => ({ method: req.method, path: new URL(req.url).pathname + new URL(req.url).search });
+
+describe("getTaskDescription", () => {
+  test("joins the pages and sends the version from the second on", async () => {
+    const requests: { method: string; path: string }[] = [];
+    const url = serve(async (req) => {
+      requests.push(seen(req));
+      const offset = new URL(req.url).searchParams.get("offset");
+      if (offset === null) return Response.json({ content: "ab", version: "7", nextOffset: 2 });
+      return Response.json({ content: "cd", version: "7", nextOffset: null });
+    });
+    using(url);
+    expect(await getTaskDescription("t1")).toBe("abcd");
+    expect(requests).toEqual([
+      { method: "GET", path: "/api/task/t1/description" },
+      { method: "GET", path: "/api/task/t1/description?offset=2&version=7" },
+    ]);
+  });
+
+  test("fails when the version moves mid-read", async () => {
+    const url = serve((req) => {
+      const offset = new URL(req.url).searchParams.get("offset");
+      if (offset === null) return Response.json({ content: "ab", version: "7", nextOffset: 2 });
+      return Response.json({ content: "cd", version: "8", nextOffset: null });
+    });
+    using(url);
+    await expect(getTaskDescription("t1")).rejects.toThrow("the description changed while it was read");
+  });
+
+  test("fails when a page does not advance", async () => {
+    const url = serve(() => Response.json({ content: "ab", version: "7", nextOffset: 0 }));
+    using(url);
+    await expect(getTaskDescription("t1")).rejects.toThrow("the description page did not advance");
+  });
+});
+
+describe("findDeferredTaskDescriptions", () => {
+  test("follows the id cursor and dedupes what it is given", async () => {
+    const requests: string[] = [];
+    const url = serve((req) => {
+      const u = new URL(req.url);
+      requests.push(u.pathname + u.search);
+      const after = u.searchParams.get("after");
+      if (after === null) return Response.json({ ids: ["a", "b"], nextCursor: "b" });
+      return Response.json({ ids: ["b", "c"], nextCursor: null });
+    });
+    using(url);
+    expect(await findDeferredTaskDescriptions("p1", "needle")).toEqual(["a", "b", "c"]);
+    expect(requests).toEqual([
+      "/api/task/description-matches/p1?query=needle",
+      "/api/task/description-matches/p1?query=needle&after=b",
+    ]);
+  });
+
+  test("fails when the cursor does not advance", async () => {
+    const url = serve(() => Response.json({ ids: ["a"], nextCursor: "a" }));
+    using(url);
+    await expect(findDeferredTaskDescriptions("p1", "q")).rejects.toThrow("the description search did not advance");
+  });
+});
+
+const TASK = {
+  id: "task0001",
+  projectId: "proj1",
+  position: 0,
+  number: 1,
+  userId: null,
+  title: "Copied",
+  description: null,
+  status: "to-do",
+  priority: "no-priority",
+  startDate: null,
+  dueDate: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+};
+
+// `task ls --description` matches the descriptions the listing carries and
+// asks the server about the deferred ones; a deferred task the server's search
+// does not return — its description shortened under the limit since the board
+// was read — is read back by id and matched on that text instead.
+describe("task list --description", () => {
+  const boardTask = (over: Record<string, unknown>) => ({
+    id: "t",
+    number: 1,
+    title: "t",
+    description: null,
+    status: "to-do",
+    priority: "no-priority",
+    position: 0,
+    projectId: "p1",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    userId: null,
+    assigneeId: null,
+    assigneeName: null,
+    labels: [],
+    ...over,
+  });
+  const deferred = (id: string, number: number, title: string) =>
+    boardTask({ id, number, title, descriptionDeferred: true });
+
+  const runList = async (description: string) => {
+    const requests: string[] = [];
+    const url = serve(async (req) => {
+      const u = new URL(req.url);
+      requests.push(`${req.method} ${u.pathname}${u.search}`);
+      if (u.pathname === "/api/task/tasks/p1") {
+        return Response.json({
+          data: {
+            id: "p1",
+            name: "P",
+            slug: "p",
+            columns: [
+              {
+                id: "c-todo",
+                name: "To do",
+                tasks: [
+                  deferred("task-big", 7, "Shrunken"),
+                  deferred("task-huge", 8, "Still big"),
+                  deferred("task-other", 9, "Other"),
+                  boardTask({ id: "task-plain", number: 10, title: "Plain", description: "a needle in plain text" }),
+                ],
+              },
+            ],
+            archivedTasks: [],
+            plannedTasks: [],
+          },
+          pagination: { total: 4, totalPages: 1, page: 1, pageSize: 50, relatedPage: 1, relatedPageSize: 100, relatedTotalPages: 1 },
+        });
+      }
+      if (u.pathname === "/api/task/description-matches/p1") {
+        // task-big was shortened under the limit since the listing, so the
+        // search — which covers only still-deferred descriptions — misses it.
+        return Response.json({ ids: ["task-huge"], nextCursor: null });
+      }
+      if (u.pathname === "/api/task/task-big") {
+        return Response.json(boardTask({ id: "task-big", number: 7, title: "Shrunken", description: "needle in the shortened text", projectId: "p1" }));
+      }
+      if (u.pathname === "/api/task/task-other") {
+        return Response.json(boardTask({ id: "task-other", number: 9, title: "Other", description: "nothing here", projectId: "p1" }));
+      }
+      return new Response("not found", { status: 404 });
+    });
+    using(url);
+    let listed: { id: string }[] = [];
+    const list = (
+      taskCommand.children as { name: string; run: (ctx: { flags: FlagValues; changed: ReadonlySet<string>; app: App }) => Promise<void> }[]
+    ).find((c) => c.name === "list")!;
+    const app = {
+      cfg: { apiKey: "test-key", projectIds: ["p1"], repo: "" },
+      out: { human: () => {}, data: (v: unknown) => (listed = v as { id: string }[]), status: () => {} },
+    } as unknown as App;
+    await list.run({ flags: { description }, changed: new Set(["description"]), app });
+    return { listed, requests };
+  };
+
+  test("a deferred task the search missed is read back and matched", async () => {
+    const { listed, requests } = await runList("needle");
+    expect(listed.map((t) => t.id)).toEqual(["task-big", "task-huge", "task-plain"]);
+    // Only the deferred tasks the search did not return are read back: the
+    // matched one and the plain one cost no detail request.
+    expect(requests).toEqual([
+      "GET /api/task/tasks/p1",
+      "GET /api/task/description-matches/p1?query=needle",
+      "GET /api/task/task-big",
+      "GET /api/task/task-other",
+    ]);
+  });
+});
+
+describe("duplicateTask", () => {
+  test("sends an empty body without a title and the title with one", async () => {
+    const bodies: unknown[] = [];
+    const url = serve(async (req) => {
+      bodies.push(await req.json());
+      return Response.json(TASK);
+    });
+    using(url);
+    const copy = await duplicateTask("t1");
+    expect(copy.id).toBe("task0001");
+    expect(copy.title).toBe("Copied");
+    await duplicateTask("t1", "Renamed");
+    expect(bodies).toEqual([{}, { title: "Renamed" }]);
+  });
+});
+
+describe("task image upload", () => {
+  const wanted = { filename: "pixel.png", contentType: "image/png", size: 14, surface: "description" as const };
+
+  test("stage sends the metadata and reads the presign", async () => {
+    let request: { method: string; path: string; body: unknown } | undefined;
+    const url = serve(async (req) => {
+      request = { method: req.method, path: new URL(req.url).pathname, body: await req.json() };
+      return Response.json({ key: "k/1", uploadUrl: `${url}/uploads/k/1`, headers: { "Content-Type": "image/png" } });
+    });
+    using(url);
+    expect(await stageTaskImage("t1", wanted)).toEqual({ key: "k/1", uploadUrl: `${url}/uploads/k/1`, headers: { "Content-Type": "image/png" } });
+    expect(request).toEqual({ method: "PUT", path: "/api/task/image-upload/t1", body: wanted });
+  });
+
+  test("finalize sends the key with the same metadata", async () => {
+    let request: { method: string; path: string; body: unknown } | undefined;
+    const url = serve(async (req) => {
+      request = { method: req.method, path: new URL(req.url).pathname, body: await req.json() };
+      return Response.json({ id: "asset1", url: `${url}/asset/asset1` });
+    });
+    using(url);
+    expect(await finalizeTaskImage("t1", { ...wanted, key: "k/1" })).toEqual({ id: "asset1", url: `${url}/asset/asset1` });
+    expect(request).toEqual({ method: "POST", path: "/api/task/image-upload/t1/finalize", body: { ...wanted, key: "k/1" } });
+  });
+});
+
+describe("external links", () => {
+  const link = {
+    id: "link1",
+    taskId: "t1",
+    integrationId: null,
+    resourceType: "url",
+    externalId: "https://example.com/x",
+    url: "https://example.com/x",
+    title: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  test("create sends the url and only a given title", async () => {
+    const bodies: unknown[] = [];
+    const url = serve(async (req) => {
+      bodies.push(await req.json());
+      return Response.json(link);
+    });
+    using(url);
+    const created = await createExternalLink("t1", { url: "https://example.com/x" });
+    expect(created.id).toBe("link1");
+    expect(created.integrationType).toBeNull();
+    await createExternalLink("t1", { url: "https://example.com/x", title: "Spec" });
+    expect(bodies).toEqual([{ url: "https://example.com/x" }, { url: "https://example.com/x", title: "Spec" }]);
+  });
+
+  test("delete answers the removed link's id", async () => {
+    const requests: string[] = [];
+    const url = serve((req) => {
+      requests.push(`${req.method} ${new URL(req.url).pathname}`);
+      return Response.json({ id: "link1" });
+    });
+    using(url);
+    expect(await deleteExternalLink("t1", "link1")).toBe("link1");
+    expect(requests).toEqual(["DELETE /api/external-link/task/t1/link1"]);
+  });
+});
+
+// `task upload` reads the file before it asks the server anything, so a file
+// too large to be an image is refused before its bytes are held in memory.
+// The run is invoked directly: the refusal lands before the app is read, and
+// a file that passes the check fails next on the missing API key.
+describe("task upload's local file check", () => {
+  const runUpload = (file: string): Promise<void> => {
+    const upload = (
+      taskCommand.children as { name: string; run: (ctx: { args: string[]; flags: FlagValues; app: App }) => Promise<void> }[]
+    ).find((c) => c.name === "upload")!;
+    return upload.run({ args: ["1", file], flags: {}, app: { cfg: { apiKey: "" } } as unknown as App });
+  };
+
+  test("refuses a file too large to be an image before reading it", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "kaneo-upload-"));
+    try {
+      const huge = join(dir, "huge.png");
+      writeFileSync(huge, "");
+      truncateSync(huge, 1073741825);
+      await expect(runUpload(huge)).rejects.toThrow(`${huge} is too large to upload`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("reads a small file and stops at the missing API key", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "kaneo-upload-"));
+    try {
+      const small = join(dir, "pixel.png");
+      writeFileSync(small, "fake png bytes");
+      await expect(runUpload(small)).rejects.toThrow("no API key");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("putUpload", () => {
+  // The presigned URL's query is the credential and the bytes the payload, so
+  // the scheme is held to the API key's rule before fetch: https anywhere,
+  // http only to a loopback host. fetch is stubbed so a refusal is proven by
+  // it never being called.
+  const stubFetch = (answer: () => Response) => {
+    const real = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = Object.assign(
+      async (input: Parameters<typeof fetch>[0]) => {
+        calls.push(String(input));
+        return answer();
+      },
+      { preconnect: real.preconnect },
+    );
+    return {
+      calls,
+      restore: () => {
+        globalThis.fetch = real;
+      },
+    };
+  };
+
+  test("PUTs the bytes with the given headers and no API key", async () => {
+    let seenReq: { bytes: number; type: string | null; auth: string | null } | undefined;
+    const url = serve(async (req) => {
+      seenReq = {
+        bytes: (await req.arrayBuffer()).byteLength,
+        type: req.headers.get("content-type"),
+        auth: req.headers.get("authorization"),
+      };
+      return new Response(null, { status: 200 });
+    });
+    await putUpload(`${url}/uploads/k`, { "Content-Type": "image/png", "x-amz-meta": "1" }, new Uint8Array([1, 2, 3, 4]));
+    expect(seenReq).toEqual({ bytes: 4, type: "image/png", auth: null });
+  });
+
+  test("a redirect is not followed", async () => {
+    let hits = 0;
+    const url = serve((req) => {
+      hits++;
+      if (new URL(req.url).pathname === "/uploads/k") {
+        return new Response(null, { status: 302, headers: { location: "/elsewhere" } });
+      }
+      return new Response(null, { status: 200 });
+    });
+    const e = await putUpload(`${url}/uploads/k`, {}, new Uint8Array([1])).then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(e).toBeInstanceOf(Error);
+    expect((e as Error).message).toBe("upload to storage failed: HTTP 302");
+    expect(hits).toBe(1);
+  });
+
+  test("a refused upload is an error that names no URL", async () => {
+    const url = serve(() => new Response("no", { status: 403 }));
+    const e = await putUpload(`${url}/uploads/secret-key`, {}, new Uint8Array([1])).then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(e).toBeInstanceOf(Error);
+    expect((e as Error).message).toBe("upload to storage failed: HTTP 403");
+    expect((e as Error).message).not.toContain("secret-key");
+  });
+
+  test("a transport failure is an error that names no URL", async () => {
+    const e = await putUpload("http://127.0.0.1:1/uploads/k", {}, new Uint8Array([1])).then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(e).toBeInstanceOf(Error);
+    expect((e as Error).message).toMatch(/^upload to storage failed: \w+$/);
+    expect((e as Error).message).not.toContain("127.0.0.1");
+  });
+
+  test("an https URL passes the check and is sent the bytes", async () => {
+    const stub = stubFetch(() => new Response(null, { status: 200 }));
+    try {
+      await putUpload("https://storage.example.invalid/uploads/k?sig=secret", { "x-amz-meta": "1" }, new Uint8Array([1, 2, 3]));
+    } finally {
+      stub.restore();
+    }
+    expect(stub.calls).toEqual(["https://storage.example.invalid/uploads/k?sig=secret"]);
+  });
+
+  // http to loopback is the self-hosted case the rule exists for: the check
+  // passes and the call fails only at the connection, as it does for https.
+  test("http to a loopback host passes the check and fails only at the connection", async () => {
+    const e = await putUpload("http://127.0.0.1:9/uploads/k?sig=1", {}, new Uint8Array([1])).then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(e).toBeInstanceOf(Error);
+    expect((e as Error).message).toMatch(/^upload to storage failed: \w+$/);
+    expect((e as Error).message).not.toContain("refused");
+    expect((e as Error).message).not.toContain("sig=1");
+  });
+
+  test("http to a non-loopback host is refused before fetch", async () => {
+    const stub = stubFetch(() => new Response(null, { status: 200 }));
+    try {
+      const e = await putUpload("http://storage.example.invalid/uploads/k?sig=secret", {}, new Uint8Array([1])).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(e).toBeInstanceOf(Error);
+      expect((e as Error).message).toBe(
+        "upload to storage refused: http://storage.example.invalid/uploads/k is not https, or http to a loopback host",
+      );
+      expect((e as Error).message).not.toContain("sig=secret");
+      expect(stub.calls).toEqual([]);
+    } finally {
+      stub.restore();
+    }
+  });
+
+  // The allowance is https, or http to loopback — another scheme is refused
+  // even on loopback rather than left for fetch to reject.
+  test("a non-http scheme is refused even on loopback", async () => {
+    const stub = stubFetch(() => new Response(null, { status: 200 }));
+    try {
+      const e = await putUpload("ftp://127.0.0.1/uploads/k", {}, new Uint8Array([1])).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(e).toBeInstanceOf(Error);
+      expect((e as Error).message).toBe(
+        "upload to storage refused: ftp://127.0.0.1/uploads/k is not https, or http to a loopback host",
+      );
+      expect(stub.calls).toEqual([]);
+    } finally {
+      stub.restore();
+    }
+  });
+});

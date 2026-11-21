@@ -19,6 +19,7 @@ import {
   Comment,
   Config,
   CreateNotification200,
+  CreatedExternalLink,
   CreatedGitHubIntegration,
   CurrentUser,
   CustomFieldDefinition,
@@ -29,6 +30,7 @@ import {
   DeleteMattermostIntegration200,
   DeleteSlackIntegration200,
   DeleteTelegramIntegration200,
+  DeletedExternalLink,
   ExternalLink,
   GitHubAppInfo,
   GitHubDeleteResult,
@@ -59,8 +61,11 @@ import {
   SetCustomFieldValueResponse,
   Task,
   TaskByTicketId,
+  TaskDescriptionMatches,
   TaskDescriptionPage,
   TaskExport,
+  TaskImageAsset,
+  TaskImageUpload,
   TaskImportResult,
   TaskRelation,
   TaskRelationWithTasks,
@@ -82,6 +87,7 @@ import type {
   CreateColumnBody,
   CreateCustomFieldBody,
   CreateDiscordIntegrationBody,
+  CreateExternalLinkBody,
   CreateGenericWebhookIntegrationBody,
   CreateGitHubIntegrationBody,
   CreateGitlabIntegrationBody,
@@ -92,17 +98,22 @@ import type {
   CreateSlackIntegrationBody,
   CreateTaskBody,
   CreateTaskCommentBody,
+  CreateTaskImageUploadBody,
   CreateTaskRelationBody,
   CreateTelegramIntegrationBody,
   CreateTimeEntryBody,
   DiscordIntegration,
+  DuplicateTaskBody,
   FinalizeProjectBackgroundUploadBody,
+  FinalizeTaskImageUploadBody,
+  FindDeferredTaskDescriptionsParams,
   GenericWebhookIntegration,
   GetActivitiesParams,
   GetPublicProjectDescriptionPageParams,
   GetPublicProjectParams,
   GetPublicTaskDescriptionPageParams,
   GetTaskByTicketIdParams,
+  GetTaskDescriptionPageParams,
   GetTaskParams,
   GitHubIntegration,
   GitlabIntegration,
@@ -1015,6 +1026,74 @@ export const revokeCalendarFeed = async (projectId: string,
 
 
 
+export const getGetTaskDescriptionPageUrl = (id: string,
+    params?: GetTaskDescriptionPageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/task/${id}/description?${stringifiedParams}` : `/task/${id}/description`
+}
+
+/**
+ * @summary Read a description page
+ */
+export const getTaskDescriptionPage = async (id: string,
+    params?: GetTaskDescriptionPageParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<TaskDescriptionPage> => {
+
+  return kaneoFetch<TaskDescriptionPage>(getGetTaskDescriptionPageUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: TaskDescriptionPage
+  }
+);}
+
+
+
+export const getFindDeferredTaskDescriptionsUrl = (projectId: string,
+    params: FindDeferredTaskDescriptionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/task/description-matches/${projectId}?${stringifiedParams}` : `/task/description-matches/${projectId}`
+}
+
+/**
+ * @summary Search descriptions omitted from task lists
+ */
+export const findDeferredTaskDescriptions = async (projectId: string,
+    params: FindDeferredTaskDescriptionsParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<TaskDescriptionMatches> => {
+
+  return kaneoFetch<TaskDescriptionMatches>(getFindDeferredTaskDescriptionsUrl(projectId,params),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: TaskDescriptionMatches
+  }
+);}
+
+
+
 export const getListAssignedTasksUrl = (params: ListAssignedTasksParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -1158,6 +1237,47 @@ return kaneoFetch<Task>(getCreateTaskUrl(projectId),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createTaskBody),
+    schema: Task
+  }
+);}
+
+
+
+export const getDuplicateTaskUrl = (id: string,) => {
+
+
+
+
+  return `/task/duplicate/${id}`
+}
+
+/**
+ * Copy a task into the same project and column, including custom fields, labels, description assets and same-workspace parent links. Copying parent links also requires task:update. Comments, time entries and child tasks are not copied.
+ * @summary Duplicate a task
+ */
+export const duplicateTask = async (id: string,
+    duplicateTaskBody: DuplicateTaskBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<Task> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<Task>(getDuplicateTaskUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(duplicateTaskBody),
     schema: Task
   }
 );}
@@ -1609,6 +1729,88 @@ return kaneoFetch<Task>(getUpdateTaskTitleUrl(id),
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateTaskTitleBody),
     schema: Task
+  }
+);}
+
+
+
+export const getCreateTaskImageUploadUrl = (id: string,) => {
+
+
+
+
+  return `/task/image-upload/${id}`
+}
+
+/**
+ * Get a presigned URL for uploading an image used in a task description or comment. PUT the bytes to it, then call the finalize route.
+ * @summary Create image upload URL
+ */
+export const createTaskImageUpload = async (id: string,
+    createTaskImageUploadBody: CreateTaskImageUploadBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<TaskImageUpload> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<TaskImageUpload>(getCreateTaskImageUploadUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createTaskImageUploadBody),
+    schema: TaskImageUpload
+  }
+);}
+
+
+
+export const getFinalizeTaskImageUploadUrl = (id: string,) => {
+
+
+
+
+  return `/task/image-upload/${id}/finalize`
+}
+
+/**
+ * Record an uploaded image as a private asset and return the URL to reference it by.
+ * @summary Finalize image upload
+ */
+export const finalizeTaskImageUpload = async (id: string,
+    finalizeTaskImageUploadBody: FinalizeTaskImageUploadBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<TaskImageAsset> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<TaskImageAsset>(getFinalizeTaskImageUploadUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(finalizeTaskImageUploadBody),
+    schema: TaskImageAsset
   }
 );}
 
@@ -4025,6 +4227,47 @@ export const deleteTaskRelation = async (id: string, options?: Parameters<typeof
 
 
 
+export const getCreateExternalLinkUrl = (taskId: string,) => {
+
+
+
+
+  return `/external-link/task/${taskId}`
+}
+
+/**
+ * Add a resource link to a task
+ * @summary Create an external link
+ */
+export const createExternalLink = async (taskId: string,
+    createExternalLinkBody: CreateExternalLinkBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<CreatedExternalLink> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<CreatedExternalLink>(getCreateExternalLinkUrl(taskId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createExternalLinkBody),
+    schema: CreatedExternalLink
+  }
+);}
+
+
+
 export const getGetExternalLinksByTaskUrl = (taskId: string,) => {
 
 
@@ -4046,6 +4289,34 @@ export const getExternalLinksByTask = async (taskId: string, options?: Parameter
 
     ,
     schema: zod.array(ExternalLink)
+  }
+);}
+
+
+
+export const getDeleteExternalLinkUrl = (taskId: string,
+    id: string,) => {
+
+
+
+
+  return `/external-link/task/${taskId}/${id}`
+}
+
+/**
+ * Remove a manually added link from a task. Integration-managed links cannot be removed through this endpoint.
+ * @summary Remove a manual resource link
+ */
+export const deleteExternalLink = async (taskId: string,
+    id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<DeletedExternalLink> => {
+
+  return kaneoFetch<DeletedExternalLink>(getDeleteExternalLinkUrl(taskId,id),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: DeletedExternalLink
   }
 );}
 

@@ -91,7 +91,7 @@ A link from a task to something outside the board. Two kinds share one list: a l
 
 The integration is the one thing that tells them apart: `integrationId` and the nested `integration` are set only for the second kind, so the second kind is what has one and a manual link has none. `resourceType` says what the link points at rather than where it came from — `url` for a manual link, and e.g. `issue`, `pull_request` or `branch` for one a provider brought in — and the list is open-ended, being whatever the integration wrote. `externalId` is the provider's identifier, or the URL itself for a manual link, so a manual link identifies itself by where it points. `title` is nullable on either kind and may be empty.
 
-`kaneo task external-links` (`xlinks`) lists a task's, marking each integration's with the integration it came through. It is the only read of these this CLI wires: adding a link ([#208](https://github.com/TakashiAihara/kaneo-cli/issues/208)) and deleting one ([#210](https://github.com/TakashiAihara/kaneo-cli/issues/210)) are tracked as issues.
+`kaneo task external-links` (`xlinks`) lists a task's, marking each integration's with the integration it came through; `--add <url>` attaches a link by hand and `--rm <id>` removes one, each followed by the list as it now stands.
 
 ### project integration
 

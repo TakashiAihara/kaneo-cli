@@ -1,0 +1,54 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "duplicate",
+        "1",
+        "--to",
+        "proj-beta",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"duplicated #1 as #4, but the copy is still in proj-alpha: project is \\\"proj-alpha\\\" after setting it to \\\"proj-beta\\\"\"\n}\n",
+      "stderr": "Error: duplicated #1 as #4, but the copy is still in proj-alpha: project is \"proj-alpha\" after setting it to \"proj-beta\"\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/duplicate/task-a1",
+      "query": "",
+      "body": {}
+    },
+    {
+      "method": "PUT",
+      "path": "/task/move/task0002",
+      "query": "",
+      "body": {
+        "destinationProjectId": "proj-beta"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task0002",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

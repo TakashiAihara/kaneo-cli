@@ -26,7 +26,7 @@ export type Seed = {
     userId?: string | null;
     // Calendar feeds only list tasks carrying a start or a due date.
     startDate?: string;
-    dueDate?: string;
+    dueDate?: string | null;
   }[];
   // A comment with a userId of its own was written by someone else, so only
   // the server's author check stands between it and a delete.
@@ -2611,29 +2611,41 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
 
     // A description page is a slice of the stored text; the fake pages at
-    // 1024 characters so a scenario can exercise the continuation.
+    // 1024 characters so a scenario can exercise the continuation. The version
+    // is what the row's xmin would be: once a read knows it, later offsets pin
+    // to it and a row that no longer matches is a 409, as
+    // description-pages.ts answers; without one the same absence is a 404.
     const DESCRIPTION_PAGE = 1024;
+    const DESCRIPTION_VERSION = "1";
     const descriptionPage = (content: string, offset: number): z.input<typeof M.TaskDescriptionPage> => ({
       content: content.slice(offset, offset + DESCRIPTION_PAGE),
-      version: "1",
+      version: DESCRIPTION_VERSION,
       nextOffset: offset + DESCRIPTION_PAGE < content.length ? offset + DESCRIPTION_PAGE : null,
     });
+    const descriptionMiss = (gone: boolean): Response | undefined => {
+      const version = url.searchParams.get("version");
+      if (!gone && (version === null || version === DESCRIPTION_VERSION)) return undefined;
+      return fail(version === null ? 404 : 409, "Description changed or is unavailable; refresh before loading it again");
+    };
     if (req.method === "GET" && (p = m(/^\/public-project\/([^/]+)\/description$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj || !proj.isPublic) return fail(404, "Project not found");
-      return ok(M.TaskDescriptionPage, descriptionPage(proj.description ?? "", Number(url.searchParams.get("offset") ?? 0)));
+      const miss = descriptionMiss(proj === undefined || !proj.isPublic);
+      if (miss !== undefined) return miss;
+      return ok(M.TaskDescriptionPage, descriptionPage(proj!.description ?? "", Number(url.searchParams.get("offset") ?? 0)));
     }
     if (req.method === "GET" && (p = m(/^\/public-project\/([^/]+)\/task\/([^/]+)\/description$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       const task = tasks.find((t) => t.id === decodeURIComponent(p![2]!));
-      if (!proj || !proj.isPublic || task === undefined || task.projectId !== proj.id) return fail(404, "Description changed or is unavailable");
-      return ok(M.TaskDescriptionPage, descriptionPage(task.description ?? "", Number(url.searchParams.get("offset") ?? 0)));
+      const miss = descriptionMiss(proj === undefined || !proj.isPublic || task === undefined || task.projectId !== proj.id);
+      if (miss !== undefined) return miss;
+      return ok(M.TaskDescriptionPage, descriptionPage(task!.description ?? "", Number(url.searchParams.get("offset") ?? 0)));
     }
     if (req.method === "GET" && (p = m(/^\/public-project\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      // Visibility is checked before the board is read: a project that is not
-      // public answers as one that does not exist.
-      if (!proj || !proj.isPublic) return fail(404, "Project not found");
+      // As get-public-project.ts answers: an unknown id is a 404, a project
+      // that is not public a 403 — the board is not read for either.
+      if (!proj) return fail(404, "Project not found");
+      if (!proj.isPublic) return fail(403, "Project is not public");
       const filterStatus = url.searchParams.get("status");
       const filterPriority = url.searchParams.get("priority");
       const filterAssignee = url.searchParams.get("assigneeId");
@@ -2700,6 +2712,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           relatedPage: related,
           relatedPageSize: 100,
           relatedTotalPages: 1,
+          relatedRevision: `relrev-${mine.length}`,
           revision: `rev-${mine.length}`,
         },
       });

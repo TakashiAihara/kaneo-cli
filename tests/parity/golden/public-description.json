@@ -55,8 +55,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/public-project/proj-alpha/description: 404: Project not found\"\n}\n",
-      "stderr": "Error: GET /api/public-project/proj-alpha/description: 404: Project not found\n"
+      "stdout": "{\n  \"error\": \"GET /api/public-project/proj-alpha/description: 404: Description changed or is unavailable; refresh before loading it again\"\n}\n",
+      "stderr": "Error: GET /api/public-project/proj-alpha/description: 404: Description changed or is unavailable; refresh before loading it again\n"
     }
   ],
   "requests": [
@@ -68,7 +68,7 @@
     {
       "method": "GET",
       "path": "/public-project/proj-public/description",
-      "query": "?offset=1024"
+      "query": "?offset=1024&version=1"
     },
     {
       "method": "GET",
@@ -78,12 +78,12 @@
     {
       "method": "GET",
       "path": "/public-project/proj-public/task/task-pub2/description",
-      "query": "?offset=1024"
+      "query": "?offset=1024&version=1"
     },
     {
       "method": "GET",
       "path": "/public-project/proj-public/task/task-pub2/description",
-      "query": "?offset=2048"
+      "query": "?offset=2048&version=1"
     },
     {
       "method": "GET",
@@ -98,12 +98,12 @@
     {
       "method": "GET",
       "path": "/public-project/proj-public/task/task-pub2/description",
-      "query": "?offset=1024"
+      "query": "?offset=1024&version=1"
     },
     {
       "method": "GET",
       "path": "/public-project/proj-public/task/task-pub2/description",
-      "query": "?offset=2048"
+      "query": "?offset=2048&version=1"
     },
     {
       "method": "GET",

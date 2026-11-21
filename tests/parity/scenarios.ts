@@ -2025,15 +2025,40 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     // Commands that send no request, or only a request that needs no key
-    // (api-check), never run it, and a fail-open session command that needs
-    // the key still exits 0 when the command fails.
+    // (api-check, the instance and public reads, an avatar download, a feed
+    // download), never run it, and a fail-open session command that needs
+    // the key still exits 0 when the command fails. whoami at the end is the
+    // contrast: it does need the key, so the command runs and fails the step.
     name: "a failing api_key_command spares commands that send no key",
     env: { KANEO_API_KEY: "", KANEO_SESSION_ID: "sess-cmd" },
     config: { profiles: { self: { api_key_command: "echo ran >&2; exit 3" } } },
     // The calendar route declares security: [], so `feed get` is one of the
     // commands that send no key; the seeded feed's empty labels still serve.
-    seed: { calendarFeeds: [{ projectId: P1 }] },
-    steps: [["completion", "bash"], ["__complete", "task", ""], ["session", "status", "--json"], ["session", "attach", "1"], ["context", "--json"], ["context", "--human"], ["api-check", "--json"], ["feed", "get", feedToken(1)], ["whoami", "--json"]],
+    seed: {
+      calendarFeeds: [{ projectId: P1 }],
+      projects: [
+        ...SEED.projects,
+        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+      ],
+      avatars: [{ id: "av-1", body: "avatar-one-bytes", contentType: "image/webp" }],
+    },
+    extraTasks: [{ id: "task-pub1", projectId: "proj-public", title: "Public first" }],
+    steps: [
+      ["completion", "bash"],
+      ["__complete", "task", ""],
+      ["session", "status", "--json"],
+      ["session", "attach", "1"],
+      ["context", "--json"],
+      ["context", "--human"],
+      ["api-check", "--json"],
+      ["feed", "get", feedToken(1)],
+      ["instance", "status", "--json"],
+      ["instance", "config", "--json"],
+      ["public", "project", "proj-public", "--json"],
+      ["public", "description", "proj-public", "--json"],
+      ["avatar", "get", "av-1", "--out", "face.webp", "--json"],
+      ["whoami", "--json"],
+    ],
   },
   {
     name: "api_key_command printing too much",
@@ -2979,15 +3004,18 @@ export const SCENARIOS: Scenario[] = [
         { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
       ],
     },
+    // The three tasks differ on every field the filters read, so the filtered
+    // read answers with task-pub1 alone.
     extraTasks: [
-      { id: "task-pub1", projectId: "proj-public", title: "Public first", priority: "high" },
-      { id: "task-pub2", projectId: "proj-public", title: "Public second", status: "done" },
+      { id: "task-pub1", projectId: "proj-public", title: "Public first", priority: "high", userId: "user-1", dueDate: "2026-01-10T00:00:00.000Z" },
+      { id: "task-pub2", projectId: "proj-public", title: "Public second", status: "done", priority: "low", userId: "user-2", dueDate: "2026-03-10T00:00:00.000Z" },
       { id: "task-pub3", projectId: "proj-public", title: "Public third", status: "archived" },
     ],
     steps: [
       ["public", "project", "proj-public", "--human"],
       ["public", "project", "proj-public", "--status", "to-do", "--json"],
       ["public", "project", "proj-public", "--sort-by", "title", "--sort-order", "desc", "--limit", "1", "--json"],
+      ["public", "project", "proj-public", "--priority", "high", "--assignee-id", "user-1", "--due-before", "2026-02-01T00:00:00.000Z", "--due-after", "2026-01-01T00:00:00.000Z", "--json"],
       ["public", "project", "proj-alpha", "--json"],
       ["public", "project", "proj-public", "--sort-by", "sideways", "--json"],
     ],

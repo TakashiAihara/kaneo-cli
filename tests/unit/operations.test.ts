@@ -2524,17 +2524,43 @@ test("getPublicBoard reads every page and merges the tasks in order", async () =
 });
 
 test("getPublicProjectDescription concatenates the pages and keeps the first version", async () => {
-  const offsets: string[] = [];
+  const pages: [string, string | null][] = [];
   newServer(async (req) => {
     const url = new URL(req.url);
-    offsets.push(url.searchParams.get("offset") ?? "");
+    pages.push([url.searchParams.get("offset") ?? "", url.searchParams.get("version")]);
     const offset = Number(url.searchParams.get("offset") ?? "0");
     const content = offset === 0 ? "hello " : "world";
-    return Response.json({ content, version: "v1", nextOffset: offset === 0 ? 6 : null });
+    return Response.json({ content, version: "7", nextOffset: offset === 0 ? 6 : null });
   });
   const description = await api.getPublicProjectDescription("proj-pub");
-  expect(offsets).toEqual(["0", "6"]);
-  expect(description).toEqual({ content: "hello world", version: "v1" });
+  // The first page names no version to pin; every later offset carries the
+  // one it answered, so an edit mid-read is a 409 rather than a splice.
+  expect(pages).toEqual([
+    ["0", null],
+    ["6", "7"],
+  ]);
+  expect(description).toEqual({ content: "hello world", version: "7" });
+});
+
+test("a public description that changed mid-read fails with the server's 409", async () => {
+  newServer(async (req) => {
+    const url = new URL(req.url);
+    const offset = Number(url.searchParams.get("offset") ?? "0");
+    if (offset === 0) return Response.json({ content: "hello ", version: "7", nextOffset: 6 });
+    // Only the pinned read is refused: an unpinned offset would splice the
+    // new text in, which is what the version exists to prevent.
+    if (url.searchParams.get("version") !== "7") {
+      return Response.json({ content: "world", version: "8", nextOffset: null });
+    }
+    return Response.json(
+      { success: false, error: "Description changed or is unavailable; refresh before loading it again" },
+      { status: 409 },
+    );
+  });
+  const err = (await failure(api.getPublicProjectDescription("proj-pub"))) as KaneoApiError;
+  expect(err).toBeInstanceOf(KaneoApiError);
+  expect(err.statusCode).toBe(409);
+  expect(err.message).toContain("Description changed or is unavailable; refresh before loading it again");
 });
 
 test("downloadAsset and downloadAvatar hand back the bytes and their type", async () => {
@@ -2544,7 +2570,113 @@ test("downloadAsset and downloadAvatar hand back the bytes and their type", asyn
   expect(asset.contentType).toBe("image/png");
   expect(asset.data).toEqual(bytes);
 
-  const avatar = await api.downloadAvatar("u1");
+  const avatar = await api.downloadAvatar("av1");
   expect(avatar.contentType).toBe("image/png");
   expect(avatar.data).toEqual(bytes);
+});
+
+// relatedRevision covers the related rows of the one task page it rides on:
+// a change between that page's related continuations is a board that moved,
+// so the read is taken again.
+test("getPublicBoard rereads when relatedRevision moves between related pages", async () => {
+  const reads: string[] = [];
+  let settled = false;
+  newServer(async (req) => {
+    const url = new URL(req.url);
+    const related = Number(url.searchParams.get("relatedPage") ?? "1");
+    reads.push(`related=${related}`);
+    const body = JSON.parse(publicPage([pubTask("t1", 1, "first")], 1, 1));
+    body.pagination.relatedTotalPages = 2;
+    // The first read sees the related rows change under it; the reread finds
+    // them still, which is what ends the loop.
+    body.pagination.relatedRevision = settled ? "r2" : related === 1 ? "r1" : "r2";
+    if (related === 2) settled = true;
+    return Response.json(body);
+  });
+  const board = await api.getPublicBoard("proj-pub");
+  expect(reads).toEqual(["related=1", "related=2", "related=1", "related=2"]);
+  expect(board.columns[0]!.tasks.map((t) => t.title)).toEqual(["first"]);
+});
+
+// The same field legitimately differs between task pages — it describes each
+// page's own related rows — so only a change within one page's continuations
+// counts as the board moving.
+test("getPublicBoard does not reread when relatedRevision differs between task pages", async () => {
+  const reads: string[] = [];
+  newServer(async (req) => {
+    const url = new URL(req.url);
+    const page = Number(url.searchParams.get("page") ?? "1");
+    reads.push(`page=${page}`);
+    const body = JSON.parse(publicPage([pubTask(`t${page}`, page, `task ${page}`)], page, 2));
+    body.pagination.relatedRevision = `rel-${page}`;
+    return Response.json(body);
+  });
+  const board = await api.getPublicBoard("proj-pub");
+  expect(reads).toEqual(["page=1", "page=2"]);
+  expect(board.columns[0]!.tasks.map((t) => t.title)).toEqual(["task 1", "task 2"]);
+});
+
+// Every route the new reads hit is anonymous: none of them may run the
+// profile's api_key_command or put a key on the wire. authSession is the
+// contrast — the session route answers a key, so it asks for and sends one.
+test("the anonymous reads never ask for or send the key", async () => {
+  const asked: string[] = [];
+  const auths: (string | null)[] = [];
+  const s = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: (req) => {
+      const path = new URL(req.url).pathname;
+      auths.push(req.headers.get("authorization"));
+      if (path === "/api/instance/status") return Response.json({ hasUsers: true, hasAdmin: true });
+      if (path === "/api/config") return Response.json({});
+      if (path === "/api/auth/get-session") return Response.json(null);
+      if (path === "/api/public-project/p1/description" || path === "/api/public-project/p1/task/t1/description") {
+        return Response.json({ content: "", version: "1", nextOffset: null });
+      }
+      if (path === "/api/public-project/p1") return Response.json(JSON.parse(publicPage([], 1, 1)));
+      if (path === "/api/user/avatar/av1") {
+        return new Response(new Uint8Array([1, 2]), { headers: { "content-type": "image/webp" } });
+      }
+      return new Response(`unexpected ${path}`, { status: 500 });
+    },
+  });
+  servers.push(s);
+  configureClient({ baseUrl: `http://127.0.0.1:${s.port}`, apiKey: () => (asked.push("key"), "test-key") });
+
+  await api.instanceStatus();
+  await api.instanceConfig();
+  await api.getPublicBoard("p1");
+  await api.getPublicProjectDescription("p1");
+  await api.getPublicTaskDescription("p1", "t1");
+  await api.downloadAvatar("av1");
+  expect(asked).toEqual([]);
+  expect(auths).toEqual([null, null, null, null, null, null]);
+
+  await api.authSession();
+  expect(asked).toEqual(["key"]);
+  expect(auths[6]).toBe("Bearer test-key");
+});
+
+// The public board's filter flags land on the wire under the document's own
+// query names, so a flag that renamed one would be caught here.
+test("getPublicBoard sends every filter under its query name", async () => {
+  const queries: string[] = [];
+  newServer(async (req) => {
+    queries.push(new URL(req.url).search);
+    return Response.json(JSON.parse(publicPage([], 1, 1)));
+  });
+  await api.getPublicBoard("proj-pub", {
+    status: "done",
+    priority: "high",
+    assigneeId: "u1",
+    sortBy: "title",
+    sortOrder: "desc",
+    dueBefore: "2026-02-01",
+    dueAfter: "2026-01-01",
+    limit: 5,
+  });
+  expect(queries).toEqual([
+    "?status=done&priority=high&assigneeId=u1&page=1&relatedPage=1&limit=5&sortBy=title&sortOrder=desc&dueBefore=2026-02-01&dueAfter=2026-01-01",
+  ]);
 });

@@ -37,7 +37,7 @@
     {
       "method": "GET",
       "path": "/public-project/proj-public/description",
-      "query": "?offset=1024"
+      "query": "?offset=1024&version=1"
     }
   ],
   "files": {}

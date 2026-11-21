@@ -103,6 +103,24 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
         // 2026-01-01 and stay.
         .replace(/\b(?!2026-01-01T)\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d:\d\d)/g, "<TIME>$2");
 
+    // What the cwd holds before the first step, so a file a command writes
+    // there (an --out download) is told apart from the scenario's own inputs
+    // and a repository's .git, neither of which the CLI produced.
+    const cwdTree = (): Map<string, string> => {
+      const out = new Map<string, string>();
+      const walk = (dir: string) => {
+        for (const name of readdirSync(dir).sort()) {
+          if (name === ".git") continue;
+          const full = join(dir, name);
+          if (statSync(full).isDirectory()) walk(full);
+          else out.set(relative(cwd, full), readFileSync(full, "utf8"));
+        }
+      };
+      walk(cwd);
+      return out;
+    };
+    const cwdBefore = cwdTree();
+
     const steps: StepResult[] = [];
     for (const args of s.steps) {
       // <URL> in a scenario's arguments stands for the fake's address, which
@@ -137,6 +155,11 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
       }
     };
     if (existsSync(join(home, ".config"))) walk(join(home, ".config"));
+    // Files the steps wrote or changed in the cwd, named as the .config walk
+    // names its own: home-relative, so "work/face.webp".
+    for (const [name, text] of cwdTree()) {
+      if (cwdBefore.get(name) !== text) files[join("work", name)] = normalize(text);
+    }
 
     const requests = settle(JSON.parse(normalize(JSON.stringify(fake.requests))) as Recorded[]);
     return { steps, requests, files };

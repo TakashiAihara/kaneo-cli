@@ -1205,9 +1205,12 @@ const readBoard = async (
   }, projectId, stopAt);
 };
 
-// Reads a paged board listing into a board. revision asks the paging block's
-// revision to be watched as well as the total: the public board reports one,
-// and a board edited between pages keeps its total while its revision moves.
+// Reads a paged board listing into a board. watchRevision asks the paging
+// block's revisions to be watched as well as the total: the public board
+// reports them, and a board edited between pages keeps its total while its
+// revisions move. relatedRevision covers the related rows of the task page it
+// rides on, so it is compared only across that page's related continuations,
+// never carried to the next task page whose rows it does not describe.
 const readPages = async (
   fetchPage: (page: number, relatedPage: number) => Promise<BoardPage>,
   projectId: string,
@@ -1226,6 +1229,7 @@ const readPages = async (
 
   for (let page = 1, pages = 1; page <= pages && stopped === undefined; page++) {
     const onPage: Task[] = [];
+    let relatedRevision: string | undefined;
     for (let related = 1, relatedPages = 1; related <= relatedPages; related++) {
       const response = await fetchPage(page, related);
       pages = response.pagination?.totalPages ?? 0;
@@ -1238,6 +1242,11 @@ const readPages = async (
         if (seen !== undefined) {
           if (revision === undefined) revision = seen;
           else if (seen !== revision) revisionMoved = true;
+        }
+        const seenRelated = response.pagination?.relatedRevision;
+        if (seenRelated !== undefined) {
+          if (relatedRevision === undefined) relatedRevision = seenRelated;
+          else if (seenRelated !== relatedRevision) revisionMoved = true;
         }
       }
 
@@ -3070,36 +3079,41 @@ export const findPublicTaskByNumber = async (
 
 // A description read whole: the pages are contiguous slices of one text, so
 // the content is their concatenation and the version is the one they were all
-// read under.
+// read under. The first page's version is pinned onto every later offset, so
+// an edit mid-read is answered 409 rather than spliced into the text.
 export type Description = { content: string; version: string };
 
 const readDescription = async (
-  fetchPage: (offset: number) => Promise<GenDescriptionPage>,
+  fetchPage: (offset: number, version: string | undefined) => Promise<GenDescriptionPage>,
 ): Promise<Description> => {
   let content = "";
-  let version = "";
+  let version: string | undefined;
   for (let offset = 0; ; ) {
-    const page = zeroRecord(await fetchPage(offset));
+    const page = zeroRecord(await fetchPage(offset, version));
     content += page.content ?? "";
-    if (version === "") version = page.version ?? "";
+    // The first page that names a version pins every later offset to it; one
+    // that names none leaves the read unpinned, as it was.
+    version ??= page.version || undefined;
     const next = page.nextOffset;
     // A next offset that does not advance is a page that would be read for
     // ever; the text read so far is the answer the server gave.
     if (next === null || next === undefined || next <= offset) break;
     offset = next;
   }
-  return { content, version };
+  return { content, version: version ?? "" };
 };
 
 // The public project description, every page of it.
 export const getPublicProjectDescription = (projectId: string): Promise<Description> =>
-  readDescription((offset) => readPublicDescription(pathParam(projectId), { offset }, { anonymous: true }));
+  readDescription((offset, version) =>
+    readPublicDescription(pathParam(projectId), { offset, version }, { anonymous: true }),
+  );
 
 // The public task description, every page of it. taskId is the task's id,
 // which the board listing carries.
 export const getPublicTaskDescription = (projectId: string, taskId: string): Promise<Description> =>
-  readDescription((offset) =>
-    readPublicTaskDescription(pathParam(projectId), pathParam(taskId), { offset }, { anonymous: true }),
+  readDescription((offset, version) =>
+    readPublicTaskDescription(pathParam(projectId), pathParam(taskId), { offset, version }, { anonymous: true }),
   );
 
 // Bytes a binary route answered with, and the content type it was served as.
@@ -3116,9 +3130,10 @@ export const downloadAsset = async (assetId: string): Promise<Download> =>
   toDownload(await readAsset(pathParam(assetId), { blob: true }));
 
 // A user's avatar image, served without authentication: the route is how a
-// shared board shows its members' faces.
-export const downloadAvatar = async (userId: string): Promise<Download> =>
-  toDownload(await readAvatar(pathParam(userId), { blob: true, anonymous: true }));
+// shared board shows its members' faces. The path names the avatar record's
+// id, which changes whenever the image is replaced — not the user's.
+export const downloadAvatar = async (avatarId: string): Promise<Download> =>
+  toDownload(await readAvatar(pathParam(avatarId), { blob: true, anonymous: true }));
 
 // Sets the credential's own avatar: the image's bytes as base64 and the type
 // they are, which the command reads off the file.

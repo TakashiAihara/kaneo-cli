@@ -35,6 +35,10 @@
     "body.required": false,
     "body.type": true
   },
+  "createGitHubIntegration": {
+    "body.repositoryName": true,
+    "body.repositoryOwner": true
+  },
   "createGitlabIntegration": {
     "body.accessToken": false,
     "body.baseUrl": true,
@@ -90,6 +94,7 @@
   },
   "deleteColumn": {},
   "deleteCustomField": {},
+  "deleteGitHubIntegration": {},
   "deleteGitlabIntegration": {},
   "deleteLabel": {},
   "deleteNotificationPreferenceWorkspaceRule": {},
@@ -118,6 +123,8 @@
   "getCustomFieldValuesByTask": {},
   "getCustomFieldsByProject": {},
   "getExternalLinksByTask": {},
+  "getGitHubAppInfo": {},
+  "getGitHubIntegration": {},
   "getGitlabIntegration": {},
   "getInvitationDetails": {},
   "getLabel": {},
@@ -148,6 +155,10 @@
     "query.userEmail": false,
     "query.workspaceId": true
   },
+  "importGitHubIssues": {
+    "body.projectId": true,
+    "body.runId": false
+  },
   "importGitlabIssues": {
     "body.projectId": true
   },
@@ -159,6 +170,10 @@
     "query.workspaceId": true
   },
   "listCalendarFeeds": {},
+  "listGitHubRepositories": {
+    "query.installationPage": false,
+    "query.repositoryPage": false
+  },
   "listGitlabProjects": {
     "body.accessToken": true,
     "body.baseUrl": true,
@@ -218,6 +233,10 @@
     "body.icon": false,
     "body.isFinal": false,
     "body.name": false
+  },
+  "updateGitHubIntegration": {
+    "body.commentTaskLinkOnGitHubIssue": false,
+    "body.isActive": false
   },
   "updateGitlabIntegration": {
     "body.commentTaskLinkOnGitlabIssue": false,
@@ -310,6 +329,11 @@
     "body.columnId": true,
     "body.eventType": true,
     "body.integrationType": true
+  },
+  "verifyGitHubInstallation": {
+    "body.projectId": true,
+    "body.repositoryName": true,
+    "body.repositoryOwner": true
   },
   "verifyGitlabAccess": {
     "body.accessToken": true,

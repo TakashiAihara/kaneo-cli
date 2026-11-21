@@ -73,6 +73,24 @@ export type Seed = {
   // A feed names its labels the way create's body does; the workspace
   // definitions it resolves to are materialized as the route would.
   calendarFeeds?: { projectId: string; labels?: string[]; timeZone?: string }[];
+  // A GitHub integration a project already has, reported the way the routes
+  // answer it. importPages is how many provider pages a fresh import run
+  // needs; each request works up to four of them, as the server's
+  // IMPORT_PAGES_PER_REQUEST does. verified stands for the stored binding a
+  // repository administrator's verification writes — the repository id, the
+  // GitHub account and the verifying user — which hasVerifiedGitHubBinding
+  // requires along with a positive installationId.
+  githubIntegrations?: {
+    projectId: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    installationId?: number | null;
+    isActive?: boolean;
+    verified?: boolean;
+    branchPattern?: string;
+    commentTaskLinkOnGitHubIssue?: boolean;
+    importPages?: number;
+  }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
@@ -568,6 +586,80 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const ALLOWED_IMAGE_TYPES = new Set(["image/apng", "image/avif", "image/gif", "image/heic", "image/heif", "image/jpeg", "image/jpg", "image/png", "image/webp"]);
   const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
   const backgroundKeyPrefix = (proj: (typeof projects)[number]) => `workspace/${proj.workspaceId}/project/${proj.id}/backgrounds/`;
+
+  // GitHub integrations, at most one per project as the table's uniqueness
+  // gives them. importRun is the resumable import the routes continue; its
+  // ids number apart from everything else so a seeded run leaves the recorded
+  // ids alone.
+  type GitHubRow = {
+    id: string;
+    projectId: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    installationId: number | null;
+    isActive: boolean;
+    verified: boolean;
+    branchPattern?: string;
+    commentTaskLinkOnGitHubIssue?: boolean;
+    importPages: number;
+    importRun: { runId: string; pagesLeft: number; done: boolean; imported: number; updated: number; skipped: number } | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  let importSeq = 0;
+  const githubIntegrations: GitHubRow[] = (seed.githubIntegrations ?? []).map((g) => ({
+    id: id("ghi"),
+    projectId: g.projectId,
+    repositoryOwner: g.repositoryOwner,
+    repositoryName: g.repositoryName,
+    installationId: g.installationId ?? 42,
+    isActive: g.isActive ?? true,
+    verified: g.verified ?? true,
+    ...(g.branchPattern === undefined ? {} : { branchPattern: g.branchPattern }),
+    ...(g.commentTaskLinkOnGitHubIssue === undefined ? {} : { commentTaskLinkOnGitHubIssue: g.commentTaskLinkOnGitHubIssue }),
+    importPages: g.importPages ?? 0,
+    importRun: null,
+    createdAt: seededAt,
+    updatedAt: seededAt,
+  }));
+  // hasVerifiedGitHubBinding: the verified fields and a positive installation
+  // id together. The routes fold it into requiresVerification and isActive.
+  const githubBound = (i: GitHubRow) => i.verified && (i.installationId ?? 0) > 0;
+  // What get-github-integration.ts answers: the stored config flattened, the
+  // import progress only while a run exists for the linked repository, and
+  // isActive already folded with the verified binding.
+  const githubView = (i: GitHubRow) => ({
+    id: i.id,
+    projectId: i.projectId,
+    repositoryOwner: i.repositoryOwner,
+    repositoryName: i.repositoryName,
+    installationId: i.installationId,
+    requiresVerification: !githubBound(i),
+    ...(i.importRun === null
+      ? {}
+      : {
+          importProgress: {
+            runId: i.importRun.runId,
+            pending: !i.importRun.done,
+            imported: i.importRun.imported,
+            updated: i.importRun.updated,
+            skipped: i.importRun.skipped,
+          },
+        }),
+    branchPattern: i.branchPattern || "{slug}-{number}",
+    commentTaskLinkOnGitHubIssue: i.commentTaskLinkOnGitHubIssue !== false,
+    isActive: i.isActive && githubBound(i),
+    createdAt: i.createdAt,
+    updatedAt: i.updatedAt,
+  });
+  const githubProgress = (r: NonNullable<GitHubRow["importRun"]>) => ({
+    runId: r.runId,
+    pending: !r.done,
+    imported: r.imported,
+    updated: r.updated,
+    skipped: r.skipped,
+  });
+
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
@@ -817,6 +909,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/gitlab-integration\/import-issues$/, M.ImportGitlabIssuesBody],
       ["POST", /^\/gitlab-integration\/project\/[^/]+$/, M.CreateGitlabIntegrationBody],
       ["PATCH", /^\/gitlab-integration\/project\/[^/]+$/, M.UpdateGitlabIntegrationBody],
+      ["POST", /^\/github-integration\/verify$/, M.VerifyGitHubInstallationBody],
+      ["POST", /^\/github-integration\/project\/[^/]+$/, M.CreateGitHubIntegrationBody],
+      ["PATCH", /^\/github-integration\/project\/[^/]+$/, M.UpdateGitHubIntegrationBody],
+      ["POST", /^\/github-integration\/import-issues$/, M.ImportGitHubIssuesBody],
     ];
     for (const [method, re, schema] of BODIES) {
       if (req.method !== method || !re.test(path)) continue;
@@ -2193,6 +2289,72 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           "x-content-type-options": "nosniff",
         },
       });
+    }
+
+    // The GitHub integration routes, wired the way
+    // github-integration/index.ts wires them on v2.32.0: app-info answers
+    // anyone the key reaches; repositories, verify and connect sit behind
+    // requireUserSession, which refuses an API key with its own words before
+    // the project is placed; get places the project and asks nothing more;
+    // update and delete add workspace:manage_settings; import-issues places
+    // the project from the body and asks task create/update.
+    const SESSION = () => failText(403, "A user session is required");
+    if (req.method === "GET" && path === "/github-integration/app-info") {
+      return ok(M.GitHubAppInfo, { accountConnected: true, accountLinkingAvailable: true, appName: "kaneo" });
+    }
+    if (req.method === "GET" && (p = m(/^\/github-integration\/repositories\/([^/]+)$/))) return SESSION();
+    if (req.method === "POST" && path === "/github-integration/verify") return SESSION();
+    if ((p = m(/^\/github-integration\/project\/([^/]+)$/))) {
+      const projectId = decodeURIComponent(p[1]);
+      const integ = githubIntegrations.find((x) => x.projectId === projectId);
+      // requireUserSession runs before the project is placed on connect.
+      if (req.method === "POST") return SESSION();
+      if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+      if (req.method === "GET") return ok(M.GitHubIntegration, integ === undefined ? null : githubView(integ));
+      if ((req.method === "PATCH" || req.method === "DELETE") && opts.plainMember) return failText(403, "Insufficient permissions");
+      if (req.method === "PATCH") {
+        // The route answers its own not-found shape, not the error envelope.
+        if (integ === undefined) return Response.json({ error: "Integration not found" }, { status: 404 });
+        const b = (body ?? {}) as { isActive?: boolean; commentTaskLinkOnGitHubIssue?: boolean };
+        if (b.commentTaskLinkOnGitHubIssue !== undefined) integ.commentTaskLinkOnGitHubIssue = b.commentTaskLinkOnGitHubIssue;
+        if (b.isActive !== undefined) integ.isActive = b.isActive;
+        integ.updatedAt = now();
+        return ok(M.GitHubIntegration, githubView(integ));
+      }
+      if (req.method === "DELETE") {
+        if (integ === undefined) return failText(404, "GitHub integration not found");
+        githubIntegrations.splice(githubIntegrations.indexOf(integ), 1);
+        return ok(M.GitHubDeleteResult, { success: true, message: "GitHub integration deleted" });
+      }
+    }
+    if (req.method === "POST" && path === "/github-integration/import-issues") {
+      const b = (body ?? {}) as { projectId?: unknown; runId?: string };
+      const projectId = typeof b.projectId === "string" ? b.projectId : "";
+      if (projectId === "") return failText(400, "projectId is required");
+      if (!projects.some((x) => x.id === projectId)) return failText(404, "Project not found");
+      const integ = githubIntegrations.find((x) => x.projectId === projectId);
+      if (integ === undefined) return failText(404, "GitHub integration not found");
+      // readConfig's order: the row's own isActive first, then the verified
+      // binding the import needs.
+      if (!integ.isActive) return failText(400, "GitHub integration is not active");
+      if (!githubBound(integ)) return failText(400, "GitHub integration must be reconnected by a repository administrator");
+      if (b.runId !== undefined && (integ.importRun === null || integ.importRun.runId !== b.runId)) {
+        return failText(409, "GitHub integration or import changed; refresh before resuming");
+      }
+      if (b.runId !== undefined && integ.importRun !== null && integ.importRun.done) {
+        return ok(M.IssueImportResult, githubProgress(integ.importRun));
+      }
+      // No runId continues an unfinished run and starts a fresh one over a
+      // finished one, as the route's reset does.
+      if (integ.importRun === null || integ.importRun.done) {
+        integ.importRun = { runId: `run-${String(++importSeq).padStart(4, "0")}`, pagesLeft: integ.importPages, done: false, imported: 0, updated: 0, skipped: 0 };
+      }
+      const run = integ.importRun;
+      const processed = Math.min(4, run.pagesLeft);
+      run.pagesLeft -= processed;
+      run.imported += processed;
+      if (run.pagesLeft === 0) run.done = true;
+      return ok(M.IssueImportResult, githubProgress(run), run.done ? 200 : 202);
     }
 
     return fail(404, `no route: ${req.method} ${path}`);

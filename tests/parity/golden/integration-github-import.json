@@ -1,0 +1,73 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "import",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"runId\": \"run-0001\",\n  \"pending\": false,\n  \"imported\": 5,\n  \"updated\": 0,\n  \"skipped\": 0\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "github",
+        "import",
+        "--run-id",
+        "run-0001",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"runId\": \"run-0001\",\n  \"pending\": false,\n  \"imported\": 5,\n  \"updated\": 0,\n  \"skipped\": 0\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "github",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "repository   acme/kaneo\nactive       yes\nverified     yes\ninstallation 42\ncomments     on\nbranches     {slug}-{number}\nimport       5 imported, 0 updated, 0 skipped\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/github-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/github-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "runId": "run-0001"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/github-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "runId": "run-0001"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/github-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

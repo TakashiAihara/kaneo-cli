@@ -93,6 +93,14 @@ The integration is the one thing that tells them apart: `integrationId` and the 
 
 `kaneo task external-links` (`xlinks`) lists a task's, marking each integration's with the integration it came through. It is the only read of these this CLI wires: adding a link ([#208](https://github.com/TakashiAihara/kaneo-cli/issues/208)) and deleting one ([#210](https://github.com/TakashiAihara/kaneo-cli/issues/210)) are tracked as issues.
 
+### project integration
+
+The link between a project and a repository on an outside provider — today GitHub, through `kaneo integration github`. One per project: `get` reads it, answering `null` when there is none; `connect` links a repository the provider's app installation reaches; `update` changes its settings; `rm` unlinks it.
+
+The routes split on what they ask of the caller. `repos`, `verify` and `connect` need a user session — an API key is refused `403 A user session is required`, because the link inherits the reach of the account behind the session. `get` asks only for workspace membership; `update` and `rm` ask for `manage_settings`; `import` asks for task `create` and `update`.
+
+`import` is resumable: the server answers 202 with `{runId, pending, imported, updated, skipped}` while pages remain and 200 once done, and each answer's `runId` is what the next request continues. A call without one resumes an unfinished run or starts a new one over a finished one; the integration read carries the last run's progress as `importProgress` while a run exists for the linked repository.
+
 ## This CLI's concepts
 
 ### task reference

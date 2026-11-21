@@ -36,16 +36,13 @@ import { labelCommand } from "./label";
 import { feedCommand } from "./feed";
 import { timeCommand } from "./time";
 import { apiCheckCommand } from "./apicheck";
+import { upgradeCommand } from "./upgrade";
 import { assetCommand } from "./asset";
 import { avatarCommand } from "./avatar";
 import { instanceCommand } from "./instance";
 import { publicCommand } from "./public";
 import { completeCommand, completionCommand } from "./completion";
-
-// The version is stamped in at build time; an unreleased build calls itself dev,
-// which is what makes it obvious that a report about it belongs to no release.
-declare const KANEO_VERSION: string | undefined;
-const version = typeof KANEO_VERSION === "undefined" ? "dev" : KANEO_VERSION;
+import { version } from "../version";
 
 const DEFAULT_TIMEOUT = "10s";
 
@@ -125,6 +122,7 @@ export const rootCommand = (): { root: Command<App> } => {
     assetCommand,
     avatarCommand,
     apiCheckCommand,
+    upgradeCommand,
     completionCommand,
     helpCommand,
     // The command the completion scripts call, built against this tree and kept

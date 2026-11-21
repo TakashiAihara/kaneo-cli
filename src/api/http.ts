@@ -570,7 +570,7 @@ const codedMessage = (text: string): string[] | undefined => {
   } catch {
     return undefined;
   }
-  if (parsed === null) return undefined;
+  if (typeof parsed !== "object" || parsed === null) return undefined;
   if (Object.keys(parsed).some((k) => !CODED_KEYS.includes(k))) return undefined;
   const { message, code } = parsed as { message?: unknown; code?: unknown };
   return typeof message === "string" && message !== "" && typeof code === "string" && code !== "" ? [message] : undefined;

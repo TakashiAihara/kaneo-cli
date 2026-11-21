@@ -1,0 +1,306 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"cfv0004\",\n    \"taskId\": \"task-a1\",\n    \"fieldId\": \"fld0001\",\n    \"value\": \"needs review\",\n    \"fieldName\": \"Priority note\",\n    \"fieldPosition\": 0,\n    \"fieldType\": \"text\",\n    \"fieldOptions\": null\n  },\n  {\n    \"id\": \"cfv0005\",\n    \"taskId\": \"task-a1\",\n    \"fieldId\": \"fld0002\",\n    \"value\": \"3\",\n    \"fieldName\": \"Story points\",\n    \"fieldPosition\": 1,\n    \"fieldType\": \"number\",\n    \"fieldOptions\": null\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "ALP#2",
+        "Release",
+        "CLI",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "set Release on #2\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"cfv0006\",\n    \"taskId\": \"task-a2\",\n    \"fieldId\": \"fld0003\",\n    \"value\": \"CLI\",\n    \"fieldName\": \"Release\",\n    \"fieldPosition\": 2,\n    \"fieldType\": \"dropdown\",\n    \"fieldOptions\": [\n      \"Web\",\n      \"CLI\"\n    ]\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "Priority note",
+        "ship",
+        "it",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"cfv0004\",\n  \"taskId\": \"task-a1\",\n  \"fieldId\": \"fld0001\",\n  \"value\": \"ship it\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "Priority note  text  ship it\nStory points  number  3\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "Fresh",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task0002\",\n  \"number\": 4,\n  \"title\": \"Fresh\",\n  \"description\": \"\",\n  \"status\": \"to-do\",\n  \"priority\": \"medium\",\n  \"position\": 3,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"labels\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "4",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "Release",
+        "Mobile",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/custom-field/value: 400: Invalid option for this custom field\"\n}\n",
+      "stderr": "Error: PUT /api/custom-field/value: 400: Invalid option for this custom field\n"
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "Story points",
+        "abc",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/custom-field/value: 400: Value must be a valid number\"\n}\n",
+      "stderr": "Error: PUT /api/custom-field/value: 400: Value must be a valid number\n"
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "nope",
+        "x",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no field \\\"nope\\\" for task #1; `kaneo field ls -p proj-alpha` lists them\"\n}\n",
+      "stderr": "Error: no field \"nope\" for task #1; `kaneo field ls -p proj-alpha` lists them\n"
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "Priority note",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"field takes a task, or a task, a field and a value: kaneo task field \\u003ctask\\u003e [\\u003cname\\u003e \\u003cvalue...\\u003e]\"\n}\n",
+      "stderr": "Error: field takes a task, or a task, a field and a value: kaneo task field <task> [<name> <value...>]\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-a2",
+        "fieldId": "fld0003",
+        "value": "CLI"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "fieldId": "fld0001",
+        "value": "ship it"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
+      "query": "",
+      "body": {
+        "title": "Fresh",
+        "description": "",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "fieldId": "fld0003",
+        "value": "Mobile"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "fieldId": "fld0002",
+        "value": "abc"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

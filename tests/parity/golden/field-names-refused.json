@@ -1,0 +1,77 @@
+{
+  "steps": [
+    {
+      "args": [
+        "field",
+        "rm",
+        "Note",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"2 fields are named \\\"Note\\\"; name one by its id (fld0001, fld0002)\"\n}\n",
+      "stderr": "Error: 2 fields are named \"Note\"; name one by its id (fld0001, fld0002)\n"
+    },
+    {
+      "args": [
+        "field",
+        "values",
+        "Note",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"2 fields are named \\\"Note\\\"; name one by its id (fld0001, fld0002)\"\n}\n",
+      "stderr": "Error: 2 fields are named \"Note\"; name one by its id (fld0001, fld0002)\n"
+    },
+    {
+      "args": [
+        "field",
+        "rm",
+        "fld0001",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"fld0001\",\n  \"projectId\": \"proj-alpha\",\n  \"name\": \"Note\",\n  \"type\": \"text\",\n  \"required\": false,\n  \"defaultValue\": null,\n  \"options\": null,\n  \"position\": 0,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"fld0002\",\n    \"projectId\": \"proj-alpha\",\n    \"name\": \"Note\",\n    \"type\": \"text\",\n    \"required\": false,\n    \"defaultValue\": null,\n    \"options\": null,\n    \"position\": 1,\n    \"createdAt\": \"<TIME>Z\",\n    \"updatedAt\": \"<TIME>Z\"\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/filter-values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/custom-field/fld0001",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

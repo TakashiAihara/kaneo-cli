@@ -1,0 +1,97 @@
+{
+  "steps": [
+    {
+      "args": [
+        "field",
+        "add",
+        "QA",
+        "owner",
+        "--type",
+        "text",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"fld0008\",\n  \"projectId\": \"proj-alpha\",\n  \"name\": \"QA owner\",\n  \"type\": \"text\",\n  \"required\": false,\n  \"defaultValue\": null,\n  \"options\": null,\n  \"position\": 3,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "add",
+        "Ships in",
+        "--type",
+        "dropdown",
+        "--options",
+        "Web, CLI, Mobile",
+        "--required",
+        "--default",
+        "Web",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"fld0009\",\n  \"projectId\": \"proj-alpha\",\n  \"name\": \"Ships in\",\n  \"type\": \"dropdown\",\n  \"required\": true,\n  \"defaultValue\": \"Web\",\n  \"options\": [\n    \"Web\",\n    \"CLI\",\n    \"Mobile\"\n  ],\n  \"position\": 4,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "fld0001  Priority note  (text)\nfld0002  Story points  (number)\nfld0003  Release  (dropdown)  [Web, CLI]\nfld0008  QA owner  (text)\nfld0009  Ships in  (dropdown, required)  [Web, CLI, Mobile]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "values",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "task-a1  Priority note  text  needs review\ntask-a1  Story points  number  3\ntask-a2  Release  dropdown  Web\ntask-a3  Release  dropdown  CLI\ntask-a1  Ships in  dropdown  Web\ntask-a2  Ships in  dropdown  Web\ntask-a3  Ships in  dropdown  Web\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/custom-field",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "name": "QA owner",
+        "type": "text",
+        "required": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/custom-field",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "name": "Ships in",
+        "type": "dropdown",
+        "required": true,
+        "defaultValue": "Web",
+        "options": [
+          "Web",
+          "CLI",
+          "Mobile"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/values",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

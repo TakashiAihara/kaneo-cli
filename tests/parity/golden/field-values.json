@@ -1,0 +1,85 @@
+{
+  "steps": [
+    {
+      "args": [
+        "field",
+        "values",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"cfv0004\",\n    \"taskId\": \"task-a1\",\n    \"fieldId\": \"fld0001\",\n    \"value\": \"needs review\",\n    \"fieldName\": \"Priority note\",\n    \"fieldPosition\": 0,\n    \"fieldType\": \"text\",\n    \"fieldOptions\": null\n  },\n  {\n    \"id\": \"cfv0005\",\n    \"taskId\": \"task-a1\",\n    \"fieldId\": \"fld0002\",\n    \"value\": \"3\",\n    \"fieldName\": \"Story points\",\n    \"fieldPosition\": 1,\n    \"fieldType\": \"number\",\n    \"fieldOptions\": null\n  },\n  {\n    \"id\": \"cfv0006\",\n    \"taskId\": \"task-a2\",\n    \"fieldId\": \"fld0003\",\n    \"value\": \"Web\",\n    \"fieldName\": \"Release\",\n    \"fieldPosition\": 2,\n    \"fieldType\": \"dropdown\",\n    \"fieldOptions\": [\n      \"Web\",\n      \"CLI\"\n    ]\n  },\n  {\n    \"id\": \"cfv0007\",\n    \"taskId\": \"task-a3\",\n    \"fieldId\": \"fld0003\",\n    \"value\": \"CLI\",\n    \"fieldName\": \"Release\",\n    \"fieldPosition\": 2,\n    \"fieldType\": \"dropdown\",\n    \"fieldOptions\": [\n      \"Web\",\n      \"CLI\"\n    ]\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "values",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "task-a1  Priority note  text  needs review\ntask-a1  Story points  number  3\ntask-a2  Release  dropdown  Web\ntask-a3  Release  dropdown  CLI\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "values",
+        "Release",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"fieldId\": \"fld0003\",\n  \"fieldName\": \"Release\",\n  \"fieldType\": \"dropdown\",\n  \"values\": [\n    \"Web\",\n    \"CLI\"\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "values",
+        "Story points",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "3\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "values",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no field \\\"nope\\\" in this project; `kaneo field ls` lists them\"\n}\n",
+      "stderr": "Error: no field \"nope\" in this project; `kaneo field ls` lists them\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/filter-values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/filter-values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/filter-values",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

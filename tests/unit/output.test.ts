@@ -26,14 +26,14 @@ const run = (json: boolean, body: string) => {
 
 // A --jq filter is compiled before the Writer is built, so the child loads it the
 // way the root does rather than being handed one.
-const runJq = (expression: string, body: string, terminal = false, stderrTerminal = false) => {
+const runJq = (expression: string, body: string, terminal = false, stderrTerminal = false, timeoutMs = 10_000) => {
   const p = Bun.spawnSync(
     [
       "bun",
       "-e",
-      `import { Writer } from ${JSON.stringify(OUTPUT)}; import { loadFilter } from ${JSON.stringify(JQ)}; const w = new Writer({ json: true, color: false }, await loadFilter(${JSON.stringify(expression)}, ${stderrTerminal}), ${terminal}); ${body}`,
+      `import { Writer } from ${JSON.stringify(OUTPUT)}; import { loadFilter } from ${JSON.stringify(JQ)}; const w = new Writer({ json: true, color: false }, await loadFilter(${JSON.stringify(expression)}, ${stderrTerminal}, ${timeoutMs}), ${terminal}); ${body}`,
     ],
-    { env: cleanEnv(), stdout: "pipe", stderr: "pipe", timeout: 10_000 },
+    { env: cleanEnv(), stdout: "pipe", stderr: "pipe", timeout: 20_000 },
   );
   return { out: p.stdout.toString(), err: p.stderr.toString(), exit: p.exitCode };
 };
@@ -180,6 +180,46 @@ describe("Writer with a --jq filter", () => {
     expect(exit).toBe(0);
     expect(out).toBe("7\n");
     expect(err).toBe('["DEBUG:",7]\n');
+  });
+
+  // On failure the debug line is still jq's own stderr text, not part of the
+  // error: it reaches fd 2 raw while the JqFailure is built from the "jq: "
+  // diagnostic alone, so no "--jq:" prefix lands on the DEBUG array.
+  test("TestJQSeparatesDebugFromAFailure", () => {
+    const { out, err, exit } = runJq(". | debug | .title | tonumber", `w.data({ title: "Ship it" });`);
+    expect(exit).toBe(1);
+    expect(out).toBe("");
+    expect(err).toContain('["DEBUG:",{"title":"Ship it"}]');
+    expect(err).toContain("--jq: jq: error");
+    expect(err).toContain('cannot be parsed as a number');
+    expect(err).not.toContain('--jq: ["DEBUG:"');
+  });
+
+  // halt_error's whole stderr is its message — there is no "jq: " line to
+  // split it from — but a debug line in front of it is still separated.
+  test("TestJQKeepsAHaltMessageAsTheError", () => {
+    const { out, err, exit } = runJq('1 | debug | "boom" | halt_error', `w.data({ title: "Ship it" });`);
+    expect(exit).toBe(1);
+    expect(out).toBe("");
+    expect(err).toContain('["DEBUG:",1]');
+    expect(err).toContain("--jq: boom");
+  });
+
+  // halt_error(n) is how a jq program chooses its exit status, and the
+  // JqFailure carries it through rather than collapsing every failure to 1.
+  test("TestJQFailureKeepsJqExitCode", () => {
+    const { out } = runJq('"boom" | halt_error(2)', `try { w.data({}); } catch (e) { console.log("code=" + e.exitCode); }`);
+    expect(out).toBe("code=2\n");
+  });
+
+  // An expression that never finishes cannot hold the command: the same
+  // bound --timeout puts on a request kills the evaluation and reports it.
+  test("TestJQTimeoutKillsAnUnfinishedExpression", () => {
+    const { out, err, exit } = runJq("def f: f; f", `w.data({});`, false, false, 2000);
+    expect(exit).toBe(1);
+    expect(out).toBe("");
+    expect(err).toContain("--jq: the expression did not finish within 2000ms");
+    expect(err).toContain("the command had already run");
   });
 
   // What stderr prints can carry server text, so a terminal on stderr gets it with

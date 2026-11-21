@@ -5,7 +5,7 @@
         "api-check",
         "--jq=.covered | tonumber"
       ],
-      "exit": 1,
+      "exit": 5,
       "stdout": "",
       "stderr": "Error: 1 operation(s) this client calls are missing from the server\nError: --jq: jq: error: array ([{\"ID\":\"listOrganization\"...]) cannot be parsed as a number\nthe command had already run when --jq failed; anything it changes has been changed\n"
     },

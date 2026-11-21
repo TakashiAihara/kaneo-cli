@@ -302,7 +302,7 @@ Anywhere a task is taken, either its number or its id works — `kaneo task stat
 
 `task link` will not guess the type: a link written with one nobody asked for has to be undone before the right one can be written. `task unlink` takes two tasks and removes the one link joining them in either direction, or one relation id from `task links --json`.
 
-`--timeout` bounds one request, not the command: every page of a board gets the whole of it, so a board's size does not decide whether it can be read. Nothing bounds the command as a whole. A timeout of zero or less is not the default and not no timeout: every request fails at once.
+`--timeout` bounds one request, not the command: every page of a board gets the whole of it, so a board's size does not decide whether it can be read. Each `--jq` evaluation is bounded the same way — an expression that never finishes is killed rather than holding the process after the command's work is done — but nothing bounds the command as a whole. A timeout of zero or less is not the default and not no timeout: every request fails at once, and so does every filter evaluation.
 
 A request the API key's rate limiter refuses (429 `RATE_LIMITED`, which the server answers on `/api/auth/*`) is sent again after the wait the server names, with a line on stderr, up to three times and 60 seconds of waiting in all — the window Kaneo gives new keys. The fail-open `session` commands do not wait unless `--strict` is given. Kaneo's other routes answer an exhausted key with 401 instead, which cannot be told from a bad key and is not retried.
 
@@ -408,10 +408,10 @@ jq runs inside the binary, so nothing has to be installed. Output follows `gh --
 
 In JSON mode (`--json`, or stdout not a terminal) a failure exits 1 and puts `{"error": ...}` on stdout, unless the command has already printed its payload: `api-check` and `task import` print their report and then exit 1, and the report stays the only document on stdout, with the error on stderr. Until 0.2.1-rc.38 the `{"error": ...}` object followed the report as a second document.
 
-With `--jq`, a failure exits 1 and stdout holds only what the expression made of a payload that was printed, which is nothing unless the command had one:
+With `--jq`, a failure exits with jq's own status — 3 for an expression that does not compile, 5 for one that fails on the payload or calls `halt_error`, the given number for `halt_error(n)` — and stdout holds only what the expression made of a payload that was printed, which is nothing unless the command had one:
 
 - an expression jq cannot compile is refused before any request is made
-- an expression that fails on the payload reports jq's message on stderr, followed by a line saying the command had already run — `task create … --jq` that exits 1 this way has still created the task, so do not retry it blindly
+- an expression that fails on the payload reports jq's message on stderr — what `debug` and `stderr` print goes to stderr as jq writes it, not into the error — followed by a line saying the command had already run — `task create … --jq` that fails this way has still created the task, so do not retry it blindly
 - a failing command reports its error on stderr only; the `{"error": ...}` object `--json` prints is left out
 - `api-check` and `task import` are the exceptions: the report is the output, so a failed check, or an import where any task failed, still prints the report (and what the expression makes of it) before exiting 1
 

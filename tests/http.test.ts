@@ -393,6 +393,47 @@ describe("failures", () => {
     const e = (await failure(kaneoFetch("/task/x", { method: "GET" }))) as KaneoApiError;
     expect(e.message).toBe("GET /api/task/x: 404: Task not found");
   });
+
+  // Kaneo 2.50 sends an HTTPException as {"message","code"} JSON. The message is
+  // in `messages`, as the plain text of 2.32 was, because callers decide on it.
+  test("an error status carrying {message, code} reports the message", async () => {
+    const url = serve(() => Response.json({ message: "Project not found", code: "NOT_FOUND" }, { status: 404 }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/task/tasks/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual(["Project not found"]);
+    expect(e.message).toBe("GET /api/task/tasks/x: 404: Project not found");
+  });
+
+  test("an error status carrying {message, code, issues} reports the message", async () => {
+    const url = serve(() => Response.json({ message: "Invalid title", code: "VALIDATION_ERROR", issues: [{ path: "body.title", message: "Required" }] }, { status: 400 }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/task/x", { method: "POST" }))) as KaneoApiError;
+    expect(e.messages).toEqual(["Invalid title"]);
+  });
+
+  test("an error status carrying {message, code, missingPermissions} reports the message", async () => {
+    const url = serve(() => Response.json({ message: "Missing permission", code: "MISSING_PERMISSION", missingPermissions: ["task:update"] }, { status: 403 }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/task/x", { method: "PUT" }))) as KaneoApiError;
+    expect(e.messages).toEqual(["Missing permission"]);
+  });
+
+  // Without a string code it is some other JSON, a 500 with no reason to decide
+  // on, or a body that says more than its message: it stays a body.
+  test.each([
+    ["no code", { message: "Internal Server Error" }],
+    ["a code that is not text", { message: "Project not found", code: 404 }],
+    ["a message that is not text", { message: ["Project not found"], code: "NOT_FOUND" }],
+    ["an empty message", { message: "", code: "NOT_FOUND" }],
+    ["no message", { code: "NOT_FOUND" }],
+    ["a key the error schema does not have", { message: "Rate limit exceeded.", code: "RATE_LIMITED", details: { tryAgainIn: 61000 } }],
+  ])("an error status carrying JSON with %s is a body only", async (_name, body) => {
+    const url = serve(() => Response.json(body, { status: 404 }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/task/tasks/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual([]);
+    expect(e.message).toBe(`GET /api/task/tasks/x: 404: ${JSON.stringify(body)}`);
+  });
 });
 
 describe("responses", () => {

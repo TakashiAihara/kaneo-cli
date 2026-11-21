@@ -550,10 +550,32 @@ const failure = (
   const envelope = decodeEnvelope(raw);
   if (envelope) return new KaneoApiError(method, path, status, messagesOf(envelope), trimmed);
   if (status >= 200 && status < 300) return undefined;
-  return new KaneoApiError(method, path, status, plainMessage(trimmed), trimmed);
+  return new KaneoApiError(method, path, status, codedMessage(trimmed) ?? plainMessage(trimmed), trimmed);
 };
 
-// The message of a failure sent as plain text. The server sends every
+// The message of a failure sent as {"message", "code"} JSON, which is how
+// Kaneo v2.50 sends every HTTPException (v2.32 sent it as plain text, below;
+// the release that changed it is not pinned down), or undefined when the body
+// is not that shape. The code is what tells it from the bare {"message": ...}
+// of a 500 that carries no reason a caller could decide on, and a key beyond
+// the four the server's error schema has (a rate limit's `details`) is a body
+// that says more than its message, so it is shown whole.
+const CODED_KEYS = ["message", "code", "issues", "missingPermissions"];
+
+const codedMessage = (text: string): string[] | undefined => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (parsed === null || typeof parsed !== "object") return undefined;
+  if (Object.keys(parsed).some((k) => !CODED_KEYS.includes(k))) return undefined;
+  const { message, code } = parsed as { message?: unknown; code?: unknown };
+  return typeof message === "string" && message !== "" && typeof code === "string" ? [message] : undefined;
+};
+
+// The message of a failure sent as plain text. Kaneo up to v2.32 sends every
 // HTTPException that way — its access checks, its "not found"s and, from v2.23,
 // its validation failures — so this is the shape most failures arrive in, and a
 // caller deciding on the server's message has to find it in `messages` either

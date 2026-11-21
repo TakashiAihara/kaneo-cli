@@ -23,11 +23,13 @@ import {
   listMyTasks,
   listComments,
   listRelations,
+  listTaskFieldValues,
   moveTask,
   PRIORITIES,
   priorityRank,
   projectTasks,
   RELATION_TYPES,
+  setCustomFieldValue,
   setTaskAssignee,
   setTaskDescription,
   setTaskDueDate,
@@ -52,6 +54,7 @@ import { readInput, sourceName } from "./input";
 import { shellWord } from "../output/output";
 import { KaneoApiError } from "../api/http";
 import { resolveWorkspace, slugOr, withProject, workspaceInReference } from "./lookup";
+import { resolveField } from "./field";
 import { attachTask, currentSessionId } from "../session/attach";
 import { BAD_ID, validSessionId } from "../session/store";
 import { sharedReference, similarOpenTasks } from "./similar";
@@ -950,6 +953,39 @@ export const taskCommand = {
         const links = await listExternalLinks(task.id);
         for (const link of links) app.out.human(externalLinkLine(link));
         app.out.data(links);
+      },
+    },
+    {
+      name: "field",
+      use: "field <task> [<name> <value...>]",
+      short: "Read or set a task's custom field values",
+      long:
+        "Read or set a task's custom field values.\n\n" +
+        "With the task alone, the values it holds are listed — only fields\n" +
+        "somebody set a value on appear. With a field name or id and a value,\n" +
+        "the value is set; the words after the name make the value, so a text\n" +
+        "value with spaces needs no quoting. A multiselect value is a JSON\n" +
+        "array of the field's options, as the web app writes it. The field is\n" +
+        "resolved in the task's own project.",
+      args: (args: string[]) => {
+        if (args.length !== 1 && args.length < 3) {
+          throw new Error("field takes a task, or a task, a field and a value: kaneo task field <task> [<name> <value...>]");
+        }
+      },
+      run: async ({ args, app }: { args: string[]; app: App }) => {
+        apiKey(app);
+        const task = await resolveTask(app, args[0]!);
+        if (args.length === 1) {
+          const values = (await listTaskFieldValues(task.id)).sort((a, b) => a.fieldPosition - b.fieldPosition);
+          for (const value of values) app.out.human(`${value.fieldName}  ${value.fieldType}  ${value.value ?? "(unset)"}`);
+          app.out.data(values);
+          return;
+        }
+        const field = await resolveField(task.projectId, args[1]!, `for task #${task.number}`);
+        const value = args.slice(2).join(" ");
+        const set = await setCustomFieldValue(task.id, field.id, value);
+        app.out.human(`set ${field.name} on #${task.number}`);
+        app.out.data(set);
       },
     },
   ],

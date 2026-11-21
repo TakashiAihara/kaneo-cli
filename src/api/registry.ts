@@ -85,4 +85,12 @@ export const OPERATIONS: Operation[] = [
   { id: "getTimeEntry", method: "GET", path: "/time-entry/{id}", command: "kaneo time get / update / stop" },
   { id: "createTimeEntry", method: "POST", path: "/time-entry", command: "kaneo time add" },
   { id: "updateTimeEntry", method: "PUT", path: "/time-entry/{id}", command: "kaneo time update / stop" },
+  { id: "getCustomFieldsByProject", method: "GET", path: "/custom-field/project/{projectId}", command: "kaneo field ls" },
+  { id: "getCustomFieldValuesByProject", method: "GET", path: "/custom-field/project/{projectId}/values", command: "kaneo field values" },
+  { id: "getCustomFieldValuesByTask", method: "GET", path: "/custom-field/task/{taskId}", command: "kaneo task field" },
+  { id: "getCustomFieldFilterValues", method: "GET", path: "/custom-field/project/{projectId}/filter-values", command: "kaneo field values" },
+  { id: "createCustomField", method: "POST", path: "/custom-field", command: "kaneo field add" },
+  { id: "reorderCustomFields", method: "PUT", path: "/custom-field/reorder/{projectId}", command: "kaneo field reorder" },
+  { id: "setCustomFieldValue", method: "PUT", path: "/custom-field/value", command: "kaneo task field" },
+  { id: "deleteCustomField", method: "DELETE", path: "/custom-field/{id}", command: "kaneo field rm" },
 ];

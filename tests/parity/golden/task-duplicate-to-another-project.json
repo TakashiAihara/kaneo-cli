@@ -38,8 +38,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"duplicated #1 as #6, but moving the copy to ALP failed: PUT /api/task/move/task0004: 400: Task is already in that project\"\n}\n",
-      "stderr": "Error: duplicated #1 as #6, but moving the copy to ALP failed: PUT /api/task/move/task0004: 400: Task is already in that project\n"
+      "stdout": "{\n  \"error\": \"--to \\\"ALP\\\" is the project the task is already in\"\n}\n",
+      "stderr": "Error: --to \"ALP\" is the project the task is already in\n"
     },
     {
       "args": [
@@ -62,7 +62,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "[\n  {\n    \"id\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"description\": \"multi\\nline\",\n    \"status\": \"to-do\",\n    \"priority\": \"high\",\n    \"position\": 0,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task0004\",\n    \"number\": 6,\n    \"title\": \"Write the parser\",\n    \"description\": \"multi\\nline\",\n    \"status\": \"to-do\",\n    \"priority\": \"high\",\n    \"position\": 3,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:12.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task-a2\",\n    \"number\": 2,\n    \"title\": \"Ship it\",\n    \"description\": \"\",\n    \"status\": \"in-progress\",\n    \"priority\": \"no-priority\",\n    \"position\": 1,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": \"user-1\",\n    \"assigneeName\": \"Ada\",\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task-a3\",\n    \"number\": 3,\n    \"title\": \"Old news\",\n    \"description\": \"\",\n    \"status\": \"done\",\n    \"priority\": \"no-priority\",\n    \"position\": 2,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:06.000Z\",\n    \"labels\": []\n  }\n]\n",
+      "stdout": "[\n  {\n    \"id\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"description\": \"multi\\nline\",\n    \"status\": \"to-do\",\n    \"priority\": \"high\",\n    \"position\": 0,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task-a2\",\n    \"number\": 2,\n    \"title\": \"Ship it\",\n    \"description\": \"\",\n    \"status\": \"in-progress\",\n    \"priority\": \"no-priority\",\n    \"position\": 1,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": \"user-1\",\n    \"assigneeName\": \"Ada\",\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task-a3\",\n    \"number\": 3,\n    \"title\": \"Old news\",\n    \"description\": \"\",\n    \"status\": \"done\",\n    \"priority\": \"no-priority\",\n    \"position\": 2,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:06.000Z\",\n    \"labels\": []\n  }\n]\n",
       "stderr": ""
     }
   ],
@@ -176,20 +176,6 @@
       "method": "GET",
       "path": "/project/proj-alpha",
       "query": ""
-    },
-    {
-      "method": "POST",
-      "path": "/task/duplicate/task-a1",
-      "query": "",
-      "body": {}
-    },
-    {
-      "method": "PUT",
-      "path": "/task/move/task0004",
-      "query": "",
-      "body": {
-        "destinationProjectId": "proj-alpha"
-      }
     },
     {
       "method": "GET",

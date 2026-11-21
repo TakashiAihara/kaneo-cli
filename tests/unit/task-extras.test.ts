@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, truncateSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { configureClient, putUpload } from "../../src/api/http";
+import type { App } from "../../src/cli/app";
+import type { FlagValues } from "../../src/cli/args";
+import { taskCommand } from "../../src/cli/task";
 import {
   createExternalLink,
   deleteExternalLink,
@@ -182,6 +188,42 @@ describe("external links", () => {
   });
 });
 
+// `task upload` reads the file before it asks the server anything, so a file
+// too large to be an image is refused before its bytes are held in memory.
+// The run is invoked directly: the refusal lands before the app is read, and
+// a file that passes the check fails next on the missing API key.
+describe("task upload's local file check", () => {
+  const runUpload = (file: string): Promise<void> => {
+    const upload = (
+      taskCommand.children as { name: string; run: (ctx: { args: string[]; flags: FlagValues; app: App }) => Promise<void> }[]
+    ).find((c) => c.name === "upload")!;
+    return upload.run({ args: ["1", file], flags: {}, app: { cfg: { apiKey: "" } } as unknown as App });
+  };
+
+  test("refuses a file too large to be an image before reading it", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "kaneo-upload-"));
+    try {
+      const huge = join(dir, "huge.png");
+      writeFileSync(huge, "");
+      truncateSync(huge, 1073741825);
+      await expect(runUpload(huge)).rejects.toThrow(`${huge} is too large to upload`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("reads a small file and stops at the missing API key", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "kaneo-upload-"));
+    try {
+      const small = join(dir, "pixel.png");
+      writeFileSync(small, "fake png bytes");
+      await expect(runUpload(small)).rejects.toThrow("no API key");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("putUpload", () => {
   test("PUTs the bytes with the given headers and no API key", async () => {
     let seenReq: { bytes: number; type: string | null; auth: string | null } | undefined;
@@ -195,6 +237,24 @@ describe("putUpload", () => {
     });
     await putUpload(`${url}/uploads/k`, { "Content-Type": "image/png", "x-amz-meta": "1" }, new Uint8Array([1, 2, 3, 4]));
     expect(seenReq).toEqual({ bytes: 4, type: "image/png", auth: null });
+  });
+
+  test("a redirect is not followed", async () => {
+    let hits = 0;
+    const url = serve((req) => {
+      hits++;
+      if (new URL(req.url).pathname === "/uploads/k") {
+        return new Response(null, { status: 302, headers: { location: "/elsewhere" } });
+      }
+      return new Response(null, { status: 200 });
+    });
+    const e = await putUpload(`${url}/uploads/k`, {}, new Uint8Array([1])).then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(e).toBeInstanceOf(Error);
+    expect((e as Error).message).toBe("upload to storage failed: HTTP 302");
+    expect(hits).toBe(1);
   });
 
   test("a refused upload is an error that names no URL", async () => {

@@ -131,8 +131,8 @@ export const taskCommand = {
         "List the tasks in a project.\n\n" +
         "With --mine the listing is instead the open tasks assigned to you across the\n" +
         "whole workspace: the project setting is not used, the server returns at most\n" +
-        "100 (stderr says when it cut the list), and --status, --priority and --all\n" +
-        "are refused because the server takes no filter for it.",
+        "100 (stderr says when it cut the list), and --status, --priority, --all and\n" +
+        "--description are refused because the server takes no filter for it.",
       args: noArgs("kaneo task list"),
       flags: [
         { name: "status", type: "string" as const, usage: "only tasks in this column", defaultValue: "" },
@@ -162,6 +162,10 @@ export const taskCommand = {
       ],
       run: async ({ flags, changed, app }: { flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
         apiKey(app);
+        // A value flag passed as "" is a mistake, not an absent flag, as bulk
+        // reads them. Checked before --mine, whose refusal of the flag would
+        // otherwise never see the empty value it was given.
+        if (changed.has("description") && String(flags.description ?? "").trim() === "") throw new Error("--description is empty");
         if (flags.mine === true) {
           // The server lists open tasks only and takes no filter (as of v2.32.0), so a flag that
           // narrows or widens the listing would be accepted and do nothing.
@@ -180,9 +184,6 @@ export const taskCommand = {
         }
         const status = String(flags.status ?? "");
         const priority = String(flags.priority ?? "");
-        // A value flag passed as "" is a mistake, not an absent flag, as bulk
-        // reads them.
-        if (changed.has("description") && String(flags.description ?? "").trim() === "") throw new Error("--description is empty");
         const query = String(flags.description ?? "").trim();
         if (query.length > 256) throw new Error("--description is longer than 256 characters");
         // Asked of the server, which filters before it pages, and of the answer
@@ -871,7 +872,9 @@ export const taskCommand = {
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
         // The destination is resolved before the copy is made, so a --to that
-        // names no project fails before anything is written.
+        // names no project fails before anything is written. The source's own
+        // project is refused for the same reason: the move would fail after
+        // the copy existed, leaving it behind.
         let destId = "";
         if (to !== "") {
           destId = await withProject(
@@ -882,6 +885,9 @@ export const taskCommand = {
             },
             { sameWorkspaceAs: task.projectId },
           );
+          if (destId === task.projectId) {
+            throw new Error(`--to ${JSON.stringify(to)} is the project the task is already in`);
+          }
         }
         const copy = await duplicateTask(task.id, title);
         let shown = copy;
@@ -1079,16 +1085,29 @@ export const taskCommand = {
         }
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
+        // What the write left is named when the follow-up read fails, as
+        // taskAfterWrite names it: a bare read failure would read as a write
+        // that never happened, and the caller would retry a write that landed.
+        let wrote = "";
         if (add !== "") {
           await createExternalLink(task.id, { url, ...(title.trim() === "" ? {} : { title: title.trim() }) });
+          wrote = "the link was added";
         }
         if (rm !== "") {
           const removed = await deleteExternalLink(task.id, rm.trim());
           if (removed !== rm.trim()) {
             throw new Error(`the server answered a different link id (${JSON.stringify(removed)}); check \`kaneo task external-links\``);
           }
+          wrote = "the link was removed";
         }
-        const links = await listExternalLinks(task.id);
+        let links: ExternalLink[];
+        try {
+          links = await listExternalLinks(task.id);
+        } catch (e) {
+          throw wrote === ""
+            ? e
+            : new Error(`${wrote}, but listing the links failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
         for (const link of links) app.out.human(externalLinkLine(link));
         app.out.data(links);
       },
@@ -1529,12 +1548,22 @@ const descriptionOf = async (flags: FlagValues, changed: ReadonlySet<string>): P
   return read;
 };
 
+// The largest file `task upload` reads before the server is asked. The cap
+// the server enforces at prepare is its own configurable one, so this only
+// refuses a file too large to be an image at all, before its bytes are held
+// in memory.
+const MAX_IMAGE_BYTES = 1024 * 1024 * 1024;
+
 // The image `task upload` stores: its bytes, its name as a basename rather
 // than the path it was found at, and the content type the extension gives it,
-// which is what the server would have been sent for the same file. An empty
-// file is refused before any request: the server takes no zero-byte image.
+// which is what the server would have been sent for the same file. The
+// basename is node:path's own, splitting on the platform's separator only: a
+// backslash is part of the name off Windows, as it is to the filesystem that
+// just read the file. An empty file is refused before any request: the server
+// takes no zero-byte image.
 const imageFile = async (path: string): Promise<{ name: string; type: string; size: number; bytes: Uint8Array }> => {
   const file = Bun.file(path);
+  if (file.size > MAX_IMAGE_BYTES) throw new Error(`${path} is too large to upload`);
   let bytes: Uint8Array;
   try {
     bytes = new Uint8Array(await file.arrayBuffer());
@@ -1582,9 +1611,13 @@ const filterTasks = (tasks: Task[], status: string, priority: string, all: boole
 // The tasks whose description contains the query. A description the listing
 // deferred is not on the task to match, so the server is asked which deferred
 // descriptions match and their ids stand in for the text; the rest are matched
-// here. Both sides compare case-insensitively, as the server does.
+// here. Both sides compare case-insensitively, as the server does. The search
+// is asked only when the listing actually deferred a description: with none,
+// every description is already on its task and the answer would be empty.
 const describedTasks = async (projectId: string, tasks: Task[], query: string): Promise<Task[]> => {
-  const deferred = new Set(await findDeferredTaskDescriptions(projectId, query));
+  const deferred = tasks.some(descriptionDeferred)
+    ? new Set(await findDeferredTaskDescriptions(projectId, query))
+    : new Set<string>();
   const needle = query.toLowerCase();
   return tasks.filter((task) => deferred.has(task.id) || task.description.toLowerCase().includes(needle));
 };

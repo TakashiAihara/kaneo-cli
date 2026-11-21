@@ -1242,6 +1242,18 @@ export const SCENARIOS: Scenario[] = [
       ["task", "external-links", "99", "--add", "https://example.com/x", "--json"],
     ],
   },
+  // The mutation lands and the list that follows it fails: the error names
+  // the write that happened, as taskAfterWrite names its own, so the caller
+  // does not retry a write that already landed.
+  {
+    name: "task external-links names a landed write when the list fails",
+    seed: { externalLinks: [{ taskId: "task-a1", url: "https://example.com/spec", title: "Spec" }] },
+    failOn: "^GET /external-link/",
+    steps: [
+      ["task", "external-links", "1", "--add", "https://example.com/notes", "--json"],
+      ["task", "external-links", "1", "--rm", "link0002", "--json"],
+    ],
+  },
   // The description page route: a short description is one page, a long one
   // pages at 32 Ki characters with the version the first page answered, and a
   // task the board does not have is the server's 404.
@@ -1287,7 +1299,9 @@ export const SCENARIOS: Scenario[] = [
     })),
     steps: [["task", "ls", "--description", "needle", "--json"]],
   },
-  // An empty or overlong query and --mine are refused before any request.
+  // An empty or overlong query and --mine are refused before any request; an
+  // empty query --mine is passed still hits the empty check rather than
+  // being ignored.
   {
     name: "task list by description refuses bad input",
     steps: [
@@ -1295,7 +1309,17 @@ export const SCENARIOS: Scenario[] = [
       ["task", "ls", "--description", "  ", "--json"],
       ["task", "ls", "--description", "x".repeat(257), "--json"],
       ["task", "ls", "--mine", "--description", "x", "--json"],
+      ["task", "ls", "--mine", "--description", "", "--json"],
       ["task", "ls", "--json"],
+    ],
+  },
+  // With nothing deferred there is nothing for the server to be asked about:
+  // the listing's requests show no description-matches call.
+  {
+    name: "task list by description with nothing deferred",
+    steps: [
+      ["task", "ls", "--description", "multi", "--json"],
+      ["task", "ls", "--description", "missing", "--human"],
     ],
   },
   // The copy keeps the source's fields, its parent link and its label; the
@@ -1313,8 +1337,8 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   // --to resolves the destination before the copy exists and moves the copy
-  // after; a destination that is the source's own project fails the move with
-  // the copy already made, which the error says.
+  // after; a destination that is the source's own project is refused before
+  // the copy is made, since the move would fail and leave the copy behind.
   {
     name: "task duplicate to another project",
     steps: [
@@ -1353,7 +1377,7 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   // An empty file is refused before any request, and a storage that refuses
-  // the bytes fails the upload after the stage was issued.
+  // the bytes fails the upload after the stage was issued, before finalize.
   {
     name: "task upload refuses an empty file",
     files: { "empty.png": "" },
@@ -1363,6 +1387,21 @@ export const SCENARIOS: Scenario[] = [
     name: "task upload storage refuses the bytes",
     files: { "pixel.png": "fake png bytes" },
     failOn: "^PUT /uploads/",
+    steps: [["task", "upload", "1", "pixel.png", "--json"], ["task", "ls", "--all", "--json"]],
+  },
+  // The stage and the finalize are /api routes, so failOn reaches them as it
+  // does every other write: the stage failing means no bytes are PUT, and the
+  // finalize failing means the stored object is never recorded as an asset.
+  {
+    name: "task upload stage is refused",
+    files: { "pixel.png": "fake png bytes" },
+    failOn: "^PUT /task/image-upload/",
+    steps: [["task", "upload", "1", "pixel.png", "--json"], ["task", "ls", "--all", "--json"]],
+  },
+  {
+    name: "task upload finalize is refused",
+    files: { "pixel.png": "fake png bytes" },
+    failOn: "^POST /task/image-upload/",
     steps: [["task", "upload", "1", "pixel.png", "--json"], ["task", "ls", "--all", "--json"]],
   },
 

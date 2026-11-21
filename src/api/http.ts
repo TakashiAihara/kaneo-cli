@@ -691,13 +691,15 @@ const messageOf = (value: unknown): string => {
 // The URL is not Kaneo's: it carries no API key and answers to no schema, so
 // only its status is judged. It is bounded by the same --timeout every other
 // request is, since a storage endpoint that never answers would otherwise hold
-// the command open for ever. The URL itself is never repeated in a failure: a
-// presigned URL's query is its credential.
+// the command open for ever. A redirect is refused rather than followed, as
+// kaneoFetch refuses its own: the signature is bound to this URL, and the
+// bytes and credential would otherwise go wherever it points. The URL itself
+// is never repeated in a failure: a presigned URL's query is its credential.
 export const putUpload = async (url: string, headers: Record<string, string>, body: Uint8Array): Promise<void> => {
   const cap = settings.timeoutMs > 0 ? AbortSignal.timeout(settings.timeoutMs) : AbortSignal.abort();
   let response: Response;
   try {
-    response = await fetch(url, { method: "PUT", headers, body, signal: cap });
+    response = await fetch(url, { method: "PUT", headers, body, signal: cap, redirect: "manual" });
   } catch (e) {
     // A transport error's own wording can quote the request URL, and a
     // presigned URL's query is the upload's credential, so only the failure's

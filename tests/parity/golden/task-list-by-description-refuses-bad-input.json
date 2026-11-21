@@ -53,6 +53,19 @@
       "args": [
         "task",
         "ls",
+        "--mine",
+        "--description",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--description is empty\"\n}\n",
+      "stderr": "Error: --description is empty\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
         "--json"
       ],
       "exit": 0,

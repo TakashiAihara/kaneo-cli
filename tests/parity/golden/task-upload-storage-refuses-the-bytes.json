@@ -8,9 +8,9 @@
         "pixel.png",
         "--json"
       ],
-      "exit": 0,
-      "stdout": "{\n  \"id\": \"asset0003\",\n  \"url\": \"<URL>/asset/asset0003\",\n  \"taskId\": \"task-a1\",\n  \"taskNumber\": 1,\n  \"filename\": \"pixel.png\",\n  \"contentType\": \"image/png\",\n  \"size\": 14,\n  \"surface\": \"description\"\n}\n",
-      "stderr": ""
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"upload to storage failed: HTTP 500\"\n}\n",
+      "stderr": "Error: upload to storage failed: HTTP 500\n"
     },
     {
       "args": [
@@ -47,18 +47,6 @@
       "query": "",
       "body": {
         "bytes": 14
-      }
-    },
-    {
-      "method": "POST",
-      "path": "/task/image-upload/task-a1/finalize",
-      "query": "",
-      "body": {
-        "filename": "pixel.png",
-        "contentType": "image/png",
-        "size": 14,
-        "surface": "description",
-        "key": "workspace/ws-main/project/proj-alpha/task/task-a1/descriptions/pixel-10-upl0002.png"
       }
     },
     {

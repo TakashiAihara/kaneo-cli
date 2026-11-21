@@ -1,0 +1,66 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "external-links",
+        "1",
+        "--add",
+        "https://example.com/notes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"the link was added, but listing the links failed: GET /api/external-link/task/task-a1: 500: injected failure\"\n}\n",
+      "stderr": "Error: the link was added, but listing the links failed: GET /api/external-link/task/task-a1: 500: injected failure\n"
+    },
+    {
+      "args": [
+        "task",
+        "external-links",
+        "1",
+        "--rm",
+        "link0002",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"the link was removed, but listing the links failed: GET /api/external-link/task/task-a1: 500: injected failure\"\n}\n",
+      "stderr": "Error: the link was removed, but listing the links failed: GET /api/external-link/task/task-a1: 500: injected failure\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/external-link/task/task-a1",
+      "query": "",
+      "body": {
+        "url": "https://example.com/notes"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/external-link/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/external-link/task/task-a1/link0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/external-link/task/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

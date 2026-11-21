@@ -1238,6 +1238,17 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   let limited = 0;
   const misstoring = opts.misstoreOn ? new RegExp(opts.misstoreOn) : undefined;
 
+  // The failure failOn describes, or undefined for a request it does not name.
+  // failOnSkip counts the matching requests answered as usual first. The
+  // /uploads/ storage route asks the same question itself, since it answers
+  // before the /api checks below run.
+  const injectedFailure = (method: string, path: string, query: string): Response | undefined => {
+    if (failing === undefined || !failing.test(`${method} ${path}`)) return undefined;
+    if (!(failingQuery?.test(query) ?? true)) return undefined;
+    if (skipped++ < (opts.failOnSkip ?? 0)) return undefined;
+    return opts.failMessage === undefined ? fail(opts.failStatus ?? 500, "injected failure") : failText(opts.failStatus ?? 500, opts.failMessage);
+  };
+
   // The checks 2.32.0's storage layer runs on an image upload, with the same
   // answers: the size cap is the server's default of 10 MiB.
   const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -1293,6 +1304,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "PUT" && url.pathname.startsWith("/uploads/")) {
       const bytes = new Uint8Array(await req.arrayBuffer());
       requests.push({ method: req.method, path: url.pathname, query: url.search, body: { bytes: bytes.byteLength } });
+      const refused = injectedFailure(req.method, path, url.search);
+      if (refused !== undefined) return refused;
       objects.set(decodeURIComponent(url.pathname.slice("/uploads/".length)), { bytes, contentType: req.headers.get("content-type") ?? "" });
       return new Response(null, { status: 200 });
     }
@@ -1323,7 +1336,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         /^\/user\/avatar\/[^/]+$/.test(path) ||
         /^\/calendar-feed\/[^/]+\/calendar\.ics$/.test(path));
     if (!anonymous && req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
-    if (failing?.test(`${req.method} ${path}`) && (failingQuery?.test(url.search) ?? true) && skipped++ >= (opts.failOnSkip ?? 0)) return opts.failMessage === undefined ? fail(opts.failStatus ?? 500, "injected failure") : failText(opts.failStatus ?? 500, opts.failMessage);
+    const injected = injectedFailure(req.method, path, url.search);
+    if (injected !== undefined) return injected;
 
     // The server validates request bodies against the same schemas the
     // document declares, and answers 400 with the first issue.

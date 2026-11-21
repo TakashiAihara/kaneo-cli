@@ -17,6 +17,10 @@
     "body.taskId": true,
     "body.type": true
   },
+  "createCalendarFeed": {
+    "body.labelIds": true,
+    "body.timeZone": false
+  },
   "createColumn": {
     "body.color": false,
     "body.icon": false,
@@ -83,6 +87,7 @@
   "getActivities": {
     "query.limit": false
   },
+  "getCalendarFeed": {},
   "getColumns": {},
   "getCurrentUser": {},
   "getExternalLinksByTask": {},
@@ -121,6 +126,7 @@
     "query.countOnly": false,
     "query.workspaceId": true
   },
+  "listCalendarFeeds": {},
   "listNotifications": {
     "query.workspaceId": false
   },
@@ -156,6 +162,7 @@
     "body.projects": true,
     "query.workspaceId": true
   },
+  "revokeCalendarFeed": {},
   "unarchiveProject": {},
   "updateColumn": {
     "body.color": false,

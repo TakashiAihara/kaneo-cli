@@ -602,6 +602,25 @@ test("TestSetProjectBackgroundRefusesAFinalizeWithoutAURL", async () => {
   expect(String(err)).toContain("/project/p1/background-upload/finalize: reply carries no URL");
 });
 
+// The stage's uploadUrl is the server's word for where the bytes go, and a
+// plain http one off loopback would carry the signed headers and the image
+// in the clear — the PUT is refused before it is made, and the finalize
+// never runs.
+test("TestSetProjectBackgroundRefusesAPlainHTTPUploadURL", async () => {
+  const seen: string[] = [];
+  newServer(async (req) => {
+    const path = new URL(req.url).pathname;
+    seen.push(`${req.method} ${path}`);
+    if (path === "/api/project/p1/background-upload") {
+      return Response.json({ key: "k1", uploadUrl: "http://storage.example.invalid/k1?sig=1", version: "v1", headers: {} });
+    }
+    return new Response("unexpected", { status: 500 });
+  });
+  const err = await failure(api.setProjectBackground("p1", "image/png", new Uint8Array([1])));
+  expect(String(err)).toContain("PUT http://storage.example.invalid/k1: refusing to send the upload");
+  expect(seen).toEqual(["PUT /api/project/p1/background-upload"]);
+});
+
 // The move reply's unassignedTaskCount is the only place the CLI learns how
 // many tasks lost their assignee: a reply without it cannot be read as none.
 test("TestMoveProjectRefusesAReplyWithoutTheCount", async () => {

@@ -486,8 +486,16 @@ export const projectCommand = {
             apiKey(app);
             const blob = await withProject(args[0] ?? project(app), (id) => getProjectBackground(id));
             // The bytes go out as they arrived: an image is not text, so
-            // nothing here may decode or re-encode it.
-            writeSync(1, new Uint8Array(await blob.arrayBuffer()));
+            // nothing here may decode or re-encode it. writeSync reports the
+            // bytes it took, which on a pipe can be fewer than it was given,
+            // so the rest goes out until the image is whole; a write that
+            // takes nothing is a failure rather than a silently cut image.
+            const image = new Uint8Array(await blob.arrayBuffer());
+            for (let offset = 0; offset < image.byteLength; ) {
+              const written = writeSync(1, image, offset, image.byteLength - offset);
+              if (written === 0) throw new Error(`stdout accepted none of the remaining ${image.byteLength - offset} image bytes`);
+              offset += written;
+            }
           },
         },
         {
@@ -519,6 +527,15 @@ export const projectCommand = {
             const ref = args[0]!;
             const source = args[1]!;
             const named = sourceName(source);
+            // What --content-type asked for, "" included: an empty one is
+            // refused the same as none below. stdin has no file to take a
+            // type from, so for it the flag is the only source — checked
+            // before the read, which on a terminal would wait for EOF before
+            // reporting the missing flag.
+            const contentTypeFlag = changed.has("content-type") ? String(flags["content-type"] ?? "").trim() : undefined;
+            if (source === "-" && (contentTypeFlag === undefined || contentTypeFlag === "")) {
+              throw new Error(`${named} gives no usable content type; pass --content-type`);
+            }
             let bytes: Uint8Array;
             let fileType = "";
             try {
@@ -538,7 +555,7 @@ export const projectCommand = {
             // "" outright. --content-type wins either way, and an empty one is
             // refused the same as none.
             const detected = fileType === "application/octet-stream" ? "" : fileType;
-            const contentType = changed.has("content-type") ? String(flags["content-type"] ?? "").trim() : detected;
+            const contentType = contentTypeFlag ?? detected;
             if (contentType === "") throw new Error(`${named} gives no usable content type; pass --content-type`);
             const done = await withProject(ref, async (id) => ({
               project: id,

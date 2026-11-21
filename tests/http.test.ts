@@ -860,4 +860,34 @@ describe("presignedPut", () => {
     const e = await failure(presignedPut(`${url}/storage/k1`, {}, new Uint8Array([1])));
     expect(String(e)).toBe(`Error: PUT ${url}/storage/k1: 403`);
   });
+
+  // The signed query and headers are the credential and the bytes the
+  // payload, so plain http to a host that is not loopback would put both on
+  // the wire in the clear. Refused before the request, the way the API key
+  // is — the unreachable host could not answer either way, so the refusal
+  // itself is what the message pins.
+  test("a plain-http URL off loopback is refused before sending", async () => {
+    configureClient({ baseUrl: "http://127.0.0.1:9", apiKey: "test-key" });
+    const e = await failure(presignedPut("http://kaneo.example.invalid/storage/k?sig=1", {}, new Uint8Array([1])));
+    expect(String(e)).toBe(
+      "Error: PUT http://kaneo.example.invalid/storage/k: refusing to send the upload over a URL that is not https, or http to a loopback host",
+    );
+  });
+
+  // https is fine wherever it points: the check passes and the call fails
+  // only at the connection, named the way every other transport failure is.
+  test("an https URL passes the check and fails only at the connection", async () => {
+    configureClient({ baseUrl: "http://127.0.0.1:9", apiKey: "test-key" });
+    const e = await failure(presignedPut("https://127.0.0.1:9/storage/k?sig=1", {}, new Uint8Array([1])));
+    expect(String(e)).toContain("PUT https://127.0.0.1:9/storage/k:");
+    expect(String(e)).not.toContain("refusing to send the upload");
+  });
+
+  // The allowance is https, or http to loopback — another scheme is refused
+  // even on loopback rather than left for fetch to reject.
+  test("a non-http scheme is refused even on loopback", async () => {
+    configureClient({ baseUrl: "http://127.0.0.1:9", apiKey: "test-key" });
+    const e = await failure(presignedPut("ftp://127.0.0.1/storage/k", {}, new Uint8Array([1])));
+    expect(String(e)).toContain("PUT ftp://127.0.0.1/storage/k: refusing to send the upload");
+  });
 });

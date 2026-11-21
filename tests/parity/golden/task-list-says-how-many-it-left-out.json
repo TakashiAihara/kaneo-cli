@@ -61,7 +61,7 @@
         "--jq",
         "error(\"boom\")"
       ],
-      "exit": 1,
+      "exit": 5,
       "stdout": "",
       "stderr": "(3 done / planned / archived tasks left out; --all to include them)\nError: --jq: jq: error: boom\nthe command had already run when --jq failed; anything it changes has been changed\n"
     }

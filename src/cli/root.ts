@@ -67,7 +67,7 @@ const GLOBAL_FLAGS: Flag[] = [
   { name: "human", type: "bool", usage: "force human-readable output, even through a pipe", defaultValue: "false" },
   // jq runs inside the binary, so reading one field needs nothing installed.
   { name: "jq", type: "string", usage: "filter JSON output with a jq expression (implies --json)", defaultValue: "" },
-  { name: "timeout", type: "duration", usage: "per-request timeout", defaultValue: DEFAULT_TIMEOUT },
+  { name: "timeout", type: "duration", usage: "timeout for each request and each --jq evaluation", defaultValue: DEFAULT_TIMEOUT },
 ];
 
 // `help` is a command of its own, the way it is in every cobra-built CLI, and
@@ -136,9 +136,10 @@ export const rootCommand = (): { root: Command<App> } => {
 
 // An expression that cannot be compiled is refused before the command runs, so
 // a typo costs no request. An empty --jq is no expression at all: the output is
-// what it would have been without the flag.
-const maybeFilter = async (expression: string): Promise<Filter | undefined> =>
-  expression === "" ? undefined : loadFilter(expression, isTTY(2));
+// what it would have been without the flag. timeoutMs is the --timeout value:
+// it bounds each evaluation of the filter the same way it bounds a request.
+const maybeFilter = async (expression: string, timeoutMs: number): Promise<Filter | undefined> =>
+  expression === "" ? undefined : loadFilter(expression, isTTY(2), timeoutMs);
 
 const env = (name: string): string => process.env[name] ?? "";
 const noColor = (): boolean => env("NO_COLOR") !== "";
@@ -213,7 +214,7 @@ export const run = async (argv: string[]): Promise<number> => {
     // The filter goes in before the settings are resolved, so that an expression
     // which cannot be compiled is refused without a request being made to find
     // out.
-    const filter = await maybeFilter(String(parsed.flags.jq ?? ""));
+    const filter = await maybeFilter(String(parsed.flags.jq ?? ""), Number(parsed.flags.timeout ?? 0));
     out = writerFor(filter, parsed.flags.json === true, parsed.flags.human === true);
     // A flag is keyed by the name it was declared with, so a dashed flag only
     // answers to that dashed spelling. Asking for it in any other case misses
@@ -254,7 +255,10 @@ export const run = async (argv: string[]): Promise<number> => {
     // with one.
     if (e instanceof JqFailure || (out === undefined && askedForJq(found))) {
       writeSync(2, `Error: ${sanitizeControl(message)}\n`);
-      return 1;
+      // A filter failure exits with jq's own status, so halt_error(n) keeps
+      // the n the expression asked for; a failure that is not the filter's
+      // stays 1.
+      return e instanceof JqFailure ? e.exitCode : 1;
     }
     const writer = out ?? writerFor(undefined, askedFor(argv, "--json"), askedFor(argv, "--human"));
     writer.error(message);

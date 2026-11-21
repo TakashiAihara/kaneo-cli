@@ -5,7 +5,7 @@
         "api-check",
         "--jq=.missing | tonumber"
       ],
-      "exit": 1,
+      "exit": 5,
       "stdout": "",
       "stderr": "Error: --jq: jq: error: array ([]) cannot be parsed as a number\nthe command had already run when --jq failed; anything it changes has been changed\n"
     }

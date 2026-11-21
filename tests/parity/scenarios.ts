@@ -1440,6 +1440,13 @@ export const SCENARIOS: Scenario[] = [
   // before the command would have asked anything.
   { name: "jq with a bad expression", steps: [["task", "ls", "--jq", ".[", "--json"]] },
   { name: "jq runtime error", steps: [["task", "get", "1", "--jq", ".title | tonumber"]] },
+  // halt_error(n) is jq's own way to pick an exit status, and it survives.
+  { name: "jq halt_error keeps its exit code", steps: [["task", "get", "1", "--jq", '"boom" | halt_error(2)']] },
+  // debug's line is jq's stderr text, not part of the failure message.
+  { name: "jq separates debug from a failure", steps: [["task", "get", "1", "--jq", ". | debug | .title | tonumber"]] },
+  // --timeout bounds the filter the way it bounds a request: an expression
+  // that never finishes is killed rather than holding the command open.
+  { name: "jq timeout bounds the filter", steps: [["task", "get", "1", "--jq", "def f: f; f", "--timeout", "1s"]] },
   { name: "jq leaves stdout empty on a command error", steps: [["task", "get", "99", "--jq", ".number"]] },
   // Refused while parsing, before the filter exists, and still kept off stdout.
   { name: "jq leaves stdout empty on a usage error", steps: [["task", "get", "--jq", ".number"], ["task", "get", "1", "--bogus", "--jq=.number"]] },

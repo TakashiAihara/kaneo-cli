@@ -43,7 +43,7 @@ const server = Bun.serve({
 configureClient({ baseUrl: "http://127.0.0.1:" + server.port, apiKey: "test-key" });
 const get = feedCommand.children.find((c) => c.name === "get");
 const changed = new Set(${JSON.stringify(opts.changed ?? [])});
-const filter = ${opts.jq === undefined ? "undefined" : `await loadFilter(${JSON.stringify(opts.jq)}, false)`};
+const filter = ${opts.jq === undefined ? "undefined" : `await loadFilter(${JSON.stringify(opts.jq)}, false, 10_000)`};
 const tty = isTTY(1);
 const mode = filter === undefined ? resolveMode(changed.has("json"), changed.has("human"), tty, false) : resolveMode(true, false, tty, false);
 const out = new Writer(mode, filter, ${opts.terminal === true});

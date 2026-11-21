@@ -1,12 +1,27 @@
 // The `--jq` expression, as a filter over what a command wrote.
 //
-// The WebAssembly comes in through the "inline" entry, which carries it inside
-// the JavaScript rather than in a file beside it, so a compiled binary needs
-// nothing next to itself. The import is dynamic, so a command without --jq
-// never pays to instantiate a module it will not run.
+// jq-wasm's raw() blocks the thread it runs on, so an expression that never
+// finishes (`def f: f; f`, `[range(1e9)]`) would hold the process after the
+// command's side effects already ran — and only another thread can be killed
+// for it. The filter therefore evaluates in a worker thread, where
+// --timeout's bound can terminate it, while the main thread blocks on
+// Atomics.wait for the answer, which keeps Filter synchronous for the Writer.
+//
+// The worker cannot resolve "jq-wasm/inline" — a compiled binary ships no
+// node_modules — so the module's own source travels as text and is imported
+// from a data: URL. The "inline" entry carries the WebAssembly inside the
+// JavaScript, so nothing sits beside the binary either way.
 
 import { writeSync } from "node:fs";
+import { Worker, MessageChannel, receiveMessageOnPort } from "node:worker_threads";
 import { sanitizeControl } from "./output";
+
+// jq-wasm's inline entry as source text, for the worker's data: URL import.
+// The text loader returns the module's bytes as a string; tsc types the
+// import as the module itself, so what follows is the loader's shape, not a
+// guess at the package's.
+// @ts-expect-error Bun's text loader returns a string, not the module's types
+import jqModuleSource from "jq-wasm/inline" with { type: "text" };
 
 // A JSON document in, whatever the expression makes of it out.
 export type Filter = (json: string) => string;
@@ -19,13 +34,22 @@ const FLAGS = ["-c"];
 
 // A failure of the expression rather than of the command, and a class of its own
 // because it is reported differently: the payload that was to be filtered is
-// not there, so nothing of it belongs on stdout.
-export class JqFailure extends Error {}
+// not there, so nothing of it belongs on stdout. exitCode is jq's own — the
+// status the same expression would have given a jq process, so halt_error(n)
+// keeps the n the caller asked for.
+export class JqFailure extends Error {
+  constructor(
+    message: string,
+    readonly exitCode: number,
+  ) {
+    super(message);
+  }
+}
 
 // The position jq reports is a line of kaneo's own serialisation of the
 // payload, which the caller never sees, so it is taken out.
-const failure = (stderr: string, after = ""): JqFailure =>
-  new JqFailure(`--jq: ${stderr.trim().replace(/ \(at \/dev\/stdin:\d+\)/g, "")}${after}`);
+const failure = (message: string, exitCode: number, after = ""): JqFailure =>
+  new JqFailure(`--jq: ${message.trim().replace(/ \(at \/dev\/stdin:\d+\)/g, "")}${after}`, exitCode);
 
 // Every command hands over its payload as its last step, so by the time the
 // filter runs, whatever the command changes has been changed — and a caller that
@@ -48,25 +72,154 @@ const lines = (stdout: string): string =>
     .map((value) => `${unquoted(value)}\n`)
     .join("");
 
-// Loads jq once for the whole command and checks the expression against it.
-// Whether stderr is a terminal is passed in, as it is to the Writer for stdout,
-// so that both ways of printing what jq says can be exercised.
-export const loadFilter = async (expression: string, stderrIsTerminal: boolean): Promise<Filter> => {
-  const { loadJq } = await import("jq-wasm/inline");
-  const jq = await loadJq();
-  // jq compiles a program before it reads any input, and with no input at all it
-  // runs nothing, so this checks the expression without executing it against a
-  // made-up value — one that loops, or halts, on null would otherwise hang or
-  // fail the command. Refusing here also means no request is made to find out
-  // that the expression was never going to work.
-  const compiled = jq.raw("", expression, FLAGS);
-  if (compiled.exitCode !== 0) throw failure(compiled.stderr);
+// jq writes two kinds of text into one stderr stream: its diagnostics, each a
+// line that opens "jq: ", and what the program itself printed — debug's
+// ["DEBUG:",...] arrays, stderr's raw values, halt_error's bare message. On
+// success everything goes to fd 2 raw; on failure the diagnostics are the
+// error and the rest is still output. A printed value that does not end its
+// line glues the next write onto it, so the split is by what opens a line,
+// not by writer — a diagnostic glued mid-line reads as program output, and a
+// failure with no diagnostic line at all keeps the whole stream as its
+// message, which is what halt_error's bare message needs.
+const splitStderr = (stderr: string): { diagnostics: string[]; program: string[] } => {
+  const all = stderr.split("\n");
+  if (all[all.length - 1] === "") all.pop();
+  const diagnostics: string[] = [];
+  const program: string[] = [];
+  for (const line of all) (line.startsWith("jq: ") ? diagnostics : program).push(line);
+  return { diagnostics, program };
+};
+
+// What `debug` and `stderr` print, as jq itself would show it. It can carry
+// server text, so a terminal gets it with control characters neutralised.
+const emit = (text: string, stderrIsTerminal: boolean): void => {
+  if (text === "") return;
+  writeSync(2, `${stderrIsTerminal ? sanitizeControl(text) : text}\n`);
+};
+
+// The worker's own source, eval'd because a compiled binary cannot hand a
+// Worker a file to run. It is plain JavaScript — no type annotations — for
+// that reason. jq-wasm arrives as text through workerData and is imported
+// from a data: URL, the one specifier a string-spawned worker can resolve on
+// every build the CLI ships as. ctrl is a one-word mailbox: the worker stores
+// 1 and notifies when a result is on the port, which is what Atomics.wait on
+// the main thread blocks on.
+const WORKER = `
+const wt = require("node:worker_threads");
+const ctrl = new Int32Array(wt.workerData.sab);
+let port = null;
+let jq = null;
+wt.parentPort.on("message", (msg) => {
+  if (msg.port === undefined) return;
+  port = msg.port;
+  port.on("message", (job) => {
+    const r = jq.raw(job.json, wt.workerData.expression, wt.workerData.flags);
+    port.postMessage({ stdout: r.stdout, stderr: r.stderr, exitCode: r.exitCode });
+    Atomics.store(ctrl, 0, 1);
+    Atomics.notify(ctrl, 0);
+  });
+  port.start();
+  (async () => {
+    const m = await import("data:text/javascript;base64," + Buffer.from(wt.workerData.source).toString("base64"));
+    jq = await m.loadJq();
+    const compiled = jq.raw("", wt.workerData.expression, wt.workerData.flags);
+    wt.parentPort.postMessage({ type: "ready", exitCode: compiled.exitCode, stderr: compiled.stderr });
+  })();
+});
+`;
+
+type Ready = { exitCode: number; stderr: string };
+
+// The worker loads jq-wasm and compiles the expression before it answers a
+// job, so its ready message carries the compile check's verdict. Startup is
+// bounded by the same --timeout as an evaluation: on a build where the worker
+// cannot start at all, the command fails the way an expression that never
+// finishes does rather than hanging.
+const readyResult = (worker: Worker, timeoutMs: number): Promise<Ready> =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(failure(`the filter did not start within ${timeoutMs}ms`, 1));
+    }, timeoutMs);
+    worker.once("message", (ready: Ready) => {
+      clearTimeout(timer);
+      resolve(ready);
+    });
+    worker.once("error", (e) => {
+      clearTimeout(timer);
+      reject(e);
+    });
+    worker.once("exit", (code) => {
+      clearTimeout(timer);
+      reject(failure(`the jq worker exited ${code} before it was ready`, 1));
+    });
+  });
+
+type Answer = { stdout: string; stderr: string; exitCode: number };
+
+// Loads jq once for the whole command — in the worker, where its synchronous
+// evaluations can be killed — and checks the expression against it. Whether
+// stderr is a terminal is passed in, as it is to the Writer for stdout, so
+// that both ways of printing what jq says can be exercised.
+export const loadFilter = async (expression: string, stderrIsTerminal: boolean, timeoutMs: number): Promise<Filter> => {
+  const { port1, port2 } = new MessageChannel();
+  const sab = new SharedArrayBuffer(8);
+  const ctrl = new Int32Array(sab);
+  const worker = new Worker(WORKER, {
+    eval: true,
+    workerData: { sab, source: jqModuleSource, expression, flags: FLAGS },
+  });
+  // The command ends in process.exit either way; unref keeps a stray caller —
+  // a test, a future embedder — from being held open by the worker.
+  worker.unref();
+  port1.unref();
+  worker.postMessage({ port: port2 }, [port2]);
+
+  let ready: Ready;
+  try {
+    ready = await readyResult(worker, timeoutMs);
+  } catch (e) {
+    // A worker that never answered is no use to a retry: on the timeout path
+    // it is still alive, finished with init and idle, and would hold the
+    // jq-wasm instance for the life of the process.
+    void worker.terminate();
+    throw e;
+  }
+  if (ready.exitCode !== 0) {
+    void worker.terminate();
+    throw failure(ready.stderr, ready.exitCode);
+  }
+
   return (json) => {
-    const { stdout, stderr, exitCode } = jq.raw(json, expression, FLAGS);
-    if (exitCode !== 0) throw failure(stderr, RAN);
-    // What `debug` and `stderr` print, as jq itself would show it. It can carry
-    // server text, so a terminal gets it with control characters neutralised.
-    if (stderr !== "") writeSync(2, `${stderrIsTerminal ? sanitizeControl(stderr) : stderr}\n`);
+    Atomics.store(ctrl, 0, 0);
+    port1.postMessage({ json });
+    if (Atomics.wait(ctrl, 0, 0, timeoutMs) === "timed-out") {
+      // The worker is still inside jq.raw; terminate is the only way out of a
+      // synchronous wasm loop, and the next call — if a caller retries —
+      // bounds itself the same way.
+      void worker.terminate();
+      throw failure(`the expression did not finish within ${timeoutMs}ms`, 1, RAN);
+    }
+    const answer = receiveMessageOnPort(port1)?.message as Answer | undefined;
+    // The worker posts its answer before it signals done, so a missing one
+    // means it died between the two — unreachable unless the runtime breaks.
+    if (answer === undefined) throw new Error("internal error: the jq worker finished without an answer");
+    const { stdout, stderr, exitCode } = answer;
+    if (exitCode !== 0) {
+      const { diagnostics, program } = splitStderr(stderr);
+      if (diagnostics.length > 0) {
+        emit(program.join("\n"), stderrIsTerminal);
+        throw failure(diagnostics.join("\n"), exitCode, RAN);
+      }
+      // No "jq: " line: the whole stream is what the program printed. debug's
+      // arrays still read as debug and go to fd 2; what remains is
+      // halt_error's message — nothing, when the program printed only debug
+      // lines (a halt_error on null or "" has no message of its own).
+      const debug = program.filter((line) => line.startsWith('["DEBUG:",'));
+      const rest = program.filter((line) => !line.startsWith('["DEBUG:",'));
+      emit(debug.join("\n"), stderrIsTerminal);
+      throw failure(rest.join("\n"), exitCode, RAN);
+    }
+    emit(stderr, stderrIsTerminal);
     return lines(stdout);
   };
 };

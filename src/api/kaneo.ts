@@ -2207,7 +2207,14 @@ export const reorderCustomFields = async (projectId: string, fieldIds: string[])
   const reply = await putFieldOrder(pathParam(projectId), {
     fields: fieldIds.map((id, position) => ({ id, position })),
   });
-  if (!Array.isArray(reply)) {
+  // Rows are checked for an id alone: every other field the mapping lacks is
+  // filled with its empty value, which would let a row that is no field pass.
+  const isField = (f: unknown): boolean => {
+    if (f === null || typeof f !== "object") return false;
+    const { id } = f as { id?: unknown };
+    return typeof id === "string" && id !== "";
+  };
+  if (!Array.isArray(reply) || !reply.every(isField)) {
     throw new Error(
       `PUT /custom-field/reorder/${projectId}: the fields were reordered, but the reply is not a list of them; \`kaneo field ls\` shows the new order`,
     );

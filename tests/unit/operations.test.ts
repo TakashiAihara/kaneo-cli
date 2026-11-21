@@ -1548,6 +1548,29 @@ describe("custom fields", () => {
     expect(String(await failure(api.reorderCustomFields("p1", ["f1"])))).toContain("/custom-field/reorder/p1");
   });
 
+  // A row is a field only when it names its id; every other field the mapping
+  // lacks it fills itself.
+  test("reorder accepts a row that names only its id", async () => {
+    recorder('[{"id":"f1"}]');
+    const fields = await api.reorderCustomFields("p1", ["f1"]);
+    expect(fields.map((f) => f.id)).toEqual(["f1"]);
+  });
+
+  // A list whose rows carry no usable id fails the same way one that is not a
+  // list at all does.
+  test.each([
+    ["an object without an id", "[{}]"],
+    ["a null row", "[null]"],
+    ["an empty id", '[{"id":""}]'],
+    ["a non-string id", '[{"id":3}]'],
+    ["a bare string", '["f1"]'],
+  ])("reorder answered with %s", async (_shape, reply) => {
+    recorder(reply);
+    const e = String(await failure(api.reorderCustomFields("p1", ["f1"])));
+    expect(e).toContain("/custom-field/reorder/p1");
+    expect(e).toContain("is not a list of them");
+  });
+
   test("set value", async () => {
     const seen = recorder('{"id":"v1","taskId":"t1","fieldId":"f1","value":"3"}');
     const got = await api.setCustomFieldValue("t1", "f1", "3");

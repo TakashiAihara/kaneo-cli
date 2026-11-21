@@ -778,7 +778,6 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     skipped: r.skipped,
   });
 
-<<<<<<< HEAD
   // Integrations as the server keeps them: one row per project and type, the
   // config holding the credentials, isActive, and the timestamps a write bumps.
   // The replies mask the URL and the signing secret the way the plugins do.

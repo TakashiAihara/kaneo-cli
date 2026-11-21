@@ -85,4 +85,11 @@ export const OPERATIONS: Operation[] = [
   { id: "getTimeEntry", method: "GET", path: "/time-entry/{id}", command: "kaneo time get / update / stop" },
   { id: "createTimeEntry", method: "POST", path: "/time-entry", command: "kaneo time add" },
   { id: "updateTimeEntry", method: "PUT", path: "/time-entry/{id}", command: "kaneo time update / stop" },
+  { id: "listGitlabProjects", method: "POST", path: "/gitlab-integration/projects", command: "kaneo integration gitlab projects" },
+  { id: "verifyGitlabAccess", method: "POST", path: "/gitlab-integration/verify", command: "kaneo integration gitlab verify" },
+  { id: "getGitlabIntegration", method: "GET", path: "/gitlab-integration/project/{projectId}", command: "kaneo integration gitlab get" },
+  { id: "createGitlabIntegration", method: "POST", path: "/gitlab-integration/project/{projectId}", command: "kaneo integration gitlab connect" },
+  { id: "updateGitlabIntegration", method: "PATCH", path: "/gitlab-integration/project/{projectId}", command: "kaneo integration gitlab update" },
+  { id: "deleteGitlabIntegration", method: "DELETE", path: "/gitlab-integration/project/{projectId}", command: "kaneo integration gitlab rm" },
+  { id: "importGitlabIssues", method: "POST", path: "/gitlab-integration/import-issues", command: "kaneo integration gitlab import" },
 ];

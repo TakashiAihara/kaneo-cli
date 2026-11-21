@@ -174,6 +174,13 @@ kaneo column rm <column> --yes
 kaneo workflow ls                 # the resolved project's rules, and where each one puts a task
 kaneo workflow set <integration> <event> <column>   # one of the pairs listed below; setting a pair again moves the column
 kaneo workflow rm <rule-id>       # or <integration> <event>, instead of the id; by id the rule is deleted wherever it is
+kaneo integration gitlab get      # the project's stored link, or that there is none
+kaneo integration gitlab connect --base-url URL --project-path PATH [--access-token -] [--token-type private|bearer]
+kaneo integration gitlab update [--active=false] [--comment-task-link=false]   # only what is passed changes
+kaneo integration gitlab rm --yes   # also: delete; removes the link and its stored secrets
+kaneo integration gitlab verify --base-url URL --project-path PATH --access-token -   # checks the token reaches the project, stores nothing; exits non-zero when the check fails
+kaneo integration gitlab projects --base-url URL --access-token -   # the GitLab projects the token can see, to pick one
+kaneo integration gitlab import   # the linked project's open issues as tasks; exits non-zero when any issue failed
 kaneo task ls [--status ...] [--priority ...] [--all]
 kaneo task ls --mine       # open tasks assigned to you across the workspace, at most 100
 kaneo task get <task-id>                 # also lists the task's relations and the sessions holding it
@@ -246,6 +253,10 @@ A request the API key's rate limiter refuses (429 `RATE_LIMITED`, which the serv
 A workflow rule moves a task with nobody at the board: `kaneo workflow set github pr_opened in-review` says that a task whose pull request was opened lands in that column. The integration and the event are Kaneo's own names, the ones its plugins fire, and not the provider's webhook names: an integration of `github`, `gitea` or `gitlab`, and an event of `branch_push`, `pr_opened`, `pr_merged`, `issue_opened`, `issue_closed` or `issue_reopened`. Anything else is stored as written and warned about on stderr, since no plugin fires it. The server's upsert looks for a rule the project already has for the pair and moves its column, so setting a pair again moves the rule already there rather than adding a second one — though nothing on the server keeps it to one, and `workflow rm` refuses a pair it finds twice rather than delete one of the two. `kaneo workflow rm` deletes a rule by its id, wherever it is, or by the integration and event it names in the resolved project.
 
 `kaneo task external-links <task>` lists what a task points at outside the board: the links an integration brought in — an issue, a pull request — and the ones somebody added by hand. A link that came through an integration is marked with the integration it came through, since the same URL can be either.
+
+`kaneo integration gitlab` works the link between a project and a GitLab project. `connect` stores it — the instance's root URL, the project's full path (`group/sub/project`), and the token — and answers the webhook URL and secret to give GitLab afterwards; connecting again keeps the stored token while the GitLab URL is unchanged and asks for a new one when it is not. `verify` runs the same checks without storing anything, `projects` lists what a token can see to pick the project, `update` changes only the flags passed, `import` brings the linked project's open issues in as tasks, and `rm --yes` removes the link.
+
+The GitLab token is a secret, so `--access-token` takes only `-`, which reads it from stdin: a literal value is refused rather than written into the process list or the shell history. One trailing line ending is dropped and empty stdin is an error. `connect` may omit the token for the reuse above. The stored token is only ever answered masked, and the webhook secret only to a caller that may manage the workspace's settings — a plain member reads the link with both withheld, is refused `connect`, `update`, `rm`, `verify` and `projects`, and can still `import`, which asks for task permissions instead.
 
 ### Shell completion
 

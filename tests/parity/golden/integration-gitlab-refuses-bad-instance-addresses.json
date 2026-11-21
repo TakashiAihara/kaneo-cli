@@ -1,0 +1,141 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/gitlab-integration/project/proj-alpha: 400: Invalid key: baseUrl: Invalid URL\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "http://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/gitlab-integration/project/proj-alpha: 400: GitLab URL must use https unless KANEO_ALLOW_PRIVATE_WEBHOOK_DESTINATIONS is enabled\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "http://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/gitlab-integration/verify: 400: GitLab URL must use https unless KANEO_ALLOW_PRIVATE_WEBHOOK_DESTINATIONS is enabled\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "projects",
+        "--base-url",
+        "http://gitlab.example.com",
+        "--access-token",
+        "-",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/gitlab-integration/projects: 400: GitLab URL must use https unless KANEO_ALLOW_PRIVATE_WEBHOOK_DESTINATIONS is enabled\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "web-app",
+        "--access-token",
+        "-",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/gitlab-integration/project/proj-alpha: 400: GitLab project path must include a namespace, for example group/project\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "gitlab.example.com",
+        "projectPath": "acme/web-app",
+        "accessToken": "addr-token-0123456789abcdef"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "http://gitlab.example.com",
+        "projectPath": "acme/web-app",
+        "accessToken": "addr-token-0123456789abcdef"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/verify",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "http://gitlab.example.com",
+        "accessToken": "addr-token-0123456789abcdef",
+        "projectPath": "acme/web-app"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/projects",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "http://gitlab.example.com",
+        "accessToken": "addr-token-0123456789abcdef"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitlab.example.com",
+        "projectPath": "web-app",
+        "accessToken": "addr-token-0123456789abcdef"
+      }
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,57 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "projects",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--access-token",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": 101,\n    \"name\": \"Web App\",\n    \"path_with_namespace\": \"acme/web-app\",\n    \"name_with_namespace\": \"Acme / Web App\",\n    \"visibility\": \"private\",\n    \"web_url\": \"https://gitlab.example.com/acme/web-app\"\n  },\n  {\n    \"id\": 102,\n    \"name\": \"Docs\",\n    \"path_with_namespace\": \"acme/docs\",\n    \"name_with_namespace\": \"Acme / Docs\",\n    \"visibility\": \"internal\",\n    \"web_url\": \"https://gitlab.example.com/acme/docs\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "projects",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--access-token",
+        "-",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "101  acme/web-app  private  https://gitlab.example.com/acme/web-app\n102  acme/docs  internal  https://gitlab.example.com/acme/docs\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/projects",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitlab.example.com",
+        "accessToken": "list-token-0123456789abcdef"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/projects",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitlab.example.com",
+        "accessToken": "list-token-0123456789abcdef"
+      }
+    }
+  ],
+  "files": {}
+}

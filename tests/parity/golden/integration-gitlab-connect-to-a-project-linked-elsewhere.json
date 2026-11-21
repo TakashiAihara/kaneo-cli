@@ -1,0 +1,65 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "connect",
+        "-p",
+        "proj-beta",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/gitlab-integration/project/proj-beta: 409: Project acme/web-app on this GitLab instance is already linked to another project\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "connect",
+        "-p",
+        "proj-beta",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/gitlab-integration/project/proj-beta: 409: Project acme/web-app on this GitLab instance is already linked to another project\"\n}\n",
+      "stderr": "Error: POST /api/gitlab-integration/project/proj-beta: 409: Project acme/web-app on this GitLab instance is already linked to another project\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/project/proj-beta",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitlab.example.com",
+        "projectPath": "acme/web-app",
+        "accessToken": "cli-token-0123456789abcdef"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/project/proj-beta",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitlab.example.com",
+        "projectPath": "acme/web-app",
+        "accessToken": "cli-token-0123456789abcdef"
+      }
+    }
+  ],
+  "files": {}
+}

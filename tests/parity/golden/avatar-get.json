@@ -1,0 +1,57 @@
+{
+  "steps": [
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "avatar-one-bytes",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-1",
+        "--out",
+        "face.webp",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"path\": \"face.webp\",\n  \"bytes\": 16,\n  \"contentType\": \"image/webp\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/user/avatar/nope: 404: Avatar not found\"\n}\n",
+      "stderr": "Error: GET /api/user/avatar/nope: 404: Avatar not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/user/avatar/av-1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/av-1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/nope",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

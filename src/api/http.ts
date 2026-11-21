@@ -24,9 +24,9 @@ import { OPERATIONS, type Operation } from "./registry";
 // non-loopback host on the first hop and on every redirect, where a header
 // could have been stripped and the path cannot.
 // blob marks a route whose document declares a binary body (the project
-// background's image/*): the reply is handed back as a Blob of the bytes it
-// arrived as, since there is no JSON value to parse and no schema to check it
-// against.
+// background's image/*, an asset or an avatar image): the reply is handed
+// back as a Blob of the bytes it arrived as, since there is no JSON value to
+// parse and no schema to check it against.
 export type KaneoInit<T = unknown> = RequestInit & {
   schema?: ZodType<T> | ZodType;
   anonymous?: boolean;

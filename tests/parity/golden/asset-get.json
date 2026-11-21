@@ -1,0 +1,55 @@
+{
+  "steps": [
+    {
+      "args": [
+        "asset",
+        "get",
+        "asset-pic",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "fake-asset-bytes",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "asset",
+        "get",
+        "asset-priv",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "private-asset-bytes",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "asset",
+        "get",
+        "missing",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/asset/missing: 404: Asset not found\"\n}\n",
+      "stderr": "Error: GET /api/asset/missing: 404: Asset not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/asset/asset-pic",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/asset/asset-priv",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/asset/missing",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

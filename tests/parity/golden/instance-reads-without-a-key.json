@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "args": [
+        "instance",
+        "status",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "has users  yes\nhas admin  yes\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "instance",
+        "config",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"isCloud\": false,\n  \"disableRegistration\": false,\n  \"disablePasswordRegistration\": false,\n  \"disableEmailOtpSignIn\": false,\n  \"disableWorkspaceCreation\": false,\n  \"isDemoMode\": false,\n  \"hasSmtp\": false,\n  \"hasGithubSignIn\": false,\n  \"hasGoogleSignIn\": false,\n  \"hasDiscordSignIn\": false,\n  \"hasCustomOAuth\": false,\n  \"hasGuestAccess\": false,\n  \"disableLoginForm\": false,\n  \"customOAuthAutoLogin\": false,\n  \"customOAuthLogoutUrl\": null,\n  \"billingEnabled\": false\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/instance/status",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/config",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

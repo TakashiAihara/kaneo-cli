@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "instance",
+        "config",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "isCloud  off\ndisableRegistration  off\ndisablePasswordRegistration  off\ndisableEmailOtpSignIn  off\ndisableWorkspaceCreation  off\nisDemoMode  off\nhasSmtp  off\nhasGithubSignIn  off\nhasGoogleSignIn  off\nhasDiscordSignIn  off\nhasCustomOAuth  off\nhasGuestAccess  off\ndisableLoginForm  off\ncustomOAuthAutoLogin  off\ncustomOAuthLogoutUrl  -\nbillingEnabled  off\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/config",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

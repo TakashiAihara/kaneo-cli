@@ -2428,3 +2428,123 @@ test("TestDeleteGenericWebhookIntegrationAnswersSuccess", async () => {
   expect(await api.deleteGenericWebhookIntegration("p1")).toEqual({ success: true });
   expect([seen.method, seen.path]).toEqual(["DELETE", "/api/generic-webhook-integration/project/p1"]);
 });
+
+// --- batch 11: instance, session, public board, binary downloads ---
+
+test("instanceStatus asks without a key and reports the two flags", async () => {
+  const seen = recorder(`{"hasUsers":true,"hasAdmin":false}`);
+  const status = await api.instanceStatus();
+  expect(seen.path).toBe("/api/instance/status");
+  expect(status).toEqual({ hasUsers: true, hasAdmin: false });
+});
+
+test("authSession answers null for a signed-out reply and drops the token", async () => {
+  const anon = recorder(`null`);
+  expect(await api.authSession()).toBeNull();
+  expect(anon.path).toBe("/api/auth/get-session");
+
+  const signedIn = recorder(
+    `{"user":{"id":"u1","name":"Sam","email":"sam@example.com"},"session":{"id":"s1","userId":"u1","token":"sekrit","createdAt":"${TIME}","expiresAt":"2027-01-01T00:00:00.000Z","ipAddress":"10.0.0.1","userAgent":"kaneo-cli"}}`,
+  );
+  const session = await api.authSession();
+  expect(signedIn.path).toBe("/api/auth/get-session");
+  expect(session).toEqual({
+    user: { id: "u1", name: "Sam", email: "sam@example.com" },
+    session: {
+      id: "s1",
+      userId: "u1",
+      createdAt: TIME,
+      expiresAt: "2027-01-01T00:00:00.000Z",
+      ipAddress: "10.0.0.1",
+      userAgent: "kaneo-cli",
+    },
+  });
+  expect(JSON.stringify(session)).not.toContain("sekrit");
+});
+
+const publicPage = (tasks: unknown[], page: number, totalPages: number) =>
+  JSON.stringify({
+    id: "proj-pub",
+    name: "Pub",
+    slug: "PUB",
+    icon: null,
+    description: null,
+    isPublic: true,
+    workspaceId: "w1",
+    backgroundVersion: null,
+    columns: [{ id: "to-do", slug: "to-do", name: "To Do", icon: null, isFinal: false, tasks }],
+    archivedTasks: [],
+    plannedTasks: [],
+    pagination: {
+      total: tasks.length,
+      page,
+      pageSize: 1,
+      totalPages,
+      relatedPage: 1,
+      relatedPageSize: 100,
+      relatedTotalPages: 1,
+      revision: "rev1",
+    },
+  });
+
+const pubTask = (id: string, number: number, title: string) => ({
+  id,
+  projectId: "proj-pub",
+  title,
+  number,
+  description: "",
+  status: "to-do",
+  priority: "high",
+  startDate: null,
+  dueDate: null,
+  position: number,
+  createdAt: TIME,
+  userId: null,
+  assigneeName: null,
+  assigneeId: null,
+  assigneeImage: null,
+  subtaskCounts: { completed: 0, total: 0 },
+  labels: [],
+  externalLinks: [],
+});
+
+test("getPublicBoard reads every page and merges the tasks in order", async () => {
+  const queries: string[] = [];
+  newServer(async (req) => {
+    const url = new URL(req.url);
+    queries.push(url.search);
+    const page = Number(url.searchParams.get("page") ?? "1");
+    const tasks = page === 1 ? [pubTask("t1", 1, "first")] : [pubTask("t2", 2, "second")];
+    return Response.json(JSON.parse(publicPage(tasks, page, 2)));
+  });
+  const board = await api.getPublicBoard("proj-pub", { limit: 1 });
+  expect(queries).toEqual(["?page=1&relatedPage=1&limit=1", "?page=2&relatedPage=1&limit=1"]);
+  expect(board.projectName).toBe("Pub");
+  expect(board.columns[0]!.tasks.map((t) => t.title)).toEqual(["first", "second"]);
+});
+
+test("getPublicProjectDescription concatenates the pages and keeps the first version", async () => {
+  const offsets: string[] = [];
+  newServer(async (req) => {
+    const url = new URL(req.url);
+    offsets.push(url.searchParams.get("offset") ?? "");
+    const offset = Number(url.searchParams.get("offset") ?? "0");
+    const content = offset === 0 ? "hello " : "world";
+    return Response.json({ content, version: "v1", nextOffset: offset === 0 ? 6 : null });
+  });
+  const description = await api.getPublicProjectDescription("proj-pub");
+  expect(offsets).toEqual(["0", "6"]);
+  expect(description).toEqual({ content: "hello world", version: "v1" });
+});
+
+test("downloadAsset and downloadAvatar hand back the bytes and their type", async () => {
+  const bytes = new Uint8Array([137, 80, 78, 71]);
+  newServer(() => new Response(bytes, { headers: { "content-type": "image/png" } }));
+  const asset = await api.downloadAsset("a1");
+  expect(asset.contentType).toBe("image/png");
+  expect(asset.data).toEqual(bytes);
+
+  const avatar = await api.downloadAvatar("u1");
+  expect(avatar.contentType).toBe("image/png");
+  expect(avatar.data).toEqual(bytes);
+});

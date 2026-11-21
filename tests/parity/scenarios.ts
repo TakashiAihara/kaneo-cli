@@ -2901,4 +2901,129 @@ export const SCENARIOS: Scenario[] = [
       ["integration", "webhook", "set", WF, "-", "-p", "BET", "--json"],
     ],
   },
+
+  // ===== Instance, public boards, session, assets and avatars =====
+
+  ...both("instance status", ["instance", "status"]),
+  ...both("instance config", ["instance", "config"]),
+  {
+    // The routes are security: [], so no key, workspace or project is needed.
+    name: "instance reads without a key",
+    env: { KANEO_API_KEY: "", KANEO_PROJECT: "", KANEO_WORKSPACE: "" },
+    steps: [["instance", "status", "--human"], ["instance", "config", "--json"]],
+  },
+  ...both("whoami session", ["whoami", "session"]),
+  {
+    // set stores the image, get reads it back, rm takes it away — and rm again
+    // reports there was nothing left.
+    name: "whoami avatar set, get and rm",
+    files: { "face.png": "fake-png-bytes" },
+    steps: [
+      ["whoami", "avatar", "set", "face.png", "--json"],
+      ["avatar", "get", "avatar-self", "--human"],
+      ["whoami", "avatar", "rm", "--human"],
+      ["whoami", "avatar", "rm", "--json"],
+      ["avatar", "get", "avatar-self", "--json"],
+    ],
+  },
+  {
+    name: "whoami avatar set refuses what is not an image",
+    files: { "notes.txt": "text", "empty.png": "" },
+    steps: [
+      ["whoami", "avatar", "set", "notes.txt", "--json"],
+      ["whoami", "avatar", "set", "empty.png", "--json"],
+      ["whoami", "avatar", "set", "missing.png", "--json"],
+    ],
+  },
+  {
+    name: "avatar get",
+    env: { KANEO_API_KEY: "" },
+    seed: { avatars: [{ id: "av-1", body: "avatar-one-bytes", contentType: "image/webp" }] },
+    steps: [
+      ["avatar", "get", "av-1", "--human"],
+      ["avatar", "get", "av-1", "--out", "face.webp", "--json"],
+      ["avatar", "get", "nope", "--json"],
+    ],
+  },
+  {
+    name: "asset get",
+    seed: {
+      assets: [
+        { id: "asset-pic", body: "fake-asset-bytes", contentType: "image/png" },
+        { id: "asset-priv", body: "private-asset-bytes", contentType: "text/plain", public: false },
+      ],
+    },
+    steps: [
+      ["asset", "get", "asset-pic", "--human"],
+      ["asset", "get", "asset-priv", "--human"],
+      ["asset", "get", "missing", "--json"],
+    ],
+  },
+  {
+    // A public asset answers without a key; a private one is refused.
+    name: "asset get without a key",
+    env: { KANEO_API_KEY: "" },
+    seed: {
+      assets: [
+        { id: "asset-pic", body: "fake-asset-bytes", contentType: "image/png" },
+        { id: "asset-priv", body: "private-asset-bytes", contentType: "text/plain", public: false },
+      ],
+    },
+    steps: [["asset", "get", "asset-pic", "--human"], ["asset", "get", "asset-priv", "--json"]],
+  },
+  {
+    name: "public project",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+      ],
+    },
+    extraTasks: [
+      { id: "task-pub1", projectId: "proj-public", title: "Public first", priority: "high" },
+      { id: "task-pub2", projectId: "proj-public", title: "Public second", status: "done" },
+      { id: "task-pub3", projectId: "proj-public", title: "Public third", status: "archived" },
+    ],
+    steps: [
+      ["public", "project", "proj-public", "--human"],
+      ["public", "project", "proj-public", "--status", "to-do", "--json"],
+      ["public", "project", "proj-public", "--sort-by", "title", "--sort-order", "desc", "--limit", "1", "--json"],
+      ["public", "project", "proj-alpha", "--json"],
+      ["public", "project", "proj-public", "--sort-by", "sideways", "--json"],
+    ],
+  },
+  {
+    name: "public reads without a key",
+    env: { KANEO_API_KEY: "", KANEO_PROJECT: "", KANEO_WORKSPACE: "" },
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+      ],
+    },
+    extraTasks: [{ id: "task-pub1", projectId: "proj-public", title: "Public first" }],
+    steps: [["public", "project", "proj-public", "--human"], ["public", "description", "proj-public", "--json"]],
+  },
+  {
+    // The project description pages at 1024 characters a page; the task's by
+    // id, by number, and the misses.
+    name: "public description",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+      ],
+    },
+    extraTasks: [
+      { id: "task-pub1", projectId: "proj-public", title: "Public first" },
+      { id: "task-pub2", projectId: "proj-public", title: "Public second", description: "task detail ".repeat(200) },
+    ],
+    steps: [
+      ["public", "description", "proj-public", "--human"],
+      ["public", "description", "proj-public", "task-pub2", "--json"],
+      ["public", "description", "proj-public", "2", "--human"],
+      ["public", "description", "proj-public", "99", "--json"],
+      ["public", "description", "proj-alpha", "--json"],
+    ],
+  },
 ];

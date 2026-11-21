@@ -1,0 +1,92 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "avatar",
+        "set",
+        "face.png",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"avatar-self\",\n  \"url\": \"/api/user/avatar/avatar-self\",\n  \"size\": 14\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "avatar-self",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "fake-png-bytes",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "whoami",
+        "avatar",
+        "rm",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "avatar removed\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "whoami",
+        "avatar",
+        "rm",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"deleted\": false\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "avatar-self",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/user/avatar/avatar-self: 404: Avatar not found\"\n}\n",
+      "stderr": "Error: GET /api/user/avatar/avatar-self: 404: Avatar not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/user/avatar",
+      "query": "",
+      "body": {
+        "contentType": "image/png",
+        "data": "ZmFrZS1wbmctYnl0ZXM="
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/avatar-self",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/user/avatar",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/user/avatar",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/avatar-self",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

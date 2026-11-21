@@ -1,0 +1,102 @@
+{
+  "steps": [
+    {
+      "args": [
+        "public",
+        "project",
+        "proj-public",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Public (PUB)\n\n### To Do\n#1    [high       ] to-do         Public first\n\n### In Progress\n\n### Done\n#2    [no-priority] done          Public second\n\n### Archived\n#3    [no-priority] archived      Public third\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "public",
+        "project",
+        "proj-public",
+        "--status",
+        "to-do",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"projectId\": \"proj-public\",\n  \"projectName\": \"Public\",\n  \"projectSlug\": \"PUB\",\n  \"columns\": [\n    {\n      \"id\": \"to-do\",\n      \"name\": \"To Do\",\n      \"tasks\": [\n        {\n          \"id\": \"task-pub1\",\n          \"number\": 1,\n          \"title\": \"Public first\",\n          \"description\": \"\",\n          \"status\": \"to-do\",\n          \"priority\": \"high\",\n          \"position\": 0,\n          \"projectId\": \"proj-public\",\n          \"assigneeId\": null,\n          \"assigneeName\": null,\n          \"startDate\": null,\n          \"dueDate\": null,\n          \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n          \"labels\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"in-progress\",\n      \"name\": \"In Progress\",\n      \"tasks\": []\n    },\n    {\n      \"id\": \"done\",\n      \"name\": \"Done\",\n      \"tasks\": []\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "public",
+        "project",
+        "proj-public",
+        "--sort-by",
+        "title",
+        "--sort-order",
+        "desc",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"projectId\": \"proj-public\",\n  \"projectName\": \"Public\",\n  \"projectSlug\": \"PUB\",\n  \"columns\": [\n    {\n      \"id\": \"to-do\",\n      \"name\": \"To Do\",\n      \"tasks\": [\n        {\n          \"id\": \"task-pub1\",\n          \"number\": 1,\n          \"title\": \"Public first\",\n          \"description\": \"\",\n          \"status\": \"to-do\",\n          \"priority\": \"high\",\n          \"position\": 0,\n          \"projectId\": \"proj-public\",\n          \"assigneeId\": null,\n          \"assigneeName\": null,\n          \"startDate\": null,\n          \"dueDate\": null,\n          \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n          \"labels\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"in-progress\",\n      \"name\": \"In Progress\",\n      \"tasks\": []\n    },\n    {\n      \"id\": \"done\",\n      \"name\": \"Done\",\n      \"tasks\": [\n        {\n          \"id\": \"task-pub2\",\n          \"number\": 2,\n          \"title\": \"Public second\",\n          \"description\": \"\",\n          \"status\": \"done\",\n          \"priority\": \"no-priority\",\n          \"position\": 1,\n          \"projectId\": \"proj-public\",\n          \"assigneeId\": null,\n          \"assigneeName\": null,\n          \"startDate\": null,\n          \"dueDate\": null,\n          \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n          \"labels\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"archived\",\n      \"name\": \"Archived\",\n      \"tasks\": [\n        {\n          \"id\": \"task-pub3\",\n          \"number\": 3,\n          \"title\": \"Public third\",\n          \"description\": \"\",\n          \"status\": \"archived\",\n          \"priority\": \"no-priority\",\n          \"position\": 2,\n          \"projectId\": \"proj-public\",\n          \"assigneeId\": null,\n          \"assigneeName\": null,\n          \"startDate\": null,\n          \"dueDate\": null,\n          \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n          \"labels\": []\n        }\n      ]\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "public",
+        "project",
+        "proj-alpha",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/public-project/proj-alpha: 404: Project not found\"\n}\n",
+      "stderr": "Error: GET /api/public-project/proj-alpha: 404: Project not found\n"
+    },
+    {
+      "args": [
+        "public",
+        "project",
+        "proj-public",
+        "--sort-by",
+        "sideways",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--sort-by \\\"sideways\\\" is not one of: createdAt, priority, dueDate, position, title, number\"\n}\n",
+      "stderr": "Error: --sort-by \"sideways\" is not one of: createdAt, priority, dueDate, position, title, number\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public",
+      "query": "?page=1&relatedPage=1"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public",
+      "query": "?status=to-do&page=1&relatedPage=1"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public",
+      "query": "?page=1&relatedPage=1&limit=1&sortBy=title&sortOrder=desc"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public",
+      "query": "?page=2&relatedPage=1&limit=1&sortBy=title&sortOrder=desc"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public",
+      "query": "?page=3&relatedPage=1&limit=1&sortBy=title&sortOrder=desc"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-alpha",
+      "query": "?page=1&relatedPage=1"
+    }
+  ],
+  "files": {}
+}

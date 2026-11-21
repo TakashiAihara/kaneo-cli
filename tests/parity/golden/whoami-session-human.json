@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "session",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "session    sess-self-1\nuser       Self <self@example.com> (user-self)\ncreated    2026-01-01T00:00:00.000Z\nexpires    <TIME>Z\nip         127.0.0.1\nagent      kaneo-cli-test\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/get-session",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

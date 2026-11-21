@@ -1,0 +1,155 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "background",
+        "set",
+        "proj-alpha",
+        "bg.png",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"project\": \"proj-alpha\",\n  \"url\": \"<URL>/project/proj-alpha/background?v=bg0001\",\n  \"version\": \"bg0001\",\n  \"contentType\": \"image/png\",\n  \"size\": 20\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "get",
+        "BET"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/project/proj-beta/background: 404: Project background not found\n"
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "get",
+        "proj-alpha"
+      ],
+      "exit": 0,
+      "stdout": "PNG-BYTES-0123456789",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "get"
+      ],
+      "exit": 0,
+      "stdout": "PNG-BYTES-0123456789",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "rm",
+        "proj-alpha",
+        "--yes",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "removed the background of proj-alpha  Alpha\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "get",
+        "proj-alpha"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/project/proj-alpha/background: 404: Project background not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha/background-upload",
+      "query": "",
+      "body": {
+        "contentType": "image/png",
+        "size": 20
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/storage/workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001",
+      "query": "?signature=fake",
+      "body": {
+        "key": "workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001",
+        "bytes": 20
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/project/proj-alpha/background-upload/finalize",
+      "query": "",
+      "body": {
+        "key": "workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001",
+        "contentType": "image/png",
+        "version": "bg0001",
+        "size": 20
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/BET/background",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta/background",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha/background",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha/background",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/project/proj-alpha/background",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha/background",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

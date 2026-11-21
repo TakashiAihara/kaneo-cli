@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "background",
+        "set",
+        "proj-alpha",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"stdin gives no usable content type; pass --content-type\"\n}\n",
+      "stderr": "Error: stdin gives no usable content type; pass --content-type\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

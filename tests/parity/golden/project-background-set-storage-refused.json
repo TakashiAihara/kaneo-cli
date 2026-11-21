@@ -1,0 +1,38 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "background",
+        "set",
+        "proj-alpha",
+        "bg.png",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT <URL>/storage/workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001: 403: SignatureDoesNotMatch: The request signature does not match\"\n}\n",
+      "stderr": "Error: PUT <URL>/storage/workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001: 403: SignatureDoesNotMatch: The request signature does not match\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha/background-upload",
+      "query": "",
+      "body": {
+        "contentType": "image/png",
+        "size": 9
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/storage/workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001",
+      "query": "?signature=fake",
+      "body": {
+        "key": "workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001",
+        "bytes": 9
+      }
+    }
+  ],
+  "files": {}
+}

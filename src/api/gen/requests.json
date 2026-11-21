@@ -94,12 +94,19 @@
   "deleteLabel": {},
   "deleteNotificationPreferenceWorkspaceRule": {},
   "deleteProject": {},
+  "deleteProjectBackground": {},
   "deleteTask": {},
   "deleteTaskComment": {},
   "deleteTaskRelation": {},
   "deleteWorkflowRule": {},
   "detachLabelFromTask": {},
   "exportTasks": {},
+  "finalizeProjectBackgroundUpload": {
+    "body.contentType": true,
+    "body.key": true,
+    "body.size": true,
+    "body.version": true
+  },
   "getActivities": {
     "query.limit": false
   },
@@ -116,6 +123,7 @@
   "getLabel": {},
   "getNotificationPreferences": {},
   "getProject": {},
+  "getProjectBackground": {},
   "getTask": {
     "query.view": false
   },
@@ -181,6 +189,9 @@
     "query.workspaceId": false
   },
   "markNotificationAsRead": {},
+  "moveProject": {
+    "body.workspaceId": true
+  },
   "moveTask": {
     "body.destinationProjectId": true,
     "body.destinationStatus": false
@@ -281,6 +292,10 @@
     "body.description": false,
     "body.endTime": false,
     "body.startTime": true
+  },
+  "uploadProjectBackground": {
+    "body.contentType": true,
+    "body.size": true
   },
   "upsertNotificationPreferenceWorkspaceRule": {
     "body.emailEnabled": true,

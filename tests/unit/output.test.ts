@@ -82,6 +82,16 @@ describe("Writer", () => {
     expect(err).toContain("boom");
   });
 
+  // A command whose stdout is a payload that is not JSON — an image's bytes —
+  // marks it spoken for before the payload is on its way, so a failure is
+  // stderr-only: an error object would land inside the file the bytes are
+  // being redirected into.
+  test("TestErrorAfterDataOnlyStaysOffStdout", () => {
+    const { out, err } = run(true, `w.dataOnly(); w.error("boom");`);
+    expect(out).toBe("");
+    expect(err).toContain("boom");
+  });
+
   // Task titles, branch names and session notes come from the server. An escape
   // sequence in one of them would otherwise reach the terminal.
   test("TestHumanOutputStripsControlCharacters", () => {

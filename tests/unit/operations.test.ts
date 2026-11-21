@@ -463,6 +463,10 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["CreateCalendarFeed", "POST", "/api/calendar-feed/project/a%2Fb", () => api.createCalendarFeed(id, ["l1"], "")],
     ["RevokeCalendarFeed", "DELETE", "/api/calendar-feed/project/a%2Fb/a%2Fb", () => api.revokeCalendarFeed(id, id)],
     ["GetCalendarFeed", "GET", "/api/calendar-feed/a%2Fb/calendar.ics", () => api.calendarFeedIcs(id)],
+    ["MoveProject", "PUT", "/api/project/a%2Fb/move", () => api.moveProject(id, "w2")],
+    ["GetProjectBackground", "GET", "/api/project/a%2Fb/background", () => api.getProjectBackground(id)],
+    ["DeleteProjectBackground", "DELETE", "/api/project/a%2Fb/background", () => api.deleteProjectBackground(id)],
+    ["SetProjectBackground", "PUT", "/api/project/a%2Fb/background-upload", () => api.setProjectBackground(id, "image/png", new Uint8Array([1]))],
   ];
   test.each(calls)("%s", async (name, method, path, call) => {
     const seen: { method: string; path: string }[] = [];
@@ -471,8 +475,10 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
       return new Response(null, { status: 204 });
     });
     // An empty reply is an error for the board, which must name a project, for
-    // the writes that must echo what they wrote, and for an export, an import or
-    // a bulk change, which must account for the tasks; a success for everything else.
+    // the writes that must echo what they wrote, for an export, an import or
+    // a bulk change, which must account for the tasks, and for the move and
+    // the background upload, whose replies carry counts and URLs nothing else
+    // can supply; a success for everything else.
     const err = await call().then(
       () => undefined,
       (e) => e,
@@ -489,10 +495,121 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
         "ImportTasks",
         "BulkUpdate",
         "SetStartAndPosition",
+        "SetProjectBackground",
+        "MoveProject",
       ].includes(name),
     );
     expect(seen[0]).toEqual({ method, path });
   });
+});
+
+// The move route answers the moved project plus the count of tasks it
+// unassigned, and the body names the destination workspace it was given.
+test("TestMoveProjectSendsTheWorkspaceAndReadsTheCount", async () => {
+  const seen = recorder(
+    `{"id":"p1","workspaceId":"w2","backgroundVersion":null,"slug":"mv","icon":null,"name":"Moved","description":null,"createdAt":"${TIME}","isPublic":false,"archivedAt":null,"position":0,"lastTaskNumber":0,"unassignedTaskCount":3}`,
+  );
+  const got = await api.moveProject("p1", "w2");
+  expect([seen.method, seen.path]).toEqual(["PUT", "/api/project/p1/move"]);
+  expect(seen.body).toBe('{"workspaceId":"w2"}');
+  expect(got.workspaceId).toBe("w2");
+  expect(got.unassignedTaskCount).toBe(3);
+});
+
+// The background image is not JSON: the call returns the bytes as a Blob,
+// whatever the body holds.
+test("TestGetProjectBackgroundReturnsTheBytes", async () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00]);
+  newServer(() => new Response(png, { headers: { "content-type": "image/png" } }));
+  const blob = await api.getProjectBackground("p1");
+  expect(blob.type).toBe("image/png");
+  expect(new Uint8Array(await blob.arrayBuffer())).toEqual(png);
+});
+
+// The upload is the web app's three steps in order: the API prepares a
+// presigned PUT, the bytes go to it with the headers it signed and no key,
+// and the finalize names the staged key and version back.
+test("TestSetProjectBackgroundRunsThePresignedUpload", async () => {
+  type SeenRequest = { method: string; path: string; query: string; body: string; auth: string | null; type: string | null; bytes: Uint8Array };
+  const seen: SeenRequest[] = [];
+  newServer(async (req) => {
+    const url = new URL(req.url);
+    const buf = await req.arrayBuffer();
+    seen.push({
+      method: req.method,
+      path: url.pathname,
+      query: url.search,
+      body: new TextDecoder().decode(buf),
+      auth: req.headers.get("authorization"),
+      type: req.headers.get("content-type"),
+      bytes: new Uint8Array(buf),
+    });
+    if (url.pathname === "/api/project/p1/background-upload") {
+      return Response.json({ key: "k1", uploadUrl: `${url.origin}/storage/k1?signature=s3cr3t`, version: "v1", headers: { "Content-Type": "image/png" } });
+    }
+    if (url.pathname === "/storage/k1") return new Response(null, { status: 200 });
+    if (url.pathname === "/api/project/p1/background-upload/finalize") {
+      return Response.json({ url: `${url.origin}/project/p1/background?v=v1` });
+    }
+    return new Response("unexpected", { status: 500 });
+  });
+  const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+  const got = await api.setProjectBackground("p1", "image/png", bytes);
+  expect(got.version).toBe("v1");
+  expect(got.url).toContain("/project/p1/background?v=v1");
+  expect(seen.map((s) => [s.method, s.path])).toEqual([
+    ["PUT", "/api/project/p1/background-upload"],
+    ["PUT", "/storage/k1"],
+    ["POST", "/api/project/p1/background-upload/finalize"],
+  ]);
+  expect(JSON.parse(seen[0]!.body)).toEqual({ contentType: "image/png", size: 4 });
+  // The PUT to storage carries the signed header and the bytes, and the key
+  // stays behind: the URL's query is the credential, not a header.
+  expect(seen[1]!.type).toBe("image/png");
+  expect(seen[1]!.auth).toBeNull();
+  expect(seen[1]!.bytes).toEqual(bytes);
+  expect(JSON.parse(seen[2]!.body)).toEqual({ key: "k1", contentType: "image/png", version: "v1", size: 4 });
+});
+
+// A stage reply that names no URL, key, version or headers cannot be
+// finished: the call fails before any PUT rather than finalize a key the
+// server never made, and names the field it lacked.
+test.each([
+  ["key", '{"uploadUrl":"http://x/","version":"v1","headers":{}}', "no key"],
+  ["uploadUrl", '{"key":"k1","version":"v1","headers":{}}', "no upload URL"],
+  ["version", '{"key":"k1","uploadUrl":"http://x/","headers":{}}', "no version"],
+  ["headers", '{"key":"k1","uploadUrl":"http://x/","version":"v1"}', "no headers"],
+])("TestSetProjectBackgroundRefusesAStageMissing%s", async (_field, reply, missing) => {
+  const seen = recorder(reply);
+  const err = await failure(api.setProjectBackground("p1", "image/png", new Uint8Array([1])));
+  expect(String(err)).toContain(`/project/p1/background-upload: reply carries ${missing}`);
+  expect(seen.path).toBe("/api/project/p1/background-upload");
+});
+
+// The finalize answers with the URL the image landed at and nothing else it
+// could be read for: a reply without one cannot say where it went.
+test("TestSetProjectBackgroundRefusesAFinalizeWithoutAURL", async () => {
+  newServer((req) => {
+    const path = new URL(req.url).pathname;
+    if (path === "/api/project/p1/background-upload") {
+      return Response.json({ key: "k1", uploadUrl: `${new URL(req.url).origin}/storage/k1`, version: "v1", headers: {} });
+    }
+    if (path === "/storage/k1") return new Response(null, { status: 200 });
+    if (path === "/api/project/p1/background-upload/finalize") return Response.json({});
+    return new Response("unexpected", { status: 500 });
+  });
+  const err = await failure(api.setProjectBackground("p1", "image/png", new Uint8Array([1])));
+  expect(String(err)).toContain("/project/p1/background-upload/finalize: reply carries no URL");
+});
+
+// The move reply's unassignedTaskCount is the only place the CLI learns how
+// many tasks lost their assignee: a reply without it cannot be read as none.
+test("TestMoveProjectRefusesAReplyWithoutTheCount", async () => {
+  recorder(
+    `{"id":"p1","workspaceId":"w2","backgroundVersion":null,"slug":"mv","icon":null,"name":"Moved","description":null,"createdAt":"${TIME}","isPublic":false,"archivedAt":null,"position":0,"lastTaskNumber":0}`,
+  );
+  const err = await failure(api.moveProject("p1", "w2"));
+  expect(String(err)).toContain("/project/p1/move: reply carries no unassignedTaskCount");
 });
 
 const LABEL = (extra = "") =>

@@ -1,0 +1,77 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "background",
+        "set",
+        "proj-alpha",
+        "bg.png",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/project/proj-alpha/background-upload: 403: Insufficient permissions: setting a project background needs the project update permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\"\n}\n",
+      "stderr": "Error: PUT /api/project/proj-alpha/background-upload: 403: Insufficient permissions: setting a project background needs the project update permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "rm",
+        "proj-alpha",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"DELETE /api/project/proj-alpha/background: 403: Insufficient permissions: removing a project background needs the project update permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\"\n}\n",
+      "stderr": "Error: DELETE /api/project/proj-alpha/background: 403: Insufficient permissions: removing a project background needs the project update permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed; your role there is member; `kaneo workspace members -w ws-main` lists each member's role\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha/background-upload",
+      "query": "",
+      "body": {
+        "contentType": "image/png",
+        "size": 3
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/project/proj-alpha/background",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -136,6 +136,10 @@ export type FakeOptions = {
   // The key's user lacks the project update and delete permissions, so those
   // routes answer as Kaneo 2.32.0's requireWorkspacePermission does.
   plainMember?: boolean;
+  // The key's user lacks what a project move needs in this destination
+  // workspace (project creation and workspace settings management), so the
+  // move route answers 403 for a move into it while the source check passes.
+  moveDeniedTarget?: string;
   // A server older than v2.28.0, which has no /user/me.
   noCurrentUser?: boolean;
   blankCurrentUserId?: boolean;
@@ -193,7 +197,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const projects = seed.projects.map((p, i) => ({
     id: p.id,
     workspaceId: p.workspaceId,
-    backgroundVersion: null,
+    backgroundVersion: null as string | null,
     slug: p.slug,
     icon: "Layout",
     name: p.name,
@@ -551,6 +555,19 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     addFeed(f.projectId, roots.map((r) => r.id), f.timeZone ?? "UTC");
   }
 
+  // A project's board background, as v2.32.0 keeps it: the project row carries
+  // the finalized key and version, and the bytes live under the staged key the
+  // presigned PUT wrote them to. Versions number apart from every other id so
+  // the sequences the other scenarios record stay put.
+  const backgrounds = new Map<string, { key: string; version: string; contentType: string; size: number }>();
+  const staged = new Map<string, { bytes: Uint8Array; contentType: string }>();
+  let bgSeq = 0;
+  const bgVersion = () => `bg${String(++bgSeq).padStart(4, "0")}`;
+  // The image types and size cap v2.32.0's validateProjectBackgroundUploadInput
+  // enforces, in its order, for both the prepare and the finalize call.
+  const ALLOWED_IMAGE_TYPES = new Set(["image/apng", "image/avif", "image/gif", "image/heic", "image/heif", "image/jpeg", "image/jpg", "image/png", "image/webp"]);
+  const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+  const backgroundKeyPrefix = (proj: (typeof projects)[number]) => `workspace/${proj.workspaceId}/project/${proj.id}/backgrounds/`;
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
@@ -727,6 +744,21 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
   const route = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
+    // The presigned PUT a background upload is given lands outside /api and
+    // carries no key — the URL itself is the credential — so it is answered
+    // before the JSON body read below would consume its bytes.
+    if (req.method === "PUT" && url.pathname.startsWith("/storage/")) {
+      const key = decodeURIComponent(url.pathname.slice("/storage/".length));
+      const bytes = new Uint8Array(await req.arrayBuffer());
+      requests.push({ method: req.method, path: url.pathname, query: url.search, body: { key, bytes: bytes.byteLength } });
+      // A storage refusal is not an API error: it answers with the storage
+      // server's own body, which is what failMessage carries here.
+      if (failing?.test(`${req.method} ${url.pathname}`) && (failingQuery?.test(url.search) ?? true) && skipped++ >= (opts.failOnSkip ?? 0)) {
+        return failText(opts.failStatus ?? 500, opts.failMessage ?? "injected failure");
+      }
+      staged.set(key, { bytes, contentType: req.headers.get("content-type") ?? "" });
+      return new Response(null, { status: 200 });
+    }
     const path = url.pathname.replace(/^\/api/, "");
     const body = req.method === "GET" || req.method === "DELETE" ? undefined : await req.json().catch(() => null);
     requests.push({ method: req.method, path, query: url.search, body });
@@ -746,6 +778,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/project$/, M.CreateProjectBody],
       ["PUT", /^\/project\/(?!reorder$)[^/]+$/, M.UpdateProjectBody],
       ["PUT", /^\/project\/reorder$/, M.ReorderProjectsBody],
+      ["PUT", /^\/project\/[^/]+\/move$/, M.MoveProjectBody],
+      ["PUT", /^\/project\/[^/]+\/background-upload$/, M.UploadProjectBackgroundBody],
+      ["POST", /^\/project\/[^/]+\/background-upload\/finalize$/, M.FinalizeProjectBackgroundUploadBody],
       ["PUT", /^\/workflow-rule\/[^/]+$/, M.UpsertWorkflowRuleBody],
       ["POST", /^\/column\/[^/]+$/, M.CreateColumnBody],
       ["PUT", /^\/column\/[^/]+$/, M.UpdateColumnBody],
@@ -1009,6 +1044,120 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         projects.splice(projects.indexOf(proj), 1);
         return reply;
       }
+    }
+
+    // Move, as v2.32.0's move-project.ts answers it: the source permission is
+    // the route middleware's (plainMember above), the destination must exist,
+    // the key must be free there, no relation may cross the boundary, and an
+    // assignee who is not a member of the destination loses the task.
+    if (req.method === "PUT" && (p = m(/^\/project\/([^/]+)\/move$/))) {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!proj) return failText(400, "Workspace ID could not be determined");
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
+      const target = workspaces.find((w) => w.id === (body as any)?.workspaceId);
+      // The document's 400 is "Invalid destination or same workspace"; the
+      // same-workspace case has its own answer below.
+      if (!target) return failText(400, "Invalid destination");
+      if (proj.workspaceId === target.id) return failText(400, "Project already belongs to this workspace");
+      // The destination-side permission check: the caller may update and
+      // delete in the source but lacks what a move needs in this workspace
+      // (project creation and workspace settings management), so the move
+      // route answers the same bare 403 the source check does.
+      if (opts.moveDeniedTarget === target.id) return failText(403, "Insufficient permissions");
+      const taken = keyTaken(target.id, proj.slug, proj.id);
+      if (taken) {
+        return failText(409, `The target workspace already has a project using the key "${proj.slug}" (${taken.name}). Change this project's key before moving it.`);
+      }
+      const crossProject = relations.some((r) => {
+        const inProject = (taskId: string) => tasks.find((t) => t.id === taskId)?.projectId === proj.id;
+        return inProject(r.sourceTaskId) !== inProject(r.targetTaskId);
+      });
+      if (crossProject) return failText(409, "Remove task relationships to other projects before moving this project.");
+      proj.workspaceId = target.id;
+      proj.position = Math.max(-1, ...projects.filter((x) => x.workspaceId === target.id).map((x) => x.position)) + 1;
+      const memberOf = (userId: string) =>
+        (seed.members ?? []).some((mm) => mm.id === userId && (mm.workspaceId === undefined || mm.workspaceId === target.id));
+      let unassignedTaskCount = 0;
+      for (const t of tasks) {
+        if (t.projectId === proj.id && t.userId && !memberOf(t.userId)) {
+          t.userId = null;
+          unassignedTaskCount += 1;
+        }
+      }
+      return ok(M.MovedProject, { ...proj, unassignedTaskCount });
+    }
+
+    const checkBackgroundUpload = (contentType: string, size: number): Response | undefined => {
+      if (contentType.trim() === "") return failText(400, "A valid content type is required.");
+      if (!ALLOWED_IMAGE_TYPES.has(contentType.toLowerCase())) {
+        return failText(400, `Unsupported content type "${contentType}". Upload a supported image.`);
+      }
+      if (size <= 0) return failText(400, "Upload size must be greater than zero.");
+      if (size > MAX_IMAGE_UPLOAD_BYTES) return failText(400, "Upload exceeds the maximum upload size of 10MB.");
+      return undefined;
+    };
+
+    if (req.method === "PUT" && (p = m(/^\/project\/([^/]+)\/background-upload$/))) {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!proj) return failText(400, "Workspace ID could not be determined");
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
+      const b = body as any;
+      const refusedUpload = checkBackgroundUpload(String(b?.contentType ?? ""), Number(b?.size ?? 0));
+      if (refusedUpload) return refusedUpload;
+      const version = bgVersion();
+      const key = `${backgroundKeyPrefix(proj)}background-${version}`;
+      return ok(M.ProjectBackgroundUpload, {
+        key,
+        uploadUrl: `${new URL(req.url).origin}/storage/${key}?signature=fake`,
+        version,
+        headers: { "Content-Type": String(b.contentType) },
+      });
+    }
+    if (req.method === "POST" && (p = m(/^\/project\/([^/]+)\/background-upload\/finalize$/))) {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!proj) return failText(400, "Workspace ID could not be determined");
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
+      const b = body as any;
+      const refusedUpload = checkBackgroundUpload(String(b?.contentType ?? ""), Number(b?.size ?? 0));
+      if (refusedUpload) return refusedUpload;
+      const key = String(b?.key ?? "").trim();
+      const version = String(b?.version ?? "");
+      // assertProjectBackgroundKeyMatchesContext: the key must sit under this
+      // project's backgrounds prefix and name this version, with nothing else
+      // after it.
+      if (!key.startsWith(backgroundKeyPrefix(proj)) || key.slice(backgroundKeyPrefix(proj).length) !== `background-${version}` || !/^[A-Za-z0-9_-]+$/.test(version)) {
+        return failText(400, "Image upload key does not match the project context.");
+      }
+      proj.backgroundVersion = version;
+      backgrounds.set(proj.id, { key, version, contentType: String(b.contentType), size: Number(b.size) });
+      return ok(M.ProjectBackgroundFinalize, { url: `${new URL(req.url).origin}/project/${proj.id}/background?v=${encodeURIComponent(version)}` });
+    }
+    if (req.method === "GET" && (p = m(/^\/project\/([^/]+)\/background$/))) {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!proj) return failText(400, "Workspace ID could not be determined");
+      const bg = backgrounds.get(proj.id);
+      const object = bg === undefined ? undefined : staged.get(bg.key);
+      // The stored object's type wins over the declared one, as upstream's
+      // object.contentType || backgroundMimeType does; either way it must be
+      // an image the route would serve.
+      const contentType = (object?.contentType || bg?.contentType || "").toLowerCase().split(";")[0]!.trim();
+      if (bg === undefined || object === undefined || !ALLOWED_IMAGE_TYPES.has(contentType)) {
+        return failText(404, "Project background not found");
+      }
+      const etag = `"${bg.version}"`;
+      const headers: Record<string, string> = { "Cache-Control": "private, max-age=300, must-revalidate", "Content-Type": contentType, ETag: etag, "X-Content-Type-Options": "nosniff" };
+      if (req.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers });
+      return new Response(object.bytes, { headers });
+    }
+    if (req.method === "DELETE" && (p = m(/^\/project\/([^/]+)\/background$/))) {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      if (!proj) return failText(400, "Workspace ID could not be determined");
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
+      const bg = backgrounds.get(proj.id);
+      if (bg !== undefined) staged.delete(bg.key);
+      backgrounds.delete(proj.id);
+      proj.backgroundVersion = null;
+      return new Response(null, { status: 204 });
     }
 
     if ((p = m(/^\/column\/reorder\/([^/]+)$/)) && req.method === "PUT") {

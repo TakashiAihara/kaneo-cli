@@ -166,6 +166,10 @@ kaneo project create --name <name> [flags]                     # the same, as pr
 kaneo project update <project-id> [--name NAME] [--slug SLUG] [-d TEXT] [--icon ICON]   # only what is passed changes; --json adds "unread", the fields the read lacked (their "from" is "")
 kaneo project reorder <project>...   # the new order: every project not archived in the workspace, exactly once, by id, slug or name
 kaneo project rm <project> --yes   # permanent: everything in it goes — tasks, comments, columns, workflow rules, external links
+kaneo project move <project> --to <workspace>   # to another workspace, named by id, slug or name; tasks follow, and an assignee who is no member there is unassigned
+kaneo project background get [project]          # the board background image, written to stdout as it arrives — redirect it to a file
+kaneo project background set <project> <file>   # `-` reads stdin; the content type comes from --content-type or the file's extension
+kaneo project background rm <project> --yes     # alias: delete
 kaneo column ls                    # the resolved project's columns, in board order
 kaneo column create <name...> [--final] [--icon ICON] [--color COLOR]
 kaneo column rename <column> <new name...>   # the slug, and so every status in it, stays
@@ -243,6 +247,10 @@ A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` 
 Long text is taken as it was written rather than as a shell passes it: `-` is stdin, `--description-file` and `-F, --file` name a file, and `-d -`, `--description-file -` and `-F -` all read stdin. It is stored byte for byte, trailing newline included, so a heredoc or a note file arrives as it stands — except for a leading BOM, which is dropped as the encoding signature it is. Text that turns out to be nothing but whitespace on the way is refused rather than stored, so clearing a description is `-d ""`.
 
 A project's slug is the prefix of its task identifiers. Without `--slug`, `project create` derives it the way the Kaneo web app does: the first three letters of a one-word name, or the initials of the first three words, upper case, in any script (`Alpha Beta Gamma` → `ABG`, `日本語だけ` → `日本語`). A name with no letter or number derives nothing, and a derived slug another project in the workspace already has is refused; both have to be given `--slug`.
+
+`project move` takes a project to another workspace: `--to` is a workspace id, slug or name matched the way `--workspace` is, resolved before the project is even tried. The project keeps its id and moves with its tasks; the server refuses the move when the destination already has a project with the same key or a task in it relates to a task in another project, and it unassigns the tasks whose assignee is not a member of the destination — the count is in the reply. The project is named the way `project rm` names it: required rather than resolved from the settings, since a move typed inside a checkout would otherwise hit whichever project that repo maps to.
+
+A project's board background is an image the `background` group manages. `background set` uploads `file` (`-` reads the bytes from stdin, which then needs `--content-type`) through the presigned URL the API prepares, the way the web app's upload runs; the content type comes from `--content-type` or the file's extension, and the server accepts only the image types it lists, up to its size limit. `background get` writes the image to stdout exactly as it arrives — it is not JSON, so `--json` and `--jq` are refused, and so is a terminal, since the bytes are the server's to choose; redirect it to a file (`> bg.png`) or pipe it on. `background rm` needs `--yes`, as every delete does.
 
 A task in no column at all — the server answers `planned` and `archived` tasks beside the columns — is read as a column of its own. `task ls` leaves out tasks in `done`, `planned` and `archived` unless `--all` or an explicit `--status` asks for them, and says on stderr, in every output mode, how many it left out. `board` shows neither planned nor archived tasks.
 

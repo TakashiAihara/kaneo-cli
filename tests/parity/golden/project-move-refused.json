@@ -1,0 +1,129 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "move",
+        "proj-alpha",
+        "--to",
+        "Main",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/project/proj-alpha/move: 400: Project already belongs to this workspace\"\n}\n",
+      "stderr": "Error: PUT /api/project/proj-alpha/move: 400: Project already belongs to this workspace\n"
+    },
+    {
+      "args": [
+        "project",
+        "move",
+        "proj-alpha",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no destination: pass --to \\u003cworkspace\\u003e\"\n}\n",
+      "stderr": "Error: no destination: pass --to <workspace>\n"
+    },
+    {
+      "args": [
+        "project",
+        "move",
+        "proj-alpha",
+        "--to",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no workspace has the id, slug or name \\\"nope\\\" (kaneo workspace ls lists them)\"\n}\n",
+      "stderr": "Error: no workspace has the id, slug or name \"nope\" (kaneo workspace ls lists them)\n"
+    },
+    {
+      "args": [
+        "project",
+        "move",
+        "nope",
+        "--to",
+        "Other",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/project/nope/move: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: PUT /api/project/nope/move: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
+    },
+    {
+      "args": [
+        "project",
+        "move",
+        "proj-taken",
+        "--to",
+        "Other",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/project/proj-taken/move: 409: The target workspace already has a project using the key \\\"CLASH\\\" (Clash). Change this project's key before moving it.\"\n}\n",
+      "stderr": "Error: PUT /api/project/proj-taken/move: 409: The target workspace already has a project using the key \"CLASH\" (Clash). Change this project's key before moving it.\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha/move",
+      "query": "",
+      "body": {
+        "workspaceId": "ws-main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/nope/move",
+      "query": "",
+      "body": {
+        "workspaceId": "ws-other"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-taken/move",
+      "query": "",
+      "body": {
+        "workspaceId": "ws-other"
+      }
+    }
+  ],
+  "files": {}
+}

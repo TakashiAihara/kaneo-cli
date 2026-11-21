@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "field",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "fld0001  Priority note  (text)\nfld0002  Story points  (number)\nfld0003  Release  (dropdown)  [Web, CLI]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

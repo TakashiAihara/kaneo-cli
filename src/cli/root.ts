@@ -21,6 +21,7 @@ import { whoamiCommand } from "./whoami";
 import { workspaceCommand } from "./workspace";
 import { projectCommand } from "./project";
 import { columnCommand } from "./column";
+import { fieldCommand } from "./field";
 import { invitationCommand } from "./invitation";
 import { searchCommand } from "./search";
 import { workflowCommand } from "./workflow";
@@ -99,6 +100,7 @@ export const rootCommand = (): { root: Command<App> } => {
     workspaceCommand,
     projectCommand,
     columnCommand,
+    fieldCommand,
     searchCommand,
     invitationCommand,
     workflowCommand,

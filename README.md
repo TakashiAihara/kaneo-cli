@@ -171,6 +171,11 @@ kaneo column create <name...> [--final] [--icon ICON] [--color COLOR]
 kaneo column rename <column> <new name...>   # the slug, and so every status in it, stays
 kaneo column reorder <column>...   # the new order: every column exactly once, by id, slug or name
 kaneo column rm <column> --yes
+kaneo field ls                     # the resolved project's custom fields, in order
+kaneo field add <name...> --type <type> [--required] [--default VALUE] [--options a,b,c]
+kaneo field values [field]         # every value tasks hold, or the distinct values one field takes
+kaneo field reorder <field>...     # the new order: every field exactly once, by id or name
+kaneo field rm <field> --yes       # also deletes the values tasks hold for it
 kaneo workflow ls                 # the resolved project's rules, and where each one puts a task
 kaneo workflow set <integration> <event> <column>   # one of the pairs listed below; setting a pair again moves the column
 kaneo workflow rm <rule-id>       # or <integration> <event>, instead of the id; by id the rule is deleted wherever it is
@@ -193,6 +198,7 @@ kaneo notification preferences workspace set <workspace-id> [--active=false] [--
 kaneo notification preferences workspace rm <workspace-id>   # the workspace is then sent nothing outside the app
 kaneo task links <task>
 kaneo task external-links <task>   # links to what is outside the board, from an integration or added by hand
+kaneo task field <task> [<name> <value...>]   # the values the task holds, or set one; the words make the value
 kaneo task link <task> <other> --type <type>    # subtask, blocks or related; the type says which way round
 kaneo task unlink <relation-id>
 kaneo task unlink <task> <other> [--type <type>]
@@ -247,6 +253,8 @@ A workflow rule moves a task with nobody at the board: `kaneo workflow set githu
 
 `kaneo task external-links <task>` lists what a task points at outside the board: the links an integration brought in — an issue, a pull request — and the ones somebody added by hand. A link that came through an integration is marked with the integration it came through, since the same URL can be either.
 
+A custom field is a definition a project carries — a text, number, date, dropdown, boolean or multiselect — that its tasks can hold a value for. `kaneo field ls` lists the resolved project's fields in order and `kaneo field add` makes one; a choice field takes `--options`, a required one takes `--default`, and the server checks the rest of the combination. Fields are named by id or name wherever one is taken, and a name two fields share is refused rather than guessed. `kaneo field values` lists every value the project's tasks hold, or with a field the distinct values it actually takes — what a filter on it can offer. `kaneo task field <task>` reads what one task holds and `kaneo task field <task> <name> <value>` sets it, in the task's own project; the words after the name make the value, so a text value with spaces needs no quoting, and a multiselect value is a JSON array of the field's options, as the web app writes it. `kaneo field reorder` and `kaneo field rm` manage the definitions; a delete takes the values tasks hold for the field with it, which is why it asks for `--yes`.
+
 ### Shell completion
 
 ```bash
@@ -257,7 +265,7 @@ Each sub-command writes the script for its shell and says where to put it. `--no
 
 ### Agent sessions
 
-Tasks carry no custom fields, so the link between a session and a task is written into a task comment:
+The link between a session and a task is written into a task comment:
 
 ```bash
 kaneo session attach 7 "what happens next"

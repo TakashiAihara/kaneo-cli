@@ -135,8 +135,8 @@ export const giteaCommand = {
         "link, and answers with the integration it saved — including the webhook\n" +
         "URL Gitea should post events to, and its secret when the key may see it.\n\n" +
         "--token may be left out to keep the stored token, which only works while\n" +
-        "the base URL is the saved integration's; a new instance or repository\n" +
-        "needs a token. Connecting again with a different repository or instance\n" +
+        "the base URL is the saved integration's; a new instance needs a token,\n" +
+        "a different repository on the same instance does not. Connecting again\n" +
         "is how the link is moved — update only changes the two settings.",
       args: exactArgs(1),
       flags: TARGET_FLAGS,

@@ -22,6 +22,7 @@ import {
   updateLabel as putLabel,
   createProject as postProject,
   createTask as postTask,
+  createCalendarFeed as postCalendarFeed,
   createTaskComment,
   bulkUpdateTasks,
   createTaskRelation,
@@ -36,6 +37,7 @@ import {
   deleteWorkflowRule as removeRule,
   exportTasks as readExport,
   getColumns as readColumns,
+  getCalendarFeed as readCalendarFeed,
   getCurrentUser,
   getInvitationDetails,
   getWorkspaceMembers,
@@ -47,6 +49,7 @@ import {
   getTaskComments,
   getTaskRelations,
   listNotifications as getNotifications,
+  listCalendarFeeds as readCalendarFeeds,
   getTaskTimeEntries,
   getTimeEntry,
   getWorkflowRules as readRules,
@@ -75,6 +78,7 @@ import {
   moveTask as putTaskMove,
   reorderColumns as putColumns,
   reorderProjects as putProjects,
+  revokeCalendarFeed as removeCalendarFeed,
   unarchiveProject,
   updateNotificationPreferences as putNotificationPreferences,
   updateColumn as putColumn,
@@ -94,6 +98,7 @@ import {
 import type {
   Board as GenBoard,
   BoardTask,
+  CalendarFeed as GenCalendarFeed,
   CreateNotificationBody,
   BulkUpdateTasksBody,
   Column as GenColumn,
@@ -2069,6 +2074,60 @@ export const attachLabel = async (labelId: string, taskId: string): Promise<Labe
 // workspace label's: the server answers 400 for a label on no task.
 export const detachLabel = async (copyId: string): Promise<LabelRecord> =>
   labelRecord(zeroRecord(await detachLabelFromTask(pathParam(copyId))));
+
+// A project's calendar feed: a secret link that serves the project's scheduled
+// tasks as an iCalendar document to anyone holding it. token is that secret —
+// the subscribe URL is built from it, and the document itself is read through
+// calendarFeedIcs, which needs no key because the route is public.
+export type CalendarFeed = {
+  id: string;
+  projectId: string;
+  token: string;
+  labelIds: string[];
+  timeZone: string;
+  createdAt: string;
+};
+
+const calendarFeed = (f: GenCalendarFeed): CalendarFeed => ({
+  id: f.id ?? "",
+  projectId: f.projectId ?? "",
+  token: f.token ?? "",
+  labelIds: f.labelIds ?? [],
+  timeZone: f.timeZone ?? "",
+  createdAt: isoTime(f, "createdAt"),
+});
+
+export const listCalendarFeeds = async (projectId: string): Promise<CalendarFeed[]> =>
+  zeroList(await readCalendarFeeds(pathParam(projectId))).map(calendarFeed);
+
+// Creates a feed matching tasks that carry any of the labels, by label id.
+// timeZone is the zone all-day dates are read in; "" leaves the server's
+// default (UTC) rather than sending a zone nobody asked for.
+export const createCalendarFeed = async (projectId: string, labelIds: string[], timeZone: string): Promise<CalendarFeed> =>
+  calendarFeed(
+    zeroRecord(
+      await postCalendarFeed(pathParam(projectId), {
+        labelIds,
+        ...(timeZone === "" ? {} : { timeZone }),
+      }),
+    ),
+  );
+
+// Revokes a feed by id, which stops its link from serving. The server answers
+// with {success: true} and nothing about the feed that was revoked.
+export const revokeCalendarFeed = async (projectId: string, id: string): Promise<{ success: boolean }> => {
+  const reply = zeroRecord(await removeCalendarFeed(pathParam(projectId), pathParam(id)));
+  return { success: reply.success ?? false };
+};
+
+// The iCalendar document a feed's link serves. The route is public — the token
+// is the credential — so the call is anonymous, asks for the document's own
+// media type, and the body comes back as the text it is rather than as JSON.
+// The token rides in the URL, so the call is marked credentialInUrl: the
+// transport refuses it over plain HTTP to a non-loopback host, on the first
+// hop and on every redirect, the way it refuses to send the key there.
+export const calendarFeedIcs = async (token: string): Promise<string> =>
+  readCalendarFeed(pathParam(token), { anonymous: true, text: true, credentialInUrl: true, headers: { Accept: "text/calendar" } });
 
 // A link from a task to something outside the board.
 //

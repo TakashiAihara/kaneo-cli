@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { resolveMode, sanitizeControl, shellWord } from "../../src/output/output";
+import { resolveMode, sanitizeControl, sanitizeDocument, shellWord } from "../../src/output/output";
 
 // Ported from the Go build's internal/output/output_test.go. The Writer talks
 // to fd 1 and 2 directly, so each Writer test runs it in a child process and
@@ -238,6 +238,22 @@ describe("sanitizeControl", () => {
     ["日本語はそのまま", "日本語はそのまま"],
   ])("TestSanitizeControl(%j)", (input, want) => {
     expect(sanitizeControl(input)).toBe(want);
+  });
+});
+
+// A document whose CRLF line endings are the format: the endings survive the
+// sanitising a line at a time, and a lone CR inside a line is content.
+describe("sanitizeDocument", () => {
+  const repl = "�";
+  test.each([
+    ["plain", "plain"],
+    ["a\r\nb\r\n", "a\r\nb\r\n"],
+    ["esc\x1b[31m\r\nnext", `esc${repl}[31m\r\nnext`],
+    ["bell\x07mid", `bell${repl}mid`],
+    ["carriage\rreturn\r\n", `carriage${repl}return\r\n`],
+    ["line\nfeed", "line\nfeed"],
+  ])("TestSanitizeDocument(%j)", (input, want) => {
+    expect(sanitizeDocument(input)).toBe(want);
   });
 });
 

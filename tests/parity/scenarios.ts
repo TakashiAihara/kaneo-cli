@@ -42,6 +42,10 @@ const N1 = "ntf0001";
 const N2 = "ntf0002";
 const N3 = "ntf0003";
 
+// The token the fake mints the n-th calendar feed with: "feed" is hex, so
+// repeating it pads the sequence to the token's 64 hex characters.
+const feedToken = (n: number) => `${"feed".repeat(15)}${n.toString(16).padStart(4, "0")}`;
+
 const MEMBERS: Seed["members"] = [
   { id: "user-self", name: "Self", email: "self@example.com", role: "owner" },
   { id: "user-1", name: "Ada", email: "ada@example.com", role: "reviewer" },
@@ -1231,6 +1235,92 @@ export const SCENARIOS: Scenario[] = [
       ["label", "ls", "--human"],
     ],
   },
+  {
+    // A seeded feed resolves its label names to workspace definitions the way
+    // create does, so "bug" is a definition while "solo" exists only as a copy
+    // on task-cal2 until `feed create solo` materializes one. "doomed" exists
+    // as a live copy on task-cal3 and as a workspace definition whose deletion
+    // has started: the feed form drops the whole name, the way the task label
+    // picker does, so create refuses it before the server is asked.
+    name: "feed create, list, get and rm",
+    seed: {
+      labels: [
+        { taskId: "task-cal", name: "bug" },
+        { taskId: "task-cal2", name: "solo" },
+        { taskId: "task-cal3", name: "doomed" },
+      ],
+      deletingLabels: [{ workspaceId: WS, name: "doomed" }],
+      calendarFeeds: [{ projectId: P1, labels: ["bug"] }],
+    },
+    extraTasks: [
+      { id: "task-cal", projectId: P1, title: "Ship the feed", description: "line one\nline two", startDate: "2026-01-05T00:00:00Z", dueDate: "2026-01-07T00:00:00Z" },
+      { id: "task-cal2", projectId: P1, title: "Solo dated", startDate: "2026-01-09T00:00:00Z" },
+      { id: "task-cal3", projectId: P1, title: "Undated" },
+    ],
+    steps: [
+      ["feed", "ls", "--json"],
+      ["feed", "ls", "--human"],
+      ["feed", "create", "bug", "--time-zone", "Europe/Berlin", "--json"],
+      // Human mode, so the line has to name the definition the create
+      // materialized for "solo" rather than the copy it was resolved from.
+      ["feed", "create", "solo", "--human"],
+      ["feed", "create", "bug", "bug", "--human"],
+      ["feed", "create", "nope", "--json"],
+      ["feed", "create", "doomed", "--json"],
+      ["feed", "create", "bug", "--time-zone", "Nowhere/Special", "--json"],
+      ["feed", "get", feedToken(1)],
+      // The token is trimmed like every other argument: the padding is not
+      // part of it, and the document still arrives.
+      ["feed", "get", ` ${feedToken(1)} `],
+      // The document is not JSON, so the output flags are refused rather than
+      // answered with text they cannot read.
+      ["feed", "get", feedToken(3), "--json"],
+      ["feed", "get", feedToken(3), "--jq", "."],
+      ["feed", "get", "not-a-token"],
+      ["feed", "get", feedToken(99)],
+      ["feed", "rm", "feed0001", "--json"],
+      ["feed", "rm", feedToken(2), "--yes", "--json"],
+      ["feed", "rm", "feed9999", "--yes", "--json"],
+      ["feed", "ls", "-p", "BET", "--json"],
+      ["feed", "ls", "--human"],
+      ["feed", "rm", " feed0004 ", "--yes", "--json"],
+    ],
+  },
+  {
+    // The listing decorates label ids with names only in human mode, so a
+    // missing workspace costs the names, not the feeds; create needs the
+    // workspace's labels, so it is refused outright.
+    name: "feed without a workspace",
+    env: { KANEO_WORKSPACE: "" },
+    seed: { calendarFeeds: [{ projectId: P1, labels: ["bug"] }] },
+    steps: [["feed", "ls", "--human"], ["feed", "ls", "--json"], ["feed", "create", "bug", "--json"]],
+  },
+  {
+    // -w takes an id, a slug or a name, and the feed commands resolve it to the
+    // workspace's id the way every other workspace-scoped command does before
+    // asking for its labels. "main" is ws-main's slug: sent raw it would name
+    // no workspace's labels at all.
+    name: "feed commands resolve a workspace slug",
+    env: { KANEO_WORKSPACE: "main" },
+    seed: { calendarFeeds: [{ projectId: P1, labels: ["bug"] }] },
+    steps: [
+      ["feed", "ls", "--human"],
+      ["feed", "create", "bug", "--json"],
+      ["feed", "ls", "--human"],
+    ],
+  },
+  {
+    // The label names are decoration read after the write: when that read
+    // fails the created feed — and its subscribe link — is still printed, with
+    // the reason on stderr, rather than the command failing as if nothing was
+    // made. The first labels read, create's own options, still succeeds; every
+    // read after it fails, so `feed ls` degrades the same way.
+    name: "feed create prints the feed when label names cannot be read",
+    failOn: "^GET /label/workspace/",
+    failOnSkip: 1,
+    seed: { calendarFeeds: [{ projectId: P1, labels: ["bug"] }] },
+    steps: [["feed", "create", "bug", "--human"], ["feed", "ls", "--human"]],
+  },
   { name: "comment add from stdin", stdin: "multi\nline $comment\n", steps: [["comment", "add", "1", "-", "--json"], ["comment", "ls", "1", "--json"]] },
   { name: "comment add from a file", files: { "c.md": "from a file\n" }, steps: [["comment", "add", "1", "--file", "c.md", "--human"]] },
   { name: "comment add with text and a file", files: { "c.md": "x" }, steps: [["comment", "add", "1", "hi", "--file", "c.md", "--json"]] },
@@ -1791,7 +1881,10 @@ export const SCENARIOS: Scenario[] = [
     name: "a failing api_key_command spares commands that send no key",
     env: { KANEO_API_KEY: "", KANEO_SESSION_ID: "sess-cmd" },
     config: { profiles: { self: { api_key_command: "echo ran >&2; exit 3" } } },
-    steps: [["completion", "bash"], ["__complete", "task", ""], ["session", "status", "--json"], ["session", "attach", "1"], ["context", "--json"], ["context", "--human"], ["api-check", "--json"], ["whoami", "--json"]],
+    // The calendar route declares security: [], so `feed get` is one of the
+    // commands that send no key; the seeded feed's empty labels still serve.
+    seed: { calendarFeeds: [{ projectId: P1 }] },
+    steps: [["completion", "bash"], ["__complete", "task", ""], ["session", "status", "--json"], ["session", "attach", "1"], ["context", "--json"], ["context", "--human"], ["api-check", "--json"], ["feed", "get", feedToken(1)], ["whoami", "--json"]],
   },
   {
     name: "api_key_command printing too much",

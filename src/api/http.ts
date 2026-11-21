@@ -15,7 +15,20 @@ import { OPERATIONS, type Operation } from "./registry";
 // anonymous marks a route the server serves without authentication, so the key
 // is neither fetched nor sent: fetching it can run a profile's api_key_command,
 // whose failure must not stop a call that never needed a key.
-export type KaneoInit<T = unknown> = RequestInit & { schema?: ZodType<T> | ZodType; anonymous?: boolean };
+// text marks a route whose document declares a non-JSON body (the calendar
+// feed's text/calendar): the reply is handed back as the text it arrived as,
+// since there is no JSON value to parse and no schema to check it against.
+// credentialInUrl marks a route whose URL path is itself the credential (the
+// calendar feed's token): the call stays anonymous, but the URL is owed the
+// keepsCredential protection the key gets — refused over plain HTTP to a
+// non-loopback host on the first hop and on every redirect, where a header
+// could have been stripped and the path cannot.
+export type KaneoInit<T = unknown> = RequestInit & {
+  schema?: ZodType<T> | ZodType;
+  anonymous?: boolean;
+  text?: boolean;
+  credentialInUrl?: boolean;
+};
 
 type ClientConfig = {
   baseUrl: string;
@@ -115,13 +128,14 @@ const isLoopback = (hostname: string): boolean => {
   return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) || hostname === "::1";
 };
 
-// Raised instead of sending the key where TLS is not protecting it. The check
-// runs before the request, so nothing leaves the process, and the message names
-// the target but never the key.
+// Raised instead of sending a credential where TLS is not protecting it — the
+// key, or a credential the URL itself carries. The check runs before the
+// request, so nothing leaves the process, and the message names the target but
+// never the credential.
 export class InsecureCredentialError extends Error {
   constructor(public readonly target: string) {
     super(
-      `${target}: refusing to send the API key over plain HTTP; use https, or a loopback address for a local instance`,
+      `${target}: refusing to send credentials over plain HTTP; use https, or a loopback address for a local instance`,
     );
   }
 }
@@ -176,7 +190,7 @@ const describeFailure = (
 export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T> => {
   if (settings.baseUrl === "") throw new Error("no API URL configured");
 
-  const { schema, anonymous, ...request } = init;
+  const { schema, anonymous, text: wantText, credentialInUrl, ...request } = init;
   // The endpoint as the generated client wrote it, query included: the spelling
   // the operation is looked up by, since reading it back first would split an id
   // that needed escaping into two segments of its own.
@@ -191,13 +205,18 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // failure names the call that was made rather than the hop that failed.
   const served = servedPath(target);
   let headers = new Headers(request.headers);
-  headers.set("Accept", "application/json");
+  // A request that names its own document type keeps it — the calendar feed's
+  // text/calendar — and everything else still asks for JSON.
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
   const key = anonymous ? "" : settings.apiKey();
-  if (key !== "") {
+  // credentialInUrl puts a URL-carried credential under the same check the
+  // key gets: the flag's request is anonymous, so the key's own condition
+  // alone would never reach it.
+  if (key !== "" || credentialInUrl === true) {
     if (!keepsCredential(target.href)) {
       throw new InsecureCredentialError(`${target.protocol}//${target.host}`);
     }
-    headers.set("Authorization", `Bearer ${key}`);
+    if (key !== "") headers.set("Authorization", `Bearer ${key}`);
   }
 
   // The cap --timeout puts on the request is what cuts it short. The same cap
@@ -250,6 +269,11 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       }
       const next = redirectTarget(response, target);
       if (!next) break;
+      // A credential carried in the URL cannot be stripped the way the key's
+      // header can, so an insecure hop is refused rather than followed bare.
+      if (credentialInUrl === true && !keepsCredential(next.href)) {
+        throw new InsecureCredentialError(`${next.protocol}//${next.host}`);
+      }
       location = response.headers.get("location") ?? "";
       // The key stays only where it would still be protected and where it was
       // already meant to go; a hop to an insecure host, or to another one, goes
@@ -331,6 +355,11 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // answer: a body of no bytes at all, so a 2xx carrying only whitespace is not
   // a reply to return zero values for but one that failed to decode, which is
   // what stopped the command there.
+  //
+  // A text reply is the body itself, empty included: there is no JSON value
+  // whose absence would stand for a zero, and "" is what a text document of no
+  // bytes is.
+  if (wantText) return text as T;
   if (operation === undefined ? trimmed === "" : bytes.byteLength === 0) return undefined as T;
 
   let decoded: unknown;

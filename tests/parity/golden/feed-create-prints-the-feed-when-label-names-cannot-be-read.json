@@ -1,0 +1,73 @@
+{
+  "steps": [
+    {
+      "args": [
+        "feed",
+        "create",
+        "bug",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created feed0002  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0002/calendar.ics  lbl0002  UTC  2026-01-01T01:00:01.000Z\n",
+      "stderr": "kaneo: label names unavailable, the feed's label ids are shown instead: GET /api/label/workspace/ws-main: 500: injected failure\n"
+    },
+    {
+      "args": [
+        "feed",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "feed0001  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001/calendar.ics  lbl0002  UTC  2026-01-01T01:00:00.000Z\nfeed0002  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0002/calendar.ics  lbl0002  UTC  2026-01-01T01:00:01.000Z\n",
+      "stderr": "kaneo: label names unavailable, the feed's label ids are shown instead: GET /api/label/workspace/ws-main: 500: injected failure\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": "",
+      "body": {
+        "labelIds": [
+          "lbl0002"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

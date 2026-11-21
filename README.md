@@ -182,6 +182,8 @@ kaneo task create --title <title> [flags]                      # the same, as ta
 kaneo task create <title> --attach [--next <step>] [--force]   # attaches this session to the new task; --force creates beside one naming the same reference
 kaneo task update <task> [--title TEXT] [-d TEXT | --description-file PATH] [--status COL] [--priority P] [--assignee USER] [--start-date DATE] [--position N]   # only what is passed changes; --start-date "" clears
 kaneo task status <task-id> <status>
+kaneo task attach <task> <file>             # uploads the file and references it at the end of the description; an image embeds, anything else becomes an attachment card
+kaneo task reorder <task> --before <task> | --after <task>   # moves it on the board; the anchor may be in another column
 kaneo notification ls [--unread]                             # the newest 50, as the server returns
 kaneo notification read <notification-id>... | --all
 kaneo notification create <message> [--title T] [--type T]   # to yourself
@@ -199,7 +201,7 @@ kaneo task unlink <task> <other> [--type <type>]
 kaneo comment ls <task>
 kaneo comment add <task> <text...> | - | -F PATH
 kaneo comment edit <task> <comment-id> <text...>   # only the author may edit
-kaneo activity ls <task>                            # history: comments and events such as status changes
+kaneo activity ls [task]                     # a task's history; with no task, the workspace's recent activity (newest first, at most 20)
 kaneo activity add <task> <type> [message...] [--data '{"k":"v"}']   # a history entry only; cannot be removed on its own; Kaneo 2.23.0+
 kaneo label ls [task]                # the workspace's labels, or those on a task
 kaneo label get <label>
@@ -234,6 +236,10 @@ Times are ISO 8601 with an offset (`2026-01-02T09:00:00Z`, `2026-01-02T18:00+09:
 `task create` reads the board first and refuses a title that names a reference an open task already names — `ccx#165`, `(ccx #165)` and `TakashiAihara/ccx#165` are one reference, while a bare `#165`, `ccx #165` outside parentheses and two different owners are not — and `--force` creates it anyway. A title merely worded like an open one is created, with the tasks it resembles named on stderr. `--attach` and `--next` are about the attachment rather than the task: `--next` without `--attach` is refused rather than dropped, and a `--attach` with no session id is refused before anything is created.
 
 `task status`, `task priority`, `task assign` and `task move` read the task back after the write and print the state the server holds, rather than the value that was sent; a value that came back different fails the command instead of printing as a write that took.
+
+`task attach` stages the upload against the task's project, PUTs the bytes to the presigned URL the server returns — with every header it issued, `Content-Type` among them — and finalizes it before writing the reference at the end of the description. An image is embedded as an image; anything else becomes an attachment card. The staged asset is a draft: the server keeps it private to the uploader and drops it after a day, which is the semantics the draft-upload routes carry.
+
+`task reorder` reads the board first and sends the previous contents of the columns the move touches with the write, so a board that changed in between is refused with a 409 rather than reordered from stale positions. Exactly one of `--before` and `--after` is required; the anchor may sit in another column, which moves the task into it.
 
 Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project>#<number>` names a board and a number on it: `kaneo task get kaneo-cli#3` reads the reference written as `kaneo kaneo-cli#3`, which is also what `KANEO_TASK_REF` holds after its `kaneo ` prefix. The project before the `#` is an id, slug or name. `<slug>-<number>` (`kaneo task get BET-1`) is the form the Kaneo server and UI write a task as: the server resolves it in one request, the last dash splits it (so `kaneo-cli-3` is slug `kaneo-cli`), and the slug is matched ignoring case. Its errors are shown as the server wrote them, including a 409 when the slug names more than one project. It needs Kaneo v2.30.0 or later; an older server answers 404.
 

@@ -80,6 +80,13 @@
   "deleteWorkflowRule": {},
   "detachLabelFromTask": {},
   "exportTasks": {},
+  "finalizeStagedTaskAsset": {
+    "body.contentType": true,
+    "body.filename": true,
+    "body.key": true,
+    "body.size": true,
+    "body.surface": true
+  },
   "getActivities": {
     "query.limit": false
   },
@@ -104,6 +111,7 @@
   "getTaskTimeEntries": {},
   "getTimeEntry": {},
   "getWorkflowRules": {},
+  "getWorkspaceActivities": {},
   "getWorkspaceLabels": {},
   "getWorkspaceMembers": {},
   "globalSearch": {
@@ -155,6 +163,17 @@
   "reorderProjects": {
     "body.projects": true,
     "query.workspaceId": true
+  },
+  "reorderTasks": {
+    "body.expectedTasks": false,
+    "body.projectId": true,
+    "body.tasks": true
+  },
+  "stageTaskAssetUpload": {
+    "body.contentType": true,
+    "body.filename": true,
+    "body.size": true,
+    "body.surface": true
   },
   "unarchiveProject": {},
   "updateColumn": {

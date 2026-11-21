@@ -1,6 +1,13 @@
-import { apiKey, type App } from "./app";
-import { addActivity, listActivities, type Activity } from "../api/kaneo";
-import { exactArgs, minimumArgs, type RunContext } from "./args";
+import { apiKey, workspace, type App } from "./app";
+import {
+  addActivity,
+  listActivities,
+  listWorkspaceActivities,
+  type Activity,
+  type WorkspaceActivity,
+} from "../api/kaneo";
+import { minimumArgs, rangeArgs, type RunContext } from "./args";
+import { resolveWorkspace } from "./lookup";
 import { resolveTask } from "./task";
 
 // An event's details are in eventData, shown after its message. The server
@@ -9,6 +16,17 @@ const activityLine = (a: Activity): string => {
   const data = a.eventData === null || JSON.stringify(a.eventData) === "{}" ? "" : JSON.stringify(a.eventData);
   const body = [a.content, data].filter((s) => s !== "").join("  ");
   return `${a.createdAt}  ${a.type}  ${body.replaceAll("\n", "\n  ")}`.trimEnd();
+};
+
+// A workspace entry reads like a task's history line with who did it and which
+// task it was on added: the feed spans projects, so the task reference carries
+// its project's slug the way a task reference does.
+const workspaceActivityLine = (a: WorkspaceActivity): string => {
+  const data = a.eventData === null || JSON.stringify(a.eventData) === "{}" ? "" : JSON.stringify(a.eventData);
+  const body = [a.excerpt ?? "", data].filter((s) => s !== "").join("  ");
+  const who = a.userName ?? a.externalUserName ?? "";
+  const task = a.taskNumber === null ? `${a.projectSlug} ${a.taskTitle}` : `${a.projectSlug}#${a.taskNumber} ${a.taskTitle}`;
+  return [a.createdAt, a.type, who, body, task].filter((s) => s !== "").join("  ").replaceAll("\n", "\n  ");
 };
 
 // --data takes a JSON object, since that is what the server stores.
@@ -33,11 +51,23 @@ export const activityCommand = {
     {
       name: "list",
       aliases: ["ls"],
-      use: "list <task>",
-      short: "List a task's history: comments and events such as status changes",
-      args: exactArgs(1),
+      use: "list [task]",
+      short: "List a task's history, or with no task the workspace's recent activity",
+      long:
+        "List a task's history: comments and events such as status changes.\n\n" +
+        "With no task the listing is instead the workspace's recent activity\n" +
+        "feed, the same rows across every project in it, newest first. The\n" +
+        "workspace is the configured one (-w, KANEO_WORKSPACE or .kaneo.json);\n" +
+        "a task argument always means the task's own history, whatever -w says.",
+      args: rangeArgs(0, 1),
       run: async ({ args, app }: RunContext<App>) => {
         apiKey(app);
+        if (args.length === 0) {
+          const activities = await listWorkspaceActivities(await resolveWorkspace(workspace(app)));
+          for (const a of activities) app.out.human(workspaceActivityLine(a));
+          app.out.data(activities);
+          return;
+        }
         const task = await resolveTask(app, args[0]!);
         const activities = await listActivities(task.id);
         for (const a of activities) app.out.human(activityLine(a));

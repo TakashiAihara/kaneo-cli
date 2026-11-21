@@ -1,0 +1,207 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "attach",
+        "1",
+        "notes.txt",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"asset0002\",\n  \"url\": \"<URL>/api/asset/asset0002\",\n  \"filename\": \"notes.txt\",\n  \"taskId\": \"task-a1\",\n  \"taskNumber\": 1\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1  Write the parser\nstatus    to-do\npriority  high\n\nmulti\nline\n\n<kaneo-attachment url=\"<URL>/api/asset/asset0002\" filename=\"notes.txt\" mime-type=\"text/plain;charset=utf-8\" size=\"5\" />\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "attach",
+        "BET#1",
+        "notes.txt",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"asset0003\",\n  \"url\": \"<URL>/api/asset/asset0003\",\n  \"filename\": \"notes.txt\",\n  \"taskId\": \"task-b1\",\n  \"taskNumber\": 1\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "BET#1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1  Beta first\nstatus    to-do\npriority  urgent\n\n<kaneo-attachment url=\"<URL>/api/asset/asset0003\" filename=\"notes.txt\" mime-type=\"text/plain;charset=utf-8\" size=\"5\" />\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/draft-upload/proj-alpha",
+      "query": "",
+      "body": {
+        "filename": "notes.txt",
+        "contentType": "text/plain;charset=utf-8",
+        "size": 5,
+        "surface": "description"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/uploads/workspace/ws-main/project/proj-alpha/task/draft-user-self/descriptions/notes-0001.txt",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "POST",
+      "path": "/task/draft-upload/proj-alpha/finalize",
+      "query": "",
+      "body": {
+        "filename": "notes.txt",
+        "contentType": "text/plain;charset=utf-8",
+        "size": 5,
+        "key": "workspace/ws-main/project/proj-alpha/task/draft-user-self/descriptions/notes-0001.txt",
+        "surface": "description"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/task/description/task-a1",
+      "query": "",
+      "body": {
+        "description": "multi\nline\n\n<kaneo-attachment url=\"<URL>/api/asset/asset0002\" filename=\"notes.txt\" mime-type=\"text/plain;charset=utf-8\" size=\"5\" />"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/draft-upload/proj-beta",
+      "query": "",
+      "body": {
+        "filename": "notes.txt",
+        "contentType": "text/plain;charset=utf-8",
+        "size": 5,
+        "surface": "description"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/uploads/workspace/ws-main/project/proj-beta/task/draft-user-self/descriptions/notes-0002.txt",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "POST",
+      "path": "/task/draft-upload/proj-beta/finalize",
+      "query": "",
+      "body": {
+        "filename": "notes.txt",
+        "contentType": "text/plain;charset=utf-8",
+        "size": 5,
+        "key": "workspace/ws-main/project/proj-beta/task/draft-user-self/descriptions/notes-0002.txt",
+        "surface": "description"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/task/description/task-b1",
+      "query": "",
+      "body": {
+        "description": "<kaneo-attachment url=\"<URL>/api/asset/asset0003\" filename=\"notes.txt\" mime-type=\"text/plain;charset=utf-8\" size=\"5\" />"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-b1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-b1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

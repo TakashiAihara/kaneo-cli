@@ -104,6 +104,10 @@ export type Scenario = {
   // The fake answers a status, priority, assignee or move write with the task
   // unchanged.
   writesNotKept?: boolean;
+  // The fake moves this task's position once when a reorder arrives, so the
+  // expectedTasks snapshot the CLI took is stale and the route answers 409;
+  // the next reorder reads the moved board and goes through.
+  shiftOnReorder?: string;
   // The fake answers a comment post without the comment's id.
   commentReplyWithoutId?: boolean;
   // The fake's OpenAPI document drifts from the pinned one in two request fields.
@@ -778,6 +782,65 @@ export const SCENARIOS: Scenario[] = [
     failMessage: "Workspace not found",
     steps: [["task", "move", "1", "--to", "BET", "--human"]],
   },
+  {
+    // to-do holds task-a1, task-a4 and task-a5; in-progress holds task-a2.
+    name: "task reorder within and across columns",
+    extraTasks: [
+      { id: "task-a4", projectId: P1, title: "Fourth" },
+      { id: "task-a5", projectId: P1, title: "Fifth" },
+    ],
+    steps: [
+      ["task", "reorder", "4", "--before", "5", "--json"],
+      ["task", "reorder", "1", "--after", "2", "--human"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  {
+    name: "task reorder takes exactly one anchor",
+    steps: [
+      ["task", "reorder", "1", "--json"],
+      ["task", "reorder", "1", "--before", "2", "--after", "3", "--json"],
+      ["task", "reorder", "1", "--before", "", "--json"],
+      ["task", "reorder", "1", "--before", "1", "--json"],
+      ["task", "reorder", "1", "--before", "BET#1", "--json"],
+      ["task", "reorder", "1", "--after", "99", "--json"],
+      ["task", "reorder", "1", "--before", "2", "--human"],
+    ],
+  },
+  {
+    // The board moved between the read and the write, so the snapshot the CLI
+    // took no longer matches and the route refuses it.
+    name: "task reorder on a stale board",
+    shiftOnReorder: "task-a2",
+    steps: [["task", "reorder", "1", "--after", "2", "--json"], ["task", "reorder", "1", "--after", "2", "--human"]],
+  },
+  {
+    name: "task attach a text file",
+    files: { "notes.txt": "hello" },
+    steps: [
+      ["task", "attach", "1", "notes.txt", "--json"],
+      ["task", "get", "1", "--human"],
+      ["task", "attach", "BET#1", "notes.txt", "--json"],
+      ["task", "get", "BET#1", "--human"],
+    ],
+  },
+  {
+    // An image is embedded rather than carded, and a name with characters the
+    // markdown would end early is escaped the way the editor escapes it.
+    name: "task attach an image",
+    files: { "pixel [one].png": "fake-png-bytes" },
+    steps: [["task", "attach", "2", "pixel [one].png", "--json"], ["task", "get", "2", "--human"]],
+  },
+  {
+    name: "task attach refuses before it uploads",
+    files: { "a.bin": "x" },
+    steps: [
+      ["task", "attach", "1", "missing.bin", "--json"],
+      ["task", "attach", "1", "--json"],
+      ["task", "attach", "99", "a.bin", "--json"],
+      ["task", "attach", "1", "a.bin", "--human"],
+    ],
+  },
   { name: "task due set and clear", steps: [["task", "due", "1", "2026-10-31", "--json"], ["task", "get", "1", "--json"], ["task", "due", "1", "--human"], ["task", "get", "1", "--json"]] },
   { name: "task due refuses a bad date", steps: [["task", "due", "1", "someday", "--json"], ["task", "due", "1", "", "--json"], ["task", "due", "1", " 2026-10-31 ", "--human"], ["task", "get", "1", "--human"]] },
   { name: "task bulk status", steps: [["task", "bulk", "1", "2", "ALP#1", "--status", "done", "--human"], ["task", "ls", "--all", "--json"]] },
@@ -977,6 +1040,26 @@ export const SCENARIOS: Scenario[] = [
       ["activity", "add", "1", "x", "--data", "nope"],
       ["activity", "ls", "1", "--human"],
       ["activity", "ls", "1", "--json"],
+    ],
+  },
+  {
+    // With no task the listing is the workspace's feed: the comments and
+    // events of every project in it, newest first, across workspaces only as
+    // far as -w says. A task argument still reads that task's own history.
+    name: "activity list workspace",
+    seed: {
+      projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
+      tasks: [...SEED.tasks, { id: "task-g1", projectId: "proj-gamma", title: "Gamma first" }],
+      comments: [...(SEED.comments ?? []), { taskId: "task-g1", content: "elsewhere" }],
+    },
+    steps: [
+      ["comment", "add", "1", "on the board", "--json"],
+      ["activity", "add", "2", "status_changed", "--data", '{"oldStatus":"to-do","newStatus":"in-progress"}', "--json"],
+      ["activity", "list", "--json"],
+      ["activity", "list", "--human"],
+      ["activity", "list", "-w", "ws-other", "--json"],
+      ["activity", "ls", "1", "--json"],
+      ["activity", "list", "-w", "nope", "--json"],
     ],
   },
 

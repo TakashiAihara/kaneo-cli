@@ -1,0 +1,190 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "reorder",
+        "1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"pass --before \\u003ctask\\u003e or --after \\u003ctask\\u003e\"\n}\n",
+      "stderr": "Error: pass --before <task> or --after <task>\n"
+    },
+    {
+      "args": [
+        "task",
+        "reorder",
+        "1",
+        "--before",
+        "2",
+        "--after",
+        "3",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"pass only one of --before and --after\"\n}\n",
+      "stderr": "Error: pass only one of --before and --after\n"
+    },
+    {
+      "args": [
+        "task",
+        "reorder",
+        "1",
+        "--before",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty --before\"\n}\n",
+      "stderr": "Error: empty --before\n"
+    },
+    {
+      "args": [
+        "task",
+        "reorder",
+        "1",
+        "--before",
+        "1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"a task cannot be reordered against itself\"\n}\n",
+      "stderr": "Error: a task cannot be reordered against itself\n"
+    },
+    {
+      "args": [
+        "task",
+        "reorder",
+        "1",
+        "--before",
+        "BET#1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"#1 and #1 are on different projects; reorder works within one project\"\n}\n",
+      "stderr": "Error: #1 and #1 are on different projects; reorder works within one project\n"
+    },
+    {
+      "args": [
+        "task",
+        "reorder",
+        "1",
+        "--after",
+        "99",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no task #99 in project ALP (proj-alpha, from env); pass --project to look elsewhere\"\n}\n",
+      "stderr": "Error: no task #99 in project ALP (proj-alpha, from env); pass --project to look elsewhere\n"
+    },
+    {
+      "args": [
+        "task",
+        "reorder",
+        "1",
+        "--before",
+        "2",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1 placed before #2\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/reorder",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "tasks": [
+          {
+            "id": "task-a1",
+            "position": 0,
+            "status": "in-progress"
+          }
+        ],
+        "expectedTasks": [
+          {
+            "id": "task-a1",
+            "position": 0,
+            "status": "to-do"
+          },
+          {
+            "id": "task-a2",
+            "position": 1,
+            "status": "in-progress"
+          }
+        ]
+      }
+    }
+  ],
+  "files": {}
+}

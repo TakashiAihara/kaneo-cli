@@ -1,0 +1,87 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "attach",
+        "2",
+        "pixel [one].png",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"asset0002\",\n  \"url\": \"<URL>/api/asset/asset0002\",\n  \"filename\": \"pixel [one].png\",\n  \"taskId\": \"task-a2\",\n  \"taskNumber\": 2\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "2",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#2  Ship it\nstatus    in-progress\npriority  no-priority\n\n![pixel \\[one\\]](<URL>/api/asset/asset0002)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/draft-upload/proj-alpha",
+      "query": "",
+      "body": {
+        "filename": "pixel [one].png",
+        "contentType": "image/png",
+        "size": 14,
+        "surface": "description"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/uploads/workspace/ws-main/project/proj-alpha/task/draft-user-self/descriptions/pixel-one-0001.png",
+      "query": "",
+      "body": null
+    },
+    {
+      "method": "POST",
+      "path": "/task/draft-upload/proj-alpha/finalize",
+      "query": "",
+      "body": {
+        "filename": "pixel [one].png",
+        "contentType": "image/png",
+        "size": 14,
+        "key": "workspace/ws-main/project/proj-alpha/task/draft-user-self/descriptions/pixel-one-0001.png",
+        "surface": "description"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/task/description/task-a2",
+      "query": "",
+      "body": {
+        "description": "![pixel \\[one\\]](<URL>/api/asset/asset0002)"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

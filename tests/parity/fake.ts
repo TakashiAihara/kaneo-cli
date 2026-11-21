@@ -130,6 +130,10 @@ export type FakeOptions = {
   // each in the shape its own route answers in, which is how a write the server
   // accepted and did not keep is exercised.
   writesNotKept?: boolean;
+  // Moves this task's position once when a reorder arrives, as a concurrent
+  // write landing between the caller's board read and its reorder would have,
+  // so the expectedTasks snapshot is stale and the route answers 409.
+  shiftOnReorder?: string;
   // Answers a comment post without the comment's id, so a marker that cannot be
   // looked for in the listing is exercised.
   commentReplyWithoutId?: boolean;
@@ -373,6 +377,29 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     });
   }
 
+  // Task asset uploads, as the server keeps them: POST /task/draft-upload
+  // issues a presigned URL and records what it signed in pendingUploads — the
+  // fake's stand-in for the signature, since a real one lives in the URL's
+  // query. The PUT to /uploads/<key> fills stagedUploads with what the object
+  // turned out to be, and finalize verifies those against the declared values
+  // before the asset row's surface moves from draft-pending to draft.
+  const assets: {
+    id: string;
+    key: string;
+    taskId: string | null;
+    projectId: string;
+    workspaceId: string;
+    filename: string;
+    contentType: string;
+    size: number;
+    kind: string;
+    surface: string;
+    createdBy: string;
+  }[] = [];
+  const pendingUploads = new Map<string, { contentType: string; size: number }>();
+  const stagedUploads = new Map<string, { size: number; contentType: string }>();
+  let assetSeq = 0;
+
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
@@ -446,6 +473,24 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     const body = req.method === "GET" || req.method === "DELETE" ? undefined : await req.json().catch(() => null);
     requests.push({ method: req.method, path, query: url.search, body });
 
+    // The presigned URL a stage issued points back here the way a real one
+    // points at object storage: no API key, and the headers the stage returned
+    // are the whole of what the PUT may carry — a Content-Type or a length that
+    // is not the staged one is the signature mismatch object storage answers
+    // with. Content-Length is signed too, though the server never returns it
+    // as a header to set.
+    if (req.method === "PUT" && url.pathname.startsWith("/uploads/")) {
+      const key = decodeURIComponent(url.pathname.slice("/uploads/".length));
+      const pending = pendingUploads.get(key);
+      if (pending === undefined) return new Response("NoSuchKey", { status: 404 });
+      const length = Number(req.headers.get("content-length") ?? "0");
+      if ((req.headers.get("content-type") ?? "") !== pending.contentType || length !== pending.size) {
+        return new Response("SignatureDoesNotMatch", { status: 403 });
+      }
+      stagedUploads.set(key, { size: length, contentType: pending.contentType });
+      return new Response(null, { status: 200 });
+    }
+
     if (!url.pathname.startsWith("/api/")) return new Response("<html>app</html>", { headers: { "content-type": "text/html" } });
     // The document is served without authentication, as the real server does.
     if (!(req.method === "GET" && path === "/openapi") && req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
@@ -462,7 +507,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/column\/[^/]+$/, M.CreateColumnBody],
       ["PUT", /^\/column\/[^/]+$/, M.UpdateColumnBody],
       ["PUT", /^\/column\/reorder\/[^/]+$/, M.ReorderColumnsBody],
-      ["POST", /^\/task\/[^/]+$/, M.CreateTaskBody],
+      ["POST", /^\/task\/(?!reorder$)[^/]+$/, M.CreateTaskBody],
       ["PUT", /^\/task\/status\/[^/]+$/, M.UpdateTaskStatusBody],
       ["PUT", /^\/task\/priority\/[^/]+$/, M.UpdateTaskPriorityBody],
       ["PUT", /^\/task\/assignee\/[^/]+$/, M.UpdateTaskAssigneeBody],
@@ -473,6 +518,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["PUT", /^\/task\/due-date\/[^/]+$/, M.UpdateTaskDueDateBody],
       ["PATCH", /^\/task\/bulk$/, M.BulkUpdateTasksBody],
       ["POST", /^\/task\/import\/[^/]+$/, M.ImportTasksBody],
+      ["POST", /^\/task\/reorder$/, M.ReorderTasksBody],
+      ["POST", /^\/task\/draft-upload\/[^/]+$/, M.StageTaskAssetUploadBody],
+      ["POST", /^\/task\/draft-upload\/[^/]+\/finalize$/, M.FinalizeStagedTaskAssetBody],
       ["POST", /^\/task-relation$/, M.CreateTaskRelationBody],
       ["POST", /^\/comment\/[^/]+$/, M.CreateTaskCommentBody],
       ["POST", /^\/notification$/, M.CreateNotificationBody],
@@ -949,6 +997,189 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         assigneeName: t.userId ? (users.get(t.userId) ?? null) : null,
       });
     }
+    // POST /task/reorder has to be matched before POST /task/{projectId}:
+    // "reorder" would otherwise read as a project id. The checks are
+    // v2.32.0's reorder-tasks.ts in order: unique ids, positions in range,
+    // statuses the project knows, the expectedTasks snapshot, then the write.
+    if (req.method === "POST" && path === "/task/reorder") {
+      // The race the option names happens once: the board moved between the
+      // CLI's read and its write, so the next read sees the new position and
+      // a retry is not stale.
+      const shifter = opts.shiftOnReorder === undefined ? undefined : tasks.find((t) => t.id === opts.shiftOnReorder);
+      if (shifter !== undefined) {
+        shifter.position = (shifter.position ?? 0) + 1;
+        opts.shiftOnReorder = undefined;
+      }
+      const b = body as any;
+      const proj = projects.find((x) => x.id === b?.projectId);
+      const wanted = (b?.tasks ?? []) as { id: string; position: number; status?: string }[];
+      if (new Set(wanted.map((t) => t.id)).size !== wanted.length) return failText(400, "Task IDs must be unique");
+      for (const t of wanted) {
+        if (!Number.isInteger(t.position) || t.position < 0 || t.position > 2147483646) {
+          return failText(400, "Position must be an integer between 0 and 2147483646");
+        }
+      }
+      // Status validity is judged before the project is looked up, as the
+      // server's own order has it: a project that does not exist knows only
+      // the virtual statuses.
+      const valid = [...(proj === undefined ? [] : columnsOf(proj.id).map((c) => c.slug)), ...VIRTUAL_STATUSES];
+      for (const status of new Set(wanted.map((t) => t.status).filter((s): s is string => s !== undefined))) {
+        if (!valid.includes(status)) return failText(400, `Invalid status "${status}". Valid statuses for this project: ${valid.join(", ")}`);
+      }
+      if (proj === undefined) return failText(404, "Project not found");
+      const statuses = new Set<string>([
+        ...((b?.expectedTasks ?? []) as { status: string }[]).map((t) => t.status),
+        ...wanted.map((t) => t.status).filter((s): s is string => s !== undefined),
+      ]);
+      // With expectedTasks the server locks every task in the columns they
+      // name; without it, only the tasks being written.
+      const scope =
+        b?.expectedTasks === undefined
+          ? tasks.filter((t) => t.projectId === proj.id && wanted.some((w) => w.id === t.id))
+          : tasks.filter((t) => t.projectId === proj.id && statuses.has(t.status));
+      if (b?.expectedTasks !== undefined) {
+        const expected = b.expectedTasks as { id: string; position: number | null; status: string }[];
+        const byId = new Map(expected.map((t) => [t.id, t]));
+        const stale =
+          byId.size !== expected.length ||
+          scope.length !== expected.length ||
+          scope.some((t) => {
+            const old = byId.get(t.id);
+            return old === undefined || old.status !== t.status || old.position !== t.position;
+          });
+        if (stale) return failText(409, "Board changed; refresh before reordering");
+      }
+      const requested = new Set(wanted.map((t) => t.id));
+      if (scope.filter((t) => requested.has(t.id)).length !== wanted.length) {
+        return failText(404, "Tasks must belong to the requested project");
+      }
+      const after = wanted.map((w) => {
+        const t = tasks.find((x) => x.id === w.id && x.projectId === proj.id)!;
+        t.position = w.position;
+        if (w.status !== undefined) t.status = w.status;
+        return { id: t.id, position: t.position, status: t.status };
+      });
+      return ok(z.array(M.ReorderTasks200Item), after);
+    }
+
+    // POST /task/draft-upload/{projectId} and
+    // POST /task/draft-upload/{projectId}/finalize: the staged pair task
+    // attach calls. The checks are stage-task-asset.ts's, in its order:
+    // input, project, and at finalize the stored row before the object.
+    const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+    const IMAGE_TYPES = new Set([
+      "image/apng",
+      "image/avif",
+      "image/gif",
+      "image/heic",
+      "image/heif",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+    ]);
+    const checkUpload = (contentType: unknown, size: unknown): string | undefined => {
+      if (typeof contentType !== "string" || contentType.trim() === "") return "A valid content type is required.";
+      if (!Number.isSafeInteger(size) || (size as number) <= 0) return "Upload size must be a positive safe integer.";
+      if ((size as number) > MAX_UPLOAD_BYTES) return "Upload exceeds the maximum upload size of 10MB.";
+      return undefined;
+    };
+    // storage/s3.ts's key shape: workspace/<ws>/project/<proj>/task/<task>/
+    // descriptions/<sanitised-name>-<stamp>-<id>.<ext>, where a staged upload's
+    // task is the draft-<user> stand-in for a task that does not exist yet.
+    // The stamp and id are stood in by the fake's own counter so goldens stay
+    // deterministic.
+    const sanitizeSegment = (value: string) =>
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, "-")
+        .replace(/-{2,}/g, "-")
+        .replace(/^-+|-+$/g, "") || "file";
+    const fileExtension = (filename: string) => {
+      const normalized = filename.trim();
+      const extension = normalized.includes(".") ? (normalized.split(".").pop() ?? "") : "";
+      return sanitizeSegment(extension).slice(0, 12);
+    };
+    const kindOf = (contentType: string) => (IMAGE_TYPES.has(contentType.toLowerCase()) ? "image" : "attachment");
+    if (req.method === "POST" && (p = m(/^\/task\/draft-upload\/([^/]+)$/))) {
+      const b = body as any;
+      const bad = checkUpload(b?.contentType, b?.size);
+      if (bad !== undefined) return failText(400, bad);
+      const project = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      if (project === undefined) return failText(404, "Project not found");
+      const extension = fileExtension(b.filename);
+      const baseName = sanitizeSegment(String(b.filename).replace(/\.[^/.]+$/, "") || "image").slice(0, 64);
+      const key = [
+        "workspace",
+        project.workspaceId,
+        "project",
+        project.id,
+        "task",
+        "draft-user-self",
+        "descriptions",
+        `${baseName}-${String(++assetSeq).padStart(4, "0")}${extension === "" ? "" : `.${extension}`}`,
+      ].join("/");
+      pendingUploads.set(key, { contentType: b.contentType, size: b.size });
+      // The row is written at stage, before the bytes exist: surface
+      // draft-pending, no task, owned by the uploader.
+      assets.push({
+        id: id("asset"),
+        key,
+        taskId: null,
+        projectId: project.id,
+        workspaceId: project.workspaceId,
+        filename: b.filename,
+        contentType: b.contentType,
+        size: b.size,
+        kind: kindOf(b.contentType),
+        surface: "draft-pending",
+        createdBy: "user-self",
+      });
+      const origin = new URL(req.url).origin;
+      return ok(M.TaskImageUpload, {
+        key,
+        uploadUrl: `${origin}/uploads/${key.split("/").map(encodeURIComponent).join("/")}`,
+        headers: { "Content-Type": b.contentType },
+      });
+    }
+    if (req.method === "POST" && (p = m(/^\/task\/draft-upload\/([^/]+)\/finalize$/))) {
+      const b = body as any;
+      const bad = checkUpload(b?.contentType, b?.size);
+      if (bad !== undefined) return failText(400, bad);
+      const project = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      if (project === undefined) return failText(404, "Project not found");
+      const key = typeof b?.key === "string" ? b.key.trim() : "";
+      const existing = assets.find((a) => a.key === key);
+      // A staged row that is not this project's pending draft — gone, already
+      // finalized, or someone else's — is one 409, as the server's is.
+      if (
+        existing === undefined ||
+        !["draft", "draft-pending"].includes(existing.surface) ||
+        existing.createdBy !== "user-self" ||
+        existing.projectId !== project.id ||
+        existing.taskId !== null
+      ) {
+        return failText(409, "Upload is unavailable or already attached");
+      }
+      const up = stagedUploads.get(key);
+      if (up === undefined) return failText(400, "Uploaded object was not found.");
+      if (up.size > MAX_UPLOAD_BYTES) {
+        stagedUploads.delete(key);
+        return failText(400, "Uploaded object exceeds the maximum upload size.");
+      }
+      if (up.size !== b.size || up.contentType.toLowerCase() !== String(b.contentType).toLowerCase()) {
+        return failText(400, "Uploaded object does not match the declared size and content type.");
+      }
+      // The row takes on what the object actually is, as the server's update
+      // does, not what was declared at stage.
+      existing.filename = b.filename;
+      existing.contentType = up.contentType;
+      existing.size = up.size;
+      existing.kind = kindOf(up.contentType);
+      existing.surface = "draft";
+      return ok(M.TaskImageAsset, { id: existing.id, url: `${new URL(req.url).origin}/api/asset/${existing.id}` });
+    }
+
     if (req.method === "POST" && (p = m(/^\/task\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       if (!proj) return failText(400, "Workspace ID could not be determined");
@@ -1097,6 +1328,58 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       return ok(M.Activity, asActivity(c));
     }
 
+    // GET /activity/workspace/{workspaceId}: the recent-activity feed, the
+    // comments and events of every task in the workspace's active projects,
+    // newest first, capped at the server's 20 and windowed to its 30 days. The
+    // window is judged at the fake's own epoch, so a golden does not depend on
+    // the wall clock; reading the clock without a tick keeps `now()` honest.
+    if (req.method === "GET" && (p = m(/^\/activity\/workspace\/([^/]+)$/))) {
+      const ws = decodeURIComponent(p![1]);
+      if (!workspaces.some((x) => x.id === ws)) return failText(404, "Workspace not found");
+      const active = new Set(projects.filter((x) => x.workspaceId === ws && !x.archivedAt).map((x) => x.id));
+      const since = new Date(T0 + 1000 * clock - 30 * 24 * 3600 * 1000).toISOString();
+      const nameOf = (userId: string | null) => (userId === "user-self" ? "Self" : (users.get(userId ?? "") ?? null));
+      // status_changed rows carry column names beside the slugs the event
+      // stored, resolved the way the server resolves them: only when the slug
+      // names exactly one column of that project.
+      const statusData = (projectId: string, data: unknown) => {
+        if (data === null || typeof data !== "object" || Array.isArray(data)) return data ?? null;
+        const d = data as Record<string, unknown>;
+        const columnName = (slug: unknown) => {
+          const matching = columnsOf(projectId).filter((c) => c.slug === slug);
+          return matching.length === 1 ? matching[0]!.name : undefined;
+        };
+        return { ...d, oldStatusName: columnName(d.oldStatus), newStatusName: columnName(d.newStatus) };
+      };
+      const feed = [
+        ...comments.map((c) => ({ row: asActivity(c), task: tasks.find((t) => t.id === c.taskId) })),
+        ...events.map((e) => ({ row: e, task: tasks.find((t) => t.id === e.taskId) })),
+      ]
+        .filter(({ row, task }) => task !== undefined && active.has(task.projectId) && row.createdAt >= since)
+        .map(({ row, task }) => {
+          const project = projects.find((x) => x.id === task!.projectId)!;
+          return {
+            id: row.id,
+            type: row.type,
+            createdAt: row.createdAt,
+            eventData: row.type === "status_changed" ? statusData(project.id, row.eventData) : (row.eventData ?? null),
+            excerpt: excerptOf(row.content),
+            userId: row.userId,
+            userName: nameOf(row.userId),
+            userImage: null,
+            externalUserName: row.externalUserName,
+            externalUserAvatar: row.externalUserAvatar,
+            taskId: task!.id,
+            taskTitle: task!.title,
+            taskNumber: task!.number,
+            projectId: project.id,
+            projectSlug: project.slug,
+          };
+        })
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+        .slice(0, 20);
+      return ok(z.array(M.WorkspaceActivity), feed);
+    }
     if ((p = m(/^\/activity\/([^/]+)$/)) && req.method === "GET") {
       const taskId = decodeURIComponent(p[1]);
       const feed = [...comments.filter((c) => c.taskId === taskId).map((c) => asActivity(c)), ...events.filter((e) => e.taskId === taskId)];
@@ -1437,4 +1720,20 @@ const parsedDate = (given: string, field: string): string | Response => {
     return Response.json({ success: false, error: `Invalid ${field} "${given}"` }, { status: 400 });
   }
   return at.toISOString();
+};
+
+// The plain-text preview the workspace feed carries instead of content, as
+// comment-excerpt.ts writes it: markup stripped, 240 characters at most.
+const excerptOf = (content: string | null | undefined): string | null => {
+  if (!content) return null;
+  const text = content
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return null;
+  const characters = [...text];
+  if (characters.length > 240) return `${characters.slice(0, 239).join("").trimEnd()}…`;
+  return text;
 };

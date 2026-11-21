@@ -35,9 +35,11 @@ import {
   deleteTaskRelation as removeRelation,
   deleteWorkflowRule as removeRule,
   exportTasks as readExport,
+  finalizeStagedTaskAsset,
   getColumns as readColumns,
   getCurrentUser,
   getInvitationDetails,
+  getWorkspaceActivities,
   getWorkspaceMembers,
   globalSearch,
   getExternalLinksByTask as readExternalLinks,
@@ -60,6 +62,8 @@ import {
   moveTask as putTaskMove,
   reorderColumns as putColumns,
   reorderProjects as putProjects,
+  reorderTasks as putTaskReorder,
+  stageTaskAssetUpload,
   unarchiveProject,
   updateNotificationPreferences as putNotificationPreferences,
   updateColumn as putColumn,
@@ -1182,9 +1186,18 @@ const deferredDescriptions = new WeakSet<Task>();
 
 export const descriptionDeferred = (task: Task): boolean => deferredDescriptions.has(task);
 
+// A stored position can still be null where the Task reads 0, and the reorder
+// route compares expectedTasks against the stored row, so the raw value is
+// held beside the task for the same reason the deferred flag is.
+const storedPositions = new WeakMap<Task, number | null>();
+
+export const storedTaskPosition = (task: Task): number | null =>
+  storedPositions.has(task) ? storedPositions.get(task)! : task.position;
+
 const toTask = (t: BoardTask): Task => {
   const read = task(t, { assigneeId: t.assigneeId, assigneeName: t.assigneeName, labels: labels(t.labels) });
   if (t.descriptionDeferred === true) deferredDescriptions.add(read);
+  storedPositions.set(read, t.position ?? null);
   return read;
 };
 
@@ -1480,6 +1493,62 @@ export const moveTask = async (taskId: string, projectId: string): Promise<void>
   await putTaskMove(pathParam(taskId), { destinationProjectId: projectId });
 };
 
+// One task's new place on the board, as the reorder route takes it: the sort
+// key within its column, and the column's slug when the move crosses columns.
+export type TaskPlacement = { id: string; position: number; status?: string };
+
+// The previous contents of the columns a reorder touches. The server compares
+// them with what it holds and answers 409 when the board moved under the
+// reader, so a stale snapshot is refused rather than applied.
+export type TaskSnapshot = { id: string; position: number | null; status: string };
+
+// What the reorder route answers for each task it moved: where it landed.
+export type ReorderedTask = { id: string; position: number; status: string };
+
+// Reorders tasks inside one project. Only the tasks whose position or status
+// changed are sent; expectedTasks is the complete previous contents of the
+// columns they came from and went to, which is what lets the server refuse a
+// board that changed since it was read.
+export const reorderTasks = async (
+  projectId: string,
+  tasks: TaskPlacement[],
+  expectedTasks: TaskSnapshot[],
+): Promise<ReorderedTask[]> =>
+  zeroList(await putTaskReorder({ projectId, tasks, expectedTasks })).map((t) => ({
+    id: t.id ?? "",
+    position: t.position ?? 0,
+    status: t.status ?? "",
+  }));
+
+// A file staged for upload to a project's task assets: the object key to send
+// back at finalize, the presigned URL to PUT the bytes to, and the headers the
+// PUT has to carry, Content-Type among them.
+export type StagedUpload = { key: string; uploadUrl: string; headers: Record<string, string> };
+
+// The asset a staged upload became once finalized: the id the description
+// references and the URL it is read back from.
+export type StoredAsset = { id: string; url: string };
+
+// What a staged upload is, as the two draft-upload routes take it.
+export type StagedAsset = { filename: string; contentType: string; size: number };
+
+// Issues the presigned upload for a file going onto a task's description.
+// Nothing is stored yet: the bytes still have to be PUT to uploadUrl, and the
+// key finalized, before the asset exists. The staged asset is a draft — the
+// server keeps it private to the uploader and drops it after a day unless a
+// task creation claims it.
+export const stageTaskAsset = async (projectId: string, wanted: StagedAsset): Promise<StagedUpload> => {
+  const u = zeroRecord(await stageTaskAssetUpload(pathParam(projectId), { ...wanted, surface: "description" }));
+  return { key: u.key ?? "", uploadUrl: u.uploadUrl ?? "", headers: u.headers ?? {} };
+};
+
+// Records the uploaded bytes as the staged asset. A 409 means the upload is
+// gone or was already attached, which the caller reports as it came.
+export const finalizeTaskAsset = async (projectId: string, wanted: StagedAsset & { key: string }): Promise<StoredAsset> => {
+  const a = zeroRecord(await finalizeStagedTaskAsset(pathParam(projectId), { ...wanted, surface: "description" }));
+  return { id: a.id ?? "", url: a.url ?? "" };
+};
+
 export const deleteTask = async (taskId: string): Promise<void> => {
   await removeTask(pathParam(taskId));
 };
@@ -1588,6 +1657,43 @@ export const addActivity = async (
   }
   return activity(a);
 };
+
+// One entry of a workspace's recent activity feed: the same kinds of rows a
+// task's history holds, each naming the task and project it happened on. The
+// server sends the last 30 days, newest first, at most 20 of them.
+export type WorkspaceActivity = {
+  id: string;
+  type: string;
+  createdAt: string;
+  excerpt: string | null;
+  eventData: Json;
+  userId: string | null;
+  userName: string | null;
+  externalUserName: string | null;
+  taskId: string;
+  taskTitle: string;
+  taskNumber: number | null;
+  projectId: string;
+  projectSlug: string;
+};
+
+export const listWorkspaceActivities = async (workspaceId: string): Promise<WorkspaceActivity[]> =>
+  zeroList(await getWorkspaceActivities(pathParam(workspaceId))).map((a) => ({
+    id: a.id ?? "",
+    type: a.type ?? "",
+    createdAt: isoTime(a, "createdAt"),
+    excerpt: a.excerpt ?? null,
+    // It came off the wire as JSON, so it is JSON.
+    eventData: (a.eventData ?? null) as Json,
+    userId: a.userId ?? null,
+    userName: a.userName ?? null,
+    externalUserName: a.externalUserName ?? null,
+    taskId: a.taskId ?? "",
+    taskTitle: a.taskTitle ?? "",
+    taskNumber: a.taskNumber ?? null,
+    projectId: a.projectId ?? "",
+    projectSlug: a.projectSlug ?? "",
+  }));
 
 // Time logged against a task. endTime and duration are null while the entry is
 // still running; duration is in seconds. userId is null once the user who

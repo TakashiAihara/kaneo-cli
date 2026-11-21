@@ -1,10 +1,17 @@
 import { writeSync } from "node:fs";
+import { basename } from "node:path";
 import { holding } from "../session/marker";
 import { apiKey, project, taskProject, workspace, type App } from "./app";
 import {
   bulkUpdate,
+  createExternalLink,
   currentUser,
+  deleteExternalLink,
+  duplicateTask,
+  finalizeTaskImage,
+  findDeferredTaskDescriptions,
   getProject,
+  getTaskDescription,
   listMembers,
   afterWrite,
   createTask,
@@ -38,10 +45,12 @@ import {
   MAX_TASK_POSITION,
   setTaskPriority,
   setTaskStatus,
+  stageTaskImage,
   taskSummary,
   type AssignedTask,
   type ExternalLink,
   type BulkOperation,
+  type ImageSurface,
   type ImportedTask,
   type NewTask,
   type Relation,
@@ -52,7 +61,7 @@ import type { Json } from "../output/json";
 import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunContext } from "./args";
 import { readInput, sourceName } from "./input";
 import { shellWord } from "../output/output";
-import { KaneoApiError } from "../api/http";
+import { KaneoApiError, putUpload } from "../api/http";
 import { resolveWorkspace, slugOr, withProject, workspaceInReference } from "./lookup";
 import { resolveField } from "./field";
 import { attachTask, currentSessionId } from "../session/attach";
@@ -144,13 +153,19 @@ export const taskCommand = {
           usage: "include tasks in the done, planned and archived columns",
           defaultValue: "false",
         },
+        {
+          name: "description",
+          type: "string" as const,
+          usage: "only tasks whose description contains this text",
+          defaultValue: "",
+        },
       ],
-      run: async ({ flags, app }: { flags: FlagValues; app: App }) => {
+      run: async ({ flags, changed, app }: { flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
         apiKey(app);
         if (flags.mine === true) {
           // The server lists open tasks only and takes no filter (as of v2.32.0), so a flag that
           // narrows or widens the listing would be accepted and do nothing.
-          for (const name of ["status", "priority", "all"]) {
+          for (const name of ["status", "priority", "all", "description"]) {
             if (flags[name] !== undefined && flags[name] !== "" && flags[name] !== false) {
               throw new Error(`--${name} cannot be combined with --mine`);
             }
@@ -165,17 +180,29 @@ export const taskCommand = {
         }
         const status = String(flags.status ?? "");
         const priority = String(flags.priority ?? "");
+        // A value flag passed as "" is a mistake, not an absent flag, as bulk
+        // reads them.
+        if (changed.has("description") && String(flags.description ?? "").trim() === "") throw new Error("--description is empty");
+        const query = String(flags.description ?? "").trim();
+        if (query.length > 256) throw new Error("--description is longer than 256 characters");
         // Asked of the server, which filters before it pages, and of the answer
         // as well (see TaskFilters).
         const board = await withProject(project(app), (id) => getBoard(id, { status, priority }));
         const everything = projectTasks(board);
-        const tasks = filterTasks(everything, status, priority, flags.all === true);
+        // A description the listing deferred is not on the task to match, so
+        // the deferred ones are asked of the server by id and the rest are
+        // matched here, both case-insensitively as the server matches.
+        const described =
+          query === ""
+            ? everything
+            : await describedTasks(board.projectId, everything, query);
+        const tasks = filterTasks(described, status, priority, flags.all === true);
         for (const task of tasks) app.out.human(taskLine(task));
         // The columns left out are not otherwise visible, so a count of the
         // listing reads as a count of the project. On stderr in every mode, as
         // warnSimilar does, so stdout stays the array it was; counted under the
         // same --status and --priority, so it is the tasks --all would add.
-        const left = filterTasks(everything, status, priority, true).length - tasks.length;
+        const left = filterTasks(described, status, priority, true).length - tasks.length;
         if (left > 0) console.error(`(${left} done / planned / archived ${left === 1 ? "task" : "tasks"} left out; --all to include them)`);
         app.out.data(tasks);
       },
@@ -220,6 +247,24 @@ export const taskCommand = {
           app.out.human(task.description);
         }
         app.out.data({ ...task, relations, sessions });
+      },
+    },
+    {
+      name: "describe",
+      use: "describe <task>",
+      short: "Print a task's description",
+      long:
+        "Print a task's description in full.\n\n" +
+        "The listing leaves out a description above 64 KiB; this reads it\n" +
+        "through the route that pages large descriptions, so it is the way to\n" +
+        "see one of those.",
+      args: exactArgs(1),
+      run: async ({ args, app }: { args: string[]; app: App }) => {
+        apiKey(app);
+        const task = await resolveTask(app, args[0]!);
+        const description = await getTaskDescription(task.id);
+        app.out.human(description);
+        app.out.data(description);
       },
     },
     {
@@ -802,6 +847,59 @@ export const taskCommand = {
       },
     },
     {
+      name: "duplicate",
+      use: "duplicate <task>",
+      short: "Copy a task",
+      long:
+        "Copy a task within its project.\n\n" +
+        "The copy keeps the source's column, priority, assignee, dates, labels\n" +
+        "and description; --title gives it a different title, and --to moves\n" +
+        "the copy to another project afterwards.",
+      args: exactArgs(1),
+      flags: [
+        { name: "title", type: "string" as const, usage: "title for the copy (default: the same title)", defaultValue: "" },
+        { name: "to", type: "string" as const, usage: "move the copy to this project (id, slug or name)", defaultValue: "" },
+      ],
+      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+        // An empty --title is refused before the copy is made: the server reads
+        // a blank one as no title at all and would keep the source's, which is
+        // not what was asked.
+        const title = changed.has("title") ? String(flags.title ?? "") : undefined;
+        if (title !== undefined && title.trim() === "") throw new Error("empty --title");
+        const to = String(flags.to ?? "");
+        if (changed.has("to") && to.trim() === "") throw new Error("empty --to");
+        apiKey(app);
+        const task = await resolveTask(app, args[0]!);
+        // The destination is resolved before the copy is made, so a --to that
+        // names no project fails before anything is written.
+        let destId = "";
+        if (to !== "") {
+          destId = await withProject(
+            to,
+            async (id) => {
+              await getProject(id);
+              return id;
+            },
+            { sameWorkspaceAs: task.projectId },
+          );
+        }
+        const copy = await duplicateTask(task.id, title);
+        let shown = copy;
+        if (destId !== "") {
+          try {
+            await moveTask(copy.id, destId);
+          } catch (e) {
+            throw new Error(
+              `duplicated #${task.number} as #${copy.number}, but moving the copy to ${to} failed: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
+          shown = await taskAfterWrite(copy, "the copy was moved");
+        }
+        app.out.human(`duplicated #${task.number} as #${shown.number} ${shown.title}`);
+        app.out.data(shown);
+      },
+    },
+    {
       name: "rm",
       aliases: ["delete"],
       use: "rm <task>",
@@ -941,15 +1039,55 @@ export const taskCommand = {
       name: "external-links",
       aliases: ["xlinks"],
       use: "external-links <task>",
-      short: "List a task's external links",
+      short: "List, add or remove a task's external links",
       long:
         "List the links a task holds to what is outside the board.\n\n" +
         "A link an integration brought in is marked with the integration it came\n" +
-        "through, which is what tells it apart from one added by hand.",
+        "through, which is what tells it apart from one added by hand. --add\n" +
+        "puts a link on by hand, --rm takes one off by its id (the ids are in\n" +
+        "the --json listing), and with neither the links are only listed.",
       args: exactArgs(1),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [
+        { name: "add", type: "string" as const, usage: "add an external link with this URL", defaultValue: "" },
+        { name: "title", type: "string" as const, usage: "title for the link --add creates", defaultValue: "" },
+        { name: "rm", type: "string" as const, usage: "remove the link with this id", defaultValue: "" },
+      ],
+      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+        const add = String(flags.add ?? "");
+        const rm = String(flags.rm ?? "");
+        const title = String(flags.title ?? "");
+        // A value flag passed as "" is a mistake, not an absent flag, as bulk
+        // reads them.
+        for (const name of ["add", "rm", "title"]) {
+          if (changed.has(name) && String(flags[name] ?? "").trim() === "") throw new Error(`--${name} is empty`);
+        }
+        if (add !== "" && rm !== "") throw new Error("pass --add or --rm, not both");
+        if (title !== "" && add === "") throw new Error("--title only names a link --add creates");
+        let url = "";
+        if (add !== "") {
+          url = add.trim();
+          let parsed: URL;
+          try {
+            parsed = new URL(url);
+          } catch {
+            throw new Error(`--add ${JSON.stringify(add)} is not a URL`);
+          }
+          if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            throw new Error(`--add ${JSON.stringify(add)} is not an http or https URL`);
+          }
+          if (title.trim().length > 200) throw new Error("--title is longer than 200 characters");
+        }
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
+        if (add !== "") {
+          await createExternalLink(task.id, { url, ...(title.trim() === "" ? {} : { title: title.trim() }) });
+        }
+        if (rm !== "") {
+          const removed = await deleteExternalLink(task.id, rm.trim());
+          if (removed !== rm.trim()) {
+            throw new Error(`the server answered a different link id (${JSON.stringify(removed)}); check \`kaneo task external-links\``);
+          }
+        }
         const links = await listExternalLinks(task.id);
         for (const link of links) app.out.human(externalLinkLine(link));
         app.out.data(links);
@@ -986,6 +1124,42 @@ export const taskCommand = {
         const set = await setCustomFieldValue(task.id, field.id, value);
         app.out.human(`set ${field.name} on #${task.number}`);
         app.out.data(set);
+      },
+    },
+    {
+      name: "upload",
+      use: "upload <task> <file>",
+      short: "Upload an image for a task",
+      long:
+        "Upload an image to a task and print where it can be read back.\n\n" +
+        "The file is staged, PUT to the storage the server presigns, and\n" +
+        "finalized; the answer is the asset's URL, which a description or a\n" +
+        "comment embeds. --surface says where the image will be used. This is\n" +
+        "not `task attach`: attach also writes the reference into the\n" +
+        "description, while upload only stores the image.",
+      args: exactArgs(2),
+      flags: [
+        {
+          name: "surface",
+          type: "string" as const,
+          usage: "where the image is used: description or comment",
+          defaultValue: "description",
+        },
+      ],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
+        const surface = String(flags.surface ?? "description") as ImageSurface;
+        if (surface !== "description" && surface !== "comment") {
+          throw new Error(`unknown surface ${JSON.stringify(String(flags.surface ?? ""))}; use description or comment`);
+        }
+        const file = await imageFile(args[1]!);
+        apiKey(app);
+        const task = await resolveTask(app, args[0]!);
+        const staged = { filename: file.name, contentType: file.type, size: file.size, surface };
+        const upload = await stageTaskImage(task.id, staged);
+        await putUpload(upload.uploadUrl, upload.headers, file.bytes);
+        const asset = await finalizeTaskImage(task.id, { ...staged, key: upload.key });
+        app.out.human(`uploaded ${file.name}: ${asset.url}`);
+        app.out.data({ id: asset.id, url: asset.url, taskId: task.id, taskNumber: task.number, filename: file.name, contentType: file.type, size: file.size, surface });
       },
     },
   ],
@@ -1355,6 +1529,27 @@ const descriptionOf = async (flags: FlagValues, changed: ReadonlySet<string>): P
   return read;
 };
 
+// The image `task upload` stores: its bytes, its name as a basename rather
+// than the path it was found at, and the content type the extension gives it,
+// which is what the server would have been sent for the same file. An empty
+// file is refused before any request: the server takes no zero-byte image.
+const imageFile = async (path: string): Promise<{ name: string; type: string; size: number; bytes: Uint8Array }> => {
+  const file = Bun.file(path);
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await file.arrayBuffer());
+  } catch (e) {
+    throw new Error(`reading ${path}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  if (bytes.byteLength === 0) throw new Error(`${path} is empty`);
+  return {
+    name: basename(path),
+    type: file.type === "" ? "application/octet-stream" : file.type,
+    size: bytes.byteLength,
+    bytes,
+  };
+};
+
 // The task `task update` just wrote, in the lines `task get` opens with. Its
 // relations are left out: the update did not touch them, and reading them is a
 // request of its own.
@@ -1383,6 +1578,16 @@ const filterTasks = (tasks: Task[], status: string, priority: string, all: boole
       (priority === "" || task.priority === priority) &&
       (all || status !== "" || !HIDDEN.includes(task.status)),
   );
+
+// The tasks whose description contains the query. A description the listing
+// deferred is not on the task to match, so the server is asked which deferred
+// descriptions match and their ids stand in for the text; the rest are matched
+// here. Both sides compare case-insensitively, as the server does.
+const describedTasks = async (projectId: string, tasks: Task[], query: string): Promise<Task[]> => {
+  const deferred = new Set(await findDeferredTaskDescriptions(projectId, query));
+  const needle = query.toLowerCase();
+  return tasks.filter((task) => deferred.has(task.id) || task.description.toLowerCase().includes(needle));
+};
 
 const assignedLine = (task: AssignedTask): string =>
   `${task.projectSlug}#${String(task.number ?? "").padEnd(4)} [${task.priority.padEnd(11)}] ${task.status.padEnd(13)} ${task.title}`;

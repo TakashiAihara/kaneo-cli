@@ -40,6 +40,10 @@
     "body.events": false,
     "body.webhookUrl": true
   },
+  "createExternalLink": {
+    "body.title": false,
+    "body.url": true
+  },
   "createGenericWebhookIntegration": {
     "body.dueDateReminderLeadTimeMinutes": false,
     "body.events": false,
@@ -102,6 +106,12 @@
     "body.externalSource": false,
     "body.externalUserName": false
   },
+  "createTaskImageUpload": {
+    "body.contentType": true,
+    "body.filename": true,
+    "body.size": true,
+    "body.surface": true
+  },
   "createTaskRelation": {
     "body.relationType": true,
     "body.sourceTaskId": true,
@@ -123,6 +133,7 @@
   "deleteColumn": {},
   "deleteCustomField": {},
   "deleteDiscordIntegration": {},
+  "deleteExternalLink": {},
   "deleteGenericWebhookIntegration": {},
   "deleteGitHubIntegration": {},
   "deleteGitlabIntegration": {},
@@ -139,12 +150,26 @@
   "deleteUserAvatar": {},
   "deleteWorkflowRule": {},
   "detachLabelFromTask": {},
+  "duplicateTask": {
+    "body.title": false
+  },
   "exportTasks": {},
   "finalizeProjectBackgroundUpload": {
     "body.contentType": true,
     "body.key": true,
     "body.size": true,
     "body.version": true
+  },
+  "finalizeTaskImageUpload": {
+    "body.contentType": true,
+    "body.filename": true,
+    "body.key": true,
+    "body.size": true,
+    "body.surface": true
+  },
+  "findDeferredTaskDescriptions": {
+    "query.after": false,
+    "query.query": true
   },
   "getActivities": {
     "query.limit": false
@@ -202,6 +227,10 @@
     "query.workspaceSlug": false
   },
   "getTaskComments": {},
+  "getTaskDescriptionPage": {
+    "query.offset": false,
+    "query.version": false
+  },
   "getTaskLabels": {},
   "getTaskRelations": {},
   "getTaskTimeEntries": {},

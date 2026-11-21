@@ -1212,6 +1212,159 @@ export const SCENARIOS: Scenario[] = [
   { name: "task unlink ambiguous", steps: [["task", "link", "1", "2", "--type", "related", "--json"], ["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "unlink", "1", "2", "--json"], ["task", "unlink", "1", "2", "--type", "blocks", "--human"], ["task", "links", "1", "--human"]] },
   { name: "task unlink nothing to unlink", steps: [["task", "unlink", "1", "2", "--json"]] },
   { name: "task external-links", seed: { externalLinks: [{ taskId: "task-a1", url: "https://example.com/spec", title: "Spec" }, { taskId: "task-a1", url: "https://github.com/o/r/pull/7", title: null, resourceType: "pull_request", externalId: "7", integration: { id: "int-1", type: "github" } }] }, steps: [["task", "external-links", "1", "--json"], ["task", "external-links", "1", "--human"], ["task", "external-links", "2", "--json"], ["task", "external-links", "2", "--human"], ["task", "external-links", "99", "--json"]] },
+  // --add and --rm mutate and then list, so the answer shows the links as the
+  // server now holds them; an integration's link is not the endpoint's to
+  // remove, and neither is an id no link has.
+  {
+    name: "task external-links add and remove",
+    seed: { externalLinks: [{ taskId: "task-a1", url: "https://example.com/spec", title: "Spec" }, { taskId: "task-a1", url: "https://github.com/o/r/pull/7", title: null, resourceType: "pull_request", externalId: "7", integration: { id: "int-1", type: "github" } }] },
+    steps: [
+      ["task", "external-links", "1", "--add", "https://example.com/notes", "--title", "Notes", "--json"],
+      ["task", "external-links", "1", "--add", "https://example.com/plain", "--human"],
+      ["task", "external-links", "1", "--rm", "link0004", "--json"],
+      ["task", "external-links", "1", "--rm", "link0003", "--json"],
+      ["task", "external-links", "1", "--rm", "link0009", "--json"],
+      ["task", "external-links", "1", "--human"],
+    ],
+  },
+  // Refused before any request: both mutations at once, a title with no --add,
+  // a value that is no http(s) URL, and a title past the server's 200.
+  {
+    name: "task external-links refuses bad input",
+    steps: [
+      ["task", "external-links", "1", "--add", "https://example.com/x", "--rm", "link0002", "--json"],
+      ["task", "external-links", "1", "--title", "Notes", "--json"],
+      ["task", "external-links", "1", "--add", "ftp://example.com/x", "--json"],
+      ["task", "external-links", "1", "--add", "not a url", "--json"],
+      ["task", "external-links", "1", "--add", "https://example.com/x", "--title", "t".repeat(201), "--json"],
+      ["task", "external-links", "1", "--add", "", "--json"],
+      ["task", "external-links", "1", "--rm", " ", "--json"],
+      ["task", "external-links", "99", "--add", "https://example.com/x", "--json"],
+    ],
+  },
+  // The description page route: a short description is one page, a long one
+  // pages at 32 Ki characters with the version the first page answered, and a
+  // task the board does not have is the server's 404.
+  {
+    name: "task describe",
+    extraTasks: [
+      { id: "task-a4", projectId: P1, title: "Paged story", description: "x".repeat(32769) },
+      { id: "task-a5", projectId: P1, title: "Kana story", description: "あ".repeat(33_000) },
+    ],
+    steps: [
+      ["task", "describe", "1", "--human"],
+      ["task", "describe", "1", "--json"],
+      ["task", "describe", "4", "--json"],
+      ["task", "describe", "5", "--json"],
+      ["task", "describe", "99", "--json"],
+    ],
+  },
+  // --description filters on the descriptions the listing carries and asks the
+  // server about the ones it deferred, both case-insensitively.
+  {
+    name: "task list by description",
+    extraTasks: [
+      { id: "task-a4", projectId: P1, title: "Deferred needle", description: `${"x".repeat(65_537)}Needle in the deferred text` },
+      { id: "task-a5", projectId: P1, title: "Deferred other", description: `${"y".repeat(65_537)}nothing here` },
+      { id: "task-a6", projectId: P1, title: "Plain needle", description: "a Needle in plain text" },
+    ],
+    steps: [
+      ["task", "ls", "--description", "needle", "--json"],
+      ["task", "ls", "--description", "NEEDLE", "--human"],
+      ["task", "ls", "--description", "missing", "--json"],
+      ["task", "ls", "--description", "needle", "--status", "to-do", "--json"],
+    ],
+  },
+  // More deferred matches than the server's hundred a page: the cursor pages
+  // the rest.
+  {
+    name: "task list by description pages the deferred matches",
+    extraTasks: Array.from({ length: 105 }, (_, i) => ({
+      id: `task-d${String(i).padStart(3, "0")}`,
+      projectId: P1,
+      title: `Deferred ${i}`,
+      description: `${"x".repeat(65_536)}needle ${i}`,
+    })),
+    steps: [["task", "ls", "--description", "needle", "--json"]],
+  },
+  // An empty or overlong query and --mine are refused before any request.
+  {
+    name: "task list by description refuses bad input",
+    steps: [
+      ["task", "ls", "--description", "", "--json"],
+      ["task", "ls", "--description", "  ", "--json"],
+      ["task", "ls", "--description", "x".repeat(257), "--json"],
+      ["task", "ls", "--mine", "--description", "x", "--json"],
+      ["task", "ls", "--json"],
+    ],
+  },
+  // The copy keeps the source's fields, its parent link and its label; the
+  // listing shows what the copy holds.
+  {
+    name: "task duplicate",
+    seed: { labels: [{ taskId: "task-a1", name: "bug", color: "red" }] },
+    steps: [
+      ["task", "link", "2", "1", "--type", "subtask", "--json"],
+      ["task", "duplicate", "1", "--json"],
+      ["task", "get", "4", "--json"],
+      ["task", "links", "4", "--human"],
+      ["task", "duplicate", "2", "--title", "Ship it, again", "--human"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  // --to resolves the destination before the copy exists and moves the copy
+  // after; a destination that is the source's own project fails the move with
+  // the copy already made, which the error says.
+  {
+    name: "task duplicate to another project",
+    steps: [
+      ["task", "duplicate", "1", "--to", "Beta", "--json"],
+      ["task", "duplicate", "2", "--to", "proj-beta", "--title", "Moved copy", "--human"],
+      ["task", "duplicate", "1", "--to", "ALP", "--json"],
+      ["task", "ls", "-p", "Beta", "--all", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  // A blank --title or --to and an unknown task are refused; a --to that
+  // names no project fails before the copy is made.
+  {
+    name: "task duplicate refuses bad input",
+    steps: [
+      ["task", "duplicate", "1", "--title", "", "--json"],
+      ["task", "duplicate", "1", "--title", " ", "--json"],
+      ["task", "duplicate", "1", "--to", "", "--json"],
+      ["task", "duplicate", "99", "--json"],
+      ["task", "duplicate", "BET#1", "--to", "NoSuch", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  // The task-scoped image upload: stage, PUT the bytes to the presigned URL,
+  // finalize, and the answer is the asset's URL. --surface picks the folder
+  // the object key is issued under.
+  {
+    name: "task upload",
+    files: { "pixel.png": "fake png bytes" },
+    steps: [
+      ["task", "upload", "1", "pixel.png", "--json"],
+      ["task", "upload", "1", "pixel.png", "--surface", "comment", "--human"],
+      ["task", "upload", "1", "pixel.png", "--surface", "bogus", "--json"],
+      ["task", "upload", "99", "pixel.png", "--json"],
+      ["task", "upload", "1", "missing.png", "--json"],
+    ],
+  },
+  // An empty file is refused before any request, and a storage that refuses
+  // the bytes fails the upload after the stage was issued.
+  {
+    name: "task upload refuses an empty file",
+    files: { "empty.png": "" },
+    steps: [["task", "upload", "1", "empty.png", "--json"], ["task", "ls", "--all", "--json"]],
+  },
+  {
+    name: "task upload storage refuses the bytes",
+    files: { "pixel.png": "fake png bytes" },
+    failOn: "^PUT /uploads/",
+    steps: [["task", "upload", "1", "pixel.png", "--json"], ["task", "ls", "--all", "--json"]],
+  },
 
   // --jq, the one flag every command carries: what a caller pipes a field into
   // python3 instead, and what must not cost a jq the reader has to install.

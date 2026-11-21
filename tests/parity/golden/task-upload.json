@@ -1,0 +1,148 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "upload",
+        "1",
+        "pixel.png",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"asset0003\",\n  \"url\": \"<URL>/asset/asset0003\",\n  \"taskId\": \"task-a1\",\n  \"taskNumber\": 1,\n  \"filename\": \"pixel.png\",\n  \"contentType\": \"image/png\",\n  \"size\": 14,\n  \"surface\": \"description\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "upload",
+        "1",
+        "pixel.png",
+        "--surface",
+        "comment",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "uploaded pixel.png: <URL>/asset/asset0005\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "upload",
+        "1",
+        "pixel.png",
+        "--surface",
+        "bogus",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown surface \\\"bogus\\\"; use description or comment\"\n}\n",
+      "stderr": "Error: unknown surface \"bogus\"; use description or comment\n"
+    },
+    {
+      "args": [
+        "task",
+        "upload",
+        "99",
+        "pixel.png",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no task #99 in project ALP (proj-alpha, from env); pass --project to look elsewhere\"\n}\n",
+      "stderr": "Error: no task #99 in project ALP (proj-alpha, from env); pass --project to look elsewhere\n"
+    },
+    {
+      "args": [
+        "task",
+        "upload",
+        "1",
+        "missing.png",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"reading missing.png: ENOENT: no such file or directory, open 'missing.png'\"\n}\n",
+      "stderr": "Error: reading missing.png: ENOENT: no such file or directory, open 'missing.png'\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/image-upload/task-a1",
+      "query": "",
+      "body": {
+        "filename": "pixel.png",
+        "contentType": "image/png",
+        "size": 14,
+        "surface": "description"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/uploads/workspace/ws-main/project/proj-alpha/task/task-a1/descriptions/pixel-10-upl0002.png",
+      "query": "",
+      "body": {
+        "bytes": 14
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/task/image-upload/task-a1/finalize",
+      "query": "",
+      "body": {
+        "filename": "pixel.png",
+        "contentType": "image/png",
+        "size": 14,
+        "surface": "description",
+        "key": "workspace/ws-main/project/proj-alpha/task/task-a1/descriptions/pixel-10-upl0002.png"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/image-upload/task-a1",
+      "query": "",
+      "body": {
+        "filename": "pixel.png",
+        "contentType": "image/png",
+        "size": 14,
+        "surface": "comment"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/uploads/workspace/ws-main/project/proj-alpha/task/task-a1/comments/pixel-11-upl0004.png",
+      "query": "",
+      "body": {
+        "bytes": 14
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/task/image-upload/task-a1/finalize",
+      "query": "",
+      "body": {
+        "filename": "pixel.png",
+        "contentType": "image/png",
+        "size": 14,
+        "surface": "comment",
+        "key": "workspace/ws-main/project/proj-alpha/task/task-a1/comments/pixel-11-upl0004.png"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

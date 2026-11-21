@@ -38,6 +38,8 @@ import {
   createTelegramIntegration as postTelegramIntegration,
   createTaskRelation,
   deleteDiscordIntegration as removeDiscordIntegration,
+  createExternalLink as postExternalLink,
+  deleteExternalLink as removeExternalLink,
   deleteNotificationPreferenceWorkspaceRule,
   deleteSlackIntegration as removeSlackIntegration,
   deleteTelegramIntegration as removeTelegramIntegration,
@@ -46,6 +48,9 @@ import {
   deleteProject as removeProject,
   deleteProjectBackground as removeProjectBackground,
   deleteTask as removeTask,
+  duplicateTask as postDuplicate,
+  createTaskImageUpload,
+  finalizeTaskImageUpload,
   getNotificationPreferences as readNotificationPreferences,
   deleteTaskComment,
   deleteTaskRelation as removeRelation,
@@ -62,6 +67,8 @@ import {
   getProjectBackground as readProjectBackground,
   getTask as readTask,
   getTaskByTicketId as readTaskByTicketId,
+  getTaskDescriptionPage as readDescriptionPage,
+  findDeferredTaskDescriptions as searchDescriptionMatches,
   getTaskComments,
   getTaskRelations,
   listNotifications as getNotifications,
@@ -1413,6 +1420,66 @@ export const getTaskByTicketId = async (ticketId: string): Promise<Task> => {
   return task(t, { assigneeId: t.assigneeId, assigneeName: t.assigneeName, labels: null });
 };
 
+// A task's whole description, read through the route the listing defers big
+// ones to. Each page is a slice of the text and the version it was read at;
+// the version of every page but the first is sent back, so an edit landing
+// mid-read fails the read (409) rather than joining two versions of it. A page
+// that does not advance fails too, since following it would read for ever.
+export const getTaskDescription = async (taskId: string): Promise<string> => {
+  const parts: string[] = [];
+  let offset = 0;
+  let version: string | undefined;
+  for (;;) {
+    const page = zeroRecord(
+      await readDescriptionPage(pathParam(taskId), {
+        ...(offset === 0 ? {} : { offset }),
+        ...(version === undefined ? {} : { version }),
+      }),
+    );
+    if (version !== undefined && page.version !== version) {
+      throw new Error("the description changed while it was read");
+    }
+    version = page.version;
+    parts.push(page.content ?? "");
+    const next = page.nextOffset ?? null;
+    if (next === null) return parts.join("");
+    if (next <= offset) throw new Error("the description page did not advance");
+    offset = next;
+  }
+};
+
+// The ids of the project's tasks whose descriptions the listing deferred and
+// whose text contains the query, matched case-insensitively. Only deferred
+// descriptions are searched: one the listing carried was already filtered on
+// by the caller. The server pages by task id cursor, a hundred at a time, and
+// every page is read so the caller sees the whole match set; a cursor seen
+// twice fails the read rather than looping for ever.
+export const findDeferredTaskDescriptions = async (projectId: string, query: string): Promise<string[]> => {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  const cursors = new Set<string>();
+  let after: string | undefined;
+  for (;;) {
+    const page = zeroRecord(
+      await searchDescriptionMatches(pathParam(projectId), {
+        query,
+        ...(after === undefined ? {} : { after }),
+      }),
+    );
+    for (const id of zeroList(page.ids)) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        ids.push(id);
+      }
+    }
+    const cursor = page.nextCursor ?? null;
+    if (cursor === null) return ids;
+    if (cursors.has(cursor)) throw new Error("the description search did not advance");
+    cursors.add(cursor);
+    after = cursor;
+  }
+};
+
 // The payload for creating a task.
 export type NewTask = {
   title: string;
@@ -1692,6 +1759,47 @@ export const moveTask = async (taskId: string, projectId: string): Promise<void>
 
 export const deleteTask = async (taskId: string): Promise<void> => {
   await removeTask(pathParam(taskId));
+};
+
+// Copies a task within its project: the copy keeps the source's column,
+// priority, assignee, dates, labels and description, and only the title can
+// differ — an absent or blank one keeps the source's. The reply is the stored
+// task, which names the assignee as userId, resolves no name and carries no
+// labels, as the other write routes answer.
+export const duplicateTask = async (taskId: string, title?: string): Promise<Task> => {
+  const copied = zeroRecord(await postDuplicate(pathParam(taskId), title === undefined ? {} : { title }));
+  return task(copied, { assigneeId: copied.userId, assigneeName: null, labels: null });
+};
+
+// Where an uploaded image is used, which decides how the server scopes it.
+export type ImageSurface = "description" | "comment";
+
+// An image going onto a task: what it is called, what it is, how big it is,
+// and where it will be used.
+export type TaskImage = { filename: string; contentType: string; size: number; surface: ImageSurface };
+
+// The staged upload a task image becomes: the object key finalize asks for,
+// the presigned URL the bytes go to, and the headers the PUT must carry,
+// Content-Type among them.
+export type StagedImage = { key: string; uploadUrl: string; headers: Record<string, string> };
+
+// The stored image a finalized upload became: the id an embed references and
+// the URL it is read back from.
+export type StoredImage = { id: string; url: string };
+
+// Issues the presigned upload for an image going onto a task. Nothing is
+// stored yet: the bytes still have to be PUT to uploadUrl and the key
+// finalized before the asset exists.
+export const stageTaskImage = async (taskId: string, wanted: TaskImage): Promise<StagedImage> => {
+  const u = zeroRecord(await createTaskImageUpload(pathParam(taskId), { ...wanted }));
+  return { key: u.key ?? "", uploadUrl: u.uploadUrl ?? "", headers: u.headers ?? {} };
+};
+
+// Records the uploaded bytes as the task's image. A refusal means the upload
+// is gone or was already finalized, which the caller reports as it came.
+export const finalizeTaskImage = async (taskId: string, wanted: TaskImage & { key: string }): Promise<StoredImage> => {
+  const a = zeroRecord(await finalizeTaskImageUpload(pathParam(taskId), { ...wanted }));
+  return { id: a.id ?? "", url: a.url ?? "" };
 };
 
 // A comment on a task. It is also where the session's metadata lives, since a
@@ -3339,6 +3447,34 @@ export const updateTelegramIntegration = async (
 
 export const deleteTelegramIntegration = async (projectId: string): Promise<{ success: boolean }> =>
   zeroRecord(await removeTelegramIntegration(pathParam(projectId)));
+
+// Adds a link by hand: the URL is the whole of what the server needs, the
+// title only a label for it. The reply is the stored link minus the
+// integration join the listing carries — a hand-added link has none, so its
+// type reads as null the same way.
+export const createExternalLink = async (taskId: string, wanted: { url: string; title?: string }): Promise<ExternalLink> => {
+  const created = zeroRecord(
+    await postExternalLink(pathParam(taskId), { url: wanted.url, ...(wanted.title === undefined ? {} : { title: wanted.title }) }),
+  );
+  return {
+    id: created.id ?? "",
+    taskId: created.taskId ?? "",
+    resourceType: created.resourceType ?? "",
+    externalId: created.externalId ?? "",
+    url: created.url ?? "",
+    title: created.title ?? null,
+    integrationType: null,
+    createdAt: isoTime(created, "createdAt"),
+    updatedAt: isoTime(created, "updatedAt"),
+  };
+};
+
+// Removes a link from a task. The reply names the link that was removed; a
+// link that is not on the task is the server's 404 to report.
+export const deleteExternalLink = async (taskId: string, linkId: string): Promise<string> => {
+  const removed = zeroRecord(await removeExternalLink(pathParam(taskId), pathParam(linkId)));
+  return removed.id ?? "";
+};
 
 export type CheckResult = {
   serverOperations: number;

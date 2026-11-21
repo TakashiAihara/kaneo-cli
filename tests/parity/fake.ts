@@ -808,6 +808,28 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const integrationSchema = (kind: string) => (kind === "mattermost" ? M.MattermostIntegration : M.GenericWebhookIntegration);
   const integrationDeleteSchema = (kind: string) => (kind === "mattermost" ? M.DeleteMattermostIntegration200 : M.DeleteGenericWebhookIntegration200);
 
+  // The description page's version is the task row's xmin upstream: any write
+  // to the row moves it, so the fake counts writes and answers the count.
+  const taskVersions = new Map<string, number>();
+  const versionOf = (t: { id: string }) => String(taskVersions.get(t.id) ?? 1);
+  const touch = (t: { id: string }) => taskVersions.set(t.id, (taskVersions.get(t.id) ?? 1) + 1);
+
+  // What the presigned URLs point at: object bytes by key until finalize
+  // records them as assets, which is also where an asset read serves them.
+  const objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
+  const imageAssets: {
+    id: string;
+    taskId: string;
+    projectId: string;
+    key: string;
+    filename: string;
+    contentType: string;
+    size: number;
+    surface: string;
+    bytes: Uint8Array;
+    createdAt: string;
+  }[] = [];
+
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
@@ -818,11 +840,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     new Response(message, { status, headers: { "content-type": "text/plain;charset=UTF-8" } });
 
   // A description above 64 KiB is left out of the listing, which marks the task
-  // rather than carrying the text; the task detail route still has it.
+  // rather than carrying the text; the task detail route still has it, and the
+  // description-matches route searches exactly these.
   const DEFERRED_OVER = 64 * 1024;
-  const boardTask = (t: (typeof tasks)[number]) => {
+  const deferredDescription = (t: (typeof tasks)[number]) =>
     // Measured in bytes, as the server's octet_length is, not in UTF-16 units.
-    const deferred = Buffer.byteLength(t.description ?? "", "utf8") > DEFERRED_OVER;
+    Buffer.byteLength(t.description ?? "", "utf8") > DEFERRED_OVER;
+  const boardTask = (t: (typeof tasks)[number]) => {
+    const deferred = deferredDescription(t);
     return {
       id: t.id,
       title: t.title,
@@ -1213,6 +1238,35 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   let limited = 0;
   const misstoring = opts.misstoreOn ? new RegExp(opts.misstoreOn) : undefined;
 
+  // The checks 2.32.0's storage layer runs on an image upload, with the same
+  // answers: the size cap is the server's default of 10 MiB.
+  const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+  const uploadInvalid = (contentType: string, size: number): string | null => {
+    if (!contentType.trim()) return "A valid content type is required.";
+    if (!Number.isSafeInteger(size) || size <= 0) return "Upload size must be a positive safe integer.";
+    if (size > MAX_UPLOAD_BYTES) return `Upload exceeds the maximum upload size of ${Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))}MB.`;
+    return null;
+  };
+  // The object key a stage issues, shaped like upstream's buildObjectKey: the
+  // workspace, project, task and surface folders, then a name ending in a
+  // timestamp and id. The fake's clock and counter stand in for Date.now()
+  // and the cuid, which keeps the golden deterministic.
+  const taskObjectKey = (workspaceId: string, projectId: string, taskId: string, surface: string, filename: string) => {
+    const folder = surface === "comment" ? "comments" : "descriptions";
+    const base = sanitizeSegment(filename.replace(/\.[^/.]+$/, "") || "image").slice(0, 64);
+    const ext = fileExtension(filename);
+    return `workspace/${sanitizeSegment(workspaceId)}/project/${sanitizeSegment(projectId)}/task/${sanitizeSegment(taskId)}/${folder}/${base}-${clock}-${id("upl")}${ext === "" ? "" : `.${ext}`}`;
+  };
+  // Upstream's assertTaskImageKeyMatchesContext: the key must sit under the
+  // prefix issued for this task and surface, with a plain file name after it.
+  const imageKeyMatches = (key: string, workspaceId: string, projectId: string, taskId: string, surface: string) => {
+    const folder = surface === "comment" ? "comments" : "descriptions";
+    const prefix = `workspace/${sanitizeSegment(workspaceId)}/project/${sanitizeSegment(projectId)}/task/${sanitizeSegment(taskId)}/${folder}/`;
+    if (!key.startsWith(prefix)) return false;
+    const suffix = key.slice(prefix.length);
+    return /^[A-Za-z0-9._-]+$/.test(suffix) && !suffix.startsWith(".");
+  };
+
   const route = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     // The presigned PUT a background upload is given lands outside /api and
@@ -1231,6 +1285,25 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       return new Response(null, { status: 200 });
     }
     const path = url.pathname.replace(/^\/api/, "");
+
+    // Storage answers the presigned uploads and the asset reads, and neither
+    // is the API: the upload takes the file's bytes with no key, the asset
+    // read answers them back. Both sit outside /api, where every API route
+    // lives, so they are handled before the body is read as JSON.
+    if (req.method === "PUT" && url.pathname.startsWith("/uploads/")) {
+      const bytes = new Uint8Array(await req.arrayBuffer());
+      requests.push({ method: req.method, path: url.pathname, query: url.search, body: { bytes: bytes.byteLength } });
+      objects.set(decodeURIComponent(url.pathname.slice("/uploads/".length)), { bytes, contentType: req.headers.get("content-type") ?? "" });
+      return new Response(null, { status: 200 });
+    }
+    const assetMatch = url.pathname.match(/^\/asset\/([^/]+)$/);
+    if (req.method === "GET" && assetMatch !== null) {
+      requests.push({ method: req.method, path: url.pathname, query: url.search, body: undefined });
+      const a = imageAssets.find((x) => x.id === decodeURIComponent(assetMatch[1]!));
+      if (a === undefined) return failText(404, "Asset not found");
+      return new Response(a.bytes, { headers: { "content-type": a.contentType } });
+    }
+
     const body = req.method === "GET" || req.method === "DELETE" ? undefined : await req.json().catch(() => null);
     requests.push({ method: req.method, path, query: url.search, body });
 
@@ -1277,6 +1350,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["PUT", /^\/task\/due-date\/[^/]+$/, M.UpdateTaskDueDateBody],
       ["PATCH", /^\/task\/bulk$/, M.BulkUpdateTasksBody],
       ["POST", /^\/task\/import\/[^/]+$/, M.ImportTasksBody],
+      ["POST", /^\/task\/duplicate\/[^/]+$/, M.DuplicateTaskBody],
+      ["PUT", /^\/task\/image-upload\/[^/]+$/, M.CreateTaskImageUploadBody],
+      ["POST", /^\/task\/image-upload\/[^/]+\/finalize$/, M.FinalizeTaskImageUploadBody],
+      ["POST", /^\/external-link\/task\/[^/]+$/, M.CreateExternalLinkBody],
       ["POST", /^\/task-relation$/, M.CreateTaskRelationBody],
       ["POST", /^\/comment\/[^/]+$/, M.CreateTaskCommentBody],
       ["POST", /^\/notification$/, M.CreateNotificationBody],
@@ -1750,6 +1827,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (typeof at !== "string") return at;
         t.dueDate = at;
       } else t.dueDate = null;
+      touch(t);
       return ok(M.Task, t);
     }
     // The caller's open tasks across a workspace's active projects; the
@@ -1797,17 +1875,26 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
             if (!columnsOf(projectId).some((c) => c.slug === value) && !VIRTUAL_STATUSES.includes(value)) {
               return fail(400, `Invalid status "${value}"`);
             }
-            for (const t of found) if (t.projectId === projectId) t.status = value;
+            for (const t of found) if (t.projectId === projectId) {
+              t.status = value;
+              touch(t);
+            }
           }
           break;
         case "updatePriority":
           if (!value) return fail(400, "Priority value is required");
-          for (const t of found) t.priority = value;
+          for (const t of found) {
+            t.priority = value;
+            touch(t);
+          }
           break;
         case "updateAssignee": {
           const assignee = value?.trim() || null;
           if (assignee && !users.has(assignee)) return fail(403, "Assignee is not a member of this workspace");
-          for (const t of found) t.userId = assignee;
+          for (const t of found) {
+            t.userId = assignee;
+            touch(t);
+          }
           break;
         }
         case "delete":
@@ -1819,7 +1906,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         case "updateDueDate": {
           const at = value ? parsedDate(value, "date value") : null;
           if (at !== null && typeof at !== "string") return at;
-          for (const t of found) t.dueDate = at;
+          for (const t of found) {
+            t.dueDate = at;
+            touch(t);
+          }
           break;
         }
         // The fake keeps no labels, so every label id is one the server would not
@@ -1948,9 +2038,155 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (dest.id === from) return fail(400, "Task is already in that project");
         dest.lastTaskNumber += 1;
         Object.assign(t, { projectId: dest.id, number: dest.lastTaskNumber, status: b.destinationStatus ?? firstColumn });
+        touch(t);
         return ok(M.MoveTaskResult, { task: t, sourceProjectId: from, destinationProjectId: dest.id });
       }
+      touch(t);
       return ok(M.Task, t);
+    }
+    // 2.32.0's deferred-description search: only the descriptions too big for
+    // the listing are searched, case-insensitively, a hundred ids a page
+    // behind an id cursor. Registered ahead of `/{id}/description`, which
+    // would otherwise claim `/task/description-matches/description`.
+    if (req.method === "GET" && (p = m(/^\/task\/description-matches\/([^/]+)$/))) {
+      const projectId = decodeURIComponent(p![1]);
+      // The workspace middleware finds no project first, as on the listing.
+      if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+      const query = url.searchParams.get("query");
+      const after = url.searchParams.get("after");
+      const needle = query === null ? "" : query.trim();
+      if (needle === "" || needle.length > 256 || (after !== null && (after === "" || after.length > 128))) {
+        return fail(400, "Invalid search query or cursor");
+      }
+      const found = tasks
+        .filter(
+          (t) =>
+            t.projectId === projectId &&
+            deferredDescription(t) &&
+            (t.description ?? "").toLowerCase().includes(needle.toLowerCase()) &&
+            (after === null || t.id > after),
+        )
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      const ids = found.slice(0, 100).map((t) => t.id);
+      return ok(M.TaskDescriptionMatches, { ids, nextCursor: found.length > 100 ? (ids.at(-1) ?? null) : null });
+    }
+    // 2.32.0's description page: a slice of the text at a character offset,
+    // with the task row's version stamp. A stamp that is not the row's current
+    // one — or a task that is not there — answers 409 under a version and 404
+    // without, the way upstream's xmin check does. The chunk is 32 Ki
+    // characters, counted as Unicode code points the way PostgreSQL counts
+    // characters.
+    if (req.method === "GET" && (p = m(/^\/task\/([^/]+)\/description$/))) {
+      const offsetParam = url.searchParams.get("offset");
+      const versionParam = url.searchParams.get("version");
+      const offset = offsetParam === null ? 0 : /^\d+$/.test(offsetParam) ? Number(offsetParam) : -1;
+      if (offset < 0 || offset > 2_000_000_000 || (versionParam !== null && !/^[0-9]{1,10}$/.test(versionParam))) {
+        return fail(400, "Invalid offset or version");
+      }
+      const t = tasks.find((x) => x.id === decodeURIComponent(p![1]));
+      const unavailable = "Description changed or is unavailable; refresh before loading it again";
+      if (t === undefined) return versionParam === null ? failText(404, unavailable) : failText(409, unavailable);
+      if (versionParam !== null && versionParam !== versionOf(t)) return failText(409, unavailable);
+      const rest = Array.from(t.description ?? "").slice(offset);
+      return ok(M.TaskDescriptionPage, {
+        content: rest.slice(0, 32768).join(""),
+        version: versionOf(t),
+        nextOffset: rest.length > 32768 ? offset + 32768 : null,
+      });
+    }
+    // 2.32.0's duplicate: the copy keeps the source's column, priority,
+    // assignee, dates, labels, parent links and description — the description
+    // assets included, which get rows and objects of their own — while
+    // comments, time entries and child tasks stay behind.
+    if (req.method === "POST" && (p = m(/^\/task\/duplicate\/([^/]+)$/))) {
+      const source = tasks.find((x) => x.id === decodeURIComponent(p![1]));
+      if (source === undefined) return failText(404, "Task not found");
+      const project = projects.find((x) => x.id === source.projectId)!;
+      const b = body as z.input<typeof M.DuplicateTaskBody>;
+      project.lastTaskNumber += 1;
+      const copy = {
+        id: id("task"),
+        projectId: source.projectId,
+        position: tasks.filter((x) => x.projectId === source.projectId).length,
+        number: project.lastTaskNumber,
+        userId: source.userId,
+        // A blank title keeps the source's, as upstream's `title?.trim() ||`.
+        title: b.title?.trim() || source.title,
+        description: source.description,
+        status: source.status,
+        priority: source.priority,
+        startDate: source.startDate,
+        dueDate: source.dueDate,
+        createdAt: now(),
+      };
+      tasks.push(copy);
+      // Every label row the fake holds was added with its workspace's id.
+      for (const l of labels.filter((l) => l.taskId === source.id)) addLabel(l.name, l.color, l.workspaceId!, copy.id);
+      // A duplicated subtask stays a subtask of the same parents; the parents
+      // themselves are not checked for workspace here, as the fake checks no
+      // relation's reach.
+      for (const r of relations.filter((r) => r.targetTaskId === source.id && r.relationType === "subtask")) {
+        relations.push({ id: id("rel"), sourceTaskId: r.sourceTaskId, targetTaskId: copy.id, relationType: r.relationType, createdAt: now() });
+      }
+      // Assets the description references are copied like upstream's
+      // duplicateDescriptionAssets: new rows and objects, the text rewritten
+      // to name them.
+      let description = copy.description;
+      if (description !== null) {
+        for (const a of imageAssets.filter((a) => a.taskId === source.id)) {
+          const ref = new RegExp(`/asset/${a.id}(?![A-Za-z0-9])`, "g");
+          if (!ref.test(description)) continue;
+          const assetId = id("asset");
+          const key = taskObjectKey(project.workspaceId, copy.projectId, copy.id, a.surface === "comment" ? "comment" : "description", a.filename);
+          objects.set(key, objects.get(a.key) ?? { bytes: a.bytes, contentType: a.contentType });
+          imageAssets.push({ ...a, id: assetId, taskId: copy.id, key, createdAt: copy.createdAt });
+          description = description.replace(ref, () => `/asset/${assetId}`);
+        }
+        copy.description = description;
+      }
+      return ok(M.Task, copy);
+    }
+    // 2.32.0's task image upload: the stage route issues a presigned PUT whose
+    // bytes land on the /uploads/ storage route above, and finalize records
+    // the stored object as the task's asset. The key embeds the workspace,
+    // project, task and surface it was issued for, and a key issued for
+    // anything else is refused.
+    if (req.method === "PUT" && (p = m(/^\/task\/image-upload\/([^/]+)$/))) {
+      const b = body as z.input<typeof M.CreateTaskImageUploadBody>;
+      const invalid = uploadInvalid(b.contentType, b.size);
+      if (invalid !== null) return failText(400, invalid);
+      const t = tasks.find((x) => x.id === decodeURIComponent(p![1]));
+      if (t === undefined) return failText(404, "Task not found");
+      const project = projects.find((x) => x.id === t.projectId)!;
+      const key = taskObjectKey(project.workspaceId, t.projectId, t.id, b.surface, b.filename);
+      return ok(M.TaskImageUpload, { key, uploadUrl: `${url.origin}/uploads/${key}`, headers: { "Content-Type": b.contentType } });
+    }
+    if (req.method === "POST" && (p = m(/^\/task\/image-upload\/([^/]+)\/finalize$/))) {
+      const b = body as z.input<typeof M.FinalizeTaskImageUploadBody>;
+      const invalid = uploadInvalid(b.contentType, b.size);
+      if (invalid !== null) return failText(400, invalid);
+      const t = tasks.find((x) => x.id === decodeURIComponent(p![1]));
+      if (t === undefined) return failText(404, "Task not found");
+      const project = projects.find((x) => x.id === t.projectId)!;
+      const key = b.key.trim();
+      if (!imageKeyMatches(key, project.workspaceId, t.projectId, t.id, b.surface)) {
+        return failText(400, "Image upload key does not match the task context.");
+      }
+      const stored = objects.get(key);
+      if (stored === undefined) return failText(400, "Uploaded object was not found.");
+      if (stored.bytes.byteLength !== b.size || stored.contentType.toLowerCase() !== b.contentType.toLowerCase()) {
+        return failText(400, "Uploaded object does not match the declared size and content type.");
+      }
+      // One asset row per object key: finalizing the same upload again updates
+      // it rather than adding a second, as upstream's upsert does.
+      const found = imageAssets.find((a) => a.key === key);
+      if (found !== undefined) {
+        Object.assign(found, { taskId: t.id, projectId: t.projectId, filename: b.filename, contentType: stored.contentType, size: stored.bytes.byteLength, surface: b.surface });
+      } else {
+        imageAssets.push({ id: id("asset"), taskId: t.id, projectId: t.projectId, key, filename: b.filename, contentType: stored.contentType, size: stored.bytes.byteLength, surface: b.surface, bytes: stored.bytes, createdAt: now() });
+      }
+      const asset = found ?? imageAssets[imageAssets.length - 1]!;
+      return ok(M.TaskImageAsset, { id: asset.id, url: `${url.origin}/asset/${asset.id}` });
     }
     if ((p = m(/^\/task\/([^/]+)$/))) {
       const i = tasks.findIndex((x) => x.id === decodeURIComponent(p![1]));
@@ -1996,6 +2232,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           userId: assignee,
           ...(b.description === undefined ? {} : { description: b.description }),
         });
+        touch(t);
         return ok(M.Task, t);
       }
       if (req.method === "DELETE") {
@@ -2140,6 +2377,31 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const taskId = decodeURIComponent(p[1]);
       if (!tasks.some((t) => t.id === taskId)) return fail(400, "Workspace ID could not be determined");
       return ok(z.array(M.ExternalLink), links.filter((l) => l.taskId === taskId));
+    }
+    // 2.32.0's manual link routes: a hand-added link is a "url" resource whose
+    // external id is the URL itself, and only manual links can be removed.
+    if (req.method === "POST" && (p = m(/^\/external-link\/task\/([^/]+)$/))) {
+      const taskId = decodeURIComponent(p[1]);
+      if (!tasks.some((t) => t.id === taskId)) return fail(400, "Workspace ID could not be determined");
+      const b = body as z.input<typeof M.CreateExternalLinkBody>;
+      // The document cannot say it, but the server's schema refines the URL
+      // to http or https.
+      if (!/^https?:\/\//i.test(b.url)) return failText(400, "URL must use http or https");
+      const at = now();
+      const link = { id: id("link"), taskId, integrationId: null, resourceType: "url", externalId: b.url, url: b.url, title: b.title ?? null, metadata: null, createdAt: at, updatedAt: at, integration: null };
+      links.push(link);
+      const { integration: _integration, ...created } = link;
+      return ok(M.CreatedExternalLink, created);
+    }
+    if (req.method === "DELETE" && (p = m(/^\/external-link\/task\/([^/]+)\/([^/]+)$/))) {
+      const taskId = decodeURIComponent(p[1]);
+      const linkId = decodeURIComponent(p[2]);
+      if (!tasks.some((t) => t.id === taskId)) return fail(400, "Workspace ID could not be determined");
+      // Only a manual link goes: an integration's own rows are not the
+      // endpoint's to remove.
+      const i = links.findIndex((l) => l.id === linkId && l.taskId === taskId && l.integrationId === null && (l.resourceType === "url" || l.resourceType === "pull_request"));
+      if (i < 0) return failText(404, "Manual resource link not found");
+      return ok(M.DeletedExternalLink, { id: links.splice(i, 1)[0]!.id });
     }
 
     if (req.method === "POST" && path === "/task-relation") {
@@ -3153,6 +3415,21 @@ const slugOf = (name: string): string => {
 
 // Statuses the server takes without a column, so no column may take their slug.
 const VIRTUAL_STATUSES = ["planned", "archived"];
+
+// The name cleanup upstream's storage layer applies to a path segment, so an
+// uploaded file's name cannot walk out of its object-key folder.
+const sanitizeSegment = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "") || "file";
+
+const fileExtension = (filename: string): string => {
+  const normalized = filename.trim();
+  const extension = normalized.includes(".") ? normalized.split(".").pop() || "" : "";
+  return sanitizeSegment(extension).slice(0, 12);
+};
 
 // What a server older than the document leaves out, applied to any response.
 const LEGACY_DROPPED = new Set(["backgroundVersion", "pagination", "labels", "externalLinks", "subtaskCounts", "assigneeImage", "lastTaskNumber"]);

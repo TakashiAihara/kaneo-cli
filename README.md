@@ -194,13 +194,15 @@ kaneo integration slack get                    # also discord and telegram: the 
 kaneo integration slack set --webhook-url - [--channel-name NAME] < webhook-url.txt
 kaneo integration telegram set --bot-token - --chat-id <chat-id> [--thread-id N] [--chat-label NAME] < token.txt
 kaneo integration slack rm --yes
-kaneo task ls [--status ...] [--priority ...] [--all]
+kaneo task ls [--status ...] [--priority ...] [--description TEXT] [--all]
 kaneo task ls --mine       # open tasks assigned to you across the workspace, at most 100
 kaneo task get <task-id>                 # also lists the task's relations and the sessions holding it
+kaneo task describe <task>               # the description in full, however long
 kaneo task create <title> [-d TEXT | --description-file PATH] [flags]
 kaneo task create --title <title> [flags]                      # the same, as task update takes the title; not both
 kaneo task create <title> --attach [--next <step>] [--force]   # attaches this session to the new task; --force creates beside one naming the same reference
 kaneo task update <task> [--title TEXT] [-d TEXT | --description-file PATH] [--status COL] [--priority P] [--assignee USER] [--start-date DATE] [--position N]   # only what is passed changes; --start-date "" clears
+kaneo task duplicate <task> [--title T] [--to PROJECT]         # a copy of the task; --to moves the copy to another project
 kaneo task status <task-id> <status>
 kaneo notification ls [--unread]                             # the newest 50, as the server returns
 kaneo notification read <notification-id>... | --all
@@ -218,7 +220,7 @@ kaneo integration webhook get
 kaneo integration webhook set [flags]   # the same shape; --help lists its event toggles and --reminder-lead
 kaneo integration webhook rm --yes
 kaneo task links <task>
-kaneo task external-links <task>   # links to what is outside the board, from an integration or added by hand
+kaneo task external-links <task> [--add URL] [--title T] [--rm ID]   # links to what is outside the board, from an integration or added by hand
 kaneo task field <task> [<name> <value...>]   # the values the task holds, or set one; the words make the value
 kaneo task link <task> <other> --type <type>    # subtask, blocks or related; the type says which way round
 kaneo task unlink <relation-id>
@@ -250,6 +252,7 @@ kaneo task due <task> [date]       # no date clears it
 kaneo task bulk <task>... --status done   # one change for many tasks; --help lists the change flags
 kaneo task export > tasks.json     # the project's tasks as JSON, labels by name
 kaneo task import tasks.json       # creates them in the resolved project; - reads stdin; exits non-zero if any task failed
+kaneo task upload <task> <file> [--surface description|comment]   # stores an image; prints the asset URL a description or comment embeds
 kaneo integration github app-info                    # the GitHub App this instance is configured with
 kaneo integration github repos [--installation-page N] [--repository-page N]
 kaneo integration github verify <owner> <repo>       # the App's installation and permissions on a repository, as data
@@ -298,7 +301,13 @@ A request the API key's rate limiter refuses (429 `RATE_LIMITED`, which the serv
 
 A workflow rule moves a task with nobody at the board: `kaneo workflow set github pr_opened in-review` says that a task whose pull request was opened lands in that column. The integration and the event are Kaneo's own names, the ones its plugins fire, and not the provider's webhook names: an integration of `github`, `gitea` or `gitlab`, and an event of `branch_push`, `pr_opened`, `pr_merged`, `issue_opened`, `issue_closed` or `issue_reopened`. Anything else is stored as written and warned about on stderr, since no plugin fires it. The server's upsert looks for a rule the project already has for the pair and moves its column, so setting a pair again moves the rule already there rather than adding a second one — though nothing on the server keeps it to one, and `workflow rm` refuses a pair it finds twice rather than delete one of the two. `kaneo workflow rm` deletes a rule by its id, wherever it is, or by the integration and event it names in the resolved project.
 
-`kaneo task external-links <task>` lists what a task points at outside the board: the links an integration brought in — an issue, a pull request — and the ones somebody added by hand. A link that came through an integration is marked with the integration it came through, since the same URL can be either.
+`kaneo task external-links <task>` lists what a task points at outside the board: the links an integration brought in — an issue, a pull request — and the ones somebody added by hand. A link that came through an integration is marked with the integration it came through, since the same URL can be either. `--add` puts a link on by hand, `--title` names it (only with `--add`), and `--rm` takes one off by the id the `--json` listing prints; the two cannot be passed together, the URL must be http or https, and the server removes only links added by hand — one an integration brought in answers 404.
+
+`task describe` prints a task's description in full. The listing carries a description only up to 64 KiB and marks a longer one deferred, so `task get` reads those through the task detail; `task describe` reads any description through the route that pages large ones, which is the way to see a deferred one without the rest of the task. `task ls --description TEXT` filters on description text case-insensitively, asking the server about the deferred ones and matching the rest locally; the query is at most 256 characters and cannot be combined with `--mine`.
+
+`task duplicate` copies a task inside its project: the copy keeps the source's column, priority, assignee, dates, labels and description, but not its comments, time entries or subtasks. `--title` gives the copy a different title and `--to` moves it to another project afterwards — the destination is resolved before the copy is made, and a move that fails leaves the copy where it was, which the error says.
+
+`task upload` stores an image a task's description or a comment can embed: the file is staged, PUT to the storage the server presigns and finalized, and the answer is the asset's URL. `--surface` says where the image will be used (`description` by default, `comment` for one a comment embeds) and chooses the folder its object key is issued under. The image is stored and nothing is written into the task; embedding the URL is the caller's step.
 
 A custom field is a definition a project carries — a text, number, date, dropdown, boolean or multiselect — that its tasks can hold a value for. `kaneo field ls` lists the resolved project's fields in order and `kaneo field add` makes one; a choice field takes `--options`, a required one takes `--default`, and the server checks the rest of the combination. Fields are named by id or name wherever one is taken, and a name two fields share is refused rather than guessed. `kaneo field values` lists every value the project's tasks hold, or with a field the distinct values it actually takes — what a filter on it can offer. `kaneo task field <task>` reads what one task holds and `kaneo task field <task> <name> <value>` sets it, in the task's own project; the words after the name make the value, so a text value with spaces needs no quoting, and a multiselect value is a JSON array of the field's options, as the web app writes it. `kaneo field reorder` and `kaneo field rm` manage the definitions; a delete takes the values tasks hold for the field with it, which is why it asks for `--yes`.
 

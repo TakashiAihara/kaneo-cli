@@ -65,6 +65,64 @@ export const sanitizeControl = (text: string): string => {
 export const sanitizeDocument = (text: string): string =>
   text.split("\r\n").map((line) => sanitizeControl(line)).join("\r\n");
 
+// Code-point ranges a terminal draws two cells wide: the East Asian Wide and
+// Fullwidth blocks a CJK name or slug is made of, and the emoji blocks. The
+// ranges skip the narrow punctuation some blocks also hold; a cell counted
+// wrong there only shifts a column by one, where a full-width character counted
+// as one shifts it by its whole width.
+const WIDE_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x1100, 0x115f], // Hangul Jamo
+  [0x2e80, 0x303e], // CJK Radicals Supplement .. CJK Symbols and Punctuation
+  [0x3041, 0x33ff], // Hiragana .. CJK Compatibility
+  [0x3400, 0x4dbf], // CJK Unified Ideographs Extension A
+  [0x4e00, 0x9fff], // CJK Unified Ideographs
+  [0xa000, 0xa4cf], // Yi
+  [0xac00, 0xd7a3], // Hangul Syllables
+  [0xf900, 0xfaff], // CJK Compatibility Ideographs
+  [0xfe30, 0xfe6f], // CJK Compatibility Forms .. Small Form Variants
+  [0xff00, 0xff60], // Fullwidth Forms
+  [0xffe0, 0xffe6], // Fullwidth signs
+  [0x1f300, 0x1f64f], // Miscellaneous Symbols and Pictographs .. Emoticons
+  [0x1f680, 0x1f6ff], // Transport and Map Symbols
+  [0x1f900, 0x1f9ff], // Supplemental Symbols and Pictographs
+  [0x20000, 0x2fffd], // CJK Unified Ideographs Extension B ..
+  [0x30000, 0x3fffd], // CJK Unified Ideographs Extension G ..
+];
+
+// Code points that take no cell: combining marks, variation selectors and the
+// joiners and bidi controls that only shape their neighbours.
+const ZERO_WIDTH = /\p{M}|\p{Cf}/u;
+
+// The cells a string takes on a terminal. JavaScript's length counts UTF-16
+// units, which lines a full-width slug up short of the names beside it; a
+// column padded by it needs the display width instead.
+export const displayWidth = (text: string): number => {
+  let width = 0;
+  for (const char of text) {
+    const code = char.codePointAt(0)!;
+    if (ZERO_WIDTH.test(char)) continue;
+    width += WIDE_RANGES.some(([from, to]) => code >= from && code <= to) ? 2 : 1;
+  }
+  return width;
+};
+
+// padEnd by display cells rather than UTF-16 units, so a full-width slug gets
+// the padding its neighbours do.
+export const padCells = (text: string, width: number): string =>
+  `${text}${" ".repeat(Math.max(0, width - displayWidth(text)))}`;
+
+// An error that carries fields for the JSON error document beside the message:
+// a write that half happened leaves something the caller has to be able to
+// name, and prose alone does not hand it back.
+export class ReportedError extends Error {
+  constructor(
+    message: string,
+    readonly fields: Record<string, Json>,
+  ) {
+    super(message);
+  }
+}
+
 export class Writer {
   // The filter, where `--jq` asked for one. It is not part of the mode: the
   // mode decides what a command is allowed to write, and the filter decides
@@ -131,8 +189,8 @@ export class Writer {
   // `--jq .number` reads stdout as the number, so an error object there would
   // be a value nobody asked for where the answer should have been, and filtering
   // it would be no better.
-  error(message: string): void {
+  error(message: string, fields: Record<string, Json> = {}): void {
     writeSync(2, `Error: ${sanitizeControl(message)}\n`);
-    if (this.mode.json && this.filter === undefined && !this.wroteData) writeSync(1, line({ error: message }));
+    if (this.mode.json && this.filter === undefined && !this.wroteData) writeSync(1, line({ error: message, ...fields }));
   }
 }

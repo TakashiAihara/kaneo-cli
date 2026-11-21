@@ -724,7 +724,7 @@ export type ProjectChanges = {
 export const updateProject = async (
   projectId: string,
   changes: ProjectChanges,
-): Promise<{ before: Project; after: Project; unread: string[] }> => {
+): Promise<{ before: Project; after: Project; unread: string[]; nulled: string[] }> => {
   const want: ProjectChanges = { ...changes };
   // The server accepts any string, but a blank name, slug or icon leaves a
   // project that cannot be read or linked to, so those are refused here.
@@ -806,9 +806,12 @@ export const updateProject = async (
     throw new Error(`/project/${projectId}: server did not echo the update: ${off.join("; ")}`);
   }
   // A field the read lacked and the caller supplied is "" in before, which would
-  // read as a project that had an empty value there.
+  // read as a project that had an empty value there. Of the unread ones, a
+  // field the reply sent as null was read — as no value — rather than left
+  // out, and the two are said apart.
   const unread = (["slug", "description", "icon"] as const).filter((field) => !present[field]);
-  return { before, after, unread };
+  const nulled = unread.filter((field) => raw[field] === null);
+  return { before, after, unread, nulled };
 };
 
 // Go's %q, which quotes whatever it is given rather than only its strings.
@@ -946,13 +949,26 @@ export const reorderColumns = async (projectId: string, columnIds: string[]): Pr
     }),
   ).map(column);
 
-// Renames a column.
+// The fields to change. A field left out is left as it is; icon and color take
+// null, which is how one is cleared — the route's own rule.
+export type ColumnChanges = {
+  name?: string;
+  icon?: string | null;
+  color?: string | null;
+  isFinal?: boolean;
+};
+
+// Changes the fields named in changes, and answers the column as written.
 //
-// Only the name is sent. The slug is derived from the name when the column is
-// created and the update route takes no slug at all, so the slug — which is what
-// every task in the column stores as its status — stays as it was.
-export const renameColumn = async (columnId: string, name: string): Promise<Column> =>
-  column(zeroRecord(await putColumn(pathParam(columnId), { name })));
+// Only the name, icon, color and done state can move this way: the slug is
+// derived from the name when the column is created and the route takes no
+// slug, so it — which is what every task in the column stores as its status —
+// stays as it was.
+export const updateColumn = async (columnId: string, changes: ColumnChanges): Promise<Column> =>
+  column(zeroRecord(await putColumn(pathParam(columnId), { ...changes })));
+
+// Renames a column.
+export const renameColumn = async (columnId: string, name: string): Promise<Column> => updateColumn(columnId, { name });
 
 // Deletes a column, which the server allows only while the column holds no tasks.
 export const deleteColumn = async (columnId: string): Promise<Column> =>

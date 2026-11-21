@@ -9,7 +9,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: refusing to delete project Twin (proj-noslug) without --yes; `kaneo project archive proj-noslug` keeps it\n"
+      "stderr": "Error: refusing to delete project Twin (proj-noslug) in workspace \"Main\" without --yes; `kaneo project archive proj-noslug` keeps it\n"
     },
     {
       "args": [
@@ -27,6 +27,11 @@
     {
       "method": "GET",
       "path": "/project/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
       "query": ""
     },
     {

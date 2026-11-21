@@ -9,9 +9,22 @@
         "AL2",
         "--human"
       ],
-      "exit": 0,
-      "stdout": "updated proj-alpha\n  slug  (not read) -> \"AL2\"\n  task identifiers may now start with AL2; the slug was not read, so whether it changed is unknown\n",
-      "stderr": ""
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: /project/proj-alpha: server did not echo the update: slug \"\", want \"AL2\"\n"
+    },
+    {
+      "args": [
+        "project",
+        "update",
+        "proj-alpha",
+        "--name",
+        "Alpha 2",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: reading project proj-alpha before the update got id \"proj-alpha\", name \"Alpha\", without slug; not writing (pass --slug TEXT to write it yourself)\n"
     }
   ],
   "requests": [
@@ -31,6 +44,11 @@
         "description": "",
         "isPublic": false
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     }
   ],
   "files": {}

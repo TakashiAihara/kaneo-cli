@@ -10,7 +10,7 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"created project proj0002 but could not set its description: GET /api/project/proj0002: error decoding response: status=200, content-type=application/json, content-length=3, target-type=GetProjectResponse: unexpected end of JSON input; set it with `kaneo project update proj0002 -d TEXT`\"\n}\n",
+      "stdout": "{\n  \"error\": \"created project proj0002 but could not set its description: GET /api/project/proj0002: error decoding response: status=200, content-type=application/json, content-length=3, target-type=GetProjectResponse: unexpected end of JSON input; set it with `kaneo project update proj0002 -d TEXT`\",\n  \"projectId\": \"proj0002\"\n}\n",
       "stderr": "Error: created project proj0002 but could not set its description: GET /api/project/proj0002: error decoding response: status=200, content-type=application/json, content-length=3, target-type=GetProjectResponse: unexpected end of JSON input; set it with `kaneo project update proj0002 -d TEXT`\n"
     }
   ],

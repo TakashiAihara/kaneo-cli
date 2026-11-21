@@ -173,6 +173,7 @@ kaneo project background rm <project> --yes     # alias: delete
 kaneo column ls                    # the resolved project's columns, in board order
 kaneo column create <name...> [--final] [--icon ICON] [--color COLOR]
 kaneo column rename <column> <new name...>   # the slug, and so every status in it, stays
+kaneo column update <column> [--name NAME] [--icon ICON] [--color COLOR] [--final]   # only what is passed changes; an empty --icon or --color clears it
 kaneo column reorder <column>...   # the new order: every column exactly once, by id, slug or name
 kaneo column rm <column> --yes
 kaneo field ls                     # the resolved project's custom fields, in order

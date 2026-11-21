@@ -416,6 +416,7 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["CreateColumn", "POST", "/api/column/a%2Fb", () => api.createColumn(id, { name: "n", icon: "", color: "", isFinal: false })],
     ["ReorderColumns", "PUT", "/api/column/reorder/a%2Fb", () => api.reorderColumns(id, [id])],
     ["RenameColumn", "PUT", "/api/column/a%2Fb", () => api.renameColumn(id, "n")],
+    ["UpdateColumn", "PUT", "/api/column/a%2Fb", () => api.updateColumn(id, { name: "n", icon: null, isFinal: true })],
     ["DeleteColumn", "DELETE", "/api/column/a%2Fb", () => api.deleteColumn(id)],
     ["DeleteProject", "DELETE", "/api/project/a%2Fb", () => api.deleteProject(id)],
     ["ReorderProjects", "PUT", "/api/project/reorder", () => api.reorderProjects(id, [id])],
@@ -1029,7 +1030,10 @@ describe("TestReadsMapEveryField", () => {
     ]);
   });
 
-  test("workflow rule without a column found", async () => {
+  // The column cascade means a stored rule always has its column, so a reply
+  // whose joined column fields are null is the decoder's case, not a rule the
+  // server could have written.
+  test("workflow rule row decodes absent joined-column fields as null", async () => {
     recorder(`[${ruleRow(",\"columnName\":null,\"columnSlug\":null")}]`);
     const got = await api.listWorkflowRules("p1");
     expect([got[0]!.columnName, got[0]!.columnSlug, got[0]!.columnId]).toEqual([null, null, "c1"]);
@@ -1669,6 +1673,22 @@ test("TestUpdateProjectReportsAFieldItDidNotRead", async () => {
 test("TestUpdateProjectReadsNothingUnreadWhenTheReadHasTheFieldAndItIsPassed", async () => {
   recorder(`{"id":"p1","name":"Board","slug":"y","icon":"Star","description":"e","isPublic":true}`);
   expect((await api.updateProject("p1", { slug: "y", icon: "Star", description: "e" })).unread).toEqual([]);
+});
+
+// Of the fields the read could not use, one sent as null was read — as no
+// value — and one left out was not read at all; the report keeps them apart.
+test("TestUpdateProjectReportsWhichUnreadFieldsCameBackNull", async () => {
+  newServer((req) =>
+    new Response(
+      req.method === "GET"
+        ? `{"id":"p1","name":"Board","icon":null,"description":"d","isPublic":true}`
+        : `{"id":"p1","name":"Board","slug":"x","icon":"Star","description":"d","isPublic":true}`,
+      { headers: { "content-type": "application/json" } },
+    ),
+  );
+  const done = await api.updateProject("p1", { slug: "x", icon: "Star" });
+  expect(done.unread).toEqual(["slug", "icon"]);
+  expect(done.nulled).toEqual(["icon"]);
 });
 
 test.each([

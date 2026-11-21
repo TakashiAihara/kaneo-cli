@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "update",
+        "proj-alpha",
+        "--icon",
+        "Star",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated proj-alpha\n  icon  null -> \"Star\"\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "Alpha",
+        "icon": "Star",
+        "slug": "ALP",
+        "description": "",
+        "isPublic": false
+      }
+    }
+  ],
+  "files": {}
+}

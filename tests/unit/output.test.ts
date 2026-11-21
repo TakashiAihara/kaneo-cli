@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { resolveMode, sanitizeControl, sanitizeDocument, shellWord } from "../../src/output/output";
+import { displayWidth, padCells, resolveMode, sanitizeControl, sanitizeDocument, shellWord } from "../../src/output/output";
 
 // Ported from the Go build's internal/output/output_test.go. The Writer talks
 // to fd 1 and 2 directly, so each Writer test runs it in a child process and
@@ -111,6 +111,33 @@ describe("Writer", () => {
   test("TestErrorOutputStripsControlCharacters", () => {
     const { err } = run(false, `w.error("boom\\x1b[2Jcleared");`);
     expect(err).not.toContain("\x1b");
+  });
+
+  // A write that half happened leaves something the caller has to be able to
+  // name, and the JSON error carries it as a field rather than only in prose.
+  test("TestErrorCarriesFieldsIntoJSON", () => {
+    const { out, err } = run(true, `w.error("created but not described", { projectId: "p1" });`);
+    expect(JSON.parse(out)).toEqual({ error: "created but not described", projectId: "p1" });
+    expect(err).toContain("created but not described");
+  });
+});
+
+// The cells a string takes on a terminal, which is what a column padded for
+// alignment needs: a full-width slug is more cells than it is UTF-16 units.
+describe("displayWidth", () => {
+  test("TestDisplayWidthCountsCellsNotUnits", () => {
+    // Six wide characters and a hyphen: 13 cells, 7 UTF-16 units.
+    expect(displayWidth("外部回答-待ち")).toBe(13);
+    expect(displayWidth("in-progress")).toBe(11);
+    expect(displayWidth("Café")).toBe(4);
+    // A combining mark takes no cell of its own.
+    expect(displayWidth("Café")).toBe(4);
+  });
+
+  test("TestPadCellsPadsByCells", () => {
+    expect(padCells("to-do", 12)).toBe("to-do       ");
+    expect(padCells("外部回答-待ち", 14)).toBe("外部回答-待ち ");
+    expect(padCells("in-progress", 11)).toBe("in-progress");
   });
 });
 

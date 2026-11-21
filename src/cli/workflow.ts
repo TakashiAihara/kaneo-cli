@@ -140,16 +140,24 @@ export const workflowCommand = {
 // nothing is not read as one that works. Not a refusal: the server takes any
 // pair, and a later release may fire a name this build has not heard of, which
 // a refusal would refuse for good.
+// A name one of the known ones in another case gets the case called out: the
+// lists are matched exactly, so `GitHub` is stored as a rule that never fires
+// rather than read as `github`.
+const caseHint = (given: string, known: string[]): string => {
+  const meant = known.find((name) => name.toLowerCase() === given.toLowerCase());
+  return meant === undefined ? "" : ` (did you mean ${meant}? the names are case-sensitive)`;
+};
+
 const warnUnfired = (app: App, integrationType: string, eventType: string): void => {
   if (!INTEGRATIONS.includes(integrationType)) {
     app.out.status(
-      `warning: Kaneo ships no integration for ${integrationType} (known integrations: ${INTEGRATIONS.join(", ")}); the rule is stored but will not move a task`,
+      `warning: Kaneo ships no integration for ${integrationType}${caseHint(integrationType, INTEGRATIONS)} (known integrations: ${INTEGRATIONS.join(", ")}); the rule is stored but will not move a task`,
     );
     return;
   }
   if (!EVENTS.includes(eventType)) {
     app.out.status(
-      `warning: Kaneo fires ${eventType} for no integration it ships (known events: ${EVENTS.join(", ")}); the rule is stored but will not move a task`,
+      `warning: Kaneo fires ${eventType} for no integration it ships${caseHint(eventType, EVENTS)} (known events: ${EVENTS.join(", ")}); the rule is stored but will not move a task`,
     );
   }
 };

@@ -38,7 +38,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "to-do        To Do\nin-progress  In Progress\ndone         Done  (final)\n外部回答-待ち      Waiting on review  (final)\n",
+      "stdout": "to-do          To Do\nin-progress    In Progress\ndone           Done  (final)\n外部回答-待ち  Waiting on review  (final)\n",
       "stderr": ""
     }
   ],

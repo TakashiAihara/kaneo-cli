@@ -1,0 +1,129 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "update",
+        "in-progress",
+        "--name",
+        "Doing",
+        "--icon",
+        "Clock",
+        "--color",
+        "#f00",
+        "--final",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0002\",\n  \"slug\": \"in-progress\",\n  \"name\": \"Doing\",\n  \"position\": 1,\n  \"isFinal\": true,\n  \"icon\": \"Clock\",\n  \"color\": \"#f00\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "update",
+        "Doing",
+        "--icon",
+        "",
+        "--color",
+        "",
+        "--final=false",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated column in-progress Doing\n  icon  \"Clock\" -> null\n  color  \"#f00\" -> null\n  isFinal  true -> false\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "to-do        To Do\nin-progress  Doing\ndone         Done  (final)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "update",
+        "done",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"nothing to change: pass --name, --icon, --color or --final\"\n}\n",
+      "stderr": "Error: nothing to change: pass --name, --icon, --color or --final\n"
+    },
+    {
+      "args": [
+        "column",
+        "update",
+        "in-progress",
+        "--name",
+        " ",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"a column name cannot be blank\"\n}\n",
+      "stderr": "Error: a column name cannot be blank\n"
+    },
+    {
+      "args": [
+        "column",
+        "update",
+        "nope",
+        "--name",
+        "x",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no column \\\"nope\\\" in this project; kaneo column ls lists them\"\n}\n",
+      "stderr": "Error: no column \"nope\" in this project; kaneo column ls lists them\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/column/col0002",
+      "query": "",
+      "body": {
+        "name": "Doing",
+        "icon": "Clock",
+        "color": "#f00",
+        "isFinal": true
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/column/col0002",
+      "query": "",
+      "body": {
+        "icon": null,
+        "color": null,
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

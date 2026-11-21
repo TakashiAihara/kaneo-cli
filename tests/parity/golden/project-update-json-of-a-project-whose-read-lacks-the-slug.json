@@ -9,9 +9,9 @@
         "AL2",
         "--json"
       ],
-      "exit": 0,
-      "stdout": "{\n  \"from\": {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  \"to\": {\n    \"id\": \"proj-alpha\",\n    \"name\": \"Alpha\",\n    \"slug\": \"AL2\",\n    \"icon\": \"Layout\",\n    \"description\": \"\",\n    \"workspaceId\": \"ws-main\",\n    \"isPublic\": false,\n    \"archivedAt\": null\n  },\n  \"unread\": [\n    \"slug\"\n  ]\n}\n",
-      "stderr": ""
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"/project/proj-alpha: server did not echo the update: slug \\\"\\\", want \\\"AL2\\\"\"\n}\n",
+      "stderr": "Error: /project/proj-alpha: server did not echo the update: slug \"\", want \"AL2\"\n"
     }
   ],
   "requests": [

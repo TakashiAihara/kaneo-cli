@@ -1,0 +1,79 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "rm",
+        "ALP",
+        "--yes",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "deleted proj-alpha  Alpha\n",
+      "stderr": "note: proj-alpha is still configured as the project, but it was just deleted; pass --project, set KANEO_PROJECT or update .kaneo.json before the next command\n"
+    },
+    {
+      "args": [
+        "project",
+        "get",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/project/proj-alpha: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-alpha\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/project/proj-alpha: 400: Workspace ID could not be determined: no project has the id, slug or name \"proj-alpha\" (kaneo project find <text> searches names and slugs)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    }
+  ],
+  "files": {}
+}

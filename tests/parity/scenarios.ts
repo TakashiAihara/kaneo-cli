@@ -2550,7 +2550,7 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   // The key may read the integration but not manage the workspace's settings,
-  // so the webhook secret is absent from the reply rather than sent and every
+  // so the webhook secret comes back empty rather than stored, and every
   // manageAccess route refuses the write. import is no manageAccess route — it
   // asks for task permissions a member has — so it still runs.
   {
@@ -2701,10 +2701,11 @@ export const SCENARIOS: Scenario[] = [
   },
   // The import brings in open issues only: issue 3 is closed and never seen,
   // issue 6 is a pull request the issue listing also carries and upstream
-  // drops before importing, issue 4 fails the incoming label rule, issue 5
-  // fails outright, and issue 7 is already linked to task-a1 (external id "7",
-  // integration git0001 — the first gitea row the fake numbers) so it
-  // refreshes instead of duplicating.
+  // drops before importing, issue 4 imports like any other open issue — the
+  // pinned release has no incoming-rule gate — issue 5 fails outright, and
+  // issue 7 is already linked to task-a1 (external id "7", integration
+  // git0001 — the first gitea row the fake numbers) so it refreshes instead
+  // of duplicating.
   {
     name: "integration gitea import",
     seed: {
@@ -2716,7 +2717,6 @@ export const SCENARIOS: Scenario[] = [
           accessToken: "seeded-token",
           repositoryOwner: "acme",
           repositoryName: "app",
-          syncRules: { incoming: { mode: "labels", match: "any", labels: ["bug", "docs"] } },
         },
       ],
       giteaRepoIssues: [
@@ -2728,7 +2728,7 @@ export const SCENARIOS: Scenario[] = [
             { number: 1, title: "Fix login bug", body: "Steps to reproduce", labels: ["bug", "priority:high", "status:in-progress"] },
             { number: 2, title: "Write the docs", labels: ["docs"] },
             { number: 3, title: "Already closed", state: "closed", labels: ["bug"] },
-            { number: 4, title: "Skipped by the rule", labels: ["wontfix"] },
+            { number: 4, title: "A chore with a wontfix label", labels: ["wontfix"] },
             { number: 5, title: "Cannot be fetched", labels: ["bug"], fail: "Gitea API error 502" },
             { number: 6, title: "A pull request, not an issue", labels: ["bug"], pullRequest: true },
             { number: 7, title: "Parser, refreshed", body: "refreshed body", labels: ["status:done", "priority:urgent"] },
@@ -2763,6 +2763,66 @@ export const SCENARIOS: Scenario[] = [
       giteaRepoIssues: [{ baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "Never imported" }] }],
     },
     steps: [["integration", "gitea", "import", "--json"]],
+  },
+  // A link whose task is gone — or belongs to another project — refreshes
+  // nothing: withIntegrationTask finds no task in the importing project and
+  // the issue counts skipped, so the foreign task keeps its title and labels.
+  {
+    name: "integration gitea import skips links to missing or foreign tasks",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [
+            { number: 8, title: "Linked to a deleted task", labels: ["bug"] },
+            { number: 9, title: "Linked to another project's task", labels: ["bug"] },
+          ],
+        },
+      ],
+      externalLinks: [
+        { taskId: "task-gone", url: "https://gitea.example.com/acme/app/issues/8", title: "Old link", resourceType: "issue", externalId: "8", integration: { id: "git0001", type: "gitea" } },
+        { taskId: "task-b1", url: "https://gitea.example.com/acme/app/issues/9", title: "Foreign link", resourceType: "issue", externalId: "9", integration: { id: "git0001", type: "gitea" } },
+      ],
+    },
+    steps: [
+      ["integration", "gitea", "import", "--json"],
+      ["task", "ls", "-p", "proj-beta", "--json"],
+    ],
+  },
+  // The human import prints each failure and the summary, then exits 1 — the
+  // --json steps elsewhere never show that path.
+  {
+    name: "integration gitea import human with errors",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [
+            { number: 1, title: "Imports fine", labels: ["bug"] },
+            { number: 2, title: "Fails to import", fail: "Gitea API error 502" },
+          ],
+        },
+      ],
+    },
+    steps: [["integration", "gitea", "import", "--human"]],
+  },
+  // The integration row's isActive column is nullable; a null reads as
+  // "unknown" rather than active or inactive.
+  {
+    name: "integration gitea get with a null active flag",
+    seed: { giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app", isActive: null }] },
+    steps: [
+      ["integration", "gitea", "get", "--human"],
+      ["integration", "gitea", "get", "--json"],
+    ],
   },
 
   // Reconnecting moves the link, and the issue list moves with the repository:

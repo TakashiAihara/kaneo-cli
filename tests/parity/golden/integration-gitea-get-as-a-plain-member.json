@@ -19,7 +19,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"git0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitea.example.com\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"app\",\n  \"maskedAccessToken\": \"seed••••••oken\",\n  \"webhookUrl\": \"<URL>/api/gitea-integration/webhook/git0001\",\n  \"webhookSecret\": null,\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGiteaIssue\": true,\n  \"isActive\": true,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stdout": "{\n  \"id\": \"git0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitea.example.com\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"app\",\n  \"maskedAccessToken\": \"seed••••••oken\",\n  \"webhookUrl\": \"<URL>/api/gitea-integration/webhook/git0001\",\n  \"webhookSecret\": \"\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGiteaIssue\": true,\n  \"isActive\": true,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
       "stderr": ""
     },
     {

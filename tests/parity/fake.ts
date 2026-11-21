@@ -57,19 +57,18 @@ export type Seed = {
   // project: only fields somebody set a value on have a row.
   customFieldValues?: { taskId: string; field: string; value: string | null }[];
   // A project's link to a Gitea repository, as the integration row keeps it.
-  // accessToken defaults to a fake one; replies carry only its mask. syncRules
-  // keeps only the incoming half the fake reads.
+  // accessToken defaults to a fake one; replies carry only its mask. isActive
+  // may be null, as the nullable column allows.
   giteaIntegrations?: {
     projectId: string;
     baseUrl: string;
     accessToken?: string;
     repositoryOwner: string;
     repositoryName: string;
-    isActive?: boolean;
+    isActive?: boolean | null;
     webhookSecret?: string;
     branchPattern?: string;
     commentTaskLinkOnGiteaIssue?: boolean;
-    syncRules?: { incoming?: { mode: "all" } | { mode: "labels"; match: "any" | "all"; labels: string[] } };
   }[];
   // The issues a repository on the instance holds, keyed by the repo's
   // normalized base URL, owner and name — upstream fetches them live, so a
@@ -77,7 +76,8 @@ export type Seed = {
   // another one sees that repository's list instead. state other than "open"
   // is never listed, pullRequest marks the pull requests the issue listing
   // also carries (upstream drops them before importing), labels feed the
-  // incoming sync rule, and fail makes that one issue an errors entry.
+  // priority, status and task-label sync, and fail makes that one issue an
+  // errors entry.
   giteaRepoIssues?: {
     baseUrl: string;
     repositoryOwner: string;
@@ -887,8 +887,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     hookSecret: string;
     branchPattern: string | null;
     commentOnIssue: boolean;
-    syncRules: { incoming?: { mode: "all" } | { mode: "labels"; match: "any" | "all"; labels: string[] } } | null;
-    isActive: boolean;
+    isActive: boolean | null;
     createdAt: string;
     updatedAt: string;
   };
@@ -919,8 +918,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       hookSecret: entry.webhookSecret ?? `fake-hook-secret-${gseq}`,
       branchPattern: entry.branchPattern ?? null,
       commentOnIssue: entry.commentTaskLinkOnGiteaIssue ?? true,
-      syncRules: entry.syncRules ?? null,
-      isActive: entry.isActive ?? true,
+      isActive: entry.isActive === undefined ? true : entry.isActive,
       createdAt: at,
       updatedAt: at,
     });
@@ -948,8 +946,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   // get-gitea-integration.ts's maskToken: short tokens mask whole, longer ones
   // keep their ends.
   const maskGiteaToken = (token: string) => (token.length <= 8 ? "••••••••" : `${token.slice(0, 4)}••••••${token.slice(-4)}`);
-  // The document answers webhookSecret only to a caller that may manage the
-  // workspace's settings; for anyone else the optional field is absent.
+  // get-gitea-integration.ts always answers webhookSecret: the stored secret
+  // when the caller may manage the workspace's settings, "" for anyone else.
   const giteaIntegrationReply = (row: GiteaRow, origin: string, includeSecrets = true) => ({
     id: row.id,
     projectId: row.projectId,
@@ -958,7 +956,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     repositoryName: row.repositoryName,
     maskedAccessToken: maskGiteaToken(row.token),
     webhookUrl: `${origin}/api/gitea-integration/webhook/${row.id}`,
-    ...(includeSecrets ? { webhookSecret: row.hookSecret } : {}),
+    webhookSecret: includeSecrets ? row.hookSecret : "",
     branchPattern: row.branchPattern ?? "{slug}-{number}",
     commentTaskLinkOnGiteaIssue: row.commentOnIssue,
     isActive: row.isActive,
@@ -980,17 +978,6 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       return failText(400, "Enter a personal access token to verify this Gitea instance.");
     }
     return { baseUrl, token: saved.token };
-  };
-  // plugins/sync/rules.ts's acceptsIssue against the stored incoming rule. No
-  // stored rules means the defaults, which take every issue; rules that would
-  // fail the schema upstream reject everything.
-  const acceptsGiteaIssue = (row: GiteaRow, labels: string[]): boolean => {
-    if (row.syncRules === null) return true;
-    const incoming = row.syncRules.incoming;
-    if (incoming === undefined) return false;
-    if (incoming.mode === "all") return true;
-    const present = new Set(labels);
-    return incoming.match === "all" ? incoming.labels.every((l) => present.has(l)) : incoming.labels.some((l) => present.has(l));
   };
   // import-gitea-issues.ts's importLabelsForTask: the task's labels become
   // exactly the issue's non-system ones — task labels the issue does not name
@@ -2941,7 +2928,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       try {
         normalized = normalizeGiteaUrl(b.baseUrl);
       } catch {
-        return failText(500, "Internal Server Error");
+        // A plain Error reaches the app's onError as a JSON 500, not text.
+        return Response.json({ message: "Internal Server Error" }, { status: 500 });
       }
       // list-gitea-repositories.ts verifies the token first and turns any
       // failure of that check into the same 400.
@@ -2999,12 +2987,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (opts.plainMember) return failText(403, "Insufficient permissions");
         const b = body as any;
         // create-gitea-integration.ts normalizes the URL before the token is
-        // resolved, so a URL it refuses is a plain 500 here.
+        // resolved, so a URL it refuses is the app's plain JSON 500 here.
         let normalized: string;
         try {
           normalized = normalizeGiteaUrl(b.baseUrl);
         } catch {
-          return failText(500, "Internal Server Error");
+          return Response.json({ message: "Internal Server Error" }, { status: 500 });
         }
         const resolved = giteaTokenFor(projectId, normalized, b.accessToken);
         if (resolved instanceof Response) return resolved;
@@ -3035,17 +3023,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
             hookSecret: `fake-hook-secret-${rowId}`,
             branchPattern: null,
             commentOnIssue: true,
-            syncRules: null,
             isActive: true,
             createdAt: at,
             updatedAt: at,
           };
           gitea.push(row);
         } else {
-          // Reconnecting keeps the webhook secret and the sync rules and
-          // resets everything else to the defaults, as getDefaultGiteaConfig
-          // does; the token is the resolved one, which is the stored token
-          // when none was sent.
+          // Reconnecting keeps the webhook secret and resets everything else
+          // to the defaults, as getDefaultGiteaConfig does; the token is the
+          // resolved one, which is the stored token when none was sent.
           existing.baseUrl = normalized;
           existing.token = resolved.token;
           existing.repositoryOwner = b.repositoryOwner;
@@ -3102,12 +3088,6 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // are filtered out upstream before a single one is imported.
         if (issue.state !== "open" || issue.pullRequest) continue;
         const link = links.find((l) => l.integrationId === row.id && l.resourceType === "issue" && l.externalId === String(issue.number));
-        // A linked issue refreshes even when the incoming rule would refuse it;
-        // the rule only gates issues with no task yet.
-        if (link === undefined && !acceptsGiteaIssue(row, issue.labels)) {
-          skipped++;
-          continue;
-        }
         try {
           if (issue.fail !== null) throw new Error(issue.fail);
           // extract-priority.ts: the first priority:/status: label decides, and
@@ -3118,12 +3098,17 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           const status = statusName !== undefined && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(statusName) ? statusName : null;
           if (link !== undefined) {
             const task = tasks.find((t) => t.id === link.taskId);
-            if (task !== undefined && task.projectId === project.id) {
-              task.title = issue.title;
-              task.description = issue.body ?? "";
-              if (priority !== null) task.priority = priority;
-              if (status !== null) task.status = status;
+            // withIntegrationTask finds no task in this project — the linked
+            // task is gone or belongs to another — and the issue counts
+            // skipped: nothing is written, not even the label sync.
+            if (task === undefined || task.projectId !== project.id) {
+              skipped++;
+              continue;
             }
+            task.title = issue.title;
+            task.description = issue.body ?? "";
+            if (priority !== null) task.priority = priority;
+            if (status !== null) task.status = status;
             syncGiteaTaskLabels(issue.labels, link.taskId, project.workspaceId);
             updated++;
             continue;

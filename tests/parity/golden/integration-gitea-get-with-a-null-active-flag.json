@@ -1,0 +1,39 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "acme/app on https://gitea.example.com\n  instance       https://gitea.example.com\n  repository     acme/app\n  token          seed••••••oken\n  webhook        <URL>/api/gitea-integration/webhook/git0001\n  webhook secret fake-hook-secret-1\n  branches       {slug}-{number}\n  state          unknown\n  issue links    on\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"git0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitea.example.com\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"app\",\n  \"maskedAccessToken\": \"seed••••••oken\",\n  \"webhookUrl\": \"<URL>/api/gitea-integration/webhook/git0001\",\n  \"webhookSecret\": \"fake-hook-secret-1\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGiteaIssue\": true,\n  \"isActive\": null,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

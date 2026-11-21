@@ -2775,11 +2775,14 @@ export const SCENARIOS: Scenario[] = [
     },
     steps: [["integration", "gitea", "import", "--json"]],
   },
-  // A link whose task is gone — or belongs to another project — refreshes
-  // nothing: withIntegrationTask finds no task in the importing project and
-  // the issue counts skipped, so the foreign task keeps its title and labels.
+  // A link whose task is gone — or belongs to another project — fails
+  // findExternalLink's scope upstream, so the issue never reaches the
+  // refresh path: it takes the create path, counts imported, and a fresh
+  // task lands in the importing project. The stale link rows stay but
+  // never match again, so the second import refreshes the new tasks, and
+  // the foreign task keeps its title and labels.
   {
-    name: "integration gitea import skips links to missing or foreign tasks",
+    name: "integration gitea import reimports links to missing or foreign tasks",
     seed: {
       giteaRepositories: [{ owner: "acme", name: "app" }],
       giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
@@ -2801,6 +2804,8 @@ export const SCENARIOS: Scenario[] = [
     },
     steps: [
       ["integration", "gitea", "import", "--json"],
+      ["integration", "gitea", "import", "--json"],
+      ["task", "ls", "--json"],
       ["task", "ls", "-p", "proj-beta", "--json"],
     ],
   },
@@ -2903,6 +2908,37 @@ export const SCENARIOS: Scenario[] = [
       ["integration", "gitea", "import", "--json"],
       ["task", "ls", "--json"],
       ["task", "ls", "-p", P2, "--json"],
+    ],
+  },
+
+  // external_link.task_id cascades on task delete upstream, on the single
+  // and bulk routes alike, so removing an imported task takes its link
+  // with it: the next import creates fresh tasks rather than counting the
+  // issues skipped against links whose tasks are gone.
+  {
+    name: "integration gitea import after imported tasks are deleted",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [
+            { number: 1, title: "Gitea issue one", labels: ["bug"] },
+            { number: 2, title: "Gitea issue two", labels: ["docs"] },
+          ],
+        },
+      ],
+    },
+    steps: [
+      ["integration", "gitea", "import", "--json"],
+      ["task", "external-links", "4", "--json"],
+      ["task", "rm", "4", "--yes", "--json"],
+      ["task", "bulk", "5", "--delete", "--yes", "--json"],
+      ["integration", "gitea", "import", "--json"],
+      ["task", "ls", "--json"],
     ],
   },
 

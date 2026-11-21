@@ -616,6 +616,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const dropFieldValues = (taskId: string) => {
     for (let j = fieldValues.length - 1; j >= 0; j--) if (fieldValues[j]!.taskId === taskId) fieldValues.splice(j, 1);
   };
+  // A task's external links go with it the same way: external_link.task_id
+  // references task.id with onDelete: "cascade" upstream, so every route that
+  // removes a task row — the single and bulk deletes, and the project delete
+  // whose tasks cascade — takes the links made through it.
+  const dropLinksForTask = (taskId: string) => {
+    for (let j = links.length - 1; j >= 0; j--) if (links[j]!.taskId === taskId) links.splice(j, 1);
+  };
 
   // The value checks the custom-field routes borrow from validate-task-fields,
   // kept to the types those routes call them for.
@@ -956,7 +963,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     maskedAccessToken: maskGiteaToken(row.token),
     webhookUrl: `${origin}/api/gitea-integration/webhook/${row.id}`,
     webhookSecret: includeSecrets ? row.hookSecret : "",
-    branchPattern: row.branchPattern ?? "{slug}-{number}",
+    // get-gitea-integration.ts falls back on any falsy stored pattern, so an
+    // empty string answers the default too.
+    branchPattern: row.branchPattern || "{slug}-{number}",
     commentTaskLinkOnGiteaIssue: row.commentOnIssue,
     isActive: row.isActive,
     createdAt: row.createdAt,
@@ -1798,7 +1807,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         for (const list of [tasks, columns, workflowRules] as { projectId?: string }[][]) {
           for (let i = list.length - 1; i >= 0; i--) if (list[i]!.projectId === proj.id) list.splice(i, 1);
         }
-        for (let i = links.length - 1; i >= 0; i--) if (gone.has(links[i]!.taskId)) links.splice(i, 1);
+        for (const taskId of gone) {
+          dropLinksForTask(taskId);
+          dropFieldValues(taskId);
+        }
         for (let i = comments.length - 1; i >= 0; i--) if (gone.has(comments[i]!.taskId)) comments.splice(i, 1);
         // A link between two tasks is two rows of one thing, so one end going
         // takes it with it, as the cascade on task_relation does.
@@ -1806,7 +1818,6 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           const r = relations[i]!;
           if (gone.has(r.sourceTaskId) || gone.has(r.targetTaskId)) relations.splice(i, 1);
         }
-        for (const taskId of gone) dropFieldValues(taskId);
         projects.splice(projects.indexOf(proj), 1);
         return reply;
       }
@@ -2093,6 +2104,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         case "delete":
           for (const t of found) {
             tasks.splice(tasks.indexOf(t), 1);
+            dropLinksForTask(t.id);
             dropFieldValues(t.id);
           }
           break;
@@ -2441,6 +2453,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         tasks.splice(i, 1);
         // The document says a task takes its time entries with it.
         for (let j = timeEntries.length - 1; j >= 0; j--) if (timeEntries[j]!.taskId === t.id) timeEntries.splice(j, 1);
+        dropLinksForTask(t.id);
         dropFieldValues(t.id);
         return ok(M.Task, t);
       }
@@ -3073,7 +3086,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // The document declares this 404 as {"error": ...} JSON, not text.
         if (row === undefined) return ok(M.GiteaIntegrationNotFound, { error: "Integration not found" }, 404);
         const b = body as any;
-        if (b.isActive !== undefined) row.isActive = b.isActive;
+        // index.ts's update route resolves the flag on every PATCH: an omitted
+        // isActive keeps the stored value read as on, so a null flips active.
+        row.isActive = b.isActive !== undefined ? b.isActive : (row.isActive ?? true);
         if (b.commentTaskLinkOnGiteaIssue !== undefined) row.commentOnIssue = b.commentTaskLinkOnGiteaIssue;
         row.updatedAt = gnow();
         return ok(M.GiteaIntegration, giteaIntegrationReply(row, url.origin));
@@ -3112,7 +3127,16 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // the import at all; the pull_request rows that listing also carries
         // are filtered out upstream before a single one is imported.
         if (issue.state !== "open" || issue.pullRequest) continue;
-        const link = links.find((l) => l.integrationId === row.id && l.resourceType === "issue" && l.externalId === String(issue.number));
+        // findExternalLink applies externalLinkScope(): the link counts only
+        // while its task exists in the link integration's project. One that
+        // fails it — the task is gone or sits in another project — is
+        // invisible here, so the issue takes the create path below and counts
+        // imported; upstream's skipped is reachable only through a race the
+        // sequential fake never has.
+        const link = links.find((l) => {
+          if (l.integrationId !== row.id || l.resourceType !== "issue" || l.externalId !== String(issue.number)) return false;
+          return tasks.some((t) => t.id === l.taskId && t.projectId === project.id);
+        });
         try {
           if (issue.fail !== null) throw new Error(issue.fail);
           // extract-priority.ts: the first priority:/status: label decides, and
@@ -3122,14 +3146,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           const statusName = issue.labels.map((n) => (n.startsWith("status:") ? n.slice("status:".length).trim().toLowerCase() : null)).find((v): v is string => v !== null);
           const status = statusName !== undefined && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(statusName) ? statusName : null;
           if (link !== undefined) {
-            const task = tasks.find((t) => t.id === link.taskId);
-            // withIntegrationTask finds no task in this project — the linked
-            // task is gone or belongs to another — and the issue counts
-            // skipped: nothing is written, not even the label sync.
-            if (task === undefined || task.projectId !== project.id) {
-              skipped++;
-              continue;
-            }
+            // The scope check above already proved the task exists in this
+            // project, so withIntegrationTask's re-checks upstream — which can
+            // only fail on a race — never skip here.
+            const task = tasks.find((t) => t.id === link.taskId)!;
             task.title = issue.title;
             task.description = issue.body ?? "";
             if (priority !== null) task.priority = priority;

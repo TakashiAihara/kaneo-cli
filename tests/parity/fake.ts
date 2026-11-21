@@ -57,11 +57,8 @@ export type Seed = {
   // project: only fields somebody set a value on have a row.
   customFieldValues?: { taskId: string; field: string; value: string | null }[];
   // A project's link to a Gitea repository, as the integration row keeps it.
-  // accessToken defaults to a fake one; replies carry only its mask. issues are
-  // the open ones import-issues would bring in for that link; state other than
-  // "open" is never listed, labels feed the incoming sync rule, and fail makes
-  // that one issue an errors entry. syncRules keeps only the incoming half the
-  // fake reads.
+  // accessToken defaults to a fake one; replies carry only its mask. syncRules
+  // keeps only the incoming half the fake reads.
   giteaIntegrations?: {
     projectId: string;
     baseUrl: string;
@@ -73,7 +70,19 @@ export type Seed = {
     branchPattern?: string;
     commentTaskLinkOnGiteaIssue?: boolean;
     syncRules?: { incoming?: { mode: "all" } | { mode: "labels"; match: "any" | "all"; labels: string[] } };
-    issues?: { number: number; title: string; body?: string; labels?: string[]; state?: string; fail?: string }[];
+  }[];
+  // The issues a repository on the instance holds, keyed by the repo's
+  // normalized base URL, owner and name — upstream fetches them live, so a
+  // link to the repository lists this repo's issues and a reconnect to
+  // another one sees that repository's list instead. state other than "open"
+  // is never listed, pullRequest marks the pull requests the issue listing
+  // also carries (upstream drops them before importing), labels feed the
+  // incoming sync rule, and fail makes that one issue an errors entry.
+  giteaRepoIssues?: {
+    baseUrl: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    issues?: { number: number; title: string; body?: string; labels?: string[]; state?: string; pullRequest?: boolean; fail?: string }[];
   }[];
   // The repositories the fake's Gitea instance knows a token can reach: what
   // repos lists and what verify and connect check owner/name against. Every
@@ -880,8 +889,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     isActive: boolean;
     createdAt: string;
     updatedAt: string;
-    issues: { number: number; title: string; body: string | null; labels: string[]; state: string; fail: string | null }[];
   };
+  // One seeded issue with the seed's defaults applied, as the instance's
+  // issue listing holds it.
+  type GiteaIssueRow = { number: number; title: string; body: string | null; labels: string[]; state: string; pullRequest: boolean; fail: string | null };
   // plugins/gitea/config.ts's normalizeGiteaBaseUrl: origin plus path, trailing
   // slashes off, and only http(s) URLs without credentials, query or fragment.
   const normalizeGiteaUrl = (raw: string): string => {
@@ -910,9 +921,23 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       isActive: entry.isActive ?? true,
       createdAt: at,
       updatedAt: at,
-      issues: (entry.issues ?? []).map((i) => ({ number: i.number, title: i.title, body: i.body ?? null, labels: i.labels ?? [], state: i.state ?? "open", fail: i.fail ?? null })),
     });
   }
+  // The instance's issue lists, one per repository the seed names. The key is
+  // the normalized base URL, owner and name together, as upstream's client is
+  // bound to one instance: the same owner/name on another base URL is another
+  // repository with its own list.
+  const giteaRepoKey = (baseUrl: string, owner: string, name: string) => JSON.stringify([baseUrl, owner, name]);
+  const giteaIssues = new Map<string, GiteaIssueRow[]>();
+  for (const repo of seed.giteaRepoIssues ?? []) {
+    giteaIssues.set(
+      giteaRepoKey(normalizeGiteaUrl(repo.baseUrl), repo.repositoryOwner, repo.repositoryName),
+      (repo.issues ?? []).map((i) => ({ number: i.number, title: i.title, body: i.body ?? null, labels: i.labels ?? [], state: i.state ?? "open", pullRequest: i.pullRequest ?? false, fail: i.fail ?? null })),
+    );
+  }
+  // What import-issues would list for the row's current repository: its own
+  // list, or none when the seed names no issues for it.
+  const giteaIssuesFor = (row: GiteaRow) => giteaIssues.get(giteaRepoKey(row.baseUrl, row.repositoryOwner, row.repositoryName)) ?? [];
   // The one Gitea instance every base URL is answered as.
   const giteaRepos = seed.giteaRepositories ?? [];
   const giteaRepo = (owner: string, name: string) => giteaRepos.find((r) => r.owner === owner && r.name === name);
@@ -2908,10 +2933,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     // seeded instance, and giteaMode is how its user check fails when a
     // scenario needs that. A project the workspace middleware cannot place is
     // the same plain-text 400 the column routes give; import-issues' own scope
-    // check answers 404 "Project not found" instead.
+    // check answers 404 "Project not found" instead. index.ts's manageAccess
+    // puts every route but get and import-issues behind workspace
+    // manage_settings, which a plain member fails with the same 403 the
+    // project writes give; get only hides the webhook secret from them, and
+    // import-issues asks for task permissions a member has.
     if (req.method === "POST" && path === "/gitea-integration/repositories") {
       const b = body as any;
       if (!projects.some((x) => x.id === b.projectId)) return failText(400, "Workspace ID could not be determined");
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
       let normalized: string;
       try {
         normalized = normalizeGiteaUrl(b.baseUrl);
@@ -2935,6 +2965,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "POST" && path === "/gitea-integration/verify") {
       const b = body as any;
       if (!projects.some((x) => x.id === b.projectId)) return failText(400, "Workspace ID could not be determined");
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
       const resolved = giteaTokenFor(b.projectId, b.baseUrl, b.accessToken);
       if (resolved instanceof Response) return resolved;
       // verify-gitea-access.ts reports what the checks found rather than
@@ -2970,6 +3001,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       if (req.method === "POST") {
         if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+        if (opts.plainMember) return failText(403, "Insufficient permissions");
         const b = body as any;
         // create-gitea-integration.ts normalizes the URL before the token is
         // resolved, so a URL it refuses is a plain 500 here.
@@ -3012,7 +3044,6 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
             isActive: true,
             createdAt: at,
             updatedAt: at,
-            issues: [],
           };
           gitea.push(row);
         } else {
@@ -3034,6 +3065,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       if (req.method === "PATCH") {
         if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+        if (opts.plainMember) return failText(403, "Insufficient permissions");
         const row = giteaRow(projectId);
         // The document declares this 404 as {"error": ...} JSON, not text.
         if (row === undefined) return ok(M.GiteaIntegrationNotFound, { error: "Integration not found" }, 404);
@@ -3045,6 +3077,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       if (req.method === "DELETE") {
         if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+        if (opts.plainMember) return failText(403, "Insufficient permissions");
         const i = gitea.findIndex((x) => x.projectId === projectId);
         if (i < 0) return failText(404, "Gitea integration not found");
         // Imported tasks keep their external links; only the integration row goes.
@@ -3064,10 +3097,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       let updated = 0;
       let skipped = 0;
       const errors: string[] = [];
-      for (const issue of row.issues) {
+      for (const issue of giteaIssuesFor(row)) {
         // The API lists state=open issues only, so anything else never reaches
-        // the import at all.
-        if (issue.state !== "open") continue;
+        // the import at all; the pull_request rows that listing also carries
+        // are filtered out upstream before a single one is imported.
+        if (issue.state !== "open" || issue.pullRequest) continue;
         const link = links.find((l) => l.integrationId === row.id && l.resourceType === "issue" && l.externalId === String(issue.number));
         // A linked issue refreshes even when the incoming rule would refuse it;
         // the rule only gates issues with no task yet.

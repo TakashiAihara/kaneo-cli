@@ -167,8 +167,9 @@ export type Scenario = {
   assignedLimit?: number;
   // Written to every step's stdin, for text a pipe carries.
   stdin?: string;
-  // Written into the cwd before the first step, for text a flag names as a file.
-  files?: Record<string, string>;
+  // Written into the cwd before the first step, for the file a flag names —
+  // bytes when the upload has to be something text cannot write, like a PNG.
+  files?: Record<string, string | Uint8Array>;
 };
 
 const both = (name: string, args: string[]): Scenario[] => [
@@ -2939,13 +2940,20 @@ export const SCENARIOS: Scenario[] = [
   },
   ...both("whoami session", ["whoami", "session"]),
   {
-    // set stores the image, get reads it back, rm takes it away — and rm again
-    // reports there was nothing left.
+    // set stores the image, get reads it back — to stdout and to --out —
+    // byte for byte, rm takes it away, and rm again reports there was
+    // nothing left.
     name: "whoami avatar set, get and rm",
-    files: { "face.png": "fake-png-bytes" },
+    files: {
+      // The PNG signature followed by bytes no text decode survives, the
+      // same payload asset-bin seeds: what the fake stores must be what the
+      // GET serves, so a fake that kept the upload as text would show here.
+      "face.png": new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00]),
+    },
     steps: [
       ["whoami", "avatar", "set", "face.png", "--json"],
       ["avatar", "get", "avatar-self", "--human"],
+      ["avatar", "get", "avatar-self", "--out", "round.png", "--json"],
       ["whoami", "avatar", "rm", "--human"],
       ["whoami", "avatar", "rm", "--json"],
       // The avatar is gone, so both reads fail — --out still reports the 404
@@ -2966,7 +2974,18 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "avatar get",
     env: { KANEO_API_KEY: "" },
-    seed: { avatars: [{ id: "av-1", body: "avatar-one-bytes", contentType: "image/webp" }] },
+    seed: {
+      avatars: [
+        { id: "av-1", body: "avatar-one-bytes", contentType: "image/webp" },
+        // UTF-8 with a leading BOM: the recording decoder keeps it as U+FEFF,
+        // so these bytes record differently from "hi" alone would.
+        { id: "av-bom", body: new Uint8Array([0xef, 0xbb, 0xbf, 0x68, 0x69]), contentType: "image/webp" },
+        // Not UTF-8: recorded as {"base64": ...}, the shape no text takes.
+        { id: "av-bin", body: new Uint8Array([0xff]), contentType: "image/webp" },
+        // Text that reads like a binary record stays the string it is.
+        { id: "av-marker", body: "base64:/w==", contentType: "image/webp" },
+      ],
+    },
     steps: [
       ["avatar", "get", "av-1", "--human"],
       // The bytes have no JSON form, so the output flags are refused on the
@@ -2974,6 +2993,12 @@ export const SCENARIOS: Scenario[] = [
       ["avatar", "get", "av-1", "--json"],
       ["avatar", "get", "av-1", "--jq", "."],
       ["avatar", "get", "av-1", "--out", "face.webp", "--json"],
+      // av-bom's bytes are UTF-8 behind a BOM, av-bin's are not UTF-8 at
+      // all, and av-marker's text is what a binary record looks like — the
+      // three must record three different ways.
+      ["avatar", "get", "av-bom", "--human"],
+      ["avatar", "get", "av-bin", "--human"],
+      ["avatar", "get", "av-marker", "--human"],
       // A missing avatar still fails the read — --out reports the 404 as
       // JSON, while the raw stdout path keeps it off stdout entirely.
       ["avatar", "get", "nope", "--out", "none.webp", "--json"],

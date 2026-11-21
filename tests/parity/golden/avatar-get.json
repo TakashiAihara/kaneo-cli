@@ -51,6 +51,41 @@
       "args": [
         "avatar",
         "get",
+        "av-bom",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "﻿hi",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-bin",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": {
+        "base64": "/w=="
+      },
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-marker",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "base64:/w==",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
         "nope",
         "--out",
         "none.webp",
@@ -81,6 +116,21 @@
     {
       "method": "GET",
       "path": "/user/avatar/av-1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/av-bom",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/av-bin",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/av-marker",
       "query": ""
     },
     {

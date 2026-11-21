@@ -47,8 +47,9 @@ describe("parity with the recorded goldens", () => {
         // JSON mode (--json, or the pipe these runs write to) promises one
         // document on stdout, failure or not, so a second one appended after the
         // payload is caught whichever command adds it. Help, completion and
-        // --version print text, and start with neither bracket.
-        if (!w.args.includes("--human") && !w.args.includes("--jq") && /^[[{]/.test(g.stdout)) {
+        // --version print text, and start with neither bracket. A binary
+        // download's stdout is the {"base64": ...} record, not text.
+        if (typeof g.stdout === "string" && !w.args.includes("--human") && !w.args.includes("--jq") && /^[[{]/.test(g.stdout)) {
           expect({ at, parses: parsesAsOne(g.stdout) }).toEqual({ at, parses: true });
         }
       }

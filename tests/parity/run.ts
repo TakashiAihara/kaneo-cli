@@ -4,8 +4,14 @@ import { join, relative, resolve } from "node:path";
 import { startFake, type Recorded } from "./fake";
 import { P1, SEED, WS, type Scenario } from "./scenarios";
 
-type StepResult = { args: string[]; exit: number; stdout: string; stderr: string };
-export type ScenarioResult = { steps: StepResult[]; requests: Recorded[]; files: Record<string, string> };
+type StepResult = { args: string[]; exit: number; stdout: string | Binary; stderr: string };
+export type ScenarioResult = { steps: StepResult[]; requests: Recorded[]; files: Record<string, string | Binary> };
+
+// What bytes are recorded as when they are not UTF-8: an object, the one
+// shape a decoded string can never take, so the record cannot be confused
+// with text that happens to read like a marker — and normalize, which
+// rewrites text, has nothing to do to it.
+type Binary = { base64: string };
 
 // Runs one scenario through `bin` (argv prefix of the CLI under test) and
 // returns everything observable from outside: per-step output and exit code,
@@ -54,7 +60,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
   try {
     const cwd = join(home, "work");
     mkdirSync(cwd);
-    for (const [name, text] of Object.entries(s.files ?? {})) writeFileSync(join(cwd, name), text);
+    for (const [name, data] of Object.entries(s.files ?? {})) writeFileSync(join(cwd, name), data);
     if (s.local !== undefined) writeFileSync(join(home, ".kaneo.json"), JSON.stringify(s.local));
     if (s.repo !== undefined) {
       for (const args of [["init", "-q"], ["remote", "add", "origin", `git@github.com:${s.repo}.git`]]) {
@@ -103,26 +109,31 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
         // 2026-01-01 and stay.
         .replace(/\b(?!2026-01-01T)\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d:\d\d)/g, "<TIME>$2");
 
+    // Bytes a step wrote or printed are recorded as text when they decode as
+    // UTF-8 and as {"base64": ...} when they do not. The decoder keeps a
+    // leading BOM as U+FEFF — the default strips it, which would record a
+    // BOM-prefixed payload and the same bytes without one alike — and fatal
+    // rejects what text cannot hold, so a corrupt download cannot pass for
+    // the text it replaced.
+    const recordBytes = (bytes: Uint8Array): string | Binary => {
+      try {
+        return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+      } catch {
+        return { base64: Buffer.from(bytes).toString("base64") };
+      }
+    };
+
     // What the cwd holds before the first step, so a file a command writes
     // there (an --out download) is told apart from the scenario's own inputs
-    // and a repository's .git, neither of which the CLI produced. A file that
-    // is not UTF-8 — a binary download — is kept as base64 behind a marker, so
-    // the golden can tell the bytes apart rather than recording U+FFFD loss.
-    const cwdTree = (): Map<string, string> => {
-      const out = new Map<string, string>();
+    // and a repository's .git, neither of which the CLI produced.
+    const cwdTree = (): Map<string, string | Binary> => {
+      const out = new Map<string, string | Binary>();
       const walk = (dir: string) => {
         for (const name of readdirSync(dir).sort()) {
           if (name === ".git") continue;
           const full = join(dir, name);
           if (statSync(full).isDirectory()) walk(full);
-          else {
-            const bytes = readFileSync(full);
-            try {
-              out.set(relative(cwd, full), new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-            } catch {
-              out.set(relative(cwd, full), `base64:${bytes.toString("base64")}`);
-            }
-          }
+          else out.set(relative(cwd, full), recordBytes(readFileSync(full)));
         }
       };
       walk(cwd);
@@ -131,16 +142,10 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     const cwdBefore = cwdTree();
 
     // A step's stdout can be a download's raw bytes rather than text, so it
-    // is kept the way cwdTree keeps --out files: UTF-8 when it decodes, and
-    // base64 behind a marker when it does not — U+FFFD would hide a corrupt
-    // download inside a readable golden.
-    const streamText = async (stream: ReadableStream<Uint8Array>): Promise<string> => {
+    // is recorded the way cwdTree records the files a step wrote.
+    const streamText = async (stream: ReadableStream<Uint8Array>): Promise<string | Binary> => {
       const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
-      try {
-        return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-      } catch {
-        return `base64:${Buffer.from(bytes).toString("base64")}`;
-      }
+      return recordBytes(bytes);
     };
 
     const steps: StepResult[] = [];
@@ -165,10 +170,10 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
         p.stdin!.end();
       }
       const [stdout, stderr, exit] = await Promise.all([streamText(p.stdout), new Response(p.stderr).text(), p.exited]);
-      steps.push({ args, exit, stdout: normalize(stdout), stderr: normalize(stderr) });
+      steps.push({ args, exit, stdout: typeof stdout === "string" ? normalize(stdout) : stdout, stderr: normalize(stderr) });
     }
 
-    const files: Record<string, string> = {};
+    const files: Record<string, string | Binary> = {};
     const walk = (dir: string) => {
       for (const name of readdirSync(dir).sort()) {
         const full = join(dir, name);
@@ -178,9 +183,11 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     };
     if (existsSync(join(home, ".config"))) walk(join(home, ".config"));
     // Files the steps wrote or changed in the cwd, named as the .config walk
-    // names its own: home-relative, so "work/face.webp".
-    for (const [name, text] of cwdTree()) {
-      if (cwdBefore.get(name) !== text) files[join("work", name)] = normalize(text);
+    // names its own: home-relative, so "work/face.webp". The two cwdTree
+    // passes build fresh records, so a binary file's object is never the
+    // same reference twice — equality is by content, not identity.
+    for (const [name, record] of cwdTree()) {
+      if (!sameRecord(cwdBefore.get(name), record)) files[join("work", name)] = typeof record === "string" ? normalize(record) : record;
     }
 
     const requests = settle(JSON.parse(normalize(JSON.stringify(fake.requests))) as Recorded[]);
@@ -194,6 +201,13 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
 // This source tree as the suite runs it: src/index.ts under the bun running the
 // suite, so a scenario that sets PATH to nowhere still starts.
 export const THIS_BUILD = [process.execPath, new URL("../../src/index.ts", import.meta.url).pathname];
+
+// Two records of the same bytes are equal: strings by value, and the binary
+// object by its base64 — each pass of cwdTree builds a fresh one.
+const sameRecord = (a: string | Binary | undefined, b: string | Binary): boolean => {
+  if (typeof a === "string" || typeof b === "string") return a === b;
+  return a !== undefined && a.base64 === b.base64;
+};
 
 // Listings that are asked for together arrive in whatever order the sockets
 // connect, so a run of them is recorded by query rather than by arrival.

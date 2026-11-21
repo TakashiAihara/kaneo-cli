@@ -42,7 +42,9 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "base64:iVBORw0KGgr//gA=",
+      "stdout": {
+        "base64": "iVBORw0KGgr//gA="
+      },
       "stderr": ""
     },
     {
@@ -127,6 +129,8 @@
     }
   ],
   "files": {
-    "work/bin.png": "base64:iVBORw0KGgr//gA="
+    "work/bin.png": {
+      "base64": "iVBORw0KGgr//gA="
+    }
   }
 }

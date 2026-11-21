@@ -366,8 +366,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     (seed.avatars ?? []).map((a) => [a.id, { body: a.body, contentType: a.contentType ?? "image/png" }]),
   );
   // The avatar PUT replaces the credential's own, which the fake names
-  // avatar-self; DELETE takes it away again.
-  let ownAvatar: { body: string; contentType: string } | undefined;
+  // avatar-self; DELETE takes it away again. The body stays bytes: a PNG or
+  // any non-UTF-8 upload decoded to a string would come back mangled.
+  let ownAvatar: { body: string | Uint8Array; contentType: string } | undefined;
 
   // Notifications number and date themselves apart from everything else, so
   // seeding them leaves the ids and times the other scenarios record alone.
@@ -2739,7 +2740,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "PUT" && path === "/user/avatar") {
       const b = body as z.input<typeof M.UploadUserAvatarBody>;
       const bytes = Buffer.from(b.data, "base64");
-      ownAvatar = { body: bytes.toString("utf8"), contentType: b.contentType };
+      ownAvatar = { body: bytes, contentType: b.contentType };
       avatars.set("avatar-self", ownAvatar);
       return ok(M.UserAvatar, { id: "avatar-self", url: "/api/user/avatar/avatar-self", size: bytes.length });
     }

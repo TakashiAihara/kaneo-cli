@@ -9,7 +9,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"avatar-self\",\n  \"url\": \"/api/user/avatar/avatar-self\",\n  \"size\": 14\n}\n",
+      "stdout": "{\n  \"id\": \"avatar-self\",\n  \"url\": \"/api/user/avatar/avatar-self\",\n  \"size\": 11\n}\n",
       "stderr": ""
     },
     {
@@ -20,7 +20,22 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "fake-png-bytes",
+      "stdout": {
+        "base64": "iVBORw0KGgr//gA="
+      },
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "avatar-self",
+        "--out",
+        "round.png",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"path\": \"round.png\",\n  \"bytes\": 11,\n  \"contentType\": \"image/png\"\n}\n",
       "stderr": ""
     },
     {
@@ -77,8 +92,13 @@
       "query": "",
       "body": {
         "contentType": "image/png",
-        "data": "ZmFrZS1wbmctYnl0ZXM="
+        "data": "iVBORw0KGgr//gA="
       }
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/avatar-self",
+      "query": ""
     },
     {
       "method": "GET",
@@ -106,5 +126,9 @@
       "query": ""
     }
   ],
-  "files": {}
+  "files": {
+    "work/round.png": {
+      "base64": "iVBORw0KGgr//gA="
+    }
+  }
 }

@@ -18,6 +18,10 @@
 // editor writes to mark the encoding, and a text that begins with one is a
 // heading or a paragraph of somebody's prose rather than text that begins with
 // an invisible character. Anywhere else it is an ordinary character and stays.
+//
+// A credential is the other side of that call: it is stored and signed byte
+// for byte, so a leading U+FEFF is part of the value, not a signature to take
+// off — readCredential keeps it.
 
 // What the text is called when it is reported: `-` on a command line is stdin,
 // and a message has to say which of the two was meant. A path that is not there
@@ -31,7 +35,7 @@ export const sourceName = (source: string): string =>
 // rather than the decoder taking it off for good.
 const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
-export const readInput = async (source: string): Promise<string> => {
+const readText = async (source: string, keepBOM: boolean): Promise<string> => {
   const named = sourceName(source);
   let bytes: Uint8Array;
   try {
@@ -45,5 +49,13 @@ export const readInput = async (source: string): Promise<string> => {
   } catch {
     throw new Error(`reading ${named}: not valid UTF-8`);
   }
-  return text.startsWith("\uFEFF") ? text.slice(1) : text;
+  return keepBOM || !text.startsWith("\uFEFF") ? text : text.slice(1);
 };
+
+// Prose — a description, a comment, a notification body — gets the editor's
+// BOM taken off; everything else the file held is kept.
+export const readInput = (source: string): Promise<string> => readText(source, false);
+
+// A credential keeps every character the decode produced, a leading U+FEFF
+// included: what a pipe or a file carried is what gets stored.
+export const readCredential = (source: string): Promise<string> => readText(source, true);

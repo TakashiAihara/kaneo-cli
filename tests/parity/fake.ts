@@ -91,6 +91,20 @@ export type Seed = {
     commentTaskLinkOnGitHubIssue?: boolean;
     importPages?: number;
   }[];
+  // A project's integrations already stored, so get/set/rm run without a
+  // create first. provider is the command name: mattermost or webhook. events
+  // holds the stored toggles by their API field names; the rest default the
+  // way a created row does.
+  integrations?: {
+    projectId: string;
+    provider: "mattermost" | "webhook";
+    webhookUrl?: string;
+    channelName?: string | null;
+    secret?: string;
+    events?: Record<string, boolean>;
+    dueDateReminderLeadTimeMinutes?: number;
+    isActive?: boolean | null;
+  }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
@@ -662,6 +676,73 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     skipped: r.skipped,
   });
 
+  // Integrations as the server keeps them: one row per project and type, the
+  // config holding the credentials, isActive, and the timestamps a write bumps.
+  // The replies mask the URL and the signing secret the way the plugins do.
+  type StoredIntegration = {
+    id: string;
+    projectId: string;
+    kind: "mattermost" | "generic-webhook";
+    webhookUrl?: string;
+    channelName?: string;
+    signingSecret?: string;
+    events: Record<string, boolean>;
+    dueDateReminderLeadTimeMinutes?: number;
+    isActive: boolean | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  const integrations: StoredIntegration[] = [];
+  // The event defaults each plugin config.ts declares (plugins/mattermost and
+  // plugins/generic-webhook in usekaneo/kaneo): created, status and comment
+  // on for both — the webhook's six extras are off — and the reminder lead
+  // defaults to a day.
+  const MM_EVENTS = { taskCreated: true, taskStatusChanged: true, taskPriorityChanged: false, taskTitleChanged: false, taskDescriptionChanged: false, taskCommentCreated: true };
+  const GW_EVENTS = { ...MM_EVENTS, taskDeleted: false, taskMoved: false, taskDueDateChanged: false, taskAssigneeChanged: false, taskUnassigned: false, dueDateReminder: false };
+  for (const i of seed.integrations ?? []) {
+    const at = now();
+    integrations.push({
+      id: id("integ"),
+      projectId: i.projectId,
+      kind: i.provider === "mattermost" ? "mattermost" : "generic-webhook",
+      webhookUrl: typeof i.webhookUrl === "string" ? i.webhookUrl : undefined,
+      channelName: i.provider === "mattermost" && typeof i.channelName === "string" ? i.channelName : undefined,
+      signingSecret: i.provider === "webhook" && typeof i.secret === "string" ? i.secret : undefined,
+      events: { ...(i.events ?? {}) },
+      dueDateReminderLeadTimeMinutes: i.provider === "webhook" ? i.dueDateReminderLeadTimeMinutes : undefined,
+      isActive: i.isActive === undefined ? true : i.isActive,
+      createdAt: at,
+      updatedAt: at,
+    });
+  }
+  const mattermostResponse = (i: StoredIntegration) => ({
+    id: i.id,
+    projectId: i.projectId,
+    channelName: i.channelName ?? null,
+    webhookConfigured: !!i.webhookUrl,
+    maskedWebhookUrl: masked(i.webhookUrl ?? null) ?? "",
+    events: { ...MM_EVENTS, ...i.events },
+    isActive: i.isActive,
+    createdAt: i.createdAt,
+    updatedAt: i.updatedAt,
+  });
+  const genericResponse = (i: StoredIntegration) => ({
+    id: i.id,
+    projectId: i.projectId,
+    webhookConfigured: !!i.webhookUrl,
+    maskedWebhookUrl: masked(i.webhookUrl ?? null),
+    secretConfigured: !!i.signingSecret,
+    maskedSecret: masked(i.signingSecret ?? null),
+    events: { ...GW_EVENTS, ...i.events },
+    dueDateReminderLeadTimeMinutes: i.dueDateReminderLeadTimeMinutes ?? 1440,
+    isActive: i.isActive,
+    createdAt: i.createdAt,
+    updatedAt: i.updatedAt,
+  });
+  const integrationResponse = (i: StoredIntegration) => (i.kind === "mattermost" ? mattermostResponse(i) : genericResponse(i));
+  const integrationSchema = (kind: string) => (kind === "mattermost" ? M.MattermostIntegration : M.GenericWebhookIntegration);
+  const integrationDeleteSchema = (kind: string) => (kind === "mattermost" ? M.DeleteMattermostIntegration200 : M.DeleteGenericWebhookIntegration200);
+
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
@@ -895,6 +976,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/notification$/, M.CreateNotificationBody],
       ["PUT", /^\/notification-preferences$/, M.UpdateNotificationPreferencesBody],
       ["PUT", /^\/notification-preferences\/workspaces\/[^/]+$/, M.UpsertNotificationPreferenceWorkspaceRuleBody],
+      ["POST", /^\/mattermost-integration\/project\/[^/]+$/, M.CreateMattermostIntegrationBody],
+      ["PATCH", /^\/mattermost-integration\/project\/[^/]+$/, M.UpdateMattermostIntegrationBody],
+      ["POST", /^\/generic-webhook-integration\/project\/[^/]+$/, M.CreateGenericWebhookIntegrationBody],
+      ["PATCH", /^\/generic-webhook-integration\/project\/[^/]+$/, M.UpdateGenericWebhookIntegrationBody],
       ["PUT", /^\/comment\/[^/]+$/, M.UpdateTaskCommentBody],
       ["POST", /^\/activity\/create$/, M.CreateActivityBody],
       ["POST", /^\/label$/, M.CreateLabelBody],
@@ -2357,6 +2442,81 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       run.imported += processed;
       if (run.pagesLeft === 0) run.done = true;
       return ok(M.IssueImportResult, githubProgress(run), run.done ? 200 : 202);
+    }
+
+    // One row per project and type: GET answers it or null, POST creates or
+    // replaces it active, PATCH merges the fields it is sent into the stored
+    // config, and DELETE removes it. An unknown project is the workspace
+    // middleware's 400, as on the column routes. The writes carry upstream's
+    // manageAccess — manage_settings, which a plain member lacks — while GET
+    // asks only for workspace access, as on the GitLab routes above.
+    if ((p = m(/^\/(mattermost-integration|generic-webhook-integration)\/project\/([^/]+)$/))) {
+      // The path segment names the route; the provider's own name is shorter.
+      const kind: StoredIntegration["kind"] = p[1] === "mattermost-integration" ? "mattermost" : "generic-webhook";
+      const projectId = decodeURIComponent(p[2]!);
+      if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+      const existing = integrations.find((i) => i.projectId === projectId && i.kind === kind);
+      if (req.method === "GET") return ok(integrationSchema(kind), existing ? integrationResponse(existing) : null);
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
+      if (req.method === "DELETE") {
+        if (!existing) return new Response("Project or integration not found", { status: 404 });
+        integrations.splice(integrations.indexOf(existing), 1);
+        return ok(integrationDeleteSchema(kind), { success: true });
+      }
+      const b = (body ?? {}) as Record<string, any>;
+      if (req.method === "POST") {
+        const at = now();
+        // The config is stored as sent: the CLI does not trim a credential,
+        // so neither does the fake. Only Mattermost's HTTPS rule is spec'd;
+        // the generic webhook's URL is any non-empty string, which the body
+        // schema already enforced.
+        const row: StoredIntegration = {
+          id: existing?.id ?? id("integ"),
+          projectId,
+          kind: kind as StoredIntegration["kind"],
+          webhookUrl: String(b.webhookUrl ?? ""),
+          channelName: kind === "mattermost" && typeof b.channelName === "string" ? b.channelName : undefined,
+          signingSecret: kind === "generic-webhook" && typeof b["secret"] === "string" ? b["secret"] : undefined,
+          events: { ...(b.events ?? {}) },
+          dueDateReminderLeadTimeMinutes: kind === "generic-webhook" ? b.dueDateReminderLeadTimeMinutes : undefined,
+          isActive: true,
+          createdAt: existing?.createdAt ?? at,
+          updatedAt: at,
+        };
+        if (kind === "mattermost" && !(row.webhookUrl ?? "").startsWith("https://")) {
+          return new Response("Webhook URL must be an HTTPS URL", { status: 400 });
+        }
+        if (existing) integrations[integrations.indexOf(existing)] = row;
+        else integrations.push(row);
+        return ok(integrationSchema(kind), integrationResponse(row));
+      }
+      if (req.method === "PATCH") {
+        if (!existing) return new Response("Project or integration not found", { status: 404 });
+        // Omitted fields keep their stored value; event toggles merge into the
+        // stored set rather than replacing it. The merged row is validated
+        // before anything is written, so a refused PATCH leaves the stored
+        // row as it was.
+        const merged: StoredIntegration = {
+          ...existing,
+          events: { ...existing.events, ...(b.events ?? {}) },
+          updatedAt: now(),
+        };
+        if (b.webhookUrl !== undefined) merged.webhookUrl = String(b.webhookUrl) || existing.webhookUrl;
+        if (kind === "mattermost" && b.channelName !== undefined) {
+          merged.channelName = b.channelName === null ? undefined : String(b.channelName);
+        }
+        if (kind === "generic-webhook" && b["secret"] !== undefined) {
+          const s = b["secret"];
+          merged.signingSecret = s === null ? undefined : String(s);
+        }
+        if (b.isActive !== undefined) merged.isActive = b.isActive;
+        if (kind === "generic-webhook" && b.dueDateReminderLeadTimeMinutes !== undefined) merged.dueDateReminderLeadTimeMinutes = b.dueDateReminderLeadTimeMinutes;
+        if (kind === "mattermost" && !(merged.webhookUrl ?? "").startsWith("https://")) {
+          return new Response("Webhook URL must be an HTTPS URL", { status: 400 });
+        }
+        Object.assign(existing, merged);
+        return ok(integrationSchema(kind), integrationResponse(existing));
+      }
     }
 
     return fail(404, `no route: ${req.method} ${path}`);

@@ -1,0 +1,55 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         integ0002\nproject    proj-alpha\nchannel    unset\nwebhook    http…eded\nevents     task created, task status changed, task comment created\nactive     unset\ncreated    2026-01-01T00:00:10.000Z\nupdated    2026-01-01T00:00:10.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         integ0003\nproject    proj-alpha\nwebhook    http…eded\nsecret     whse…d_12\nevents     task created, task status changed, task comment created\nreminder   90m before a due date\nactive     unset\ncreated    2026-01-01T00:00:11.000Z\nupdated    2026-01-01T00:00:11.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integrations",
+        "webhook",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0003\",\n  \"projectId\": \"proj-alpha\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…eded\",\n  \"secretConfigured\": true,\n  \"maskedSecret\": \"whse…d_12\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": false,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 90,\n  \"isActive\": null,\n  \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:11.000Z\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

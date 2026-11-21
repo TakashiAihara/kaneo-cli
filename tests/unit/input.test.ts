@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readInput } from "../../src/cli/input";
+import { readCredential, readInput } from "../../src/cli/input";
 
 describe("readInput", () => {
   const dir = mkdtempSync(join(tmpdir(), "kaneo-input-"));
@@ -69,5 +69,29 @@ describe("readInput", () => {
     );
     expect(message.startsWith(`reading ${missing}: `)).toBe(true);
     expect(message.slice(`reading ${missing}: `.length)).not.toBe("");
+  });
+});
+
+describe("readCredential", () => {
+  const dir = mkdtempSync(join(tmpdir(), "kaneo-credential-"));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  const at = (name: string, text: string | Uint8Array) => {
+    const path = join(dir, name);
+    writeFileSync(path, text);
+    return path;
+  };
+
+  // A credential is stored and signed byte for byte, so the BOM an editor
+  // writes to mark the encoding is part of the value here rather than a
+  // signature to take off the way readInput takes it off prose.
+  test("a leading UTF-8 BOM is kept", async () => {
+    expect(await readCredential(at("bom-secret.txt", new Uint8Array([0xef, 0xbb, 0xbf, 0x61, 0x0a])))).toBe("\uFEFFa\n");
+    expect(await readCredential(at("bom-text.txt", "\uFEFFsigning-material\n"))).toBe("\uFEFFsigning-material\n");
+  });
+
+  // Everything else the decode produced is kept too, the trailing line
+  // ending included: dropping it is credentialText's job, not the reader's.
+  test("the rest of the text is kept as it came", async () => {
+    expect(await readCredential(at("plain.txt", "whsec_1\r\n"))).toBe("whsec_1\r\n");
   });
 });

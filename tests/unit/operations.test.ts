@@ -2305,3 +2305,126 @@ test("TestGitHubSessionRefusalKeepsTheServerMessage", async () => {
   expect((err as KaneoApiError).statusCode).toBe(403);
   expect((err as KaneoApiError).messages).toEqual(["A user session is required"]);
 });
+
+// The project integrations: a read answers the row or null, a write answers
+// the row back masked, and a removal the shared {success} shape. The event
+// toggles come back whole, the unset ones the server's defaults.
+const MM_EVENTS = {
+  taskCreated: true,
+  taskStatusChanged: true,
+  taskPriorityChanged: false,
+  taskTitleChanged: false,
+  taskDescriptionChanged: false,
+  taskCommentCreated: true,
+};
+const GW_EVENTS = {
+  ...MM_EVENTS,
+  taskDeleted: false,
+  taskMoved: false,
+  taskDueDateChanged: false,
+  taskAssigneeChanged: false,
+  taskUnassigned: false,
+  dueDateReminder: false,
+};
+const mmRow = `{"id":"i1","projectId":"p1","channelName":"alerts","webhookConfigured":true,"maskedWebhookUrl":"https://mm.example/x","events":${JSON.stringify(MM_EVENTS)},"isActive":true,"createdAt":"${TIME}","updatedAt":"${TIME}"}`;
+const gwRow = `{"id":"i2","projectId":"p1","webhookConfigured":true,"maskedWebhookUrl":"https://wh.example/y","secretConfigured":true,"maskedSecret":"whs_x","events":${JSON.stringify(GW_EVENTS)},"dueDateReminderLeadTimeMinutes":120,"isActive":false,"createdAt":"${TIME}","updatedAt":"${TIME}"}`;
+
+test("TestGetMattermostIntegrationAnswersNullWhenTheProjectHasNone", async () => {
+  const seen = recorder("null");
+  expect(await api.getMattermostIntegration("p1")).toBeNull();
+  expect([seen.method, seen.path]).toEqual(["GET", "/api/mattermost-integration/project/p1"]);
+});
+
+test("TestGetMattermostIntegrationMapsTheMaskedRow", async () => {
+  recorder(mmRow);
+  const got = await api.getMattermostIntegration("p/1");
+  expect(got).toEqual({
+    id: "i1",
+    projectId: "p1",
+    channelName: "alerts",
+    webhookConfigured: true,
+    maskedWebhookUrl: "https://mm.example/x",
+    events: MM_EVENTS,
+    isActive: true,
+    createdAt: TIME,
+    updatedAt: TIME,
+  });
+});
+
+test("TestCreateMattermostIntegrationPostsTheBody", async () => {
+  const seen = recorder(mmRow);
+  const wanted: api.NewMattermostIntegration = { webhookUrl: "https://mm.example/in", channelName: "alerts", events: { taskCreated: false } };
+  await api.createMattermostIntegration("p1", wanted);
+  expect([seen.method, seen.path]).toEqual(["POST", "/api/mattermost-integration/project/p1"]);
+  expect(seen.body).toBe(JSON.stringify(wanted));
+});
+
+// Only the fields the caller set go out; the server keeps the rest and merges
+// the event toggles it is sent.
+test("TestUpdateMattermostIntegrationPatchesSparseChanges", async () => {
+  const seen = recorder(mmRow);
+  const changes: api.MattermostIntegrationChanges = { channelName: null, isActive: false, events: { taskStatusChanged: false } };
+  await api.updateMattermostIntegration("p1", changes);
+  expect([seen.method, seen.path]).toEqual(["PATCH", "/api/mattermost-integration/project/p1"]);
+  expect(seen.body).toBe(JSON.stringify(changes));
+});
+
+test("TestDeleteMattermostIntegrationAnswersSuccess", async () => {
+  const seen = recorder('{"success":true}');
+  expect(await api.deleteMattermostIntegration("p1")).toEqual({ success: true });
+  expect([seen.method, seen.path]).toEqual(["DELETE", "/api/mattermost-integration/project/p1"]);
+});
+
+test("TestGetGenericWebhookIntegrationAnswersNullWhenTheProjectHasNone", async () => {
+  const seen = recorder("null");
+  expect(await api.getGenericWebhookIntegration("p1")).toBeNull();
+  expect([seen.method, seen.path]).toEqual(["GET", "/api/generic-webhook-integration/project/p1"]);
+});
+
+test("TestGetGenericWebhookIntegrationMapsTheMaskedRow", async () => {
+  recorder(gwRow);
+  const got = await api.getGenericWebhookIntegration("p1");
+  expect(got).toEqual({
+    id: "i2",
+    projectId: "p1",
+    webhookConfigured: true,
+    maskedWebhookUrl: "https://wh.example/y",
+    secretConfigured: true,
+    maskedSecret: "whs_x",
+    events: GW_EVENTS,
+    dueDateReminderLeadTimeMinutes: 120,
+    isActive: false,
+    createdAt: TIME,
+    updatedAt: TIME,
+  });
+});
+
+// A stored config that leaves the lead out reads as the server's default.
+test("TestGetGenericWebhookIntegrationDefaultsTheReminderLead", async () => {
+  recorder(gwRow.replace(',"dueDateReminderLeadTimeMinutes":120', ""));
+  const got = await api.getGenericWebhookIntegration("p1");
+  expect(got?.dueDateReminderLeadTimeMinutes).toBe(1440);
+});
+
+test("TestCreateGenericWebhookIntegrationPostsTheBody", async () => {
+  const seen = recorder(gwRow);
+  const wanted: api.NewGenericWebhookIntegration = { webhookUrl: "https://wh.example/in", secret: "signing-material", dueDateReminderLeadTimeMinutes: 30 };
+  await api.createGenericWebhookIntegration("p1", wanted);
+  expect([seen.method, seen.path]).toEqual(["POST", "/api/generic-webhook-integration/project/p1"]);
+  expect(seen.body).toBe(JSON.stringify(wanted));
+});
+
+// A null secret is the update schema's way of clearing the stored one.
+test("TestUpdateGenericWebhookIntegrationPatchesSparseChanges", async () => {
+  const seen = recorder(gwRow);
+  const changes: api.GenericWebhookIntegrationChanges = { secret: null, events: { taskDeleted: true } };
+  await api.updateGenericWebhookIntegration("p1", changes);
+  expect([seen.method, seen.path]).toEqual(["PATCH", "/api/generic-webhook-integration/project/p1"]);
+  expect(seen.body).toBe(JSON.stringify(changes));
+});
+
+test("TestDeleteGenericWebhookIntegrationAnswersSuccess", async () => {
+  const seen = recorder('{"success":true}');
+  expect(await api.deleteGenericWebhookIntegration("p1")).toEqual({ success: true });
+  expect([seen.method, seen.path]).toEqual(["DELETE", "/api/generic-webhook-integration/project/p1"]);
+});

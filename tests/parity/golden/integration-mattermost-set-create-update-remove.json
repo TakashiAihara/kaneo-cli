@@ -1,0 +1,193 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--webhook-url",
+        "-",
+        "--channel-name",
+        "alerts",
+        "--task-comment-created=false",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created mattermost integration\nid         integ0002\nproject    proj-alpha\nchannel    alerts\nwebhook    http…lpha\nevents     task created, task status changed\nactive     on\ncreated    2026-01-01T00:00:10.000Z\nupdated    2026-01-01T00:00:10.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"channelName\": \"alerts\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…lpha\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": false\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:10.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--channel-name",
+        "",
+        "--task-status-changed",
+        "--active=false",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"channelName\": null,\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…lpha\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": false\n  },\n  \"isActive\": false,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:11.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         integ0002\nproject    proj-alpha\nchannel    unset\nwebhook    http…lpha\nevents     task created, task status changed\nactive     off\ncreated    2026-01-01T00:00:10.000Z\nupdated    2026-01-01T00:00:11.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "get",
+        "-p",
+        "proj-beta",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "rm",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"refusing to remove the mattermost integration without --yes\"\n}\n",
+      "stderr": "Error: refusing to remove the mattermost integration without --yes\n"
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "rm",
+        "--yes",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "removed the mattermost integration\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no mattermost integration on this project\"\n}\n",
+      "stderr": "Error: no mattermost integration on this project\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://example.com/mm-alpha",
+        "channelName": "alerts",
+        "events": {
+          "taskCommentCreated": false
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "channelName": null,
+        "isActive": false,
+        "events": {
+          "taskStatusChanged": true
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

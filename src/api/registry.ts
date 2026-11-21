@@ -117,4 +117,12 @@ export const OPERATIONS: Operation[] = [
   { id: "updateGitHubIntegration", method: "PATCH", path: "/github-integration/project/{projectId}", command: "kaneo integration github update" },
   { id: "deleteGitHubIntegration", method: "DELETE", path: "/github-integration/project/{projectId}", command: "kaneo integration github rm" },
   { id: "importGitHubIssues", method: "POST", path: "/github-integration/import-issues", command: "kaneo integration github import" },
+  { id: "getMattermostIntegration", method: "GET", path: "/mattermost-integration/project/{projectId}", command: "kaneo integration mattermost get" },
+  { id: "createMattermostIntegration", method: "POST", path: "/mattermost-integration/project/{projectId}", command: "kaneo integration mattermost set" },
+  { id: "updateMattermostIntegration", method: "PATCH", path: "/mattermost-integration/project/{projectId}", command: "kaneo integration mattermost set" },
+  { id: "deleteMattermostIntegration", method: "DELETE", path: "/mattermost-integration/project/{projectId}", command: "kaneo integration mattermost rm" },
+  { id: "getGenericWebhookIntegration", method: "GET", path: "/generic-webhook-integration/project/{projectId}", command: "kaneo integration webhook get" },
+  { id: "createGenericWebhookIntegration", method: "POST", path: "/generic-webhook-integration/project/{projectId}", command: "kaneo integration webhook set" },
+  { id: "updateGenericWebhookIntegration", method: "PATCH", path: "/generic-webhook-integration/project/{projectId}", command: "kaneo integration webhook set" },
+  { id: "deleteGenericWebhookIntegration", method: "DELETE", path: "/generic-webhook-integration/project/{projectId}", command: "kaneo integration webhook rm" },
 ];

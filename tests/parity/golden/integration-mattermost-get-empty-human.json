@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "no mattermost integration on this project\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,281 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--webhook-url",
+        "-",
+        "--secret-file",
+        "whsec.txt",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…iled\",\n  \"secretConfigured\": true,\n  \"maskedSecret\": \"whse…le_9\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": false,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 1440,\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:10.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         integ0002\nproject    proj-alpha\nwebhook    http…iled\nsecret     whse…le_9\nevents     task created, task status changed, task comment created\nreminder   1d before a due date\nactive     on\ncreated    2026-01-01T00:00:10.000Z\nupdated    2026-01-01T00:00:10.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--secret-file",
+        "whsec-next.txt",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…iled\",\n  \"secretConfigured\": true,\n  \"maskedSecret\": \"whse…xt_4\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": false,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 1440,\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:11.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--secret-file",
+        "whsec-lines.txt",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…iled\",\n  \"secretConfigured\": true,\n  \"maskedSecret\": \"whse…ne_2\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": false,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 1440,\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:12.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…iled\",\n  \"secretConfigured\": true,\n  \"maskedSecret\": \"whse…ne_2\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": false,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 1440,\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:12.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--secret",
+        "",
+        "--secret-file",
+        "whsec.txt",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"pass --secret or --secret-file, not both\"\n}\n",
+      "stderr": "Error: pass --secret or --secret-file, not both\n"
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--secret-file",
+        "nope.txt",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"reading nope.txt: ENOENT: no such file or directory, open 'nope.txt'\"\n}\n",
+      "stderr": "Error: reading nope.txt: ENOENT: no such file or directory, open 'nope.txt'\n"
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--secret-file",
+        "whsec-empty.txt",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty --secret-file whsec-empty.txt\"\n}\n",
+      "stderr": "Error: empty --secret-file whsec-empty.txt\n"
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…iled\",\n  \"secretConfigured\": true,\n  \"maskedSecret\": \"whse…ne_2\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": false,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 1440,\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:12.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--webhook-url-file",
+        "whurl.txt",
+        "--secret-file",
+        "whsec.txt",
+        "-p",
+        "BET",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0003\",\n  \"projectId\": \"proj-beta\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…file\",\n  \"secretConfigured\": true,\n  \"maskedSecret\": \"whse…le_9\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": false,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 1440,\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T00:00:13.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:13.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "get",
+        "-p",
+        "BET",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0003\",\n  \"projectId\": \"proj-beta\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…file\",\n  \"secretConfigured\": true,\n  \"maskedSecret\": \"whse…le_9\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": false,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 1440,\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T00:00:13.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:13.000Z\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://example.com/wh-filed",
+        "secret": "whsec_from_file_9"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "secret": "whsec_next_4"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "secret": "whsec_multi\nline_2"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/generic-webhook-integration/project/proj-beta",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://example.com/wh-urlfile",
+        "secret": "whsec_from_file_9"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-beta",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

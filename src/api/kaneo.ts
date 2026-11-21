@@ -7,6 +7,8 @@ import { shellWord } from "../output/output";
 import {
   archiveProject,
   clearAllNotifications,
+  createGenericWebhookIntegration as postGenericWebhook,
+  createMattermostIntegration as postMattermost,
   createNotification as postNotification,
   createColumn as postColumn,
   createActivity,
@@ -14,12 +16,18 @@ import {
   updateTaskComment,
   attachLabelToTask,
   createLabel as postLabel,
+  deleteGenericWebhookIntegration as removeGenericWebhook,
   deleteLabel as removeLabel,
+  deleteMattermostIntegration as removeMattermost,
   detachLabelFromTask,
+  getGenericWebhookIntegration as readGenericWebhookIntegration,
   getLabel as readLabel,
+  getMattermostIntegration as readMattermostIntegration,
   getTaskLabels,
   getWorkspaceLabels,
+  updateGenericWebhookIntegration as patchGenericWebhook,
   updateLabel as putLabel,
+  updateMattermostIntegration as patchMattermost,
   createProject as postProject,
   createTask as postTask,
   createCalendarFeed as postCalendarFeed,
@@ -112,10 +120,16 @@ import type {
   Board as GenBoard,
   BoardTask,
   CalendarFeed as GenCalendarFeed,
+  CreateGenericWebhookIntegrationBody,
+  CreateMattermostIntegrationBody,
   CreateNotificationBody,
   BulkUpdateTasksBody,
   Column as GenColumn,
   CreateTaskBody,
+  GenericWebhookEvents as GenGenericWebhookEvents,
+  GenericWebhookIntegration as GenGenericWebhookIntegration,
+  IntegrationEvents as GenIntegrationEvents,
+  MattermostIntegration as GenMattermostIntegration,
   Notification as GenNotification,
   NotificationPreferences as GenNotificationPreferences,
   CreateTaskRelationBody,
@@ -143,6 +157,8 @@ import type {
   CustomFieldValue as GenFieldValue,
   SetCustomFieldValueResponse as GenFieldSettingReply,
   CreateCustomFieldBody,
+  UpdateGenericWebhookIntegrationBody,
+  UpdateMattermostIntegrationBody,
   UpdateNotificationPreferencesBody,
   TimeEntry as GenTimeEntry,
   UpdateTaskBody,
@@ -2932,3 +2948,151 @@ const reason = (error: unknown): string => {
   if (typeof message === "string") return message;
   return error === undefined || error === null ? "" : JSON.stringify(error);
 };
+
+// A project's Mattermost integration: the incoming webhook task events are
+// posted to. The webhook URL is a credential, so the server returns only its
+// masked form and whether one is set; the events come back whole, the unset
+// ones filled with the server's defaults. isActive is null on rows written
+// before the column meant anything, and the delivery query counts only true.
+export type MattermostIntegration = {
+  id: string;
+  projectId: string;
+  channelName: string | null;
+  webhookConfigured: boolean;
+  maskedWebhookUrl: string;
+  events: GenIntegrationEvents;
+  isActive: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const mattermostIntegration = (i: NonNullable<GenMattermostIntegration>): MattermostIntegration => ({
+  id: i.id ?? "",
+  projectId: i.projectId ?? "",
+  channelName: i.channelName ?? null,
+  webhookConfigured: i.webhookConfigured ?? false,
+  maskedWebhookUrl: i.maskedWebhookUrl ?? "",
+  // These replies carry no schema check, so a toggle the server left out reads
+  // as off rather than failing the whole read.
+  events: {
+    taskCreated: i.events?.taskCreated ?? false,
+    taskStatusChanged: i.events?.taskStatusChanged ?? false,
+    taskPriorityChanged: i.events?.taskPriorityChanged ?? false,
+    taskTitleChanged: i.events?.taskTitleChanged ?? false,
+    taskDescriptionChanged: i.events?.taskDescriptionChanged ?? false,
+    taskCommentCreated: i.events?.taskCommentCreated ?? false,
+  },
+  isActive: i.isActive ?? null,
+  createdAt: isoTime(i, "createdAt"),
+  updatedAt: isoTime(i, "updatedAt"),
+});
+
+// A project's generic webhook integration: the outgoing webhook task events
+// are POSTed to, signed with the secret when one is set. Like Mattermost's, the
+// URL and the secret come back masked only; events come back whole.
+export type GenericWebhookIntegration = {
+  id: string;
+  projectId: string;
+  webhookConfigured: boolean;
+  maskedWebhookUrl: string | null;
+  secretConfigured: boolean;
+  maskedSecret: string | null;
+  events: GenGenericWebhookEvents;
+  dueDateReminderLeadTimeMinutes: number;
+  isActive: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const genericWebhookIntegration = (i: NonNullable<GenGenericWebhookIntegration>): GenericWebhookIntegration => ({
+  id: i.id ?? "",
+  projectId: i.projectId ?? "",
+  webhookConfigured: i.webhookConfigured ?? false,
+  maskedWebhookUrl: i.maskedWebhookUrl ?? null,
+  secretConfigured: i.secretConfigured ?? false,
+  maskedSecret: i.maskedSecret ?? null,
+  events: {
+    taskCreated: i.events?.taskCreated ?? false,
+    taskStatusChanged: i.events?.taskStatusChanged ?? false,
+    taskPriorityChanged: i.events?.taskPriorityChanged ?? false,
+    taskTitleChanged: i.events?.taskTitleChanged ?? false,
+    taskDescriptionChanged: i.events?.taskDescriptionChanged ?? false,
+    taskCommentCreated: i.events?.taskCommentCreated ?? false,
+    taskDeleted: i.events?.taskDeleted ?? false,
+    taskMoved: i.events?.taskMoved ?? false,
+    taskDueDateChanged: i.events?.taskDueDateChanged ?? false,
+    taskAssigneeChanged: i.events?.taskAssigneeChanged ?? false,
+    taskUnassigned: i.events?.taskUnassigned ?? false,
+    dueDateReminder: i.events?.dueDateReminder ?? false,
+  },
+  // The server fills the default (1440) when the stored config leaves it out.
+  dueDateReminderLeadTimeMinutes: i.dueDateReminderLeadTimeMinutes ?? 1440,
+  isActive: i.isActive ?? null,
+  createdAt: isoTime(i, "createdAt"),
+  updatedAt: isoTime(i, "updatedAt"),
+});
+
+// The bodies the two writes take, named for what they are rather than for the
+// routes they go to. On create webhookUrl is required; on update every field is
+// optional and an event toggle merges into the stored set.
+export type NewMattermostIntegration = CreateMattermostIntegrationBody;
+export type MattermostIntegrationChanges = UpdateMattermostIntegrationBody;
+export type NewGenericWebhookIntegration = CreateGenericWebhookIntegrationBody;
+export type GenericWebhookIntegrationChanges = UpdateGenericWebhookIntegrationBody;
+
+// What a removal answers, the document's deletedSchema both providers share.
+export type IntegrationRemoved = { success: boolean };
+
+// The integration a project has, or null when it has none: both providers
+// answer null rather than 404 for the missing one.
+export const getMattermostIntegration = async (projectId: string): Promise<MattermostIntegration | null> => {
+  const found = await readMattermostIntegration(pathParam(projectId));
+  return found === null || found === undefined ? null : mattermostIntegration(found);
+};
+
+export const createMattermostIntegration = async (
+  projectId: string,
+  wanted: NewMattermostIntegration,
+): Promise<MattermostIntegration | null> => {
+  const created = await postMattermost(pathParam(projectId), { ...wanted });
+  return created === null || created === undefined ? null : mattermostIntegration(created);
+};
+
+// Only the fields in changes are sent; the server keeps the rest and merges
+// the event toggles it is given into the stored set.
+export const updateMattermostIntegration = async (
+  projectId: string,
+  changes: MattermostIntegrationChanges,
+): Promise<MattermostIntegration | null> => {
+  const updated = await patchMattermost(pathParam(projectId), { ...changes });
+  return updated === null || updated === undefined ? null : mattermostIntegration(updated);
+};
+
+// The server refuses with 404 when the project has no integration to remove.
+export const deleteMattermostIntegration = async (projectId: string): Promise<IntegrationRemoved> =>
+  zeroRecord(await removeMattermost(pathParam(projectId)));
+
+export const getGenericWebhookIntegration = async (projectId: string): Promise<GenericWebhookIntegration | null> => {
+  const found = await readGenericWebhookIntegration(pathParam(projectId));
+  return found === null || found === undefined ? null : genericWebhookIntegration(found);
+};
+
+export const createGenericWebhookIntegration = async (
+  projectId: string,
+  wanted: NewGenericWebhookIntegration,
+): Promise<GenericWebhookIntegration | null> => {
+  const created = await postGenericWebhook(pathParam(projectId), { ...wanted });
+  return created === null || created === undefined ? null : genericWebhookIntegration(created);
+};
+
+// A null secret clears the stored one; the other fields behave as Mattermost's.
+export const updateGenericWebhookIntegration = async (
+  projectId: string,
+  changes: GenericWebhookIntegrationChanges,
+): Promise<GenericWebhookIntegration | null> => {
+  const updated = await patchGenericWebhook(pathParam(projectId), { ...changes });
+  return updated === null || updated === undefined ? null : genericWebhookIntegration(updated);
+};
+
+export const deleteGenericWebhookIntegration = async (projectId: string): Promise<IntegrationRemoved> =>
+  zeroRecord(await removeGenericWebhook(pathParam(projectId)));

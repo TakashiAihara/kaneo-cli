@@ -1,0 +1,172 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--webhook-url",
+        "-",
+        "--task-deleted",
+        "--reminder-lead",
+        "2h",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…lpha\",\n  \"secretConfigured\": false,\n  \"maskedSecret\": null,\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": true,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 120,\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:10.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         integ0002\nproject    proj-alpha\nwebhook    http…lpha\nsecret     not set\nevents     task created, task status changed, task comment created, task deleted\nreminder   2h before a due date\nactive     on\ncreated    2026-01-01T00:00:10.000Z\nupdated    2026-01-01T00:00:10.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--task-moved=false",
+        "--active=false",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…lpha\",\n  \"secretConfigured\": false,\n  \"maskedSecret\": null,\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": true,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 120,\n  \"isActive\": false,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:11.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…lpha\",\n  \"secretConfigured\": false,\n  \"maskedSecret\": null,\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": true,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 120,\n  \"isActive\": false,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:11.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "rm",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"refusing to remove the webhook integration without --yes\"\n}\n",
+      "stderr": "Error: refusing to remove the webhook integration without --yes\n"
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "rm",
+        "--yes",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "removed the webhook integration\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no webhook integration on this project\"\n}\n",
+      "stderr": "Error: no webhook integration on this project\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://example.com/wh-alpha",
+        "events": {
+          "taskDeleted": true
+        },
+        "dueDateReminderLeadTimeMinutes": 120
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "isActive": false,
+        "events": {
+          "taskMoved": false
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

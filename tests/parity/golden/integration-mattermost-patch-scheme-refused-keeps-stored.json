@@ -1,0 +1,49 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--webhook-url",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PATCH /api/mattermost-integration/project/proj-alpha: 400: Webhook URL must be an HTTPS URL\"\n}\n",
+      "stderr": "Error: PATCH /api/mattermost-integration/project/proj-alpha: 400: Webhook URL must be an HTTPS URL\n"
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         integ0002\nproject    proj-alpha\nchannel    alerts\nwebhook    http…kept\nevents     task created, task status changed, task comment created\nactive     on\ncreated    2026-01-01T00:00:10.000Z\nupdated    2026-01-01T00:00:10.000Z\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "http://insecure.example/mm"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "no webhook integration on this project\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

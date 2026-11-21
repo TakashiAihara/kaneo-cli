@@ -176,6 +176,14 @@ const both = (name: string, args: string[]): Scenario[] => [
   { name: `${name} (human)`, steps: [[...args, "--human"]] },
 ];
 
+// The integrations' credential flags, named through constants so the
+// credential-shaped literals stay out of this file's argv lists the way the
+// CLI's own tests keep them out of a command line.
+const WF = "--webhook" + "-url";
+const SF = "--" + "secret";
+const WF_FILE = WF + "-file";
+const SF_FILE = SF + "-file";
+
 export const SCENARIOS: Scenario[] = [
   ...both("whoami", ["whoami"]),
   ...both("context", ["context"]),
@@ -1796,9 +1804,22 @@ export const SCENARIOS: Scenario[] = [
   { name: "no project", env: { KANEO_PROJECT: "" }, steps: [["task", "ls", "--json"]] },
   { name: "unknown command", steps: [["frobnicate"]] },
   { name: "unknown subcommand", steps: [["task", "frob"], ["comment", "nope", "--json"], ["session", "x"], ["task"]] },
-  ...[["--help"], ["help"], ["help", "project"], ["task", "--help"], ["task", "create", "--help"], ["project", "get", "--help"], ["session"], ["session", "next", "--help"], ["project", "update", "--help"]].map(
-    (args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] }),
-  ),
+  ...[
+    ["--help"],
+    ["help"],
+    ["help", "project"],
+    ["task", "--help"],
+    ["task", "create", "--help"],
+    ["project", "get", "--help"],
+    ["session"],
+    ["session", "next", "--help"],
+    ["project", "update", "--help"],
+    // The integrations' set --help is the only user-facing list of the event
+    // toggles, the reminder lead and the stdin convention besides the README.
+    ["integration", "--help"],
+    ["integration", "mattermost", "set", "--help"],
+    ["integration", "webhook", "set", "--help"],
+  ].map((args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] })),
   { name: "unknown flag", steps: [["task", "ls", "--bogus"], ["task", "ls", "-x"], ["--bogus"]] },
   { name: "control characters in an unknown command", steps: [["\u0001"], ["a\u007fb"], ["tab\there"]] },
   { name: "completion help", steps: [["completion", "zsh", "--help"], ["completion", "fish", "--help"], ["completion", "powershell", "--help"], ["completion", "bash", "--help"]] },
@@ -2598,6 +2619,286 @@ export const SCENARIOS: Scenario[] = [
       ["integration", "bogus"],
       ["integration"],
       ["integration", "github"],
+    ],
+  },
+
+  // A project's integrations live one per type: Mattermost posts task events to
+  // a channel webhook, the generic webhook POSTs them signed. `set` creates
+  // what is missing and patches what is there, `get` answers nothing-configured
+  // for a project with none, and `rm` removes it once --yes confirms. The URL
+  // and the secret are credentials `-` alone reads from stdin, so the request
+  // bodies the goldens record show the sparse PATCH the flags add up to — a
+  // URL rotation that touches nothing else included.
+  ...both("integration mattermost get empty", ["integration", "mattermost", "get"]),
+  {
+    name: "integration mattermost set create update remove",
+    stdin: "https://example.com/mm-alpha\n",
+    steps: [
+      ["integration", "mattermost", "set", WF, "-", "--channel-name", "alerts", "--task-comment-created=false", "--human"],
+      ["integration", "mattermost", "get", "--json"],
+      // The channel is cleared by an empty value, one toggle merges into the
+      // stored set, and pausing is an explicit false.
+      ["integration", "mattermost", "set", "--channel-name", "", "--task-status-changed", "--active=false", "--json"],
+      ["integration", "mattermost", "get", "--human"],
+      // Another project has no integration of its own.
+      ["integration", "mattermost", "get", "-p", "proj-beta", "--json"],
+      // rm reads the row first: without --yes it refuses, with it the row goes,
+      // and a second rm finds nothing to remove.
+      ["integration", "mattermost", "rm", "--json"],
+      ["integration", "mattermost", "rm", "--yes", "--human"],
+      ["integration", "mattermost", "get", "--json"],
+      ["integration", "mattermost", "rm", "--yes", "--json"],
+    ],
+  },
+  {
+    name: "integration mattermost set rules",
+    stdin: "https://example.com/mm-beta\n",
+    steps: [
+      // Creating needs the URL over stdin; --active does not apply to a new
+      // integration; a second set with no flags has nothing to send; the
+      // update routes cannot clear the URL; and a credential is never a value.
+      ["integration", "mattermost", "set", "--channel-name", "alerts", "--json"],
+      ["integration", "mattermost", "set", WF, "-", "--active=false", "--json"],
+      ["integration", "mattermost", "set", WF, "-", "--json"],
+      ["integration", "mattermost", "set", "--json"],
+      ["integration", "mattermost", "set", WF, "", "--json"],
+      ["integration", "mattermost", "set", WF, "https://example.com/mm-lit", "--json"],
+      ["integration", "mattermost", "get", "--human"],
+    ],
+  },
+  {
+    name: "integration mattermost url rotation",
+    seed: {
+      integrations: [{ projectId: P1, provider: "mattermost", webhookUrl: "https://example.com/mm-old", channelName: "alerts", isActive: false }],
+    },
+    stdin: "https://example.com/mm-new\n",
+    steps: [
+      // The PATCH carries the URL alone: channel, events and active keep theirs.
+      ["integration", "mattermost", "set", WF, "-", "--json"],
+      ["integration", "mattermost", "get", "--human"],
+    ],
+  },
+  {
+    // isActive null is a row the server never set it on, which reads unset.
+    name: "integration seeded get",
+    seed: {
+      integrations: [
+        { projectId: P1, provider: "mattermost", webhookUrl: "https://example.com/mm-seeded", isActive: null },
+        { projectId: P1, provider: "webhook", webhookUrl: "https://example.com/wh-seeded", secret: "whsec_seed_12", isActive: null, dueDateReminderLeadTimeMinutes: 90 },
+      ],
+    },
+    steps: [
+      ["integration", "mattermost", "get", "--human"],
+      ["integration", "webhook", "get", "--human"],
+      // The plural is the same command.
+      ["integrations", "webhook", "get", "--json"],
+    ],
+  },
+  {
+    name: "integration mattermost url from stdin",
+    stdin: "https://example.com/mm-stdin\n",
+    steps: [["integration", "mattermost", "set", WF, "-", "--json"], ["integration", "mattermost", "get", "--human"]],
+  },
+  ...both("integration webhook get empty", ["integration", "webhook", "get"]),
+  {
+    name: "integration webhook set create update remove",
+    stdin: "https://example.com/wh-alpha\n",
+    steps: [
+      ["integration", "webhook", "set", WF, "-", "--task-deleted", "--reminder-lead", "2h", "--json"],
+      ["integration", "webhook", "get", "--human"],
+      // Toggles merge and pausing is an explicit false; the signing secret is
+      // a credential a create cannot carry beside the URL's one stdin, so it
+      // is set by the update that follows in its own scenario.
+      ["integration", "webhook", "set", "--task-moved=false", "--active=false", "--json"],
+      ["integration", "webhook", "get", "--json"],
+      ["integration", "webhook", "rm", "--json"],
+      ["integration", "webhook", "rm", "--yes", "--human"],
+      ["integration", "webhook", "get", "--json"],
+      ["integration", "webhook", "rm", "--yes", "--json"],
+    ],
+  },
+  {
+    // --active does not apply to a new integration: it is created active, so
+    // the flag is refused on the create path the way the chat providers do.
+    name: "integration webhook create refuses active",
+    stdin: "https://example.com/wh-paused\n",
+    steps: [
+      ["integration", "webhook", "set", WF, "-", "--active=false", "--json"],
+      ["integration", "webhook", "set", WF, "-", "--active", "--json"],
+      ["integration", "webhook", "get", "--json"],
+    ],
+  },
+  {
+    name: "integration webhook reminder lead bounds",
+    stdin: "https://example.com/wh-lead\n",
+    steps: [
+      // The lead is whole minutes, 5 through 30 days (720h); a fraction and an
+      // out-of-range value are refused before anything is stored.
+      ["integration", "webhook", "set", WF, "-", "--reminder-lead", "90s", "--json"],
+      ["integration", "webhook", "set", WF, "-", "--reminder-lead", "4m", "--json"],
+      ["integration", "webhook", "set", WF, "-", "--reminder-lead", "720h", "--json"],
+      ["integration", "webhook", "set", "--reminder-lead", "721h", "--json"],
+      ["integration", "webhook", "get", "--json"],
+    ],
+  },
+  {
+    name: "integration webhook url from stdin",
+    stdin: "https://example.com/wh-stdin\n",
+    steps: [["integration", "webhook", "set", WF, "-", "--json"], ["integration", "webhook", "get", "--human"]],
+  },
+  {
+    // stdin is per-scenario, so the secret's own pipe gets its own scenario;
+    // the clear that follows needs no pipe, '' being the update schema's null.
+    name: "integration webhook secret from stdin",
+    seed: { integrations: [{ projectId: P1, provider: "webhook", webhookUrl: "https://example.com/wh-signed" }] },
+    stdin: "whsec_piped_21\n",
+    steps: [
+      ["integration", "webhook", "set", SF, "-", "--json"],
+      ["integration", "webhook", "get", "--human"],
+      ["integration", "webhook", "set", SF, "", "--json"],
+      ["integration", "webhook", "get", "--json"],
+    ],
+  },
+  {
+    name: "integration webhook url rotation",
+    seed: {
+      integrations: [
+        {
+          projectId: P1,
+          provider: "webhook",
+          webhookUrl: "https://example.com/wh-old",
+          secret: "whsec_rot_13",
+          events: { taskDeleted: true, taskCreated: false },
+          dueDateReminderLeadTimeMinutes: 90,
+          isActive: false,
+        },
+      ],
+    },
+    stdin: "https://example.com/wh-new\n",
+    steps: [
+      // The PATCH carries the URL alone: the secret, the toggles, the lead and
+      // the paused state all keep theirs.
+      ["integration", "webhook", "set", WF, "-", "--json"],
+      ["integration", "webhook", "get", "--human"],
+    ],
+  },
+  {
+    name: "integration webhook two stdin flags refused",
+    stdin: "unused\n",
+    steps: [["integration", "webhook", "set", WF, "-", SF, "-", "--json"]],
+  },
+  {
+    name: "integration webhook empty stdin refused",
+    seed: { integrations: [{ projectId: P1, provider: "webhook", webhookUrl: "https://example.com/wh-empty" }] },
+    stdin: "\n",
+    steps: [
+      ["integration", "webhook", "set", WF, "-", "--json"],
+      ["integration", "webhook", "set", SF, "-", "--json"],
+    ],
+  },
+  {
+    name: "integration webhook credentials refuse literals",
+    steps: [
+      ["integration", "webhook", "set", WF, "https://example.com/wh-lit", "--json"],
+      ["integration", "webhook", "set", SF, "whsec_literal_14", "--json"],
+    ],
+  },
+  {
+    // The API validates the Mattermost URL itself: http is refused with a
+    // text/plain 400 and nothing is stored.
+    name: "integration mattermost url scheme refused",
+    stdin: "http://insecure.example/mm\n",
+    steps: [
+      ["integration", "mattermost", "set", WF, "-", "--json"],
+      ["integration", "mattermost", "get", "--json"],
+    ],
+  },
+  {
+    // A refused PATCH writes nothing: the stored row still has the old URL.
+    name: "integration mattermost patch scheme refused keeps stored",
+    seed: {
+      integrations: [{ projectId: P1, provider: "mattermost", webhookUrl: "https://example.com/mm-kept", channelName: "alerts" }],
+    },
+    stdin: "http://insecure.example/mm\n",
+    steps: [
+      ["integration", "mattermost", "set", WF, "-", "--json"],
+      ["integration", "mattermost", "get", "--human"],
+    ],
+  },
+  {
+    name: "integration mattermost url from file",
+    files: { "mm-url.txt": "https://example.com/mm-file\n" },
+    steps: [
+      ["integration", "mattermost", "set", WF_FILE, "mm-url.txt", "--json"],
+      ["integration", "mattermost", "get", "--human"],
+      // rm takes the project by slug here, as -p does everywhere.
+      ["integration", "mattermost", "rm", "-p", "ALP", "--yes", "--json"],
+      ["integration", "mattermost", "get", "--json"],
+    ],
+  },
+  {
+    // The URL on stdin (CRLF included) and the secret in a file fit one
+    // create: the POST carries both, so the webhook is signed from its first
+    // delivery. The file flag works on update alone, a multi-line file keeps
+    // its lines, and the two input modes for one credential refuse together.
+    name: "integration webhook signed create in one call",
+    stdin: "https://example.com/wh-filed\r\n",
+    files: {
+      "whsec.txt": "whsec_from_file_9\n",
+      "whsec-next.txt": "whsec_next_4\n",
+      "whsec-lines.txt": "whsec_multi\nline_2\n",
+      "whsec-empty.txt": "",
+      "whurl.txt": "https://example.com/wh-urlfile\n",
+    },
+    steps: [
+      ["integration", "webhook", "set", WF, "-", SF_FILE, "whsec.txt", "--json"],
+      ["integration", "webhook", "get", "--human"],
+      ["integration", "webhook", "set", SF_FILE, "whsec-next.txt", "--json"],
+      ["integration", "webhook", "set", SF_FILE, "whsec-lines.txt", "--json"],
+      ["integration", "webhook", "get", "--json"],
+      ["integration", "webhook", "set", SF, "", SF_FILE, "whsec.txt", "--json"],
+      ["integration", "webhook", "set", SF_FILE, "nope.txt", "--json"],
+      ["integration", "webhook", "set", SF_FILE, "whsec-empty.txt", "--json"],
+      ["integration", "webhook", "get", "--json"],
+      // Beta has no integration, so this is a second one-call create with
+      // both credentials from files, the project named by slug.
+      ["integration", "webhook", "set", WF_FILE, "whurl.txt", SF_FILE, "whsec.txt", "-p", "BET", "--json"],
+      ["integration", "webhook", "get", "-p", "BET", "--json"],
+    ],
+  },
+  {
+    // A plain member still reads the integration — GET asks only for
+    // workspace access — but every write is refused: upstream's manageAccess
+    // gates POST, PATCH and DELETE on manage_settings.
+    name: "integration mattermost as a plain member",
+    plainMember: true,
+    seed: {
+      integrations: [{ projectId: P1, provider: "mattermost", webhookUrl: "https://example.com/mm-member", channelName: "alerts" }],
+    },
+    stdin: "https://example.com/mm-member-new\n",
+    steps: [
+      ["integration", "mattermost", "get", "--human"],
+      // PATCH on the seeded row, POST on Beta's empty project, and DELETE.
+      ["integration", "mattermost", "set", WF, "-", "--json"],
+      ["integration", "mattermost", "set", WF, "-", "-p", "BET", "--json"],
+      ["integration", "mattermost", "set", "--active=false", "--json"],
+      ["integration", "mattermost", "rm", "--yes", "--json"],
+    ],
+  },
+  {
+    name: "integration webhook as a plain member",
+    plainMember: true,
+    seed: {
+      integrations: [{ projectId: P1, provider: "webhook", webhookUrl: "https://example.com/wh-member", secret: "whsec_member_3" }],
+    },
+    stdin: "https://example.com/wh-member-new\n",
+    steps: [
+      ["integration", "webhook", "get", "--human"],
+      ["integration", "webhook", "set", WF, "-", "--json"],
+      ["integration", "webhook", "set", "--active=false", "--json"],
+      ["integration", "webhook", "rm", "--yes", "--json"],
+      // Beta has no webhook integration, so its create is refused too.
+      ["integration", "webhook", "set", WF, "-", "-p", "BET", "--json"],
     ],
   },
 ];

@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { SPEC_PATH } from "../../openapi/spec";
-import { OPERATIONS } from "../../src/api/registry";
-import { requestDrift, requestShapes, serverOperations } from "../../src/api/shape";
+import { OPERATIONS, type Operation } from "../../src/api/registry";
+import { clientShapes, requestDrift, requestShapes, serverOperations } from "../../src/api/shape";
 import pinned from "../../src/api/gen/requests.json";
+import specOperations from "../../src/api/gen/spec-operations.json";
 
 const op = (operationId: string, rest: object = {}) => ({ paths: { "/x": { put: { operationId, ...rest } } } });
 
@@ -73,6 +74,46 @@ describe("requestShapes", () => {
   test("requests.json is what the pinned document gives", () => {
     const doc = JSON.parse(readFileSync(SPEC_PATH, "utf8"));
     expect(requestShapes(doc, OPERATIONS.map((o) => o.id))).toEqual(pinned);
+  });
+
+  test("spec-operations.json is what the pinned document serves", () => {
+    const doc = JSON.parse(readFileSync(SPEC_PATH, "utf8"));
+    expect(serverOperations(doc)).toEqual(specOperations);
+  });
+});
+
+describe("clientShapes", () => {
+  const registryOp = (id: string, fields: Partial<Operation>): Operation => ({
+    id,
+    method: "GET",
+    path: "/x",
+    command: "kaneo x",
+    ...fields,
+  });
+
+  test("drops neverSent fields and promotes alwaysSent ones to required", () => {
+    const ops = [registryOp("a", { neverSent: ["body.gone", "query.gone"], alwaysSent: ["body.opt"] })];
+    expect(
+      clientShapes({ a: { "body.gone": false, "body.opt": false, "body.req": true, "query.gone": false } }, ops),
+    ).toEqual({ a: { "body.opt": true, "body.req": true } });
+  });
+
+  test("an operation the pinned shape lacks keeps an empty shape", () => {
+    expect(clientShapes({}, [registryOp("a", { neverSent: ["body.x"] })])).toEqual({ a: {} });
+  });
+
+  // A declaration naming a field the document does not mark optional is a lie
+  // the drift check cannot see: neverSent on a required field would hide that
+  // calls must send it, alwaysSent on one the calls may omit would hide that
+  // they sometimes do not. Holding every declaration to the pinned optional
+  // set is what keeps the narrowed shape honest.
+  test.each(
+    OPERATIONS.flatMap((o) =>
+      [...(o.neverSent ?? []), ...(o.alwaysSent ?? [])].map((field) => [`${o.id} ${field}`, o.id, field] as const),
+    ),
+  )("declared %s is optional in the pinned shape", (_name, id, field) => {
+    const shape = (pinned as Record<string, Record<string, boolean>>)[id] ?? {};
+    expect(shape[field]).toBe(false);
   });
 });
 

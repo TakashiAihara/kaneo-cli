@@ -1,0 +1,1166 @@
+[
+  {
+    "id": "acceptOrganizationInvitation",
+    "method": "POST",
+    "path": "/auth/organization/accept-invitation",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "addOrganizationTeamMember",
+    "method": "POST",
+    "path": "/auth/organization/add-team-member",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "archiveProject",
+    "method": "PUT",
+    "path": "/project/{id}/archive",
+    "tag": "Projects"
+  },
+  {
+    "id": "attachLabelToTask",
+    "method": "PUT",
+    "path": "/label/{id}/task",
+    "tag": "Labels"
+  },
+  {
+    "id": "authorizeMcpOAuthClient",
+    "method": "GET",
+    "path": "/mcp/authorize",
+    "tag": "MCP"
+  },
+  {
+    "id": "bulkUpdateTasks",
+    "method": "PATCH",
+    "path": "/task/bulk",
+    "tag": "Tasks"
+  },
+  {
+    "id": "cancelOrganizationInvitation",
+    "method": "POST",
+    "path": "/auth/organization/cancel-invitation",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "checkOrganizationSlug",
+    "method": "POST",
+    "path": "/auth/organization/check-slug",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "clearAllNotifications",
+    "method": "DELETE",
+    "path": "/notification/clear-all",
+    "tag": "Notifications"
+  },
+  {
+    "id": "createActivity",
+    "method": "POST",
+    "path": "/activity/create",
+    "tag": "Activity"
+  },
+  {
+    "id": "createCalendarFeed",
+    "method": "POST",
+    "path": "/calendar-feed/project/{projectId}",
+    "tag": "Calendar feeds"
+  },
+  {
+    "id": "createColumn",
+    "method": "POST",
+    "path": "/column/{projectId}",
+    "tag": "Columns"
+  },
+  {
+    "id": "createComment",
+    "method": "POST",
+    "path": "/activity/comment",
+    "tag": "Activity"
+  },
+  {
+    "id": "createCustomField",
+    "method": "POST",
+    "path": "/custom-field",
+    "tag": "Custom Fields"
+  },
+  {
+    "id": "createDiscordIntegration",
+    "method": "POST",
+    "path": "/discord-integration/project/{projectId}",
+    "tag": "Discord"
+  },
+  {
+    "id": "createExternalLink",
+    "method": "POST",
+    "path": "/external-link/task/{taskId}",
+    "tag": "External Links"
+  },
+  {
+    "id": "createGenericWebhookIntegration",
+    "method": "POST",
+    "path": "/generic-webhook-integration/project/{projectId}",
+    "tag": "Generic Webhook"
+  },
+  {
+    "id": "createGitHubIntegration",
+    "method": "POST",
+    "path": "/github-integration/project/{projectId}",
+    "tag": "GitHub"
+  },
+  {
+    "id": "createGiteaIntegration",
+    "method": "POST",
+    "path": "/gitea-integration/project/{projectId}",
+    "tag": "Gitea"
+  },
+  {
+    "id": "createGitlabIntegration",
+    "method": "POST",
+    "path": "/gitlab-integration/project/{projectId}",
+    "tag": "GitLab"
+  },
+  {
+    "id": "createLabel",
+    "method": "POST",
+    "path": "/label",
+    "tag": "Labels"
+  },
+  {
+    "id": "createMattermostIntegration",
+    "method": "POST",
+    "path": "/mattermost-integration/project/{projectId}",
+    "tag": "Mattermost"
+  },
+  {
+    "id": "createNotification",
+    "method": "POST",
+    "path": "/notification",
+    "tag": "Notifications"
+  },
+  {
+    "id": "createOrganization",
+    "method": "POST",
+    "path": "/auth/organization/create",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "createOrganizationRole",
+    "method": "POST",
+    "path": "/auth/organization/create-role",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "createOrganizationTeam",
+    "method": "POST",
+    "path": "/auth/organization/create-team",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "createProject",
+    "method": "POST",
+    "path": "/project",
+    "tag": "Projects"
+  },
+  {
+    "id": "createSlackIntegration",
+    "method": "POST",
+    "path": "/slack-integration/project/{projectId}",
+    "tag": "Slack"
+  },
+  {
+    "id": "createTask",
+    "method": "POST",
+    "path": "/task/{projectId}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "createTaskComment",
+    "method": "POST",
+    "path": "/comment/{taskId}",
+    "tag": "Comments"
+  },
+  {
+    "id": "createTaskImageUpload",
+    "method": "PUT",
+    "path": "/task/image-upload/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "createTaskRelation",
+    "method": "POST",
+    "path": "/task-relation",
+    "tag": "Task Relations"
+  },
+  {
+    "id": "createTelegramIntegration",
+    "method": "POST",
+    "path": "/telegram-integration/project/{projectId}",
+    "tag": "Telegram"
+  },
+  {
+    "id": "createTimeEntry",
+    "method": "POST",
+    "path": "/time-entry",
+    "tag": "Time Entries"
+  },
+  {
+    "id": "decideMcpAuthorizationRequest",
+    "method": "POST",
+    "path": "/mcp/authorize/request/{requestId}",
+    "tag": "MCP"
+  },
+  {
+    "id": "deleteColumn",
+    "method": "DELETE",
+    "path": "/column/{id}",
+    "tag": "Columns"
+  },
+  {
+    "id": "deleteComment",
+    "method": "DELETE",
+    "path": "/activity/comment",
+    "tag": "Activity"
+  },
+  {
+    "id": "deleteCustomField",
+    "method": "DELETE",
+    "path": "/custom-field/{id}",
+    "tag": "Custom Fields"
+  },
+  {
+    "id": "deleteDiscordIntegration",
+    "method": "DELETE",
+    "path": "/discord-integration/project/{projectId}",
+    "tag": "Discord"
+  },
+  {
+    "id": "deleteExternalLink",
+    "method": "DELETE",
+    "path": "/external-link/task/{taskId}/{id}",
+    "tag": "External Links"
+  },
+  {
+    "id": "deleteGenericWebhookIntegration",
+    "method": "DELETE",
+    "path": "/generic-webhook-integration/project/{projectId}",
+    "tag": "Generic Webhook"
+  },
+  {
+    "id": "deleteGitHubIntegration",
+    "method": "DELETE",
+    "path": "/github-integration/project/{projectId}",
+    "tag": "GitHub"
+  },
+  {
+    "id": "deleteGiteaIntegration",
+    "method": "DELETE",
+    "path": "/gitea-integration/project/{projectId}",
+    "tag": "Gitea"
+  },
+  {
+    "id": "deleteGitlabIntegration",
+    "method": "DELETE",
+    "path": "/gitlab-integration/project/{projectId}",
+    "tag": "GitLab"
+  },
+  {
+    "id": "deleteLabel",
+    "method": "DELETE",
+    "path": "/label/{id}",
+    "tag": "Labels"
+  },
+  {
+    "id": "deleteMattermostIntegration",
+    "method": "DELETE",
+    "path": "/mattermost-integration/project/{projectId}",
+    "tag": "Mattermost"
+  },
+  {
+    "id": "deleteNotificationPreferenceWorkspaceRule",
+    "method": "DELETE",
+    "path": "/notification-preferences/workspaces/{workspaceId}",
+    "tag": "Notification Preferences"
+  },
+  {
+    "id": "deleteOrganization",
+    "method": "POST",
+    "path": "/auth/organization/delete",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "deleteOrganizationRole",
+    "method": "POST",
+    "path": "/auth/organization/delete-role",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "deleteProject",
+    "method": "DELETE",
+    "path": "/project/{id}",
+    "tag": "Projects"
+  },
+  {
+    "id": "deleteProjectBackground",
+    "method": "DELETE",
+    "path": "/project/{id}/background",
+    "tag": "Projects"
+  },
+  {
+    "id": "deleteSlackIntegration",
+    "method": "DELETE",
+    "path": "/slack-integration/project/{projectId}",
+    "tag": "Slack"
+  },
+  {
+    "id": "deleteTask",
+    "method": "DELETE",
+    "path": "/task/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "deleteTaskComment",
+    "method": "DELETE",
+    "path": "/comment/{id}",
+    "tag": "Comments"
+  },
+  {
+    "id": "deleteTaskRelation",
+    "method": "DELETE",
+    "path": "/task-relation/{id}",
+    "tag": "Task Relations"
+  },
+  {
+    "id": "deleteTelegramIntegration",
+    "method": "DELETE",
+    "path": "/telegram-integration/project/{projectId}",
+    "tag": "Telegram"
+  },
+  {
+    "id": "deleteUserAvatar",
+    "method": "DELETE",
+    "path": "/user/avatar",
+    "tag": "User"
+  },
+  {
+    "id": "deleteWorkflowRule",
+    "method": "DELETE",
+    "path": "/workflow-rule/{id}",
+    "tag": "Workflow Rules"
+  },
+  {
+    "id": "detachLabelFromTask",
+    "method": "DELETE",
+    "path": "/label/{id}/task",
+    "tag": "Labels"
+  },
+  {
+    "id": "duplicateTask",
+    "method": "POST",
+    "path": "/task/duplicate/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "exportTasks",
+    "method": "GET",
+    "path": "/task/export/{projectId}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "finalizeProjectBackgroundUpload",
+    "method": "POST",
+    "path": "/project/{id}/background-upload/finalize",
+    "tag": "Projects"
+  },
+  {
+    "id": "finalizeStagedTaskAsset",
+    "method": "POST",
+    "path": "/task/draft-upload/{projectId}/finalize",
+    "tag": "Tasks"
+  },
+  {
+    "id": "finalizeTaskImageUpload",
+    "method": "POST",
+    "path": "/task/image-upload/{id}/finalize",
+    "tag": "Tasks"
+  },
+  {
+    "id": "findDeferredTaskDescriptions",
+    "method": "GET",
+    "path": "/task/description-matches/{projectId}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "getActivities",
+    "method": "GET",
+    "path": "/activity/{taskId}",
+    "tag": "Activity"
+  },
+  {
+    "id": "getAsset",
+    "method": "GET",
+    "path": "/asset/{id}",
+    "tag": "Assets"
+  },
+  {
+    "id": "getCalendarFeed",
+    "method": "GET",
+    "path": "/calendar-feed/{token}/calendar.ics",
+    "tag": "Calendar feeds"
+  },
+  {
+    "id": "getColumns",
+    "method": "GET",
+    "path": "/column/{projectId}",
+    "tag": "Columns"
+  },
+  {
+    "id": "getConfig",
+    "method": "GET",
+    "path": "/config",
+    "tag": "Config"
+  },
+  {
+    "id": "getCurrentUser",
+    "method": "GET",
+    "path": "/user/me",
+    "tag": "User"
+  },
+  {
+    "id": "getCustomFieldFilterValues",
+    "method": "GET",
+    "path": "/custom-field/project/{projectId}/filter-values",
+    "tag": "Custom Fields"
+  },
+  {
+    "id": "getCustomFieldValuesByProject",
+    "method": "GET",
+    "path": "/custom-field/project/{projectId}/values",
+    "tag": "Custom Fields"
+  },
+  {
+    "id": "getCustomFieldValuesByTask",
+    "method": "GET",
+    "path": "/custom-field/task/{taskId}",
+    "tag": "Custom Fields"
+  },
+  {
+    "id": "getCustomFieldsByProject",
+    "method": "GET",
+    "path": "/custom-field/project/{projectId}",
+    "tag": "Custom Fields"
+  },
+  {
+    "id": "getDeviceAuthorizationPage",
+    "method": "GET",
+    "path": "/auth/device",
+    "tag": "Authentication"
+  },
+  {
+    "id": "getDiscordIntegration",
+    "method": "GET",
+    "path": "/discord-integration/project/{projectId}",
+    "tag": "Discord"
+  },
+  {
+    "id": "getExternalLinksByTask",
+    "method": "GET",
+    "path": "/external-link/task/{taskId}",
+    "tag": "External Links"
+  },
+  {
+    "id": "getGenericWebhookIntegration",
+    "method": "GET",
+    "path": "/generic-webhook-integration/project/{projectId}",
+    "tag": "Generic Webhook"
+  },
+  {
+    "id": "getGitHubAppInfo",
+    "method": "GET",
+    "path": "/github-integration/app-info",
+    "tag": "GitHub"
+  },
+  {
+    "id": "getGitHubIntegration",
+    "method": "GET",
+    "path": "/github-integration/project/{projectId}",
+    "tag": "GitHub"
+  },
+  {
+    "id": "getGiteaIntegration",
+    "method": "GET",
+    "path": "/gitea-integration/project/{projectId}",
+    "tag": "Gitea"
+  },
+  {
+    "id": "getGitlabIntegration",
+    "method": "GET",
+    "path": "/gitlab-integration/project/{projectId}",
+    "tag": "GitLab"
+  },
+  {
+    "id": "getInstanceStatus",
+    "method": "GET",
+    "path": "/instance/status",
+    "tag": "Instance"
+  },
+  {
+    "id": "getInvitationDetails",
+    "method": "GET",
+    "path": "/invitation/{id}",
+    "tag": "Invitations"
+  },
+  {
+    "id": "getLabel",
+    "method": "GET",
+    "path": "/label/{id}",
+    "tag": "Labels"
+  },
+  {
+    "id": "getMattermostIntegration",
+    "method": "GET",
+    "path": "/mattermost-integration/project/{projectId}",
+    "tag": "Mattermost"
+  },
+  {
+    "id": "getMcpAuthorizationRequest",
+    "method": "GET",
+    "path": "/mcp/authorize/request/{requestId}",
+    "tag": "MCP"
+  },
+  {
+    "id": "getNotificationPreferences",
+    "method": "GET",
+    "path": "/notification-preferences",
+    "tag": "Notification Preferences"
+  },
+  {
+    "id": "getOAuthIdToken",
+    "method": "GET",
+    "path": "/oauth/id-token",
+    "tag": "Authentication"
+  },
+  {
+    "id": "getOrganizationActiveMember",
+    "method": "GET",
+    "path": "/auth/organization/get-active-member",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "getOrganizationActiveMemberRole",
+    "method": "GET",
+    "path": "/auth/organization/get-active-member-role",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "getOrganizationFullOrganization",
+    "method": "GET",
+    "path": "/auth/organization/get-full-organization",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "getOrganizationInvitation",
+    "method": "GET",
+    "path": "/auth/organization/get-invitation",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "getOrganizationRole",
+    "method": "GET",
+    "path": "/auth/organization/get-role",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "getProject",
+    "method": "GET",
+    "path": "/project/{id}",
+    "tag": "Projects"
+  },
+  {
+    "id": "getProjectBackground",
+    "method": "GET",
+    "path": "/project/{id}/background",
+    "tag": "Projects"
+  },
+  {
+    "id": "getPublicProject",
+    "method": "GET",
+    "path": "/public-project/{id}",
+    "tag": "Projects"
+  },
+  {
+    "id": "getPublicProjectDescriptionPage",
+    "method": "GET",
+    "path": "/public-project/{id}/description",
+    "tag": "Projects"
+  },
+  {
+    "id": "getPublicTaskDescriptionPage",
+    "method": "GET",
+    "path": "/public-project/{id}/task/{taskId}/description",
+    "tag": "Projects"
+  },
+  {
+    "id": "getSession",
+    "method": "GET",
+    "path": "/auth/get-session",
+    "tag": "Authentication"
+  },
+  {
+    "id": "getSlackIntegration",
+    "method": "GET",
+    "path": "/slack-integration/project/{projectId}",
+    "tag": "Slack"
+  },
+  {
+    "id": "getTask",
+    "method": "GET",
+    "path": "/task/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "getTaskByTicketId",
+    "method": "GET",
+    "path": "/task/by-ticket-id/{ticketId}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "getTaskComments",
+    "method": "GET",
+    "path": "/comment/{taskId}",
+    "tag": "Comments"
+  },
+  {
+    "id": "getTaskDescriptionPage",
+    "method": "GET",
+    "path": "/task/{id}/description",
+    "tag": "Tasks"
+  },
+  {
+    "id": "getTaskLabels",
+    "method": "GET",
+    "path": "/label/task/{taskId}",
+    "tag": "Labels"
+  },
+  {
+    "id": "getTaskRelations",
+    "method": "GET",
+    "path": "/task-relation/{taskId}",
+    "tag": "Task Relations"
+  },
+  {
+    "id": "getTaskTimeEntries",
+    "method": "GET",
+    "path": "/time-entry/task/{taskId}",
+    "tag": "Time Entries"
+  },
+  {
+    "id": "getTelegramIntegration",
+    "method": "GET",
+    "path": "/telegram-integration/project/{projectId}",
+    "tag": "Telegram"
+  },
+  {
+    "id": "getTimeEntry",
+    "method": "GET",
+    "path": "/time-entry/{id}",
+    "tag": "Time Entries"
+  },
+  {
+    "id": "getUserAvatar",
+    "method": "GET",
+    "path": "/user/avatar/{id}",
+    "tag": "User"
+  },
+  {
+    "id": "getUserPendingInvitations",
+    "method": "GET",
+    "path": "/invitation/pending",
+    "tag": "Invitations"
+  },
+  {
+    "id": "getWorkflowRules",
+    "method": "GET",
+    "path": "/workflow-rule/{projectId}",
+    "tag": "Workflow Rules"
+  },
+  {
+    "id": "getWorkspaceActivities",
+    "method": "GET",
+    "path": "/activity/workspace/{workspaceId}",
+    "tag": "Activity"
+  },
+  {
+    "id": "getWorkspaceLabels",
+    "method": "GET",
+    "path": "/label/workspace/{workspaceId}",
+    "tag": "Labels"
+  },
+  {
+    "id": "getWorkspaceMembers",
+    "method": "GET",
+    "path": "/workspace/{workspaceId}/members",
+    "tag": "Workspaces"
+  },
+  {
+    "id": "globalSearch",
+    "method": "GET",
+    "path": "/search",
+    "tag": "Search"
+  },
+  {
+    "id": "hasOrganizationPermission",
+    "method": "POST",
+    "path": "/auth/organization/has-permission",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "importGitHubIssues",
+    "method": "POST",
+    "path": "/github-integration/import-issues",
+    "tag": "GitHub"
+  },
+  {
+    "id": "importGiteaIssues",
+    "method": "POST",
+    "path": "/gitea-integration/import-issues",
+    "tag": "Gitea"
+  },
+  {
+    "id": "importGitlabIssues",
+    "method": "POST",
+    "path": "/gitlab-integration/import-issues",
+    "tag": "GitLab"
+  },
+  {
+    "id": "importTasks",
+    "method": "POST",
+    "path": "/task/import/{projectId}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "inviteOrganizationMember",
+    "method": "POST",
+    "path": "/auth/organization/invite-member",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "leaveOrganization",
+    "method": "POST",
+    "path": "/auth/organization/leave",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "listAdminUsers",
+    "method": "GET",
+    "path": "/admin/users",
+    "tag": "Admin"
+  },
+  {
+    "id": "listAssignedTasks",
+    "method": "GET",
+    "path": "/task/assigned",
+    "tag": "Tasks"
+  },
+  {
+    "id": "listCalendarFeeds",
+    "method": "GET",
+    "path": "/calendar-feed/project/{projectId}",
+    "tag": "Calendar feeds"
+  },
+  {
+    "id": "listGitHubRepositories",
+    "method": "GET",
+    "path": "/github-integration/repositories/{projectId}",
+    "tag": "GitHub"
+  },
+  {
+    "id": "listGiteaRepositories",
+    "method": "POST",
+    "path": "/gitea-integration/repositories",
+    "tag": "Gitea"
+  },
+  {
+    "id": "listGitlabProjects",
+    "method": "POST",
+    "path": "/gitlab-integration/projects",
+    "tag": "GitLab"
+  },
+  {
+    "id": "listNotifications",
+    "method": "GET",
+    "path": "/notification",
+    "tag": "Notifications"
+  },
+  {
+    "id": "listOrganization",
+    "method": "GET",
+    "path": "/auth/organization/list",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "listOrganizationInvitations",
+    "method": "GET",
+    "path": "/auth/organization/list-invitations",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "listOrganizationMembers",
+    "method": "GET",
+    "path": "/auth/organization/list-members",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "listOrganizationRoles",
+    "method": "GET",
+    "path": "/auth/organization/list-roles",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "listOrganizationTeamMembers",
+    "method": "GET",
+    "path": "/auth/organization/list-team-members",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "listOrganizationTeams",
+    "method": "GET",
+    "path": "/auth/organization/list-teams",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "listOrganizationUserInvitations",
+    "method": "GET",
+    "path": "/auth/organization/list-user-invitations",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "listOrganizationUserTeams",
+    "method": "GET",
+    "path": "/auth/organization/list-user-teams",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "listProjects",
+    "method": "GET",
+    "path": "/project",
+    "tag": "Projects"
+  },
+  {
+    "id": "listTasks",
+    "method": "GET",
+    "path": "/task/tasks/{projectId}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "markAllNotificationsAsRead",
+    "method": "PATCH",
+    "path": "/notification/read-all",
+    "tag": "Notifications"
+  },
+  {
+    "id": "markNotificationAsRead",
+    "method": "PATCH",
+    "path": "/notification/{id}/read",
+    "tag": "Notifications"
+  },
+  {
+    "id": "moveProject",
+    "method": "PUT",
+    "path": "/project/{id}/move",
+    "tag": "Projects"
+  },
+  {
+    "id": "moveTask",
+    "method": "PUT",
+    "path": "/task/move/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "registerMcpOAuthClient",
+    "method": "POST",
+    "path": "/mcp/register",
+    "tag": "MCP"
+  },
+  {
+    "id": "rejectOrganizationInvitation",
+    "method": "POST",
+    "path": "/auth/organization/reject-invitation",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "removeOrganizationMember",
+    "method": "POST",
+    "path": "/auth/organization/remove-member",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "removeOrganizationTeam",
+    "method": "POST",
+    "path": "/auth/organization/remove-team",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "removeOrganizationTeamMember",
+    "method": "POST",
+    "path": "/auth/organization/remove-team-member",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "reorderColumns",
+    "method": "PUT",
+    "path": "/column/reorder/{projectId}",
+    "tag": "Columns"
+  },
+  {
+    "id": "reorderCustomFields",
+    "method": "PUT",
+    "path": "/custom-field/reorder/{projectId}",
+    "tag": "Custom Fields"
+  },
+  {
+    "id": "reorderProjects",
+    "method": "PUT",
+    "path": "/project/reorder",
+    "tag": "Projects"
+  },
+  {
+    "id": "reorderTasks",
+    "method": "POST",
+    "path": "/task/reorder",
+    "tag": "Tasks"
+  },
+  {
+    "id": "revokeCalendarFeed",
+    "method": "DELETE",
+    "path": "/calendar-feed/project/{projectId}/{id}",
+    "tag": "Calendar feeds"
+  },
+  {
+    "id": "setCustomFieldValue",
+    "method": "PUT",
+    "path": "/custom-field/value",
+    "tag": "Custom Fields"
+  },
+  {
+    "id": "setOrganizationActive",
+    "method": "POST",
+    "path": "/auth/organization/set-active",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "setOrganizationActiveTeam",
+    "method": "POST",
+    "path": "/auth/organization/set-active-team",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "stageTaskAssetUpload",
+    "method": "POST",
+    "path": "/task/draft-upload/{projectId}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "unarchiveProject",
+    "method": "PUT",
+    "path": "/project/{id}/unarchive",
+    "tag": "Projects"
+  },
+  {
+    "id": "updateColumn",
+    "method": "PUT",
+    "path": "/column/{id}",
+    "tag": "Columns"
+  },
+  {
+    "id": "updateComment",
+    "method": "PUT",
+    "path": "/activity/comment",
+    "tag": "Activity"
+  },
+  {
+    "id": "updateDiscordIntegration",
+    "method": "PATCH",
+    "path": "/discord-integration/project/{projectId}",
+    "tag": "Discord"
+  },
+  {
+    "id": "updateGenericWebhookIntegration",
+    "method": "PATCH",
+    "path": "/generic-webhook-integration/project/{projectId}",
+    "tag": "Generic Webhook"
+  },
+  {
+    "id": "updateGitHubIntegration",
+    "method": "PATCH",
+    "path": "/github-integration/project/{projectId}",
+    "tag": "GitHub"
+  },
+  {
+    "id": "updateGiteaIntegration",
+    "method": "PATCH",
+    "path": "/gitea-integration/project/{projectId}",
+    "tag": "Gitea"
+  },
+  {
+    "id": "updateGitlabIntegration",
+    "method": "PATCH",
+    "path": "/gitlab-integration/project/{projectId}",
+    "tag": "GitLab"
+  },
+  {
+    "id": "updateLabel",
+    "method": "PUT",
+    "path": "/label/{id}",
+    "tag": "Labels"
+  },
+  {
+    "id": "updateMattermostIntegration",
+    "method": "PATCH",
+    "path": "/mattermost-integration/project/{projectId}",
+    "tag": "Mattermost"
+  },
+  {
+    "id": "updateNotificationPreferences",
+    "method": "PUT",
+    "path": "/notification-preferences",
+    "tag": "Notification Preferences"
+  },
+  {
+    "id": "updateOrganization",
+    "method": "POST",
+    "path": "/auth/organization/update",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "updateOrganizationMemberRole",
+    "method": "POST",
+    "path": "/auth/organization/update-member-role",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "updateOrganizationRole",
+    "method": "POST",
+    "path": "/auth/organization/update-role",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "updateOrganizationTeam",
+    "method": "POST",
+    "path": "/auth/organization/update-team",
+    "tag": "Organization Management"
+  },
+  {
+    "id": "updateProject",
+    "method": "PUT",
+    "path": "/project/{id}",
+    "tag": "Projects"
+  },
+  {
+    "id": "updateSlackIntegration",
+    "method": "PATCH",
+    "path": "/slack-integration/project/{projectId}",
+    "tag": "Slack"
+  },
+  {
+    "id": "updateTask",
+    "method": "PUT",
+    "path": "/task/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "updateTaskAssignee",
+    "method": "PUT",
+    "path": "/task/assignee/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "updateTaskComment",
+    "method": "PUT",
+    "path": "/comment/{id}",
+    "tag": "Comments"
+  },
+  {
+    "id": "updateTaskDescription",
+    "method": "PUT",
+    "path": "/task/description/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "updateTaskDueDate",
+    "method": "PUT",
+    "path": "/task/due-date/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "updateTaskPriority",
+    "method": "PUT",
+    "path": "/task/priority/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "updateTaskStatus",
+    "method": "PUT",
+    "path": "/task/status/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "updateTaskTitle",
+    "method": "PUT",
+    "path": "/task/title/{id}",
+    "tag": "Tasks"
+  },
+  {
+    "id": "updateTelegramIntegration",
+    "method": "PATCH",
+    "path": "/telegram-integration/project/{projectId}",
+    "tag": "Telegram"
+  },
+  {
+    "id": "updateTimeEntry",
+    "method": "PUT",
+    "path": "/time-entry/{id}",
+    "tag": "Time Entries"
+  },
+  {
+    "id": "uploadProjectBackground",
+    "method": "PUT",
+    "path": "/project/{id}/background-upload",
+    "tag": "Projects"
+  },
+  {
+    "id": "uploadUserAvatar",
+    "method": "PUT",
+    "path": "/user/avatar",
+    "tag": "User"
+  },
+  {
+    "id": "upsertNotificationPreferenceWorkspaceRule",
+    "method": "PUT",
+    "path": "/notification-preferences/workspaces/{workspaceId}",
+    "tag": "Notification Preferences"
+  },
+  {
+    "id": "upsertWorkflowRule",
+    "method": "PUT",
+    "path": "/workflow-rule/{projectId}",
+    "tag": "Workflow Rules"
+  },
+  {
+    "id": "verifyGitHubInstallation",
+    "method": "POST",
+    "path": "/github-integration/verify",
+    "tag": "GitHub"
+  },
+  {
+    "id": "verifyGiteaAccess",
+    "method": "POST",
+    "path": "/gitea-integration/verify",
+    "tag": "Gitea"
+  },
+  {
+    "id": "verifyGitlabAccess",
+    "method": "POST",
+    "path": "/gitlab-integration/verify",
+    "tag": "GitLab"
+  }
+]

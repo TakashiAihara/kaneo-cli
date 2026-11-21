@@ -1,6 +1,7 @@
 import { OPERATIONS, type Operation } from "./registry";
-import { requestDrift, requestShapes, serverOperations, type Drift, type RequestShape, type ServerOperation } from "./shape";
+import { clientShapes, requestDrift, requestShapes, serverOperations, type Drift, type RequestShape, type ServerOperation } from "./shape";
 import pinnedRequests from "./gen/requests.json";
+import pinnedOperations from "./gen/spec-operations.json";
 import { kaneoFetch, KaneoApiError, originOf, presignedPut } from "./http";
 import type { Json } from "../output/json";
 import { shellWord } from "../output/output";
@@ -3694,8 +3695,12 @@ export type CheckResult = {
   // What the server offers and this client does not use yet, with where it is
   // served and the first tag the document gives it.
   newOnServer: ServerOperation[];
+  // What the pinned document serves and the server's does not — the reverse
+  // of newOnServer: the operations a server upgrade can make available. Like
+  // newOnServer it is reported, not a failure: the client calls nothing here.
+  notOnServer: ServerOperation[];
   // Request fields of a covered operation whose server definition differs from
-  // the pinned document's (see requestDrift). Reported, not a failure.
+  // what this client sends (see requestDrift).
   requestDrift: Drift[];
 };
 
@@ -3721,7 +3726,11 @@ export const checkApi = async (): Promise<CheckResult> => {
     covered: OPERATIONS.filter((operation) => seen.has(operation.id)),
     missing: OPERATIONS.filter((operation) => !seen.has(operation.id)),
     newOnServer: onServer.filter((operation) => !used.has(operation.id)),
-    requestDrift: requestDrift(pinnedRequests as Record<string, RequestShape>, requestShapes(document, used)),
+    notOnServer: pinnedOperations.filter((operation) => !seen.has(operation.id)),
+    requestDrift: requestDrift(
+      clientShapes(pinnedRequests as Record<string, RequestShape>, OPERATIONS),
+      requestShapes(document, used),
+    ),
   };
 };
 

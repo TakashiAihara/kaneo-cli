@@ -1,3 +1,5 @@
+import type { Operation } from "./registry";
+
 // The request side of an operation: its query and header parameters and its
 // top-level JSON body fields, keyed "<in>.<name>" (query.status, body.title),
 // with whether each is required. api-check compares these between the document
@@ -59,16 +61,37 @@ const deref = (doc: Node, node: any): any => {
   return node;
 };
 
-// Where the server's request side differs from the pinned document's in a way a
-// call could notice: a field the pinned document has that the server's does
-// not (the server ignores or refuses it), or one the server requires that the
-// pinned document leaves optional or does not have. A field the server added as
-// optional, or relaxed to optional, is left out.
+// The request side as this client puts it on the wire: the pinned document's
+// shape narrowed by what calls can send. The document declares fields no call
+// here makes (createTask's customFields) and calls optional fields every call
+// sends (updateTask's description); the registry's neverSent and alwaysSent
+// say which is which, and the drift check compares against this rather than
+// the document wholesale, so a field the CLI cannot send cannot drift.
+export const clientShapes = (
+  pinned: Record<string, RequestShape>,
+  operations: Operation[],
+): Record<string, RequestShape> => {
+  const shapes: Record<string, RequestShape> = {};
+  for (const op of operations) {
+    const shape = { ...(pinned[op.id] ?? {}) };
+    for (const field of op.neverSent ?? []) delete shape[field];
+    for (const field of op.alwaysSent ?? []) shape[field] = true;
+    shapes[op.id] = shape;
+  }
+  return shapes;
+};
+
+// Where the server's request side differs from what this client sends in a way
+// a call could notice: a field a call can send that the server's document does
+// not have (the server ignores or refuses it), or one the server requires that
+// the client does not always send. A field the server added as optional, or
+// relaxed to optional, is left out.
 //
-// The comparison is against the pinned document, not against what the CLI puts
-// on the wire: some fields the document offers are never sent, and some it
-// calls optional are always sent. So a drift is a lead to check, not proof that
-// a command fails, and api-check reports it without failing.
+// The comparison is only as good as the neverSent / alwaysSent declarations
+// behind clientShapes: a field wrongly declared never sent hides a "gone" the
+// server really has, and one wrongly declared always sent hides a "required"
+// the server really has. Both fail silently, which is why the declarations are
+// held to the pinned document's optional set in tests/unit/shape.test.ts.
 export type Drift = { id: string; field: string; problem: "gone" | "required" };
 
 export const requestDrift = (

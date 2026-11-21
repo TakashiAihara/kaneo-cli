@@ -1,0 +1,152 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/missing",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/gitea-integration/project/proj-alpha: 404: Gitea API error 404\"\n}\n",
+      "stderr": "Error: POST /api/gitea-integration/project/proj-alpha: 404: Gitea API error 404\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/gitea-integration/project/proj-alpha: 400: Enter a personal access token to verify this Gitea instance.\"\n}\n",
+      "stderr": "Error: POST /api/gitea-integration/project/proj-alpha: 400: Enter a personal access token to verify this Gitea instance.\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "literal",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"a Gitea access token as a flag value is visible in the process list and shell history; pass --token - and pipe it instead\"\n}\n",
+      "stderr": "Error: a Gitea access token as a flag value is visible in the process list and shell history; pass --token - and pipe it instead\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://other.example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"git0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://other.example.com\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"app\",\n  \"maskedAccessToken\": \"fake••••••oken\",\n  \"webhookUrl\": \"<URL>/api/gitea-integration/webhook/git0001\",\n  \"webhookSecret\": \"fake-hook-secret-git0001\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGiteaIssue\": true,\n  \"isActive\": true,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/gitea-integration/project/proj-alpha: 400: Enter a personal access token to verify this Gitea instance.\"\n}\n",
+      "stderr": "Error: POST /api/gitea-integration/project/proj-alpha: 400: Enter a personal access token to verify this Gitea instance.\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"git0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitea.example.com\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"app\",\n  \"maskedAccessToken\": \"fake••••••oken\",\n  \"webhookUrl\": \"<URL>/api/gitea-integration/webhook/git0001\",\n  \"webhookSecret\": \"fake-hook-secret-git0001\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGiteaIssue\": true,\n  \"isActive\": true,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitea.example.com",
+        "repositoryOwner": "acme",
+        "repositoryName": "missing",
+        "accessToken": "fake-gitea-token"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitea.example.com",
+        "repositoryOwner": "acme",
+        "repositoryName": "app"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://other.example.com",
+        "repositoryOwner": "acme",
+        "repositoryName": "app",
+        "accessToken": "fake-gitea-token"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitea.example.com",
+        "repositoryOwner": "acme",
+        "repositoryName": "app"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitea.example.com",
+        "repositoryOwner": "acme",
+        "repositoryName": "app",
+        "accessToken": "fake-gitea-token"
+      }
+    }
+  ],
+  "files": {}
+}

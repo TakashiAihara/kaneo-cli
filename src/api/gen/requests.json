@@ -54,6 +54,12 @@
     "body.repositoryName": true,
     "body.repositoryOwner": true
   },
+  "createGiteaIntegration": {
+    "body.accessToken": false,
+    "body.baseUrl": true,
+    "body.repositoryName": true,
+    "body.repositoryOwner": true
+  },
   "createGitlabIntegration": {
     "body.accessToken": false,
     "body.baseUrl": true,
@@ -136,6 +142,7 @@
   "deleteExternalLink": {},
   "deleteGenericWebhookIntegration": {},
   "deleteGitHubIntegration": {},
+  "deleteGiteaIntegration": {},
   "deleteGitlabIntegration": {},
   "deleteLabel": {},
   "deleteMattermostIntegration": {},
@@ -188,6 +195,7 @@
   "getGenericWebhookIntegration": {},
   "getGitHubAppInfo": {},
   "getGitHubIntegration": {},
+  "getGiteaIntegration": {},
   "getGitlabIntegration": {},
   "getInstanceStatus": {},
   "getInvitationDetails": {},
@@ -252,6 +260,9 @@
     "body.projectId": true,
     "body.runId": false
   },
+  "importGiteaIssues": {
+    "body.projectId": true
+  },
   "importGitlabIssues": {
     "body.projectId": true
   },
@@ -266,6 +277,11 @@
   "listGitHubRepositories": {
     "query.installationPage": false,
     "query.repositoryPage": false
+  },
+  "listGiteaRepositories": {
+    "body.accessToken": true,
+    "body.baseUrl": true,
+    "body.projectId": true
   },
   "listGitlabProjects": {
     "body.accessToken": true,
@@ -342,6 +358,10 @@
   },
   "updateGitHubIntegration": {
     "body.commentTaskLinkOnGitHubIssue": false,
+    "body.isActive": false
+  },
+  "updateGiteaIntegration": {
+    "body.commentTaskLinkOnGiteaIssue": false,
     "body.isActive": false
   },
   "updateGitlabIntegration": {
@@ -461,6 +481,13 @@
     "body.integrationType": true
   },
   "verifyGitHubInstallation": {
+    "body.projectId": true,
+    "body.repositoryName": true,
+    "body.repositoryOwner": true
+  },
+  "verifyGiteaAccess": {
+    "body.accessToken": false,
+    "body.baseUrl": true,
     "body.projectId": true,
     "body.repositoryName": true,
     "body.repositoryOwner": true

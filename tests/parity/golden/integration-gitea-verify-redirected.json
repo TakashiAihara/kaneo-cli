@@ -1,0 +1,35 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/app",
+        "--base-url",
+        "http://gitea.example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"isInstalled\": false,\n  \"hasRequiredPermissions\": false,\n  \"repositoryExists\": false,\n  \"repositoryPrivate\": null,\n  \"missingPermissions\": [],\n  \"message\": \"The Gitea URL redirected (HTTP 301). This usually means the server forces HTTPS. Please use the final URL directly.\",\n  \"failureReason\": \"redirected\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitea-integration/verify",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "http://gitea.example.com",
+        "accessToken": "fake-gitea-token",
+        "repositoryOwner": "acme",
+        "repositoryName": "app"
+      }
+    }
+  ],
+  "files": {}
+}

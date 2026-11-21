@@ -1,0 +1,35 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/app",
+        "--base-url",
+        "https://example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"isInstalled\": false,\n  \"hasRequiredPermissions\": false,\n  \"repositoryExists\": false,\n  \"repositoryPrivate\": null,\n  \"missingPermissions\": [],\n  \"message\": \"The URL does not point to a Gitea instance.\",\n  \"failureReason\": \"not_a_gitea_instance\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitea-integration/verify",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://example.com",
+        "accessToken": "fake-gitea-token",
+        "repositoryOwner": "acme",
+        "repositoryName": "app"
+      }
+    }
+  ],
+  "files": {}
+}

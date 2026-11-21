@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import { configureClient, KaneoApiError } from "../../src/api/http";
+import { configureClient, KaneoApiError, putUpload } from "../../src/api/http";
 import * as api from "../../src/api/kaneo";
 
 // Ported from the Go build's internal/api/operations_test.go. Each test serves
@@ -1471,4 +1471,125 @@ test("listMyTasks asks for the workspace and keeps the total the server counted"
   expect(mine.tasks).toEqual([
     { id: "t7", projectId: "p9", projectSlug: "GAM", number: 41, title: "Mine", status: "in-progress", priority: "urgent", dueDate: null },
   ]);
+});
+
+// The reorder body carries the placements and the previous contents of the
+// columns they touch; the route answers where each task landed.
+test("reorderTasks posts the placements and the snapshot to /task/reorder", async () => {
+  const seen = recorder('[{"id":"t1","position":5,"status":"done"}]');
+  const done = await api.reorderTasks(
+    "p1",
+    [{ id: "t1", position: 5, status: "done" }],
+    [{ id: "t1", position: 0, status: "to-do" }, { id: "t2", position: 1024, status: "to-do" }],
+  );
+  expect([seen.method, seen.path]).toEqual(["POST", "/api/task/reorder"]);
+  expect(JSON.parse(seen.body)).toEqual({
+    projectId: "p1",
+    tasks: [{ id: "t1", position: 5, status: "done" }],
+    expectedTasks: [
+      { id: "t1", position: 0, status: "to-do" },
+      { id: "t2", position: 1024, status: "to-do" },
+    ],
+  });
+  expect(done).toEqual([{ id: "t1", position: 5, status: "done" }]);
+});
+
+// A snapshot position the server stored as null goes back as null: the route
+// compares it against the row, where 0 would never match.
+test("reorderTasks keeps a null snapshot position null", async () => {
+  const seen = recorder("[]");
+  await api.reorderTasks("p1", [{ id: "t1", position: 3 }], [{ id: "t1", position: null, status: "planned" }]);
+  expect(JSON.parse(seen.body).expectedTasks).toEqual([{ id: "t1", position: null, status: "planned" }]);
+});
+
+// The stage is a POST on the project's draft-upload route with the
+// description surface; the reply's presigned URL and headers pass through
+// untouched.
+test("stageTaskAsset puts the file's description-surface upload", async () => {
+  const seen = recorder('{"key":"k/1","uploadUrl":"https://store.example/put?k=1","headers":{"Content-Type":"text/plain","x-amz-meta":"v"}}');
+  const up = await api.stageTaskAsset("p/1", { filename: "n.txt", contentType: "text/plain", size: 5 });
+  expect([seen.method, seen.path]).toEqual(["POST", "/api/task/draft-upload/p%2F1"]);
+  expect(JSON.parse(seen.body)).toEqual({ filename: "n.txt", contentType: "text/plain", size: 5, surface: "description" });
+  expect(up).toEqual({ key: "k/1", uploadUrl: "https://store.example/put?k=1", headers: { "Content-Type": "text/plain", "x-amz-meta": "v" } });
+});
+
+test("finalizeTaskAsset posts the key back on the finalize route", async () => {
+  const seen = recorder('{"id":"a1","url":"https://api.example/api/asset/a1"}');
+  const asset = await api.finalizeTaskAsset("p1", { key: "k/1", filename: "n.txt", contentType: "text/plain", size: 5 });
+  expect([seen.method, seen.path]).toEqual(["POST", "/api/task/draft-upload/p1/finalize"]);
+  expect(JSON.parse(seen.body)).toEqual({ key: "k/1", filename: "n.txt", contentType: "text/plain", size: 5, surface: "description" });
+  expect(asset).toEqual({ id: "a1", url: "https://api.example/api/asset/a1" });
+});
+
+test("listWorkspaceActivities reads the workspace feed and keeps its fields", async () => {
+  const seen = recorder(
+    JSON.stringify([
+      {
+        id: "a1",
+        type: "status_changed",
+        createdAt: "2026-09-30T00:00:02.000Z",
+        excerpt: null,
+        eventData: { oldStatus: "to-do", newStatus: "done", oldStatusName: "To Do", newStatusName: "Done" },
+        userId: "u1",
+        userName: "Sam",
+        userImage: null,
+        externalUserName: null,
+        externalUserAvatar: null,
+        taskId: "t1",
+        taskTitle: "Ship it",
+        taskNumber: 7,
+        projectId: "p1",
+        projectSlug: "KAN",
+      },
+    ]),
+  );
+  const feed = await api.listWorkspaceActivities("w/1");
+  expect([seen.method, seen.path]).toEqual(["GET", "/api/activity/workspace/w%2F1"]);
+  expect(feed).toHaveLength(1);
+  expect(feed[0]).toMatchObject({
+    id: "a1",
+    type: "status_changed",
+    createdAt: "2026-09-30T00:00:02.000Z",
+    excerpt: null,
+    taskNumber: 7,
+    projectSlug: "KAN",
+    userName: "Sam",
+  });
+  expect(feed[0]!.eventData).toEqual({ oldStatus: "to-do", newStatus: "done", oldStatusName: "To Do", newStatusName: "Done" });
+});
+
+// The presigned PUT is not Kaneo's: whatever the URL, only its status is
+// judged, and the headers it was issued with are the ones sent.
+describe("putUpload", () => {
+  test("puts the bytes with the issued headers and resolves on any 2xx", async () => {
+    const seen: { method: string; path: string; type: string | null; body: string }[] = [];
+    const s = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: async (req) => {
+        seen.push({ method: req.method, path: new URL(req.url).pathname, type: req.headers.get("content-type"), body: await req.text() });
+        return new Response(null, { status: 200 });
+      },
+    });
+    servers.push(s);
+    await putUpload(`http://127.0.0.1:${s.port}/uploads/k/1?X-Amz-Signature=secret`, { "Content-Type": "text/plain", "x-amz-meta": "v" }, new TextEncoder().encode("hello"));
+    expect(seen).toEqual([{ method: "PUT", path: "/uploads/k/1", type: "text/plain", body: "hello" }]);
+  });
+
+  test("a refused upload fails with the status and never repeats the URL", async () => {
+    const s = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("denied", { status: 403 }) });
+    servers.push(s);
+    const url = `http://127.0.0.1:${s.port}/uploads/k/1?X-Amz-Signature=secret`;
+    const e = await failure(putUpload(url, {}, new Uint8Array([1])));
+    expect(String(e)).toBe("Error: upload to storage failed: HTTP 403");
+    expect(String(e)).not.toContain("secret");
+  });
+
+  test("a transport failure names the kind of failure, not the credentialled URL", async () => {
+    // Port 1 is never listening, so the dial is refused before any answer.
+    const e = await failure(putUpload("http://127.0.0.1:1/uploads/k?X-Amz-Signature=secret", {}, new Uint8Array([1])));
+    expect(String(e)).toContain("upload to storage failed:");
+    expect(String(e)).not.toContain("X-Amz-Signature");
+    expect(String(e)).not.toContain("secret");
+  });
 });

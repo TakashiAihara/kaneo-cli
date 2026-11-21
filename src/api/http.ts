@@ -601,6 +601,28 @@ const messageOf = (value: unknown): string => {
   const { message } = value as { message?: unknown };
   return typeof message === "string" ? message : "";
 };
+// PUTs the bytes of a staged upload to the presigned URL the server issued.
+//
+// The URL is not Kaneo's: it carries no API key and answers to no schema, so
+// only its status is judged. It is bounded by the same --timeout every other
+// request is, since a storage endpoint that never answers would otherwise hold
+// the command open for ever. The URL itself is never repeated in a failure: a
+// presigned URL's query is its credential.
+export const putUpload = async (url: string, headers: Record<string, string>, body: Uint8Array): Promise<void> => {
+  const cap = settings.timeoutMs > 0 ? AbortSignal.timeout(settings.timeoutMs) : AbortSignal.abort();
+  let response: Response;
+  try {
+    response = await fetch(url, { method: "PUT", headers, body, signal: cap });
+  } catch (e) {
+    // A transport error's own wording can quote the request URL, and a
+    // presigned URL's query is the upload's credential, so only the failure's
+    // kind is repeated — the cause keeps the detail for anyone reading it.
+    const kind = e instanceof Error && e.name !== "" ? e.name : "Error";
+    throw new Error(`upload to storage failed: ${kind}`, { cause: e });
+  }
+  if (!response.ok) throw new Error(`upload to storage failed: HTTP ${response.status}`);
+};
+
 // The wait better-auth's rate limiter asks for, in milliseconds, from a 429's
 // body ({"code":"RATE_LIMITED","details":{"tryAgainIn":38153}}), or undefined
 // when the body does not say.

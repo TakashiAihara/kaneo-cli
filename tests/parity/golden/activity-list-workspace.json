@@ -1,0 +1,165 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "add",
+        "1",
+        "on the board",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"cmt0003\",\n  \"content\": \"on the board\",\n  \"userId\": \"user-self\",\n  \"userName\": \"\",\n  \"createdAt\": \"2026-01-01T00:00:13.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "activity",
+        "add",
+        "2",
+        "status_changed",
+        "--data",
+        "{\"oldStatus\":\"to-do\",\"newStatus\":\"in-progress\"}",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"act0004\",\n  \"type\": \"status_changed\",\n  \"content\": \"\",\n  \"eventData\": {\n    \"oldStatus\": \"to-do\",\n    \"newStatus\": \"in-progress\"\n  },\n  \"userId\": \"user-self\",\n  \"createdAt\": \"2026-01-01T00:00:14.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "activity",
+        "list",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"act0004\",\n    \"type\": \"status_changed\",\n    \"createdAt\": \"2026-01-01T00:00:14.000Z\",\n    \"excerpt\": null,\n    \"eventData\": {\n      \"oldStatus\": \"to-do\",\n      \"newStatus\": \"in-progress\",\n      \"oldStatusName\": \"To Do\",\n      \"newStatusName\": \"In Progress\"\n    },\n    \"userId\": \"user-self\",\n    \"userName\": \"Self\",\n    \"externalUserName\": null,\n    \"taskId\": \"task-a2\",\n    \"taskTitle\": \"Ship it\",\n    \"taskNumber\": 2,\n    \"projectId\": \"proj-alpha\",\n    \"projectSlug\": \"ALP\"\n  },\n  {\n    \"id\": \"cmt0003\",\n    \"type\": \"comment\",\n    \"createdAt\": \"2026-01-01T00:00:13.000Z\",\n    \"excerpt\": \"on the board\",\n    \"eventData\": null,\n    \"userId\": \"user-self\",\n    \"userName\": \"Self\",\n    \"externalUserName\": null,\n    \"taskId\": \"task-a1\",\n    \"taskTitle\": \"Write the parser\",\n    \"taskNumber\": 1,\n    \"projectId\": \"proj-alpha\",\n    \"projectSlug\": \"ALP\"\n  },\n  {\n    \"id\": \"cmt-other\",\n    \"type\": \"comment\",\n    \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n    \"excerpt\": \"not mine\",\n    \"eventData\": null,\n    \"userId\": \"user-1\",\n    \"userName\": \"Ada\",\n    \"externalUserName\": null,\n    \"taskId\": \"task-a3\",\n    \"taskTitle\": \"Old news\",\n    \"taskNumber\": 3,\n    \"projectId\": \"proj-alpha\",\n    \"projectSlug\": \"ALP\"\n  },\n  {\n    \"id\": \"cmt0001\",\n    \"type\": \"comment\",\n    \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n    \"excerpt\": \"first comment\",\n    \"eventData\": null,\n    \"userId\": \"user-self\",\n    \"userName\": \"Self\",\n    \"externalUserName\": null,\n    \"taskId\": \"task-a1\",\n    \"taskTitle\": \"Write the parser\",\n    \"taskNumber\": 1,\n    \"projectId\": \"proj-alpha\",\n    \"projectSlug\": \"ALP\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "activity",
+        "list",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "2026-01-01T00:00:14.000Z  status_changed  Self  {\"oldStatus\":\"to-do\",\"newStatus\":\"in-progress\",\"oldStatusName\":\"To Do\",\"newStatusName\":\"In Progress\"}  ALP#2 Ship it\n2026-01-01T00:00:13.000Z  comment  Self  on the board  ALP#1 Write the parser\n2026-01-01T00:00:11.000Z  comment  Ada  not mine  ALP#3 Old news\n2026-01-01T00:00:10.000Z  comment  Self  first comment  ALP#1 Write the parser\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "activity",
+        "list",
+        "-w",
+        "ws-other",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"cmt0002\",\n    \"type\": \"comment\",\n    \"createdAt\": \"2026-01-01T00:00:12.000Z\",\n    \"excerpt\": \"elsewhere\",\n    \"eventData\": null,\n    \"userId\": \"user-self\",\n    \"userName\": \"Self\",\n    \"externalUserName\": null,\n    \"taskId\": \"task-g1\",\n    \"taskTitle\": \"Gamma first\",\n    \"taskNumber\": 1,\n    \"projectId\": \"proj-gamma\",\n    \"projectSlug\": \"GAM\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "activity",
+        "ls",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"cmt0001\",\n    \"type\": \"comment\",\n    \"content\": \"first comment\",\n    \"eventData\": null,\n    \"userId\": \"user-self\",\n    \"createdAt\": \"2026-01-01T00:00:10.000Z\"\n  },\n  {\n    \"id\": \"cmt0003\",\n    \"type\": \"comment\",\n    \"content\": \"on the board\",\n    \"eventData\": null,\n    \"userId\": \"user-self\",\n    \"createdAt\": \"2026-01-01T00:00:13.000Z\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "activity",
+        "list",
+        "-w",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no workspace has the id, slug or name \\\"nope\\\" (kaneo workspace ls lists them)\"\n}\n",
+      "stderr": "Error: no workspace has the id, slug or name \"nope\" (kaneo workspace ls lists them)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "on the board"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/activity/create",
+      "query": "",
+      "body": {
+        "taskId": "task-a2",
+        "type": "status_changed",
+        "message": null,
+        "eventData": {
+          "oldStatus": "to-do",
+          "newStatus": "in-progress"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/activity/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/activity/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/activity/workspace/ws-other",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/activity/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

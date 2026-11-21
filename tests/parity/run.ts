@@ -43,6 +43,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     misstoreOn: s.misstoreOn,
     dropCommentsMatching: s.dropCommentsMatching,
     writesNotKept: s.writesNotKept,
+    shiftOnReorder: s.shiftOnReorder,
     commentReplyWithoutId: s.commentReplyWithoutId,
     driftedSpec: s.driftedSpec,
     specWithoutOperation: s.specWithoutOperation,

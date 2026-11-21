@@ -1,4 +1,5 @@
 import { writeSync } from "node:fs";
+import { basename } from "node:path";
 import { holding } from "../session/marker";
 import { apiKey, project, taskProject, workspace, type App } from "./app";
 import {
@@ -20,11 +21,14 @@ import {
   listColumns,
   linkTasks,
   listExternalLinks,
+  finalizeTaskAsset,
   listMyTasks,
   listComments,
   listRelations,
   moveTask,
   PRIORITIES,
+  reorderTasks,
+  stageTaskAsset,
   priorityRank,
   projectTasks,
   RELATION_TYPES,
@@ -50,8 +54,9 @@ import type { Json } from "../output/json";
 import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunContext } from "./args";
 import { readInput, sourceName } from "./input";
 import { shellWord } from "../output/output";
-import { KaneoApiError } from "../api/http";
+import { KaneoApiError, putUpload } from "../api/http";
 import { resolveWorkspace, slugOr, withProject, workspaceInReference } from "./lookup";
+import { planTaskMove } from "./task-reorder";
 import { attachTask, currentSessionId } from "../session/attach";
 import { BAD_ID, validSessionId } from "../session/store";
 import { sharedReference, similarOpenTasks } from "./similar";
@@ -799,6 +804,90 @@ export const taskCommand = {
       },
     },
     {
+      name: "attach",
+      use: "attach <task> <file>",
+      short: "Upload a file and link it in the task's description",
+      long:
+        "Upload a file to the task and add a reference to it at the end of the\n" +
+        "task's description.\n\n" +
+        "The file is staged, PUT to the storage the server presigns, and\n" +
+        "finalized before the description is written, so a failure partway\n" +
+        "leaves the task unchanged. An image is embedded as an image; anything\n" +
+        "else becomes an attachment card.",
+      args: exactArgs(2),
+      run: async ({ args, app }: RunContext<App>) => {
+        apiKey(app);
+        const file = await stagedFile(args[1]!);
+        const task = await withDescription(await resolveTask(app, args[0]!));
+        if (task.projectId === "") throw new Error("the server did not say which project the task is on");
+        const staged = { filename: file.name, contentType: file.type, size: file.size };
+        const upload = await stageTaskAsset(task.projectId, staged);
+        await putUpload(upload.uploadUrl, upload.headers, file.bytes);
+        const asset = await finalizeTaskAsset(task.projectId, { ...staged, key: upload.key });
+        // The editor's own append: the existing text keeps its content but
+        // loses trailing whitespace, then a blank line and the reference.
+        const existing = task.description.replace(/\s+$/u, "");
+        const description = existing === "" ? assetReference(file, asset.url) : `${existing}\n\n${assetReference(file, asset.url)}`;
+        await setTaskDescription(task.id, description);
+        app.out.human(`attached ${file.name} to #${task.number}`);
+        app.out.data({ id: asset.id, url: asset.url, filename: file.name, taskId: task.id, taskNumber: task.number });
+      },
+    },
+    {
+      name: "reorder",
+      use: "reorder <task> --before <task> | --after <task>",
+      short: "Move a task before or after another on the board",
+      long:
+        "Move a task before or after another task on the same board.\n\n" +
+        "The anchor may sit in another column, which moves the task into that\n" +
+        "column at the named spot. The board is read first and the previous\n" +
+        "contents of the columns the move touches are sent with the write, so\n" +
+        "a board that changed in between is refused rather than reordered from\n" +
+        "stale positions.",
+      args: exactArgs(1),
+      flags: [
+        { name: "before", type: "string" as const, usage: "place the task before this task", defaultValue: "" },
+        { name: "after", type: "string" as const, usage: "place the task after this task", defaultValue: "" },
+      ],
+      run: async ({ args, flags, changed, app }: RunContext<App>) => {
+        const hasBefore = changed.has("before");
+        const hasAfter = changed.has("after");
+        if (hasBefore === hasAfter) {
+          throw new Error(hasBefore ? "pass only one of --before and --after" : "pass --before <task> or --after <task>");
+        }
+        const side = hasBefore ? "before" : "after";
+        const anchorRef = String(flags[side] ?? "");
+        if (anchorRef.trim() === "") throw new Error(`empty --${side}`);
+        apiKey(app);
+        const move = await resolveTask(app, args[0]!);
+        const anchor = await resolveTask(app, anchorRef);
+        if (move.id === anchor.id) throw new Error("a task cannot be reordered against itself");
+        if (move.projectId === "" || anchor.projectId === "") {
+          throw new Error("the server did not say which project a task is on");
+        }
+        if (move.projectId !== anchor.projectId) {
+          throw new Error(`#${move.number} and #${anchor.number} are on different projects; reorder works within one project`);
+        }
+        const board = await getBoard(move.projectId);
+        const plan = planTaskMove(board, move.id, anchor.id, side);
+        if (plan === undefined) {
+          throw new Error(
+            `#${move.number} or #${anchor.number} is not on the board of project ${board.projectSlug === "" ? board.projectId : board.projectSlug}`,
+          );
+        }
+        // The board's own move skips the write when nothing would change, and
+        // the route takes at least one task, so there is nothing to send.
+        if (plan.tasks.length === 0) {
+          app.out.human(`#${move.number} is already ${side} #${anchor.number}`);
+          app.out.data([]);
+          return;
+        }
+        const done = await reorderTasks(move.projectId, plan.tasks, plan.expectedTasks);
+        app.out.human(`#${move.number} placed ${side} #${anchor.number}`);
+        app.out.data(done);
+      },
+    },
+    {
       name: "rm",
       aliases: ["delete"],
       use: "rm <task>",
@@ -1496,4 +1585,56 @@ const checkImport = (tasks: ImportedTask[], columns: { slug: string }[], source:
       throw new Error(`${source}: task ${at + 1} has priority ${JSON.stringify(t.priority)}; use one of: ${PRIORITIES.join(", ")}`);
     }
   });
+};
+
+// The file `task attach` uploads: its bytes, its name as a basename rather than
+// the path it was found at, and the content type the extension gives it, which
+// is what the editor would have sent for the same file.
+const stagedFile = async (path: string): Promise<{ name: string; type: string; size: number; bytes: Uint8Array }> => {
+  const file = Bun.file(path);
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await file.arrayBuffer());
+  } catch (e) {
+    throw new Error(`reading ${path}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  return {
+    name: basename(path),
+    type: file.type === "" ? "application/octet-stream" : file.type,
+    size: bytes.byteLength,
+    bytes,
+  };
+};
+
+// The image types the editor embeds and the server classifies as images;
+// every other upload becomes an attachment card. The same set the server
+// checks (apps/api/src/storage/s3.ts in Kaneo).
+const IMAGE_TYPES = new Set([
+  "image/apng",
+  "image/avif",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+]);
+
+// How the uploaded asset is written into the description, spelled the way the
+// editor's own markdown serializer spells it so the next load renders the same
+// thing: an image is a markdown image, anything else a kaneo-attachment card.
+// The URL is the server's own and needs no escaping; the names do.
+const assetReference = (file: { name: string; type: string; size: number }, url: string): string => {
+  if (IMAGE_TYPES.has(file.type.toLowerCase())) {
+    const alt = file.name
+      .replace(/\.[^/.]+$/, "")
+      .replace(/[-_]+/g, " ")
+      .trim()
+      .replace(/[\\[\]]/g, (c) => `\\${c}`);
+    const src = /[\s<>]/.test(url) ? `<${url.replace(/[<>]/g, (c) => encodeURIComponent(c))}>` : url;
+    return `![${alt}](${src})`;
+  }
+  const attr = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `<kaneo-attachment url="${attr(url)}" filename="${attr(file.name)}" mime-type="${attr(file.type)}" size="${file.size}" />`;
 };

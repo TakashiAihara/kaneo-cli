@@ -24,9 +24,9 @@ import { OPERATIONS, type Operation } from "./registry";
 // non-loopback host on the first hop and on every redirect, where a header
 // could have been stripped and the path cannot.
 // blob marks a route whose document declares a binary body (the project
-// background's image/*): the reply is handed back as a Blob of the bytes it
-// arrived as, since there is no JSON value to parse and no schema to check it
-// against.
+// background's image/*, an asset or an avatar image): the reply is handed
+// back as a Blob of the bytes it arrived as, since there is no JSON value to
+// parse and no schema to check it against.
 export type KaneoInit<T = unknown> = RequestInit & {
   schema?: ZodType<T> | ZodType;
   anonymous?: boolean;
@@ -337,7 +337,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // A non-2xx status and a 2xx carrying success:false are both failures: the
   // server reports validation problems the second way, so the status alone is
   // not enough to judge the call.
-  const reported = failure(called, served, response.status, text, trimmed);
+  const reported = failure(called, served, response.status, text, trimmed, wantBlob === true);
   if (reported) {
     const wait = response.status === 429 ? tryAgainIn(bytes) : undefined;
     if (wait !== undefined && waitOutRateLimits) {
@@ -602,8 +602,13 @@ const failure = (
   status: number,
   raw: string,
   trimmed: string,
+  blob: boolean,
 ): KaneoApiError | undefined => {
-  const envelope = decodeEnvelope(raw);
+  // A blob route's 2xx body is bytes by definition, so a document shaped
+  // like the failure envelope is the file being served — an asset can be a
+  // JSON file whose contents say success:false — not a report. The envelope
+  // still speaks for a refused call.
+  const envelope = blob && status >= 200 && status < 300 ? undefined : decodeEnvelope(raw);
   if (envelope) return new KaneoApiError(method, path, status, messagesOf(envelope), trimmed);
   if (status >= 200 && status < 300) return undefined;
   return new KaneoApiError(method, path, status, codedMessage(trimmed) ?? plainMessage(trimmed), trimmed);

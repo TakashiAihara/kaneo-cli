@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "instance",
+        "config",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"isCloud\": false,\n  \"disableRegistration\": false,\n  \"disablePasswordRegistration\": false,\n  \"disableEmailOtpSignIn\": false,\n  \"disableWorkspaceCreation\": false,\n  \"isDemoMode\": false,\n  \"hasSmtp\": false,\n  \"hasGithubSignIn\": false,\n  \"hasGoogleSignIn\": false,\n  \"hasDiscordSignIn\": false,\n  \"hasCustomOAuth\": false,\n  \"hasGuestAccess\": false,\n  \"disableLoginForm\": false,\n  \"customOAuthAutoLogin\": false,\n  \"customOAuthLogoutUrl\": null,\n  \"billingEnabled\": false\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/config",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

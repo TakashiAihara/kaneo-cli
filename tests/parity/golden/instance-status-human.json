@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "instance",
+        "status",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "has users  yes\nhas admin  yes\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/instance/status",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

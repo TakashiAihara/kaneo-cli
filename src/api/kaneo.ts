@@ -115,13 +115,24 @@ import {
   listGitHubRepositories as readGitHubRepositories,
   updateGitHubIntegration as patchGitHubIntegration,
   verifyGitHubInstallation as postGitHubVerification,
+  getInstanceStatus as readInstanceStatus,
+  getConfig as readInstanceConfig,
+  getPublicProject as readPublicProject,
+  getPublicProjectDescriptionPage as readPublicDescription,
+  getPublicTaskDescriptionPage as readPublicTaskDescription,
+  getAsset as readAsset,
+  getUserAvatar as readAvatar,
+  uploadUserAvatar as putAvatar,
+  deleteUserAvatar as removeAvatar,
 } from "./gen/kaneo";
 import type {
   Board as GenBoard,
+  BoardPagination,
   BoardTask,
   CalendarFeed as GenCalendarFeed,
   CreateGenericWebhookIntegrationBody,
   CreateMattermostIntegrationBody,
+  Config as GenConfig,
   CreateNotificationBody,
   BulkUpdateTasksBody,
   Column as GenColumn,
@@ -144,8 +155,11 @@ import type {
   UpdateGitlabIntegrationBody,
   VerifyGitlabAccessBody,
   ExternalLink as GenExternalLink,
+  GetPublicProjectParams,
   ImportTasksBody,
+  InstanceStatus as GenInstanceStatus,
   Organization,
+  TaskDescriptionPage as GenDescriptionPage,
   TaskExport,
   ProjectListItem,
   RelatedTask,
@@ -164,6 +178,9 @@ import type {
   UpdateTaskBody,
   UpdateTaskPriorityBody,
   UpsertNotificationPreferenceWorkspaceRuleBody,
+  UserAvatar as GenUserAvatar,
+  UserAvatarDeleted as GenUserAvatarDeleted,
+  UploadUserAvatarBody,
   WorkflowRule as GenWorkflowRule,
   WorkflowRuleRow as GenWorkflowRuleRow,
   CreateGitHubIntegrationBody,
@@ -1160,6 +1177,12 @@ export const findTaskByNumber = async (
 //
 // stopAt, when given, is asked after a task page and all of its related pages
 // have been read, and the task it answers is the read's reason to stop.
+// What one listing page answers the merge with: the board fields and the
+// paging block the loops are driven by. The keyed listing nests them under
+// data and pagination; the public board sends the board fields beside
+// pagination, so the page itself stands in for them.
+type BoardPage = { data: GenBoard; pagination: BoardPagination | undefined };
+
 const readBoard = async (
   projectId: string,
   filters: TaskFilters,
@@ -1167,6 +1190,33 @@ const readBoard = async (
 ): Promise<Reading> => {
   const status = filters.status ?? "";
   const priority = filters.priority ?? "";
+  return readPages(async (page, related) => {
+    // In sorted order, as above listProjectsIn: the generated client writes
+    // the query in the order it is given, and the Go build sorted it.
+    const response = zeroRecord(
+      await listTasks(pathParam(projectId), {
+        ...(page > 1 ? { page } : {}),
+        ...(priority === "" ? {} : { priority }),
+        ...(related > 1 ? { relatedPage: related } : {}),
+        ...(status === "" ? {} : { status }),
+      }),
+    );
+    return { data: zeroRecord(response.data), pagination: response.pagination };
+  }, projectId, stopAt);
+};
+
+// Reads a paged board listing into a board. watchRevision asks the paging
+// block's revisions to be watched as well as the total: the public board
+// reports them, and a board edited between pages keeps its total while its
+// revisions move. relatedRevision covers the related rows of the task page it
+// rides on, so it is compared only across that page's related continuations,
+// never carried to the next task page whose rows it does not describe.
+const readPages = async (
+  fetchPage: (page: number, relatedPage: number) => Promise<BoardPage>,
+  projectId: string,
+  stopAt?: (page: Task[]) => Task | undefined,
+  watchRevision = false,
+): Promise<Reading> => {
   let board: Board | undefined;
   let stopped: Task | undefined;
   const columnAt = new Map<string, number>();
@@ -1174,25 +1224,31 @@ const readBoard = async (
   const taskAt = new Map<string, Task>();
   let first: number | undefined;
   let last: number | undefined;
+  let revision: string | undefined;
+  let revisionMoved = false;
 
   for (let page = 1, pages = 1; page <= pages && stopped === undefined; page++) {
     const onPage: Task[] = [];
+    let relatedRevision: string | undefined;
     for (let related = 1, relatedPages = 1; related <= relatedPages; related++) {
-      // In sorted order, as above listProjectsIn: the generated client writes
-      // the query in the order it is given, and the Go build sorted it.
-      const response = zeroRecord(
-        await listTasks(pathParam(projectId), {
-          ...(page > 1 ? { page } : {}),
-          ...(priority === "" ? {} : { priority }),
-          ...(related > 1 ? { relatedPage: related } : {}),
-          ...(status === "" ? {} : { status }),
-        }),
-      );
+      const response = await fetchPage(page, related);
       pages = response.pagination?.totalPages ?? 0;
       relatedPages = response.pagination?.relatedTotalPages ?? 0;
       const total = response.pagination?.total;
       if (page === 1 && related === 1) first = total;
       last = total;
+      if (watchRevision) {
+        const seen = response.pagination?.revision;
+        if (seen !== undefined) {
+          if (revision === undefined) revision = seen;
+          else if (seen !== revision) revisionMoved = true;
+        }
+        const seenRelated = response.pagination?.relatedRevision;
+        if (seenRelated !== undefined) {
+          if (relatedRevision === undefined) relatedRevision = seenRelated;
+          else if (seenRelated !== relatedRevision) revisionMoved = true;
+        }
+      }
 
       const data = zeroRecord(response.data);
       if (board === undefined) {
@@ -1242,7 +1298,7 @@ const readBoard = async (
     const tasks = offBoard.get(column.id)!;
     if (tasks.length > 0) board.columns.push({ id: column.id, name: column.name, tasks });
   }
-  return { board, stopped, moved: first !== undefined && first !== last };
+  return { board, stopped, moved: (first !== undefined && first !== last) || revisionMoved };
 };
 
 // Every task the listing answered, the planned and the archived ones included,
@@ -2897,6 +2953,208 @@ export const importGitHubIssues = async (projectId: string, runId?: string): Pro
 const IMPORT_BUSY_RETRIES = 5;
 const IMPORT_BUSY_WAIT_MS = 1000;
 const IMPORT_STALL_LIMIT = 100;
+
+// ===== Instance, public boards and avatars =====
+//
+// The routes in this section are the ones the document marks security: [] —
+// the instance's own status and configuration, the public project board and
+// its description pages, and user avatars — plus the avatar writes, which do
+// take the key. The anonymous ones are called with anonymous so a profile's
+// api_key_command is not run for a route that never needed it.
+
+// Whether the instance has any users and any admin yet: what the sign-up page
+// asks before it offers a form.
+export const instanceStatus = async (): Promise<GenInstanceStatus> =>
+  zeroRecord(await readInstanceStatus({ anonymous: true }));
+
+// The instance's public configuration. The server sends fields the pinned
+// document does not name (instanceName, hasImageUploads, ...), which the
+// transport passes through untouched; the type names only what is documented.
+export const instanceConfig = async (): Promise<GenConfig> => zeroRecord(await readInstanceConfig({ anonymous: true }));
+
+// The better-auth session the credential resolves to, or null when there is
+// none. The session's token is a credential in its own right and is left out
+// of what is reported.
+export type AuthSession = {
+  user: { id: string; name: string; email: string };
+  session: { id: string; userId: string; createdAt: string; expiresAt: string; ipAddress: string | null; userAgent: string | null };
+};
+
+type SessionReply = {
+  user?: { id?: string; name?: string; email?: string } | undefined;
+  session?: {
+    id?: string;
+    userId?: string;
+    createdAt?: string;
+    expiresAt?: string;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+  } | undefined;
+} | null;
+
+export const authSession = async (): Promise<AuthSession | null> => {
+  const reply = await kaneoFetch<SessionReply>("/auth/get-session", { method: "GET" });
+  if (reply === null || reply === undefined) return null;
+  const user = reply.user ?? {};
+  const session = reply.session ?? {};
+  return {
+    user: { id: user.id ?? "", name: user.name ?? "", email: user.email ?? "" },
+    session: {
+      id: session.id ?? "",
+      userId: session.userId ?? "",
+      createdAt: isoTime(session, "createdAt"),
+      expiresAt: isoTime(session, "expiresAt"),
+      ipAddress: session.ipAddress ?? null,
+      userAgent: session.userAgent ?? null,
+    },
+  };
+};
+
+// What the public project listing is asked for, on top of the paging the read
+// itself drives. sortBy and sortOrder are the document's enums; anything else
+// is refused by the command before it gets here.
+export type PublicBoardFilters = {
+  status?: string;
+  priority?: string;
+  assigneeId?: string;
+  sortBy?: NonNullable<GetPublicProjectParams["sortBy"]>;
+  sortOrder?: NonNullable<GetPublicProjectParams["sortOrder"]>;
+  dueBefore?: string;
+  dueAfter?: string;
+  limit?: number;
+};
+
+const publicParams = (filters: PublicBoardFilters, page: number, relatedPage: number): GetPublicProjectParams => ({
+  ...(filters.status === undefined || filters.status === "" ? {} : { status: filters.status }),
+  ...(filters.priority === undefined || filters.priority === "" ? {} : { priority: filters.priority }),
+  ...(filters.assigneeId === undefined || filters.assigneeId === "" ? {} : { assigneeId: filters.assigneeId }),
+  page,
+  relatedPage,
+  ...(filters.limit === undefined ? {} : { limit: filters.limit }),
+  ...(filters.sortBy === undefined ? {} : { sortBy: filters.sortBy }),
+  ...(filters.sortOrder === undefined ? {} : { sortOrder: filters.sortOrder }),
+  ...(filters.dueBefore === undefined || filters.dueBefore === "" ? {} : { dueBefore: filters.dueBefore }),
+  ...(filters.dueAfter === undefined || filters.dueAfter === "" ? {} : { dueAfter: filters.dueAfter }),
+});
+
+const readPublicBoard = async (
+  projectId: string,
+  filters: PublicBoardFilters,
+  stopAt?: (page: Task[]) => Task | undefined,
+): Promise<Reading> =>
+  readPages(async (page, related) => {
+    const response = zeroRecord(
+      await readPublicProject(pathParam(projectId), publicParams(filters, page, related), { anonymous: true }),
+    );
+    // The page is the board fields beside its pagination block, so it stands
+    // in for the data the keyed listing nests them under.
+    return { data: response as GenBoard, pagination: response.pagination };
+  }, projectId, stopAt, true);
+
+// A public project's columns and tasks, every page of them, read without a
+// key: the route is the one a shared board link is served by. The merge and
+// the moved-under-the-reader rereads are the keyed board's own.
+export const getPublicBoard = async (projectId: string, filters: PublicBoardFilters = {}): Promise<Board> => {
+  let read = await readPublicBoard(projectId, filters);
+  for (let again = 0; read.moved && again < REREADS; again++) read = await readPublicBoard(projectId, filters);
+  if (read.moved) console.error(changed(projectId));
+  return read.board;
+};
+
+// One task by number on a public board, for the task description route that
+// names tasks by id: the number is what a reader of the board has, so it is
+// resolved the way findTaskByNumber resolves it on the keyed board.
+export const findPublicTaskByNumber = async (
+  projectId: string,
+  number: number,
+): Promise<{ board: Board; task: Task | undefined }> => {
+  const stopAt = (page: Task[]): Task | undefined => page.find((task) => task.number === number);
+  let read = await readPublicBoard(projectId, {}, stopAt);
+  for (let again = 0; read.stopped === undefined && read.moved && again < REREADS; again++) {
+    read = await readPublicBoard(projectId, {}, stopAt);
+  }
+  if (read.stopped === undefined && read.moved) console.error(changed(projectId));
+  return { board: read.board, task: read.stopped };
+};
+
+// A description read whole: the pages are contiguous slices of one text, so
+// the content is their concatenation and the version is the one they were all
+// read under. The first page's version is pinned onto every later offset, so
+// an edit mid-read is answered 409 rather than spliced into the text.
+export type Description = { content: string; version: string };
+
+// The server serves a description in 32K-character pages, so this many pages
+// is a text of hundreds of megabytes — far past any real description. The cap
+// exists for a nextOffset that keeps advancing without end: without it the
+// read would hold the process in a request loop.
+const DESCRIPTION_PAGES = 8192;
+
+const readDescription = async (
+  fetchPage: (offset: number, version: string | undefined) => Promise<GenDescriptionPage>,
+): Promise<Description> => {
+  let content = "";
+  let version: string | undefined;
+  for (let offset = 0, pages = 0; ; pages++) {
+    if (pages === DESCRIPTION_PAGES) {
+      throw new Error(`description read passed ${DESCRIPTION_PAGES} pages and nextOffset still had not ended the text`);
+    }
+    const page = zeroRecord(await fetchPage(offset, version));
+    content += page.content ?? "";
+    // The first page that names a version pins every later offset to it; one
+    // that names none leaves the read unpinned, as it was.
+    version ??= page.version || undefined;
+    const next = page.nextOffset;
+    if (next === null || next === undefined) break;
+    // A next offset that does not advance would reread the same page for
+    // ever, and answering the text read so far would pass a prefix off as the
+    // whole description; the read fails instead.
+    if (next <= offset) {
+      throw new Error(`description page at offset ${offset} answered nextOffset ${next}, which does not advance`);
+    }
+    offset = next;
+  }
+  return { content, version: version ?? "" };
+};
+
+// The public project description, every page of it.
+export const getPublicProjectDescription = (projectId: string): Promise<Description> =>
+  readDescription((offset, version) =>
+    readPublicDescription(pathParam(projectId), { offset, version }, { anonymous: true }),
+  );
+
+// The public task description, every page of it. taskId is the task's id,
+// which the board listing carries.
+export const getPublicTaskDescription = (projectId: string, taskId: string): Promise<Description> =>
+  readDescription((offset, version) =>
+    readPublicTaskDescription(pathParam(projectId), pathParam(taskId), { offset, version }, { anonymous: true }),
+  );
+
+// Bytes a binary route answered with, and the content type it was served as.
+export type Download = { data: Uint8Array; contentType: string };
+
+const toDownload = async (blob: Blob): Promise<Download> => ({
+  data: new Uint8Array(await blob.arrayBuffer()),
+  contentType: blob.type,
+});
+
+// An asset's bytes. Assets can belong to the private side of a board, so the
+// key is sent when one is configured; a public asset answers without it.
+export const downloadAsset = async (assetId: string): Promise<Download> =>
+  toDownload(await readAsset(pathParam(assetId), { blob: true }));
+
+// A user's avatar image, served without authentication: the route is how a
+// shared board shows its members' faces. The path names the avatar record's
+// id, which changes whenever the image is replaced — not the user's.
+export const downloadAvatar = async (avatarId: string): Promise<Download> =>
+  toDownload(await readAvatar(pathParam(avatarId), { blob: true, anonymous: true }));
+
+// Sets the credential's own avatar: the image's bytes as base64 and the type
+// they are, which the command reads off the file.
+export const uploadAvatar = async (contentType: string, data: string): Promise<GenUserAvatar> =>
+  zeroRecord(await putAvatar({ contentType, data } satisfies UploadUserAvatarBody));
+
+// Removes the credential's own avatar.
+export const deleteAvatar = async (): Promise<GenUserAvatarDeleted> => zeroRecord(await removeAvatar());
 
 export type CheckResult = {
   serverOperations: number;

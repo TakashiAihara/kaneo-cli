@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "instance",
+        "status",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"hasUsers\": true,\n  \"hasAdmin\": true\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/instance/status",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

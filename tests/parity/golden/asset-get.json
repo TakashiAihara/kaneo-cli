@@ -1,0 +1,136 @@
+{
+  "steps": [
+    {
+      "args": [
+        "asset",
+        "get",
+        "asset-pic",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "fake-asset-bytes",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "asset",
+        "get",
+        "asset-pic",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--json and --jq do not apply to asset get without --out; the bytes are written to stdout as they arrive\"\n}\n",
+      "stderr": "Error: --json and --jq do not apply to asset get without --out; the bytes are written to stdout as they arrive\n"
+    },
+    {
+      "args": [
+        "asset",
+        "get",
+        "asset-pic",
+        "--jq",
+        "."
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --json and --jq do not apply to asset get without --out; the bytes are written to stdout as they arrive\n"
+    },
+    {
+      "args": [
+        "asset",
+        "get",
+        "asset-bin",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": {
+        "base64": "iVBORw0KGgr//gA="
+      },
+      "stderr": ""
+    },
+    {
+      "args": [
+        "asset",
+        "get",
+        "asset-bin",
+        "--out",
+        "bin.png",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"path\": \"bin.png\",\n  \"bytes\": 11,\n  \"contentType\": \"image/png\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "asset",
+        "get",
+        "asset-priv",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "private-asset-bytes",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "asset",
+        "get",
+        "missing",
+        "--out",
+        "missing.bin",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/asset/missing: 404: Asset not found\"\n}\n",
+      "stderr": "Error: GET /api/asset/missing: 404: Asset not found\n"
+    },
+    {
+      "args": [
+        "asset",
+        "get",
+        "missing",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/asset/missing: 404: Asset not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/asset/asset-pic",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/asset/asset-bin",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/asset/asset-bin",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/asset/asset-priv",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/asset/missing",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/asset/missing",
+      "query": ""
+    }
+  ],
+  "files": {
+    "work/bin.png": {
+      "base64": "iVBORw0KGgr//gA="
+    }
+  }
+}

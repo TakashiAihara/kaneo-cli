@@ -17,6 +17,7 @@ import {
   CalendarFeed,
   Column,
   Comment,
+  Config,
   CreateNotification200,
   CreatedGitHubIntegration,
   CurrentUser,
@@ -34,6 +35,7 @@ import {
   GitlabImportResult,
   GitlabProjectList,
   GitlabVerificationResult,
+  InstanceStatus,
   InvitationDetails,
   IssueImportResult,
   Label,
@@ -47,12 +49,14 @@ import {
   ProjectBackgroundFinalize,
   ProjectBackgroundUpload,
   ProjectListItem,
+  PublicBoardPage,
   ReorderCustomFieldsResponse,
   RevokeCalendarFeed200,
   SearchResponse,
   SetCustomFieldValueResponse,
   Task,
   TaskByTicketId,
+  TaskDescriptionPage,
   TaskExport,
   TaskImportResult,
   TaskRelation,
@@ -60,6 +64,8 @@ import {
   TaskWithAssignee,
   TimeEntry,
   TimeEntryWithUser,
+  UserAvatar,
+  UserAvatarDeleted,
   WorkflowRule,
   WorkflowRuleRow,
   WorkspaceMember
@@ -86,6 +92,9 @@ import type {
   FinalizeProjectBackgroundUploadBody,
   GenericWebhookIntegration,
   GetActivitiesParams,
+  GetPublicProjectDescriptionPageParams,
+  GetPublicProjectParams,
+  GetPublicTaskDescriptionPageParams,
   GetTaskByTicketIdParams,
   GetTaskParams,
   GitHubIntegration,
@@ -129,6 +138,7 @@ import type {
   UpdateTaskTitleBody,
   UpdateTimeEntryBody,
   UploadProjectBackgroundBody,
+  UploadUserAvatarBody,
   UpsertNotificationPreferenceWorkspaceRuleBody,
   UpsertWorkflowRuleBody,
   VerifyGitHubInstallationBody,
@@ -136,6 +146,137 @@ import type {
 } from './model';
 
 import { kaneoFetch } from '../http';
+export const getGetInstanceStatusUrl = () => {
+
+
+
+
+  return `/instance/status`
+}
+
+/**
+ * Public instance setup status. When hasUsers is false the next signup becomes the instance admin.
+ * @summary Get instance status
+ */
+export const getInstanceStatus = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<InstanceStatus> => {
+
+  return kaneoFetch<InstanceStatus>(getGetInstanceStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: InstanceStatus
+  }
+);}
+
+
+
+export const getGetPublicProjectUrl = (id: string,
+    params?: GetPublicProjectParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/public-project/${id}?${stringifiedParams}` : `/public-project/${id}`
+}
+
+/**
+ * Read a public board in bounded task pages. Visibility is checked before loading tasks. Continue through pagination.totalPages for all tasks and through relatedPage/pagination.relatedTotalPages for their complete related records.
+ * @summary Get a public project board
+ */
+export const getPublicProject = async (id: string,
+    params?: GetPublicProjectParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<PublicBoardPage> => {
+
+  return kaneoFetch<PublicBoardPage>(getGetPublicProjectUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: PublicBoardPage
+  }
+);}
+
+
+
+export const getGetPublicProjectDescriptionPageUrl = (id: string,
+    params?: GetPublicProjectDescriptionPageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/public-project/${id}/description?${stringifiedParams}` : `/public-project/${id}/description`
+}
+
+/**
+ * @summary Read a public project description page
+ */
+export const getPublicProjectDescriptionPage = async (id: string,
+    params?: GetPublicProjectDescriptionPageParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<TaskDescriptionPage> => {
+
+  return kaneoFetch<TaskDescriptionPage>(getGetPublicProjectDescriptionPageUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: TaskDescriptionPage
+  }
+);}
+
+
+
+export const getGetPublicTaskDescriptionPageUrl = (id: string,
+    taskId: string,
+    params?: GetPublicTaskDescriptionPageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/public-project/${id}/task/${taskId}/description?${stringifiedParams}` : `/public-project/${id}/task/${taskId}/description`
+}
+
+/**
+ * @summary Read a public task description page
+ */
+export const getPublicTaskDescriptionPage = async (id: string,
+    taskId: string,
+    params?: GetPublicTaskDescriptionPageParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<TaskDescriptionPage> => {
+
+  return kaneoFetch<TaskDescriptionPage>(getGetPublicTaskDescriptionPageUrl(id,taskId,params),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: TaskDescriptionPage
+  }
+);}
+
+
+
 export const getGetCalendarFeedUrl = (token: string,) => {
 
 
@@ -156,6 +297,107 @@ export const getCalendarFeed = async (token: string, options?: Parameters<typeof
     method: 'GET'
 
 
+  }
+);}
+
+
+
+export const getGetSessionUrl = () => {
+
+
+
+
+  return `/auth/get-session`
+}
+
+/**
+ * Get the current authenticated session, or null when the caller is not signed in. Served by Better Auth.
+ * @summary Get session
+ */
+export const getSession = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<void> => {
+
+  return kaneoFetch<void>(getGetSessionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getGetAssetUrl = (id: string,) => {
+
+
+
+
+  return `/asset/${id}`
+}
+
+/**
+ * Download an uploaded asset. Readable without signing in only when it belongs to a public project; image types are served inline, everything else as an attachment.
+ * @summary Download asset
+ */
+export const getAsset = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Blob> => {
+
+  return kaneoFetch<Blob>(getGetAssetUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getGetUserAvatarUrl = (id: string,) => {
+
+
+
+
+  return `/user/avatar/${id}`
+}
+
+/**
+ * Download a user avatar by its avatar ID. Public, immutable, and cache-friendly: the id changes whenever the avatar is replaced.
+ * @summary Download avatar
+ */
+export const getUserAvatar = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Blob> => {
+
+  return kaneoFetch<Blob>(getGetUserAvatarUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getGetConfigUrl = () => {
+
+
+
+
+  return `/config`
+}
+
+/**
+ * Public instance settings: which sign-in methods, registration paths, and features are enabled.
+ * @summary Get config
+ */
+export const getConfig = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<Config> => {
+
+  return kaneoFetch<Config>(getGetConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: Config
   }
 );}
 
@@ -3821,5 +4063,71 @@ export const getCurrentUser = async ( options?: Parameters<typeof kaneoFetch>[1]
 
     ,
     schema: CurrentUser
+  }
+);}
+
+
+
+export const getUploadUserAvatarUrl = () => {
+
+
+
+
+  return `/user/avatar`
+}
+
+/**
+ * Store a base64 encoded avatar (PNG, JPEG, or WebP, up to 512KB) for the current user and return its public URL. Replaces any existing avatar.
+ * @summary Upload avatar
+ */
+export const uploadUserAvatar = async (uploadUserAvatarBody: UploadUserAvatarBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<UserAvatar> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<UserAvatar>(getUploadUserAvatarUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(uploadUserAvatarBody),
+    schema: UserAvatar
+  }
+);}
+
+
+
+export const getDeleteUserAvatarUrl = () => {
+
+
+
+
+  return `/user/avatar`
+}
+
+/**
+ * Remove the uploaded avatar of the current user. Succeeds even when there was nothing to remove.
+ * @summary Delete avatar
+ */
+export const deleteUserAvatar = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<UserAvatarDeleted> => {
+
+  return kaneoFetch<UserAvatarDeleted>(getDeleteUserAvatarUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: UserAvatarDeleted
   }
 );}

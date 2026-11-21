@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 
 export type Seed = {
   workspaces: { id: string; name: string; slug: string; description?: string | null; metadata?: unknown }[];
-  projects: { id: string; workspaceId: string; name: string; slug: string; archived?: boolean }[];
+  projects: { id: string; workspaceId: string; name: string; slug: string; archived?: boolean; isPublic?: boolean; description?: string | null }[];
   columns?: { slug: string; name: string; isFinal?: boolean }[];
   tasks: {
     id: string;
@@ -26,7 +26,7 @@ export type Seed = {
     userId?: string | null;
     // Calendar feeds only list tasks carrying a start or a due date.
     startDate?: string;
-    dueDate?: string;
+    dueDate?: string | null;
   }[];
   // A comment with a userId of its own was written by someone else, so only
   // the server's author check stands between it and a delete.
@@ -105,6 +105,14 @@ export type Seed = {
     dueDateReminderLeadTimeMinutes?: number;
     isActive?: boolean | null;
   }[];
+  // What /instance/status answers; hasUsers is otherwise read off the seed.
+  instance?: { hasUsers?: boolean; hasAdmin?: boolean };
+  // Binary documents the asset and avatar routes serve. A string body is
+  // UTF-8 text; bytes are given as a Uint8Array so a download can carry what
+  // text cannot, like a real image's. An asset is public unless it says
+  // otherwise, which is what decides whether the key is needed for it.
+  assets?: { id: string; body: string | Uint8Array; contentType?: string; public?: boolean }[];
+  avatars?: { id: string; body: string | Uint8Array; contentType?: string }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
@@ -233,9 +241,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     slug: p.slug,
     icon: "Layout",
     name: p.name,
-    description: null as string | null,
+    description: p.description ?? (null as string | null),
     createdAt: now(),
-    isPublic: false,
+    isPublic: p.isPublic ?? false,
     archivedAt: p.archived ? now() : (null as string | null),
     position: i,
     lastTaskNumber: 0,
@@ -348,6 +356,19 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   for (const l of seed.deletingLabels ?? []) addLabel(l.name, l.color ?? "gray", l.workspaceId, null, true);
   const requests: Recorded[] = [];
   let grew = 0;
+
+  // The binary documents, seeded and then kept as the avatar route writes
+  // them. Response takes a string or bytes as they are.
+  const assets = new Map(
+    (seed.assets ?? []).map((a) => [a.id, { body: a.body, contentType: a.contentType ?? "application/octet-stream", public: a.public ?? true }]),
+  );
+  const avatars = new Map(
+    (seed.avatars ?? []).map((a) => [a.id, { body: a.body, contentType: a.contentType ?? "image/png" }]),
+  );
+  // The avatar PUT replaces the credential's own, which the fake names
+  // avatar-self; DELETE takes it away again. The body stays bytes: a PNG or
+  // any non-UTF-8 upload decoded to a string would come back mangled.
+  let ownAvatar: { body: string | Uint8Array; contentType: string } | undefined;
 
   // Notifications number and date themselves apart from everything else, so
   // seeding them leaves the ids and times the other scenarios record alone.
@@ -939,11 +960,21 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     requests.push({ method: req.method, path, query: url.search, body });
 
     if (!url.pathname.startsWith("/api/")) return new Response("<html>app</html>", { headers: { "content-type": "text/html" } });
-    // The document is served without authentication, as the real server does —
-    // and so is the calendar itself: its route declares security: [] and the
-    // token in the path is the credential.
-    const open = (req.method === "GET" && path === "/openapi") || (req.method === "GET" && /^\/calendar-feed\/[^/]+\/calendar\.ics$/.test(path));
-    if (!open && req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
+    // The document and the security: [] routes are served without
+    // authentication, as the real server does; get-session among them still
+    // reads the credential when one is sent, and the calendar's token in its
+    // path is the credential the feed route checks.
+    const anonymous =
+      req.method === "GET" &&
+      (path === "/openapi" ||
+        path === "/instance/status" ||
+        path === "/config" ||
+        path === "/auth/get-session" ||
+        path.startsWith("/public-project/") ||
+        /^\/asset\/[^/]+$/.test(path) ||
+        /^\/user\/avatar\/[^/]+$/.test(path) ||
+        /^\/calendar-feed\/[^/]+\/calendar\.ics$/.test(path));
+    if (!anonymous && req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
     if (failing?.test(`${req.method} ${path}`) && (failingQuery?.test(url.search) ?? true) && skipped++ >= (opts.failOnSkip ?? 0)) return opts.failMessage === undefined ? fail(opts.failStatus ?? 500, "injected failure") : failText(opts.failStatus ?? 500, opts.failMessage);
 
     // The server validates request bodies against the same schemas the
@@ -1000,6 +1031,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/github-integration\/project\/[^/]+$/, M.CreateGitHubIntegrationBody],
       ["PATCH", /^\/github-integration\/project\/[^/]+$/, M.UpdateGitHubIntegrationBody],
       ["POST", /^\/github-integration\/import-issues$/, M.ImportGitHubIssuesBody],
+      ["PUT", /^\/user\/avatar$/, M.UploadUserAvatarBody],
     ];
     for (const [method, re, schema] of BODIES) {
       if (req.method !== method || !re.test(path)) continue;
@@ -2517,6 +2549,206 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         Object.assign(existing, merged);
         return ok(integrationSchema(kind), integrationResponse(existing));
       }
+    }
+
+    // ===== Instance, public boards and avatars =====
+
+    if (req.method === "GET" && path === "/instance/status") {
+      return ok(M.InstanceStatus, {
+        hasUsers: seed.instance?.hasUsers ?? (users.size > 0 || tasks.some((t) => t.userId !== null && t.userId !== undefined)),
+        hasAdmin: seed.instance?.hasAdmin ?? true,
+      });
+    }
+    if (req.method === "GET" && path === "/config") {
+      return ok(M.Config, {
+        isCloud: false,
+        disableRegistration: false,
+        disablePasswordRegistration: false,
+        disableEmailOtpSignIn: false,
+        disableWorkspaceCreation: false,
+        isDemoMode: false,
+        hasSmtp: false,
+        hasGithubSignIn: false,
+        hasGoogleSignIn: false,
+        hasDiscordSignIn: false,
+        hasCustomOAuth: false,
+        hasGuestAccess: false,
+        disableLoginForm: false,
+        customOAuthAutoLogin: false,
+        customOAuthLogoutUrl: null,
+        billingEnabled: false,
+      });
+    }
+    // better-auth's route: null without a credential, the session with one.
+    // The token is a credential itself and is in the reply all the same.
+    if (req.method === "GET" && path === "/auth/get-session") {
+      if (req.headers.get("authorization") !== "Bearer test-key") return Response.json(null);
+      return Response.json({
+        user: {
+          id: "user-self",
+          name: "Self",
+          email: "self@example.com",
+          emailVerified: true,
+          image: null,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          role: "user",
+          banned: false,
+          banReason: null,
+          banExpires: null,
+          locale: null,
+          emailVerificationRequired: false,
+        },
+        session: {
+          id: "sess-self-1",
+          token: "fake-session-token",
+          userId: "user-self",
+          userAgent: "kaneo-cli-test",
+          ipAddress: "127.0.0.1",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          expiresAt: "2027-01-01T00:00:00.000Z",
+        },
+      });
+    }
+
+    // A description page is a slice of the stored text; the fake pages at
+    // 1024 characters so a scenario can exercise the continuation. The version
+    // is what the row's xmin would be: once a read knows it, later offsets pin
+    // to it and a row that no longer matches is a 409, as
+    // description-pages.ts answers; without one the same absence is a 404.
+    const DESCRIPTION_PAGE = 1024;
+    const DESCRIPTION_VERSION = "1";
+    const descriptionPage = (content: string, offset: number): z.input<typeof M.TaskDescriptionPage> => ({
+      content: content.slice(offset, offset + DESCRIPTION_PAGE),
+      version: DESCRIPTION_VERSION,
+      nextOffset: offset + DESCRIPTION_PAGE < content.length ? offset + DESCRIPTION_PAGE : null,
+    });
+    const descriptionMiss = (gone: boolean): Response | undefined => {
+      const version = url.searchParams.get("version");
+      if (!gone && (version === null || version === DESCRIPTION_VERSION)) return undefined;
+      return fail(version === null ? 404 : 409, "Description changed or is unavailable; refresh before loading it again");
+    };
+    if (req.method === "GET" && (p = m(/^\/public-project\/([^/]+)\/description$/))) {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      const miss = descriptionMiss(proj === undefined || !proj.isPublic);
+      if (miss !== undefined) return miss;
+      return ok(M.TaskDescriptionPage, descriptionPage(proj!.description ?? "", Number(url.searchParams.get("offset") ?? 0)));
+    }
+    if (req.method === "GET" && (p = m(/^\/public-project\/([^/]+)\/task\/([^/]+)\/description$/))) {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      const task = tasks.find((t) => t.id === decodeURIComponent(p![2]!));
+      const miss = descriptionMiss(proj === undefined || !proj.isPublic || task === undefined || task.projectId !== proj.id);
+      if (miss !== undefined) return miss;
+      return ok(M.TaskDescriptionPage, descriptionPage(task!.description ?? "", Number(url.searchParams.get("offset") ?? 0)));
+    }
+    if (req.method === "GET" && (p = m(/^\/public-project\/([^/]+)$/))) {
+      const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
+      // As get-public-project.ts answers: an unknown id is a 404, a project
+      // that is not public a 403 — the board is not read for either.
+      if (!proj) return fail(404, "Project not found");
+      if (!proj.isPublic) return fail(403, "Project is not public");
+      const filterStatus = url.searchParams.get("status");
+      const filterPriority = url.searchParams.get("priority");
+      const filterAssignee = url.searchParams.get("assigneeId");
+      const dueBefore = url.searchParams.get("dueBefore");
+      const dueAfter = url.searchParams.get("dueAfter");
+      // The bounds are instants, not strings: an offset spelling of the same
+      // moment must compare equal, so they are judged as times.
+      const before = dueBefore === null ? null : Date.parse(dueBefore);
+      const after = dueAfter === null ? null : Date.parse(dueAfter);
+      let mine = tasks.filter(
+        (t) =>
+          t.projectId === proj.id &&
+          (filterStatus === null || t.status === filterStatus) &&
+          (filterPriority === null || t.priority === filterPriority) &&
+          (filterAssignee === null || t.userId === filterAssignee) &&
+          (before === null || (t.dueDate != null && Date.parse(t.dueDate) < before)) &&
+          (after === null || (t.dueDate != null && Date.parse(t.dueDate) > after)),
+      );
+      const sortBy = url.searchParams.get("sortBy");
+      if (sortBy !== null) {
+        const rank = (priority: string) => ["no-priority", "low", "medium", "high", "urgent"].indexOf(priority);
+        const key = (t: (typeof tasks)[number]): string | number => {
+          switch (sortBy) {
+            case "createdAt":
+              return t.createdAt;
+            case "priority":
+              return rank(t.priority);
+            case "dueDate":
+              return t.dueDate ?? "";
+            case "position":
+              return t.position ?? -1;
+            case "title":
+              return t.title;
+            default:
+              return t.number ?? -1;
+          }
+        };
+        const dir = url.searchParams.get("sortOrder") === "desc" ? -1 : 1;
+        mine = [...mine].sort((a, b) => {
+          const ka = key(a);
+          const kb = key(b);
+          return (ka < kb ? -1 : ka > kb ? 1 : 0) * dir;
+        });
+      }
+      const page = Number(url.searchParams.get("page") ?? 1);
+      const related = Number(url.searchParams.get("relatedPage") ?? 1);
+      const size = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 50)));
+      const slice = mine.slice((page - 1) * size, page * size);
+      const { lastTaskNumber: _l, archivedAt: _a, createdAt: _c, position: _o, ...head } = proj;
+      return ok(M.PublicBoardPage, {
+        ...head,
+        columns: columnsOf(proj.id).map((c) => ({
+          id: c.slug,
+          slug: c.slug,
+          name: c.name,
+          icon: c.icon,
+          isFinal: c.isFinal,
+          position: c.position,
+          tasks: slice.filter((t) => t.status === c.slug).map(boardTask),
+        })),
+        archivedTasks: slice.filter((t) => t.status === "archived").map(boardTask),
+        plannedTasks: slice.filter((t) => t.status === "planned").map(boardTask),
+        pagination: {
+          total: mine.length,
+          page,
+          pageSize: size,
+          totalPages: Math.max(1, Math.ceil(mine.length / size)),
+          relatedPage: related,
+          relatedPageSize: 100,
+          relatedTotalPages: 1,
+          relatedRevision: `relrev-${mine.length}`,
+          revision: `rev-${mine.length}`,
+        },
+      });
+    }
+
+    if (req.method === "GET" && (p = m(/^\/asset\/([^/]+)$/))) {
+      const asset = assets.get(decodeURIComponent(p![1]));
+      if (asset === undefined) return fail(404, "Asset not found");
+      // An asset of a private project answers only to a credential.
+      if (!asset.public && req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
+      return new Response(asset.body, { headers: { "content-type": asset.contentType } });
+    }
+    if (req.method === "GET" && (p = m(/^\/user\/avatar\/([^/]+)$/))) {
+      const id = decodeURIComponent(p![1]);
+      const avatar = avatars.get(id) ?? (id === "avatar-self" ? ownAvatar : undefined);
+      if (avatar === undefined) return fail(404, "Avatar not found");
+      return new Response(avatar.body, { headers: { "content-type": avatar.contentType } });
+    }
+    if (req.method === "PUT" && path === "/user/avatar") {
+      const b = body as z.input<typeof M.UploadUserAvatarBody>;
+      const bytes = Buffer.from(b.data, "base64");
+      ownAvatar = { body: bytes, contentType: b.contentType };
+      avatars.set("avatar-self", ownAvatar);
+      return ok(M.UserAvatar, { id: "avatar-self", url: "/api/user/avatar/avatar-self", size: bytes.length });
+    }
+    if (req.method === "DELETE" && path === "/user/avatar") {
+      const deleted = ownAvatar !== undefined || avatars.has("avatar-self");
+      ownAvatar = undefined;
+      avatars.delete("avatar-self");
+      return ok(M.UserAvatarDeleted, { deleted });
     }
 
     return fail(404, `no route: ${req.method} ${path}`);

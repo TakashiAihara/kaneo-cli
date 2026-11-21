@@ -1,0 +1,120 @@
+{
+  "steps": [
+    {
+      "args": [
+        "public",
+        "description",
+        "proj-public",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board \n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "public",
+        "description",
+        "proj-public",
+        "task-pub2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"content\": \"task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail \",\n  \"version\": \"1\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "public",
+        "description",
+        "proj-public",
+        "2",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail task detail \n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "public",
+        "description",
+        "proj-public",
+        "99",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"the public board of project proj-public has no task #99\"\n}\n",
+      "stderr": "Error: the public board of project proj-public has no task #99\n"
+    },
+    {
+      "args": [
+        "public",
+        "description",
+        "proj-alpha",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/public-project/proj-alpha/description: 404: Description changed or is unavailable; refresh before loading it again\"\n}\n",
+      "stderr": "Error: GET /api/public-project/proj-alpha/description: 404: Description changed or is unavailable; refresh before loading it again\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public/description",
+      "query": "?offset=0"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public/description",
+      "query": "?offset=1024&version=1"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public/task/task-pub2/description",
+      "query": "?offset=0"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public/task/task-pub2/description",
+      "query": "?offset=1024&version=1"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public/task/task-pub2/description",
+      "query": "?offset=2048&version=1"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public",
+      "query": "?page=1&relatedPage=1"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public/task/task-pub2/description",
+      "query": "?offset=0"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public/task/task-pub2/description",
+      "query": "?offset=1024&version=1"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public/task/task-pub2/description",
+      "query": "?offset=2048&version=1"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public",
+      "query": "?page=1&relatedPage=1"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-alpha/description",
+      "query": "?offset=0"
+    }
+  ],
+  "files": {}
+}

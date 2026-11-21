@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "session",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"user\": {\n    \"id\": \"user-self\",\n    \"name\": \"Self\",\n    \"email\": \"self@example.com\"\n  },\n  \"session\": {\n    \"id\": \"sess-self-1\",\n    \"userId\": \"user-self\",\n    \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n    \"expiresAt\": \"<TIME>Z\",\n    \"ipAddress\": \"127.0.0.1\",\n    \"userAgent\": \"kaneo-cli-test\"\n  }\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/get-session",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

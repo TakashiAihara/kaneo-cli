@@ -254,6 +254,16 @@ kaneo integration github connect <owner> <repo>      # link the project to a rep
 kaneo integration github update [--active=false] [--comment-task-link=false]   # only what is passed changes
 kaneo integration github rm --yes                    # unlink the project from its repository
 kaneo integration github import [--run-id ID]        # import the repository's issues as tasks, resuming until done
+kaneo instance status              # whether the instance has users and an admin yet; no key needed
+kaneo instance config              # the public configuration: sign-in methods, features, limits; no key needed
+kaneo whoami session               # the session the credential resolves to; the session token is never shown
+kaneo whoami avatar set <file>     # upload a .png, .jpg, .jpeg or .webp as your avatar (at most ~512 KiB)
+kaneo whoami avatar rm             # remove your avatar; removing none still succeeds
+kaneo public project <project-id> [--status S] [--priority P] [--assignee-id ID] [--sort-by F] [--sort-order asc|desc] [--due-before T] [--due-after T] [--limit N]
+                                # the board a public link shares, by project id; no key needed
+kaneo public description <project-id> [task]   # a public project's description, or one task's by id or board number; no key needed
+kaneo asset get <asset-id> [--out <file>]      # an asset's bytes; a private project's asset needs the key
+kaneo avatar get <avatar-id> [--out <file>]    # a user's avatar image by the id in its URL; no key needed
 ```
 
 A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds. `task update` writes the status first, and when a field after it fails the error names the fields that were already updated.
@@ -299,6 +309,8 @@ Three of the routes — `repos`, `verify` and `connect` — need a user session 
 `kaneo integration` is the project's own event delivery, one integration per type: `mattermost` posts task events to a Mattermost incoming webhook, `webhook` POSTs them to any HTTP endpoint, signed with a secret when one is set — the POST creates or replaces the row, so re-running `set` with a fresh URL and secret is a rotation, not a second integration. `set` reads the project first — with no integration it creates one, and a new one is created active, so `--active` is refused there; with one it patches only the flags passed, so an omitted field keeps its stored value and each event toggle merges into the stored set rather than replacing it. The webhook URL is required to create and cannot be emptied afterwards; on Mattermost `--channel-name ''` clears the channel, and on the webhook an empty signing secret clears it. The URL and the secret are credentials — a value is refused, and each takes stdin through `-` or a file through `--webhook-url-file` or `--secret-file`, never both forms for one credential and never two readers of stdin in one command, so a create that wants both pipes the URL and points the secret at a file in a single `set`. A credential read from stdin or a file drops exactly one trailing line ending and is otherwise kept as it came; the server answers masked forms of them only. `rm` reads the row first and refuses without `--yes`. `--reminder-lead` on the webhook is how long before a due date the reminder event fires, 5 minutes to 30 days.
 
 `kaneo feed` manages a project's calendar feeds: subscription links that serve the project's scheduled tasks — those with a start or due date and carrying any of the feed's labels — as an iCalendar document. `feed create` takes at least one label, by workspace label id or name, and `--time-zone` names the zone all-day dates are read in; left out, the server's UTC applies. A feed's subscribe link is the public half of `feed get <token>`: the route needs no key, which is what makes it pasteable into a calendar app, and `feed rm` revokes it for good — a feed created again gets a new token, so anything already subscribed has to be given the new link.
+
+`instance`, `public`, `avatar get` and the assets a public project's shared description publishes answer without a key — the routes a shared link is served by — so those commands run with `KANEO_API_KEY` unset; any other asset is the exception and is sent the configured key when there is one. `asset get` and `avatar get` write raw bytes: to stdout as they arrived — a terminal and `--json`/`--jq` are refused there, since the bytes are the server's to choose — or to the file `--out` names, where `--json` then reports the path, size and content type rather than the bytes. `whoami avatar set` reads the image type off the file's extension, refuses anything but png, jpeg and webp, and refuses an empty file or one over the server's ~512 KiB limit before sending it.
 
 ### Shell completion
 

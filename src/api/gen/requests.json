@@ -116,6 +116,7 @@
   "deleteTask": {},
   "deleteTaskComment": {},
   "deleteTaskRelation": {},
+  "deleteUserAvatar": {},
   "deleteWorkflowRule": {},
   "detachLabelFromTask": {},
   "exportTasks": {},
@@ -128,8 +129,10 @@
   "getActivities": {
     "query.limit": false
   },
+  "getAsset": {},
   "getCalendarFeed": {},
   "getColumns": {},
+  "getConfig": {},
   "getCurrentUser": {},
   "getCustomFieldFilterValues": {},
   "getCustomFieldValuesByProject": {},
@@ -140,12 +143,34 @@
   "getGitHubAppInfo": {},
   "getGitHubIntegration": {},
   "getGitlabIntegration": {},
+  "getInstanceStatus": {},
   "getInvitationDetails": {},
   "getLabel": {},
   "getMattermostIntegration": {},
   "getNotificationPreferences": {},
   "getProject": {},
   "getProjectBackground": {},
+  "getPublicProject": {
+    "query.assigneeId": false,
+    "query.dueAfter": false,
+    "query.dueBefore": false,
+    "query.limit": false,
+    "query.page": false,
+    "query.priority": false,
+    "query.relatedPage": false,
+    "query.sortBy": false,
+    "query.sortOrder": false,
+    "query.status": false
+  },
+  "getPublicProjectDescriptionPage": {
+    "query.offset": false,
+    "query.version": false
+  },
+  "getPublicTaskDescriptionPage": {
+    "query.offset": false,
+    "query.version": false
+  },
+  "getSession": {},
   "getTask": {
     "query.view": false
   },
@@ -159,6 +184,7 @@
   "getTaskRelations": {},
   "getTaskTimeEntries": {},
   "getTimeEntry": {},
+  "getUserAvatar": {},
   "getWorkflowRules": {},
   "getWorkspaceLabels": {},
   "getWorkspaceMembers": {},
@@ -343,6 +369,10 @@
   "uploadProjectBackground": {
     "body.contentType": true,
     "body.size": true
+  },
+  "uploadUserAvatar": {
+    "body.contentType": true,
+    "body.data": true
   },
   "upsertNotificationPreferenceWorkspaceRule": {
     "body.emailEnabled": true,

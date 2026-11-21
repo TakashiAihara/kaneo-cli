@@ -1,0 +1,150 @@
+{
+  "steps": [
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "avatar-one-bytes",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--json and --jq do not apply to avatar get without --out; the bytes are written to stdout as they arrive\"\n}\n",
+      "stderr": "Error: --json and --jq do not apply to avatar get without --out; the bytes are written to stdout as they arrive\n"
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-1",
+        "--jq",
+        "."
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --json and --jq do not apply to avatar get without --out; the bytes are written to stdout as they arrive\n"
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-1",
+        "--out",
+        "face.webp",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"path\": \"face.webp\",\n  \"bytes\": 16,\n  \"contentType\": \"image/webp\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-bom",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "﻿hi",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-bin",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": {
+        "base64": "/w=="
+      },
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-marker",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "base64:/w==",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "nope",
+        "--out",
+        "none.webp",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/user/avatar/nope: 404: Avatar not found\"\n}\n",
+      "stderr": "Error: GET /api/user/avatar/nope: 404: Avatar not found\n"
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "nope",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/user/avatar/nope: 404: Avatar not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/user/avatar/av-1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/av-1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/av-bom",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/av-bin",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/av-marker",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/nope",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/nope",
+      "query": ""
+    }
+  ],
+  "files": {
+    "work/face.webp": "avatar-one-bytes"
+  }
+}

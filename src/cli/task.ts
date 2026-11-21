@@ -1387,7 +1387,7 @@ const filterTasks = (tasks: Task[], status: string, priority: string, all: boole
 const assignedLine = (task: AssignedTask): string =>
   `${task.projectSlug}#${String(task.number ?? "").padEnd(4)} [${task.priority.padEnd(11)}] ${task.status.padEnd(13)} ${task.title}`;
 
-const taskLine = (task: Task): string =>
+export const taskLine = (task: Task): string =>
   `#${String(task.number).padEnd(4)} [${task.priority.padEnd(11)}] ${task.status.padEnd(13)} ${task.title}`;
 
 // One external link as a person reads it: the URL, then whatever the provider or

@@ -167,8 +167,9 @@ export type Scenario = {
   assignedLimit?: number;
   // Written to every step's stdin, for text a pipe carries.
   stdin?: string;
-  // Written into the cwd before the first step, for text a flag names as a file.
-  files?: Record<string, string>;
+  // Written into the cwd before the first step, for the file a flag names —
+  // bytes when the upload has to be something text cannot write, like a PNG.
+  files?: Record<string, string | Uint8Array>;
 };
 
 const both = (name: string, args: string[]): Scenario[] => [
@@ -2025,15 +2026,40 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     // Commands that send no request, or only a request that needs no key
-    // (api-check), never run it, and a fail-open session command that needs
-    // the key still exits 0 when the command fails.
+    // (api-check, the instance and public reads, an avatar download, a feed
+    // download), never run it, and a fail-open session command that needs
+    // the key still exits 0 when the command fails. whoami at the end is the
+    // contrast: it does need the key, so the command runs and fails the step.
     name: "a failing api_key_command spares commands that send no key",
     env: { KANEO_API_KEY: "", KANEO_SESSION_ID: "sess-cmd" },
     config: { profiles: { self: { api_key_command: "echo ran >&2; exit 3" } } },
     // The calendar route declares security: [], so `feed get` is one of the
     // commands that send no key; the seeded feed's empty labels still serve.
-    seed: { calendarFeeds: [{ projectId: P1 }] },
-    steps: [["completion", "bash"], ["__complete", "task", ""], ["session", "status", "--json"], ["session", "attach", "1"], ["context", "--json"], ["context", "--human"], ["api-check", "--json"], ["feed", "get", feedToken(1)], ["whoami", "--json"]],
+    seed: {
+      calendarFeeds: [{ projectId: P1 }],
+      projects: [
+        ...SEED.projects,
+        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+      ],
+      avatars: [{ id: "av-1", body: "avatar-one-bytes", contentType: "image/webp" }],
+    },
+    extraTasks: [{ id: "task-pub1", projectId: "proj-public", title: "Public first" }],
+    steps: [
+      ["completion", "bash"],
+      ["__complete", "task", ""],
+      ["session", "status", "--json"],
+      ["session", "attach", "1"],
+      ["context", "--json"],
+      ["context", "--human"],
+      ["api-check", "--json"],
+      ["feed", "get", feedToken(1)],
+      ["instance", "status", "--json"],
+      ["instance", "config", "--json"],
+      ["public", "project", "proj-public", "--json"],
+      ["public", "description", "proj-public", "--json"],
+      ["avatar", "get", "av-1", "--out", "face.webp", "--json"],
+      ["whoami", "--json"],
+    ],
   },
   {
     name: "api_key_command printing too much",
@@ -2899,6 +2925,186 @@ export const SCENARIOS: Scenario[] = [
       ["integration", "webhook", "rm", "--yes", "--json"],
       // Beta has no webhook integration, so its create is refused too.
       ["integration", "webhook", "set", WF, "-", "-p", "BET", "--json"],
+    ],
+  },
+
+  // ===== Instance, public boards, session, assets and avatars =====
+
+  ...both("instance status", ["instance", "status"]),
+  ...both("instance config", ["instance", "config"]),
+  {
+    // The routes are security: [], so no key, workspace or project is needed.
+    name: "instance reads without a key",
+    env: { KANEO_API_KEY: "", KANEO_PROJECT: "", KANEO_WORKSPACE: "" },
+    steps: [["instance", "status", "--human"], ["instance", "config", "--json"]],
+  },
+  ...both("whoami session", ["whoami", "session"]),
+  {
+    // set stores the image, get reads it back — to stdout and to --out —
+    // byte for byte, rm takes it away, and rm again reports there was
+    // nothing left.
+    name: "whoami avatar set, get and rm",
+    files: {
+      // The PNG signature followed by bytes no text decode survives, the
+      // same payload asset-bin seeds: what the fake stores must be what the
+      // GET serves, so a fake that kept the upload as text would show here.
+      "face.png": new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00]),
+    },
+    steps: [
+      ["whoami", "avatar", "set", "face.png", "--json"],
+      ["avatar", "get", "avatar-self", "--human"],
+      ["avatar", "get", "avatar-self", "--out", "round.png", "--json"],
+      ["whoami", "avatar", "rm", "--human"],
+      ["whoami", "avatar", "rm", "--json"],
+      // The avatar is gone, so both reads fail — --out still reports the 404
+      // as JSON, while the raw stdout path keeps it off stdout entirely.
+      ["avatar", "get", "avatar-self", "--out", "gone.webp", "--json"],
+      ["avatar", "get", "avatar-self", "--human"],
+    ],
+  },
+  {
+    name: "whoami avatar set refuses what is not an image",
+    files: { "notes.txt": "text", "empty.png": "" },
+    steps: [
+      ["whoami", "avatar", "set", "notes.txt", "--json"],
+      ["whoami", "avatar", "set", "empty.png", "--json"],
+      ["whoami", "avatar", "set", "missing.png", "--json"],
+    ],
+  },
+  {
+    name: "avatar get",
+    env: { KANEO_API_KEY: "" },
+    seed: {
+      avatars: [
+        { id: "av-1", body: "avatar-one-bytes", contentType: "image/webp" },
+        // UTF-8 with a leading BOM: the recording decoder keeps it as U+FEFF,
+        // so these bytes record differently from "hi" alone would.
+        { id: "av-bom", body: new Uint8Array([0xef, 0xbb, 0xbf, 0x68, 0x69]), contentType: "image/webp" },
+        // Not UTF-8: recorded as {"base64": ...}, the shape no text takes.
+        { id: "av-bin", body: new Uint8Array([0xff]), contentType: "image/webp" },
+        // Text that reads like a binary record stays the string it is.
+        { id: "av-marker", body: "base64:/w==", contentType: "image/webp" },
+      ],
+    },
+    steps: [
+      ["avatar", "get", "av-1", "--human"],
+      // The bytes have no JSON form, so the output flags are refused on the
+      // stdout path — before any request is made.
+      ["avatar", "get", "av-1", "--json"],
+      ["avatar", "get", "av-1", "--jq", "."],
+      ["avatar", "get", "av-1", "--out", "face.webp", "--json"],
+      // av-bom's bytes are UTF-8 behind a BOM, av-bin's are not UTF-8 at
+      // all, and av-marker's text is what a binary record looks like — the
+      // three must record three different ways.
+      ["avatar", "get", "av-bom", "--human"],
+      ["avatar", "get", "av-bin", "--human"],
+      ["avatar", "get", "av-marker", "--human"],
+      // A missing avatar still fails the read — --out reports the 404 as
+      // JSON, while the raw stdout path keeps it off stdout entirely.
+      ["avatar", "get", "nope", "--out", "none.webp", "--json"],
+      ["avatar", "get", "nope", "--human"],
+    ],
+  },
+  {
+    name: "asset get",
+    seed: {
+      assets: [
+        { id: "asset-pic", body: "fake-asset-bytes", contentType: "image/png" },
+        { id: "asset-priv", body: "private-asset-bytes", contentType: "text/plain", public: false },
+        // Not UTF-8: the PNG signature followed by bytes no text decode
+        // survives, so the goldens pin that the download's bytes — to stdout
+        // or to --out — arrive as they were served, not as text would.
+        { id: "asset-bin", body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00]), contentType: "image/png" },
+      ],
+    },
+    steps: [
+      ["asset", "get", "asset-pic", "--human"],
+      // The bytes have no JSON form, so the output flags are refused on the
+      // stdout path — before any request is made.
+      ["asset", "get", "asset-pic", "--json"],
+      ["asset", "get", "asset-pic", "--jq", "."],
+      ["asset", "get", "asset-bin", "--human"],
+      ["asset", "get", "asset-bin", "--out", "bin.png", "--json"],
+      ["asset", "get", "asset-priv", "--human"],
+      // A missing asset still fails the read — --out reports the 404 as
+      // JSON, while the raw stdout path keeps it off stdout entirely.
+      ["asset", "get", "missing", "--out", "missing.bin", "--json"],
+      ["asset", "get", "missing", "--human"],
+    ],
+  },
+  {
+    // A public asset answers without a key; a private one is refused.
+    name: "asset get without a key",
+    env: { KANEO_API_KEY: "" },
+    seed: {
+      assets: [
+        { id: "asset-pic", body: "fake-asset-bytes", contentType: "image/png" },
+        { id: "asset-priv", body: "private-asset-bytes", contentType: "text/plain", public: false },
+      ],
+    },
+    steps: [
+      ["asset", "get", "asset-pic", "--human"],
+      // --out keeps --json meaningful on a refused read: the 401 is reported
+      // as the usual error document.
+      ["asset", "get", "asset-priv", "--out", "priv.bin", "--json"],
+    ],
+  },
+  {
+    name: "public project",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+      ],
+    },
+    // The three tasks differ on every field the filters read, so the filtered
+    // read answers with task-pub1 alone.
+    extraTasks: [
+      { id: "task-pub1", projectId: "proj-public", title: "Public first", priority: "high", userId: "user-1", dueDate: "2026-01-10T00:00:00.000Z" },
+      { id: "task-pub2", projectId: "proj-public", title: "Public second", status: "done", priority: "low", userId: "user-2", dueDate: "2026-03-10T00:00:00.000Z" },
+      { id: "task-pub3", projectId: "proj-public", title: "Public third", status: "archived" },
+    ],
+    steps: [
+      ["public", "project", "proj-public", "--human"],
+      ["public", "project", "proj-public", "--status", "to-do", "--json"],
+      ["public", "project", "proj-public", "--sort-by", "title", "--sort-order", "desc", "--limit", "1", "--json"],
+      ["public", "project", "proj-public", "--priority", "high", "--assignee-id", "user-1", "--due-before", "2026-02-01T00:00:00.000Z", "--due-after", "2026-01-01T00:00:00.000Z", "--json"],
+      ["public", "project", "proj-alpha", "--json"],
+      ["public", "project", "proj-public", "--sort-by", "sideways", "--json"],
+    ],
+  },
+  {
+    name: "public reads without a key",
+    env: { KANEO_API_KEY: "", KANEO_PROJECT: "", KANEO_WORKSPACE: "" },
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+      ],
+    },
+    extraTasks: [{ id: "task-pub1", projectId: "proj-public", title: "Public first" }],
+    steps: [["public", "project", "proj-public", "--human"], ["public", "description", "proj-public", "--json"]],
+  },
+  {
+    // The project description pages at 1024 characters a page; the task's by
+    // id, by number, and the misses.
+    name: "public description",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+      ],
+    },
+    extraTasks: [
+      { id: "task-pub1", projectId: "proj-public", title: "Public first" },
+      { id: "task-pub2", projectId: "proj-public", title: "Public second", description: "task detail ".repeat(200) },
+    ],
+    steps: [
+      ["public", "description", "proj-public", "--human"],
+      ["public", "description", "proj-public", "task-pub2", "--json"],
+      ["public", "description", "proj-public", "2", "--human"],
+      ["public", "description", "proj-public", "99", "--json"],
+      ["public", "description", "proj-alpha", "--json"],
     ],
   },
 ];

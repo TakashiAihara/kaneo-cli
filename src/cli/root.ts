@@ -36,6 +36,10 @@ import { labelCommand } from "./label";
 import { feedCommand } from "./feed";
 import { timeCommand } from "./time";
 import { apiCheckCommand } from "./apicheck";
+import { assetCommand } from "./asset";
+import { avatarCommand } from "./avatar";
+import { instanceCommand } from "./instance";
+import { publicCommand } from "./public";
 import { completeCommand, completionCommand } from "./completion";
 
 // The version is stamped in at build time; an unreleased build calls itself dev,
@@ -116,6 +120,10 @@ export const rootCommand = (): { root: Command<App> } => {
     labelCommand,
     feedCommand,
     timeCommand,
+    instanceCommand,
+    publicCommand,
+    assetCommand,
+    avatarCommand,
     apiCheckCommand,
     completionCommand,
     helpCommand,

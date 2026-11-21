@@ -1,0 +1,42 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "avatar",
+        "set",
+        "notes.txt",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"cannot tell the image type of notes.txt: use a .png, .jpg, .jpeg or .webp file\"\n}\n",
+      "stderr": "Error: cannot tell the image type of notes.txt: use a .png, .jpg, .jpeg or .webp file\n"
+    },
+    {
+      "args": [
+        "whoami",
+        "avatar",
+        "set",
+        "empty.png",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty.png is empty\"\n}\n",
+      "stderr": "Error: empty.png is empty\n"
+    },
+    {
+      "args": [
+        "whoami",
+        "avatar",
+        "set",
+        "missing.png",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no such file: missing.png\"\n}\n",
+      "stderr": "Error: no such file: missing.png\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

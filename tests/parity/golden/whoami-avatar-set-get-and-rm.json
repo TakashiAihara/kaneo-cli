@@ -1,0 +1,134 @@
+{
+  "steps": [
+    {
+      "args": [
+        "whoami",
+        "avatar",
+        "set",
+        "face.png",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"avatar-self\",\n  \"url\": \"/api/user/avatar/avatar-self\",\n  \"size\": 11\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "avatar-self",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": {
+        "base64": "iVBORw0KGgr//gA="
+      },
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "avatar-self",
+        "--out",
+        "round.png",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"path\": \"round.png\",\n  \"bytes\": 11,\n  \"contentType\": \"image/png\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "whoami",
+        "avatar",
+        "rm",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "avatar removed\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "whoami",
+        "avatar",
+        "rm",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"deleted\": false\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "avatar-self",
+        "--out",
+        "gone.webp",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/user/avatar/avatar-self: 404: Avatar not found\"\n}\n",
+      "stderr": "Error: GET /api/user/avatar/avatar-self: 404: Avatar not found\n"
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "avatar-self",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/user/avatar/avatar-self: 404: Avatar not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/user/avatar",
+      "query": "",
+      "body": {
+        "contentType": "image/png",
+        "data": "iVBORw0KGgr//gA="
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/avatar-self",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/avatar-self",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/user/avatar",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/user/avatar",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/avatar-self",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/avatar-self",
+      "query": ""
+    }
+  ],
+  "files": {
+    "work/round.png": {
+      "base64": "iVBORw0KGgr//gA="
+    }
+  }
+}

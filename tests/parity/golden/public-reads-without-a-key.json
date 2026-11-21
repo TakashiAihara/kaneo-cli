@@ -1,0 +1,44 @@
+{
+  "steps": [
+    {
+      "args": [
+        "public",
+        "project",
+        "proj-public",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Public (PUB)\n\n### To Do\n#1    [no-priority] to-do         Public first\n\n### In Progress\n\n### Done\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "public",
+        "description",
+        "proj-public",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"content\": \"shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board shared board \",\n  \"version\": \"1\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public",
+      "query": "?page=1&relatedPage=1"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public/description",
+      "query": "?offset=0"
+    },
+    {
+      "method": "GET",
+      "path": "/public-project/proj-public/description",
+      "query": "?offset=1024&version=1"
+    }
+  ],
+  "files": {}
+}

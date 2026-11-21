@@ -1,0 +1,119 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"cfv0002\",\n    \"taskId\": \"task-a1\",\n    \"fieldId\": \"fld0001\",\n    \"value\": \"staging\",\n    \"fieldName\": \"Env\",\n    \"fieldPosition\": 0,\n    \"fieldType\": \"text\",\n    \"fieldOptions\": null\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "rm",
+        "1",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "values",
+        "Env",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"fieldId\": \"fld0001\",\n  \"fieldName\": \"Env\",\n  \"fieldType\": \"text\",\n  \"values\": [\n    \"prod\",\n    \"dev\"\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
+        "2",
+        "3",
+        "--delete",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"operation\": \"delete\",\n  \"value\": null,\n  \"taskIds\": [\n    \"task-a2\",\n    \"task-a3\"\n  ],\n  \"updatedCount\": 2\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "values",
+        "Env",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"fieldId\": \"fld0001\",\n  \"fieldName\": \"Env\",\n  \"fieldType\": \"text\",\n  \"values\": []\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/filter-values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/task/bulk",
+      "query": "",
+      "body": {
+        "taskIds": [
+          "task-a2",
+          "task-a3"
+        ],
+        "operation": "delete",
+        "value": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/filter-values",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

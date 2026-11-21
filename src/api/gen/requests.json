@@ -23,6 +23,14 @@
     "body.isFinal": false,
     "body.name": true
   },
+  "createCustomField": {
+    "body.defaultValue": false,
+    "body.name": true,
+    "body.options": false,
+    "body.projectId": true,
+    "body.required": false,
+    "body.type": true
+  },
   "createLabel": {
     "body.color": true,
     "body.name": true,
@@ -71,6 +79,7 @@
     "body.taskId": true
   },
   "deleteColumn": {},
+  "deleteCustomField": {},
   "deleteLabel": {},
   "deleteNotificationPreferenceWorkspaceRule": {},
   "deleteProject": {},
@@ -85,6 +94,10 @@
   },
   "getColumns": {},
   "getCurrentUser": {},
+  "getCustomFieldFilterValues": {},
+  "getCustomFieldValuesByProject": {},
+  "getCustomFieldValuesByTask": {},
+  "getCustomFieldsByProject": {},
   "getExternalLinksByTask": {},
   "getInvitationDetails": {},
   "getLabel": {},
@@ -152,9 +165,17 @@
   "reorderColumns": {
     "body.columns": true
   },
+  "reorderCustomFields": {
+    "body.fields": true
+  },
   "reorderProjects": {
     "body.projects": true,
     "query.workspaceId": true
+  },
+  "setCustomFieldValue": {
+    "body.fieldId": true,
+    "body.taskId": true,
+    "body.value": true
   },
   "unarchiveProject": {},
   "updateColumn": {

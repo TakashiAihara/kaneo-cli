@@ -1,0 +1,114 @@
+{
+  "steps": [
+    {
+      "args": [
+        "field",
+        "reorder",
+        "Release",
+        "Priority note",
+        "Story points",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"fld0003\",\n    \"projectId\": \"proj-alpha\",\n    \"name\": \"Release\",\n    \"type\": \"dropdown\",\n    \"required\": false,\n    \"defaultValue\": null,\n    \"options\": [\n      \"Web\",\n      \"CLI\"\n    ],\n    \"position\": 0,\n    \"createdAt\": \"<TIME>Z\",\n    \"updatedAt\": \"<TIME>Z\"\n  },\n  {\n    \"id\": \"fld0001\",\n    \"projectId\": \"proj-alpha\",\n    \"name\": \"Priority note\",\n    \"type\": \"text\",\n    \"required\": false,\n    \"defaultValue\": null,\n    \"options\": null,\n    \"position\": 1,\n    \"createdAt\": \"<TIME>Z\",\n    \"updatedAt\": \"<TIME>Z\"\n  },\n  {\n    \"id\": \"fld0002\",\n    \"projectId\": \"proj-alpha\",\n    \"name\": \"Story points\",\n    \"type\": \"number\",\n    \"required\": false,\n    \"defaultValue\": null,\n    \"options\": null,\n    \"position\": 2,\n    \"createdAt\": \"<TIME>Z\",\n    \"updatedAt\": \"<TIME>Z\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "fld0003  Release  (dropdown)  [Web, CLI]\nfld0001  Priority note  (text)\nfld0002  Story points  (number)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "reorder",
+        "Release",
+        "Priority note",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"every field of this project has to be named exactly once: missing: Story points\"\n}\n",
+      "stderr": "Error: every field of this project has to be named exactly once: missing: Story points\n"
+    },
+    {
+      "args": [
+        "field",
+        "reorder",
+        "Release",
+        "nope",
+        "Story points",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"every field of this project has to be named exactly once: unknown: nope; missing: Priority note\"\n}\n",
+      "stderr": "Error: every field of this project has to be named exactly once: unknown: nope; missing: Priority note\n"
+    },
+    {
+      "args": [
+        "field",
+        "reorder",
+        "Release",
+        "Release",
+        "Story points",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"every field of this project has to be named exactly once: repeated: Release; missing: Priority note\"\n}\n",
+      "stderr": "Error: every field of this project has to be named exactly once: repeated: Release; missing: Priority note\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/reorder/proj-alpha",
+      "query": "",
+      "body": {
+        "fields": [
+          {
+            "id": "fld0003",
+            "position": 0
+          },
+          {
+            "id": "fld0001",
+            "position": 1
+          },
+          {
+            "id": "fld0002",
+            "position": 2
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

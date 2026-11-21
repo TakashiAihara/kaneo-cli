@@ -1,0 +1,98 @@
+{
+  "steps": [
+    {
+      "args": [
+        "field",
+        "rm",
+        "Story points",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to delete field \"Story points\" without --yes; the values tasks hold for it are deleted too\n"
+    },
+    {
+      "args": [
+        "field",
+        "rm",
+        "Story points",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"fld0002\",\n  \"projectId\": \"proj-alpha\",\n  \"name\": \"Story points\",\n  \"type\": \"number\",\n  \"required\": false,\n  \"defaultValue\": null,\n  \"options\": null,\n  \"position\": 1,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "fld0001  Priority note  (text)\nfld0003  Release  (dropdown)  [Web, CLI]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"cfv0004\",\n    \"taskId\": \"task-a1\",\n    \"fieldId\": \"fld0001\",\n    \"value\": \"needs review\",\n    \"fieldName\": \"Priority note\",\n    \"fieldPosition\": 0,\n    \"fieldType\": \"text\",\n    \"fieldOptions\": null\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "rm",
+        "nope",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no field \\\"nope\\\" in this project; `kaneo field ls -p proj-alpha` lists them\"\n}\n",
+      "stderr": "Error: no field \"nope\" in this project; `kaneo field ls -p proj-alpha` lists them\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/custom-field/fld0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

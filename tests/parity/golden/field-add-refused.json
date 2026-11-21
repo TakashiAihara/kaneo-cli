@@ -1,0 +1,136 @@
+{
+  "steps": [
+    {
+      "args": [
+        "field",
+        "add",
+        "No type",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"field add needs --type: text, number, date, dropdown, boolean or multiselect\"\n}\n",
+      "stderr": "Error: field add needs --type: text, number, date, dropdown, boolean or multiselect\n"
+    },
+    {
+      "args": [
+        "field",
+        "add",
+        "Choice",
+        "--type",
+        "dropdown",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/custom-field: 400: Dropdown fields must have at least one option\"\n}\n",
+      "stderr": "Error: POST /api/custom-field: 400: Dropdown fields must have at least one option\n"
+    },
+    {
+      "args": [
+        "field",
+        "add",
+        "Must",
+        "--type",
+        "text",
+        "--required",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/custom-field: 400: Required fields must have a default value\"\n}\n",
+      "stderr": "Error: POST /api/custom-field: 400: Required fields must have a default value\n"
+    },
+    {
+      "args": [
+        "field",
+        "add",
+        "Bad num",
+        "--type",
+        "number",
+        "--default",
+        "abc",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/custom-field: 400: Default value must be a valid number for number type fields\"\n}\n",
+      "stderr": "Error: POST /api/custom-field: 400: Default value must be a valid number for number type fields\n"
+    },
+    {
+      "args": [
+        "field",
+        "add",
+        "Bad bool",
+        "--type",
+        "boolean",
+        "--default",
+        "yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/custom-field: 400: Default value must be 'true' or 'false' for boolean type fields\"\n}\n",
+      "stderr": "Error: POST /api/custom-field: 400: Default value must be 'true' or 'false' for boolean type fields\n"
+    },
+    {
+      "args": [
+        "field",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/custom-field",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "name": "Choice",
+        "type": "dropdown",
+        "required": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/custom-field",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "name": "Must",
+        "type": "text",
+        "required": true
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/custom-field",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "name": "Bad num",
+        "type": "number",
+        "required": false,
+        "defaultValue": "abc"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/custom-field",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "name": "Bad bool",
+        "type": "boolean",
+        "required": false,
+        "defaultValue": "yes"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

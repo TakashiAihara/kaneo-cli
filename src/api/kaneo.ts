@@ -50,6 +50,14 @@ import {
   getTaskTimeEntries,
   getTimeEntry,
   getWorkflowRules as readRules,
+  getCustomFieldsByProject as readCustomFields,
+  getCustomFieldValuesByProject as readProjectFieldValues,
+  getCustomFieldValuesByTask as readTaskFieldValues,
+  getCustomFieldFilterValues as readFieldFilterValues,
+  createCustomField as postCustomField,
+  reorderCustomFields as putFieldOrder,
+  setCustomFieldValue as putFieldValue,
+  deleteCustomField as removeCustomField,
   importTasks as postImport,
   listOrganization,
   listProjects,
@@ -99,6 +107,10 @@ import type {
   Task as GenTask,
   TaskRelation as GenRelation,
   TaskRelationWithTasks,
+  CustomFieldDefinition as GenFieldDefinition,
+  CustomFieldValue as GenFieldValue,
+  SetCustomFieldValueResponse as GenFieldSettingReply,
+  CreateCustomFieldBody,
   UpdateNotificationPreferencesBody,
   TimeEntry as GenTimeEntry,
   UpdateTaskBody,
@@ -2082,6 +2094,153 @@ const externalLink = (l: GenExternalLink): ExternalLink => ({
 // added by hand.
 export const listExternalLinks = async (taskId: string): Promise<ExternalLink[]> =>
   zeroList(await readExternalLinks(pathParam(taskId))).map(externalLink);
+
+// A custom field definition on a project: the template every task's value for
+// it refers back to by fieldId. options is the choice list of a dropdown or
+// multiselect field and is absent otherwise; the document leaves its shape
+// open, so it is kept as the server sent it.
+export type CustomField = {
+  id: string;
+  projectId: string;
+  name: string;
+  type: string;
+  required: boolean;
+  defaultValue: string | null;
+  options: Json;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const customField = (f: GenFieldDefinition): CustomField => ({
+  id: f.id ?? "",
+  projectId: f.projectId ?? "",
+  name: f.name ?? "",
+  type: f.type ?? "",
+  required: f.required ?? false,
+  defaultValue: f.defaultValue ?? null,
+  options: (f.options ?? null) as Json,
+  position: f.position ?? 0,
+  createdAt: isoTime(f, "createdAt"),
+  updatedAt: isoTime(f, "updatedAt"),
+});
+
+// A project's field definitions, in position order.
+export const listCustomFields = async (projectId: string): Promise<CustomField[]> =>
+  zeroList(await readCustomFields(pathParam(projectId))).map(customField);
+
+// One stored value, with the definition's name, position and type denormalized
+// onto it so a listing needs no second read. Only fields somebody set have a
+// row: a field never touched has none, so a listing shows what is held rather
+// than every definition.
+export type CustomFieldValue = {
+  id: string;
+  taskId: string;
+  fieldId: string;
+  value: string | null;
+  fieldName: string;
+  fieldPosition: number;
+  fieldType: string;
+  fieldOptions: Json;
+};
+
+const fieldValue = (v: GenFieldValue): CustomFieldValue => ({
+  id: v.id ?? "",
+  taskId: v.taskId ?? "",
+  fieldId: v.fieldId ?? "",
+  value: v.value ?? null,
+  fieldName: v.fieldName ?? "",
+  fieldPosition: v.fieldPosition ?? 0,
+  fieldType: v.fieldType ?? "",
+  fieldOptions: (v.fieldOptions ?? null) as Json,
+});
+
+// Every value held in a project, across all its tasks.
+export const listProjectFieldValues = async (projectId: string): Promise<CustomFieldValue[]> =>
+  zeroList(await readProjectFieldValues(pathParam(projectId))).map(fieldValue);
+
+// The values one task holds.
+export const listTaskFieldValues = async (taskId: string): Promise<CustomFieldValue[]> =>
+  zeroList(await readTaskFieldValues(pathParam(taskId))).map(fieldValue);
+
+// The distinct values tasks use for each of a project's fields, which is what
+// a filter on them can offer.
+export type CustomFieldFilter = { fieldId: string; fieldName: string; fieldType: string; values: string[] };
+
+export const listFieldFilterValues = async (projectId: string): Promise<CustomFieldFilter[]> =>
+  zeroList(await readFieldFilterValues(pathParam(projectId))).map((f) => ({
+    fieldId: f.fieldId ?? "",
+    fieldName: f.fieldName ?? "",
+    fieldType: f.fieldType ?? "",
+    values: zeroList(f.values),
+  }));
+
+// The payload for creating a field. defaultValue and options are sent only
+// when given: the route stores what it is sent, and an empty options list is
+// not the same as none for a choice field.
+export type NewCustomField = {
+  name: string;
+  type: string;
+  required: boolean;
+  defaultValue?: string;
+  options?: string[];
+};
+
+export const createCustomField = async (projectId: string, wanted: NewCustomField): Promise<CustomField> =>
+  customField(
+    zeroRecord(
+      await postCustomField({
+        projectId,
+        name: wanted.name,
+        type: unchecked<NonNullable<CreateCustomFieldBody["type"]>>(wanted.type),
+        required: wanted.required,
+        ...(wanted.defaultValue === undefined ? {} : { defaultValue: wanted.defaultValue }),
+        ...(wanted.options === undefined ? {} : { options: wanted.options }),
+      }),
+    ),
+  );
+
+// Writes a new position for fields of a project. The document leaves the reply
+// untyped; the server answers the project's fields in their new order, which
+// is what the listing would give back.
+export const reorderCustomFields = async (projectId: string, fieldIds: string[]): Promise<CustomField[]> => {
+  const reply = await putFieldOrder(pathParam(projectId), {
+    fields: fieldIds.map((id, position) => ({ id, position })),
+  });
+  // Rows are checked for an id alone: every other field the mapping lacks is
+  // filled with its empty value, which would let a row that is no field pass.
+  const isField = (f: unknown): boolean => {
+    if (f === null || typeof f !== "object") return false;
+    const { id } = f as { id?: unknown };
+    return typeof id === "string" && id !== "";
+  };
+  if (!Array.isArray(reply) || !reply.every(isField)) {
+    throw new Error(
+      `PUT /custom-field/reorder/${projectId}: the fields were reordered, but the reply is not a list of them; \`kaneo field ls\` shows the new order`,
+    );
+  }
+  return (reply as GenFieldDefinition[]).map(customField);
+};
+
+// The saved row of a set value. value is what the server stored, which is the
+// trimmed text it was sent.
+export type CustomFieldSetting = { id: string; taskId: string; fieldId: string; value: string | null };
+
+const fieldSetting = (v: GenFieldSettingReply): CustomFieldSetting => ({
+  id: v.id ?? "",
+  taskId: v.taskId ?? "",
+  fieldId: v.fieldId ?? "",
+  value: v.value ?? null,
+});
+
+// Creates or replaces the value one task holds for one field.
+export const setCustomFieldValue = async (taskId: string, fieldId: string, value: string): Promise<CustomFieldSetting> =>
+  fieldSetting(zeroRecord(await putFieldValue({ taskId, fieldId, value })));
+
+// Deletes a field definition. The server removes the definition row; the
+// values tasks hold for it go with it.
+export const deleteCustomField = async (fieldId: string): Promise<CustomField> =>
+  customField(zeroRecord(await removeCustomField(pathParam(fieldId))));
 
 export type CheckResult = {
   serverOperations: number;

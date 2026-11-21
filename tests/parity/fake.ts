@@ -44,6 +44,12 @@ export type Seed = {
   workflowRules?: { projectId: string; integrationType: string; eventType: string; columnSlug: string }[];
   // A link without an integration is one a person added by hand.
   externalLinks?: { taskId: string; url: string; title?: string | null; resourceType?: string; externalId?: string; integration?: { id: string; type: string } }[];
+  // Custom field definitions. position defaults to the field's place in the
+  // project's list, as the create route assigns it.
+  customFields?: { projectId: string; name: string; type: string; required?: boolean; defaultValue?: string | null; options?: string[]; position?: number }[];
+  // Values tasks hold for fields, named by the field's name in the task's
+  // project: only fields somebody set a value on have a row.
+  customFieldValues?: { taskId: string; field: string; value: string | null }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
@@ -285,6 +291,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   let nclock = 0;
   const nid = (prefix: string) => `${prefix}${String(++nseq).padStart(4, "0")}`;
   const nnow = () => new Date(T0 + 86_400_000 + 1000 * nclock++).toISOString();
+
+  // Custom fields number and date themselves apart too, for the same reason:
+  // a seed of them must not move the ids and times the other scenarios record.
+  let fseq = 0;
+  let fclock = 0;
+  const fid = (prefix: string) => `${prefix}${String(++fseq).padStart(4, "0")}`;
+  const fnow = () => new Date(T0 + 2 * 86_400_000 + 1000 * fclock++).toISOString();
   let notifications: z.input<typeof M.Notification>[] = [];
   const addNotification = (n: { type: string; title?: string | null; content?: string | null; isRead?: boolean | null; eventData?: unknown; resourceId?: string | null; resourceType?: string | null }) => {
     const at = nnow();
@@ -372,6 +385,110 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       integration: l.integration ?? null,
     });
   }
+
+  // Custom field definitions and the values tasks hold for them. A value row
+  // keeps only the field id; the routes join the definition the way the
+  // server's queries do, so a rename or reorder shows through at once.
+  const fields: z.input<typeof M.CustomFieldDefinition>[] = [];
+  const fieldValues: { id: string; taskId: string; fieldId: string; value: string | null }[] = [];
+  const addFieldValue = (taskId: string, fieldId: string, value: string | null) => {
+    const row = { id: fid("cfv"), taskId, fieldId, value };
+    fieldValues.push(row);
+    return row;
+  };
+  for (const f of seed.customFields ?? []) {
+    const at = fnow();
+    const field: z.input<typeof M.CustomFieldDefinition> = {
+      id: fid("fld"),
+      projectId: f.projectId,
+      name: f.name,
+      type: f.type,
+      required: f.required ?? false,
+      defaultValue: f.defaultValue ?? null,
+      options: f.options ?? null,
+      position: f.position ?? fields.filter((x) => x.projectId === f.projectId).length,
+      createdAt: at,
+      updatedAt: at,
+    };
+    fields.push(field);
+    // A default fills the tasks that already exist, as the create route's
+    // insert does for a field made after them.
+    if (field.defaultValue != null && field.defaultValue.trim() !== "") {
+      for (const t of tasks.filter((t) => t.projectId === f.projectId)) addFieldValue(t.id, field.id, field.defaultValue);
+    }
+  }
+  for (const v of seed.customFieldValues ?? []) {
+    const task = tasks.find((t) => t.id === v.taskId)!;
+    const field = fields.find((f) => f.projectId === task.projectId && f.name === v.field)!;
+    // A value the seed names for a task replaces the default the field's
+    // backfill wrote for the same pair: the row is keyed by task and field,
+    // so one row holds the explicit value, as upstream's unique constraint
+    // and its on-conflict upsert leave it.
+    const have = fieldValues.find((x) => x.taskId === v.taskId && x.fieldId === field.id);
+    if (have) have.value = v.value;
+    else addFieldValue(v.taskId, field.id, v.value);
+  }
+  // The joined row the value routes send: the definition's current name,
+  // position, type and options beside the stored value.
+  const servedValue = (v: (typeof fieldValues)[number]) => {
+    const f = fields.find((x) => x.id === v.fieldId)!;
+    return {
+      id: v.id,
+      taskId: v.taskId,
+      fieldId: v.fieldId,
+      value: v.value,
+      fieldName: f.name,
+      fieldPosition: f.position,
+      fieldType: f.type,
+      fieldOptions: f.options ?? null,
+    };
+  };
+  const servedValues = (rows: typeof fieldValues) =>
+    rows.filter((v) => fields.some((f) => f.id === v.fieldId)).map(servedValue);
+  // A task's value rows go with it, as the foreign key's cascade does.
+  const dropFieldValues = (taskId: string) => {
+    for (let j = fieldValues.length - 1; j >= 0; j--) if (fieldValues[j]!.taskId === taskId) fieldValues.splice(j, 1);
+  };
+
+  // The value checks the custom-field routes borrow from validate-task-fields,
+  // kept to the types those routes call them for.
+  const multiselectValueEmpty = (value: string): boolean => {
+    if (value.trim() === "") return true;
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) && parsed.length === 0;
+    } catch {
+      return false;
+    }
+  };
+  const dateValueError = (value: string, fieldName: string): string | null => {
+    const isoMatch = /^(\d{4})-(\d{2})-(\d{2})(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?)?$/.exec(value);
+    if (!isoMatch) return `Custom field "${fieldName}" expects a date in YYYY-MM-DD or ISO 8601 format, got "${value}".`;
+    const timestamp = Date.parse(value);
+    if (Number.isNaN(timestamp)) return `Custom field "${fieldName}" expects a valid ISO 8601 date, got "${value}".`;
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    const calendarDate = new Date(0);
+    calendarDate.setUTCFullYear(year, month - 1, day);
+    calendarDate.setUTCHours(0, 0, 0, 0);
+    if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 || calendarDate.getUTCDate() !== day)
+      return `Custom field "${fieldName}" expects a valid ISO 8601 date, got "${value}".`;
+    return null;
+  };
+  const multiselectDefaultError = (value: string, fieldName: string, options: string[] | undefined): string | null => {
+    let selectedValues: unknown;
+    try {
+      selectedValues = JSON.parse(value);
+    } catch {
+      return `Custom field "${fieldName}" expects a JSON array of selected options, got "${value}".`;
+    }
+    if (!Array.isArray(selectedValues) || selectedValues.length === 0) return `Custom field "${fieldName}" expects at least one selected option.`;
+    const parsedOptions = options ?? [];
+    const invalidValues = selectedValues.filter((v) => typeof v !== "string" || !parsedOptions.includes(v));
+    if (invalidValues.length > 0) return `Custom field "${fieldName}" expects values from: ${parsedOptions.join(", ")}, got invalid value(s): ${invalidValues.join(", ")}.`;
+    return null;
+  };
 
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
@@ -485,6 +602,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["PUT", /^\/label\/[^/]+\/task$/, M.AttachLabelToTaskBody],
       ["POST", /^\/time-entry$/, M.CreateTimeEntryBody],
       ["PUT", /^\/time-entry\/[^/]+$/, M.UpdateTimeEntryBody],
+      ["POST", /^\/custom-field$/, M.CreateCustomFieldBody],
+      ["PUT", /^\/custom-field\/value$/, M.SetCustomFieldValueBody],
+      ["PUT", /^\/custom-field\/reorder\/[^/]+$/, M.ReorderCustomFieldsBody],
     ];
     for (const [method, re, schema] of BODIES) {
       if (req.method !== method || !re.test(path)) continue;
@@ -708,6 +828,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           const r = relations[i]!;
           if (gone.has(r.sourceTaskId) || gone.has(r.targetTaskId)) relations.splice(i, 1);
         }
+        for (const taskId of gone) dropFieldValues(taskId);
         projects.splice(projects.indexOf(proj), 1);
         return reply;
       }
@@ -868,7 +989,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           break;
         }
         case "delete":
-          for (const t of found) tasks.splice(tasks.indexOf(t), 1);
+          for (const t of found) {
+            tasks.splice(tasks.indexOf(t), 1);
+            dropFieldValues(t.id);
+          }
           break;
         case "updateDueDate": {
           const at = value ? parsedDate(value, "date value") : null;
@@ -1056,6 +1180,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         tasks.splice(i, 1);
         // The document says a task takes its time entries with it.
         for (let j = timeEntries.length - 1; j >= 0; j--) if (timeEntries[j]!.taskId === t.id) timeEntries.splice(j, 1);
+        dropFieldValues(t.id);
         return ok(M.Task, t);
       }
     }
@@ -1373,6 +1498,153 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (l.taskId === null) return fail(400, "Label is not assigned to a task");
         return ok(M.Label, labels.splice(labels.indexOf(l), 1)[0]!);
       }
+    }
+
+    // Custom fields, following v2.32.0's controllers: every refusal is an
+    // HTTPException or the workspace middleware's, so text/plain.
+    const knownProject = (id: string) => projects.some((x) => x.id === id);
+    if (req.method === "GET" && (p = m(/^\/custom-field\/project\/([^/]+)\/values$/))) {
+      const projectId = decodeURIComponent(p[1]);
+      if (!knownProject(projectId)) return failText(400, "Workspace ID could not be determined");
+      const taskIds = new Set(tasks.filter((t) => t.projectId === projectId).map((t) => t.id));
+      return ok(z.array(M.CustomFieldValue), servedValues(fieldValues.filter((v) => taskIds.has(v.taskId))));
+    }
+    if (req.method === "GET" && (p = m(/^\/custom-field\/project\/([^/]+)\/filter-values$/))) {
+      const projectId = decodeURIComponent(p[1]);
+      if (!knownProject(projectId)) return failText(400, "Workspace ID could not be determined");
+      return ok(z.array(M.CustomFieldFilterValues), fields.filter((f) => f.projectId === projectId).map((f) => ({
+        fieldId: f.id,
+        fieldName: f.name,
+        fieldType: f.type,
+        values: [...new Set(fieldValues.filter((v) => v.fieldId === f.id && v.value !== null && v.value !== "").map((v) => v.value!))],
+      })));
+    }
+    if (req.method === "GET" && (p = m(/^\/custom-field\/project\/([^/]+)$/))) {
+      const projectId = decodeURIComponent(p[1]);
+      if (!knownProject(projectId)) return failText(400, "Workspace ID could not be determined");
+      return ok(z.array(M.CustomFieldDefinition), fields.filter((f) => f.projectId === projectId).sort((a, b) => a.position - b.position));
+    }
+    if (req.method === "GET" && (p = m(/^\/custom-field\/task\/([^/]+)$/))) {
+      const taskId = decodeURIComponent(p[1]);
+      if (!tasks.some((t) => t.id === taskId)) return failText(400, "Workspace ID could not be determined");
+      return ok(z.array(M.CustomFieldValue), servedValues(fieldValues.filter((v) => v.taskId === taskId)));
+    }
+    if (req.method === "POST" && path === "/custom-field") {
+      const b = body as any;
+      if (!knownProject(b.projectId)) return failText(400, "Workspace ID could not be determined");
+      const bad = (message: string) => failText(400, message);
+      if (typeof b.name !== "string" || b.name.trim() === "") return bad("Name cannot be empty");
+      const type = b.type as string;
+      const required = b.required ?? false;
+      const defaultValue = b.defaultValue as string | undefined;
+      const options = b.options as string[] | undefined;
+      if (required && (defaultValue === undefined || defaultValue === null || defaultValue.trim() === "")) return bad("Required fields must have a default value");
+      if (defaultValue !== undefined && defaultValue !== null) {
+        const trimmedValue = defaultValue.trim();
+        if (trimmedValue !== "") {
+          if (type === "number") {
+            const numberRegex = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i;
+            const parsed = Number(trimmedValue);
+            if (!numberRegex.test(trimmedValue) || Number.isNaN(parsed) || !Number.isFinite(parsed)) return bad("Default value must be a valid number for number type fields");
+          } else if (type === "boolean") {
+            if (trimmedValue !== "true" && trimmedValue !== "false") return bad("Default value must be 'true' or 'false' for boolean type fields");
+          } else if (type === "date") {
+            const error = dateValueError(trimmedValue, b.name);
+            if (error) return bad(error);
+          } else if (type === "dropdown" && options && options.length > 0) {
+            if (!options.map((opt) => opt.trim()).includes(trimmedValue)) return bad("Default value must be one of the dropdown options");
+          }
+        }
+      }
+      if (type === "dropdown" && (!options || options.length < 1)) return bad("Dropdown fields must have at least one option");
+      if (type === "multiselect") {
+        const normalizedOptions = [...new Set((options ?? []).map((opt) => opt.trim()).filter((opt) => opt.length > 0))];
+        if (normalizedOptions.length < 2) return bad("Multiselect fields must have at least 2 options");
+      }
+      if (type === "multiselect" && defaultValue != null) {
+        const empty = multiselectValueEmpty(defaultValue);
+        if (required && empty) return bad("Required fields must have a default value");
+        if (!empty) {
+          const error = multiselectDefaultError(defaultValue, b.name, options);
+          if (error) return bad(error);
+        }
+      }
+      const storedDefaultValue = type === "date" ? defaultValue?.trim() : defaultValue;
+      const position = Math.max(0, ...fields.filter((f) => f.projectId === b.projectId).map((f) => f.position)) + 1;
+      const at = fnow();
+      const field: z.input<typeof M.CustomFieldDefinition> = {
+        id: fid("fld"),
+        projectId: b.projectId,
+        name: b.name,
+        type,
+        required,
+        defaultValue: storedDefaultValue ?? null,
+        options: options ?? null,
+        position,
+        createdAt: at,
+        updatedAt: at,
+      };
+      fields.push(field);
+      if (storedDefaultValue != null && storedDefaultValue.trim() !== "") {
+        for (const t of tasks.filter((t) => t.projectId === b.projectId)) {
+          if (!fieldValues.some((v) => v.taskId === t.id && v.fieldId === field.id)) addFieldValue(t.id, field.id, storedDefaultValue);
+        }
+      }
+      return ok(M.CustomFieldDefinition, field);
+    }
+    if (req.method === "PUT" && (p = m(/^\/custom-field\/reorder\/([^/]+)$/))) {
+      const projectId = decodeURIComponent(p[1]);
+      if (!knownProject(projectId)) return failText(400, "Workspace ID could not be determined");
+      const mine = fields.filter((f) => f.projectId === projectId);
+      const wanted = ((body as any)?.fields ?? []) as { id: string; position: number }[];
+      // The transaction checks every id before it writes any, so a foreign id
+      // leaves the order untouched.
+      for (const f of wanted) if (!mine.some((x) => x.id === f.id)) return failText(400, `Custom field ${f.id} does not belong to this project`);
+      for (const f of wanted) mine.find((x) => x.id === f.id)!.position = f.position;
+      return ok(z.array(M.CustomFieldDefinition), mine.slice().sort((a, b) => a.position - b.position));
+    }
+    if (req.method === "PUT" && path === "/custom-field/value") {
+      const b = body as any;
+      const task = tasks.find((t) => t.id === b.taskId);
+      if (!task) return failText(400, "Workspace ID could not be determined");
+      const field = fields.find((f) => f.id === b.fieldId);
+      if (!field || field.projectId !== task.projectId) return failText(404, "Custom field not found");
+      const normalizedValue: string = b.value.trim();
+      const bad = (message: string) => failText(400, message);
+      const fieldOptions = Array.isArray(field.options) ? field.options : null;
+      if (field.required) {
+        if (field.type === "multiselect" ? multiselectValueEmpty(normalizedValue) : normalizedValue.length === 0) return bad("This custom field is required");
+      }
+      if (field.type === "dropdown" && normalizedValue.length > 0 && fieldOptions !== null && !fieldOptions.includes(normalizedValue)) return bad("Invalid option for this custom field");
+      if (field.type === "number" && normalizedValue.length > 0 && Number.isNaN(Number(normalizedValue))) return bad("Value must be a valid number");
+      if (field.type === "boolean" && normalizedValue.length > 0 && normalizedValue !== "true" && normalizedValue !== "false") return bad("Value must be true or false");
+      if (field.type === "multiselect" && normalizedValue.length > 0) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(normalizedValue);
+        } catch {
+          return bad("Value must be a valid JSON array");
+        }
+        if (!Array.isArray(parsed)) return bad("Value must be a JSON array");
+        if (fieldOptions !== null) {
+          const invalid = parsed.some((v) => typeof v !== "string" || !fieldOptions.includes(v));
+          if (invalid) return bad("Invalid option(s) for this custom field");
+        }
+      }
+      const row = fieldValues.find((v) => v.taskId === b.taskId && v.fieldId === b.fieldId);
+      const saved = row ? Object.assign(row, { value: normalizedValue }) : addFieldValue(b.taskId, b.fieldId, normalizedValue);
+      return ok(M.SetCustomFieldValueResponse, { id: saved.id, taskId: saved.taskId, fieldId: saved.fieldId, value: saved.value });
+    }
+    if (req.method === "DELETE" && (p = m(/^\/custom-field\/([^/]+)$/))) {
+      const id = decodeURIComponent(p[1]);
+      const i = fields.findIndex((x) => x.id === id);
+      // The workspace middleware places the field's project before the
+      // controller runs, so an unknown id never reaches the 404 below.
+      if (i < 0) return failText(400, "Workspace ID could not be determined");
+      const deleted = fields.splice(i, 1)[0]!;
+      // The value rows cascade with the definition, as the foreign key does.
+      for (let j = fieldValues.length - 1; j >= 0; j--) if (fieldValues[j]!.fieldId === id) fieldValues.splice(j, 1);
+      return ok(M.CustomFieldDefinition, deleted);
     }
 
     return fail(404, `no route: ${req.method} ${path}`);

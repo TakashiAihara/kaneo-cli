@@ -56,6 +56,23 @@ const INVITATIONS: Seed["invitations"] = [
   { id: "inv-boundary", workspaceId: WS, inviterName: "Grace", expiresAt: "2026-01-01T12:00:00.000Z" },
 ];
 
+// A project's custom fields and the values its tasks hold for them, for the
+// scenarios that exercise `field` and `task field`. The fake numbers them in
+// its own sequence, so the fields are fld0001… and the values cfv0004… here.
+const FIELD_SEED: Partial<Seed> = {
+  customFields: [
+    { projectId: P1, name: "Priority note", type: "text" },
+    { projectId: P1, name: "Story points", type: "number" },
+    { projectId: P1, name: "Release", type: "dropdown", options: ["Web", "CLI"] },
+  ],
+  customFieldValues: [
+    { taskId: "task-a1", field: "Priority note", value: "needs review" },
+    { taskId: "task-a1", field: "Story points", value: "3" },
+    { taskId: "task-a2", field: "Release", value: "Web" },
+    { taskId: "task-a3", field: "Release", value: "CLI" },
+  ],
+};
+
 export type Scenario = {
   name: string;
   // Each step is one CLI invocation. Global context (-w / -p) is passed in
@@ -347,6 +364,131 @@ export const SCENARIOS: Scenario[] = [
   { name: "column by id and name", steps: [["column", "rename", "col0002", "Doing", "--json"], ["column", "reorder", "col0001", "done", "Doing", "--human"]] },
   { name: "column create with flags", steps: [["column", "create", "外部回答", "待ち", "--final", "--icon", "Clock", "--color", "#f00", "--json"], ["column", "rename", "外部回答-待ち", "Waiting", "on", "review", "--json"], ["column", "ls", "--human"]] },
   { name: "column names refused", steps: [["column", "create", "Planned", "--json"], ["column", "create", "!!!", "--json"], ["column", "create", "To Do", "--json"], ["column", "create", " ", "--json"], ["column", "rename", "to-do", " ", "--json"], ["column", "rename", "in-progress", "To Do", "--json"], ["column", "rename", "To Do", "x", "--json"]] },
+
+  ...both("field list", ["field", "ls"]).map((s): Scenario => ({ ...s, seed: FIELD_SEED })),
+  {
+    name: "field add",
+    seed: FIELD_SEED,
+    steps: [
+      ["field", "add", "QA", "owner", "--type", "text", "--json"],
+      ["field", "add", "Ships in", "--type", "dropdown", "--options", "Web, CLI, Mobile", "--required", "--default", "Web", "--json"],
+      ["field", "ls", "--human"],
+      ["field", "values", "--human"],
+    ],
+  },
+  {
+    // What the server refuses on create, in its own words: a choice field
+    // without options, a required field without a default, a default that does
+    // not fit its type.
+    name: "field add refused",
+    steps: [
+      ["field", "add", "No type", "--json"],
+      ["field", "add", "Choice", "--type", "dropdown", "--json"],
+      ["field", "add", "Must", "--type", "text", "--required", "--json"],
+      ["field", "add", "Bad num", "--type", "number", "--default", "abc", "--json"],
+      ["field", "add", "Bad bool", "--type", "boolean", "--default", "yes", "--json"],
+      ["field", "ls", "--json"],
+    ],
+  },
+  {
+    name: "field values",
+    seed: FIELD_SEED,
+    steps: [
+      ["field", "values", "--json"],
+      ["field", "values", "--human"],
+      ["field", "values", "Release", "--json"],
+      ["field", "values", "Story points", "--human"],
+      ["field", "values", "nope", "--json"],
+    ],
+  },
+  {
+    name: "task field",
+    seed: FIELD_SEED,
+    steps: [
+      ["task", "field", "1", "--json"],
+      ["task", "field", "ALP#2", "Release", "CLI", "--human"],
+      ["task", "field", "2", "--json"],
+      ["task", "field", "1", "Priority note", "ship", "it", "--json"],
+      ["task", "field", "1", "--human"],
+      ["task", "create", "Fresh", "--json"],
+      ["task", "field", "4", "--json"],
+      ["task", "field", "1", "Release", "Mobile", "--json"],
+      ["task", "field", "1", "Story points", "abc", "--json"],
+      ["task", "field", "1", "nope", "x", "--json"],
+      ["task", "field", "1", "Priority note", "--json"],
+    ],
+  },
+  {
+    name: "task field multiselect",
+    seed: FIELD_SEED,
+    steps: [
+      ["field", "add", "Tags", "--type", "multiselect", "--options", "a, b, c", "--json"],
+      ["task", "field", "1", "Tags", '["a","c"]', "--json"],
+      ["task", "field", "1", "Tags", "not json", "--json"],
+      ["task", "field", "1", "Tags", '["a","zzz"]', "--json"],
+      ["task", "field", "1", "--human"],
+      ["field", "values", "Tags", "--json"],
+    ],
+  },
+  {
+    name: "field reorder",
+    seed: FIELD_SEED,
+    steps: [
+      ["field", "reorder", "Release", "Priority note", "Story points", "--json"],
+      ["field", "ls", "--human"],
+      ["field", "reorder", "Release", "Priority note", "--json"],
+      ["field", "reorder", "Release", "nope", "Story points", "--json"],
+      ["field", "reorder", "Release", "Release", "Story points", "--json"],
+    ],
+  },
+  {
+    name: "field rm",
+    seed: FIELD_SEED,
+    steps: [
+      ["field", "rm", "Story points", "--human"],
+      ["field", "rm", "Story points", "--yes", "--json"],
+      ["field", "ls", "--human"],
+      ["task", "field", "1", "--json"],
+      ["field", "rm", "nope", "--yes", "--json"],
+    ],
+  },
+  {
+    // The server keeps no uniqueness on names, so a shared one is refused by id
+    // rather than guessed — on delete and on the filter-values pick alike.
+    name: "field names refused",
+    seed: {
+      customFields: [
+        { projectId: P1, name: "Note", type: "text" },
+        { projectId: P1, name: "Note", type: "text" },
+      ],
+    },
+    steps: [
+      ["field", "rm", "Note", "--yes", "--json"],
+      ["field", "values", "Note", "--json"],
+      ["field", "rm", "fld0001", "--yes", "--json"],
+      ["field", "ls", "--json"],
+    ],
+  },
+  {
+    // A value the seed names for a task replaces the default the field's
+    // backfill wrote for it — one row, not two — and a deleted task's values
+    // leave the filter candidates, singly and in bulk.
+    name: "field values leave with their task",
+    seed: {
+      customFields: [{ projectId: P1, name: "Env", type: "text", defaultValue: "prod" }],
+      customFieldValues: [
+        { taskId: "task-a1", field: "Env", value: "staging" },
+        { taskId: "task-a3", field: "Env", value: "dev" },
+      ],
+    },
+    steps: [
+      ["task", "field", "1", "--json"],
+      ["task", "rm", "1", "--yes", "--json"],
+      ["field", "values", "Env", "--json"],
+      ["task", "bulk", "2", "3", "--delete", "--yes", "--json"],
+      ["field", "values", "Env", "--json"],
+    ],
+  },
 
   ...both("search", ["search", "first"]),
   // A task other than #1, so a number that only happened to be 1 is caught.

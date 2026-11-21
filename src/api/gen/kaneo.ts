@@ -18,6 +18,9 @@ import {
   Comment,
   CreateNotification200,
   CurrentUser,
+  CustomFieldDefinition,
+  CustomFieldFilterValues,
+  CustomFieldValue,
   ExternalLink,
   InvitationDetails,
   Label,
@@ -28,7 +31,9 @@ import {
   Organization,
   Project,
   ProjectListItem,
+  ReorderCustomFieldsResponse,
   SearchResponse,
+  SetCustomFieldValueResponse,
   Task,
   TaskByTicketId,
   TaskExport,
@@ -48,6 +53,7 @@ import type {
   ClearAllNotificationsParams,
   CreateActivityBody,
   CreateColumnBody,
+  CreateCustomFieldBody,
   CreateLabelBody,
   CreateNotificationBody,
   CreateProjectBody,
@@ -68,8 +74,10 @@ import type {
   MoveTaskBody,
   PendingLabelDeletion,
   ReorderColumnsBody,
+  ReorderCustomFieldsBody,
   ReorderProjectsBody,
   ReorderProjectsParams,
+  SetCustomFieldValueBody,
   UpdateColumnBody,
   UpdateLabelBody,
   UpdateNotificationPreferencesBody,
@@ -2418,6 +2426,257 @@ export const getWorkspaceMembers = async (workspaceId: string, options?: Paramet
 
     ,
     schema: zod.array(WorkspaceMember)
+  }
+);}
+
+
+
+export const getGetCustomFieldsByProjectUrl = (projectId: string,) => {
+
+
+
+
+  return `/custom-field/project/${projectId}`
+}
+
+/**
+ * Get all custom field definitions for a project.
+ * @summary Get custom fields
+ */
+export const getCustomFieldsByProject = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<CustomFieldDefinition[]> => {
+
+  return kaneoFetch<CustomFieldDefinition[]>(getGetCustomFieldsByProjectUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(CustomFieldDefinition)
+  }
+);}
+
+
+
+export const getGetCustomFieldValuesByProjectUrl = (projectId: string,) => {
+
+
+
+
+  return `/custom-field/project/${projectId}/values`
+}
+
+/**
+ * Get all custom field values for every task in a project.
+ * @summary Get project custom field values
+ */
+export const getCustomFieldValuesByProject = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<CustomFieldValue[]> => {
+
+  return kaneoFetch<CustomFieldValue[]>(getGetCustomFieldValuesByProjectUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(CustomFieldValue)
+  }
+);}
+
+
+
+export const getGetCustomFieldValuesByTaskUrl = (taskId: string,) => {
+
+
+
+
+  return `/custom-field/task/${taskId}`
+}
+
+/**
+ * Get all custom field values for a task with their definitions.
+ * @summary Get task custom field values
+ */
+export const getCustomFieldValuesByTask = async (taskId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<CustomFieldValue[]> => {
+
+  return kaneoFetch<CustomFieldValue[]>(getGetCustomFieldValuesByTaskUrl(taskId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(CustomFieldValue)
+  }
+);}
+
+
+
+export const getGetCustomFieldFilterValuesUrl = (projectId: string,) => {
+
+
+
+
+  return `/custom-field/project/${projectId}/filter-values`
+}
+
+/**
+ * Get distinct values used by tasks for each custom field of a project.
+ * @summary Get custom field filter values
+ */
+export const getCustomFieldFilterValues = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<CustomFieldFilterValues[]> => {
+
+  return kaneoFetch<CustomFieldFilterValues[]>(getGetCustomFieldFilterValuesUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(CustomFieldFilterValues)
+  }
+);}
+
+
+
+export const getCreateCustomFieldUrl = () => {
+
+
+
+
+  return `/custom-field`
+}
+
+/**
+ * Create a custom field definition for a project.
+ * @summary Create custom field
+ */
+export const createCustomField = async (createCustomFieldBody: CreateCustomFieldBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<CustomFieldDefinition> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<CustomFieldDefinition>(getCreateCustomFieldUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createCustomFieldBody),
+    schema: CustomFieldDefinition
+  }
+);}
+
+
+
+export const getReorderCustomFieldsUrl = (projectId: string,) => {
+
+
+
+
+  return `/custom-field/reorder/${projectId}`
+}
+
+/**
+ * Set new positions for a project's custom fields.
+ * @summary Reorder custom fields
+ */
+export const reorderCustomFields = async (projectId: string,
+    reorderCustomFieldsBody: ReorderCustomFieldsBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<ReorderCustomFieldsResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<ReorderCustomFieldsResponse>(getReorderCustomFieldsUrl(projectId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reorderCustomFieldsBody),
+    schema: ReorderCustomFieldsResponse
+  }
+);}
+
+
+
+export const getSetCustomFieldValueUrl = () => {
+
+
+
+
+  return `/custom-field/value`
+}
+
+/**
+ * Create or update a custom field value for a task.
+ * @summary Set custom field value
+ */
+export const setCustomFieldValue = async (setCustomFieldValueBody: SetCustomFieldValueBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<SetCustomFieldValueResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<SetCustomFieldValueResponse>(getSetCustomFieldValueUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(setCustomFieldValueBody),
+    schema: SetCustomFieldValueResponse
+  }
+);}
+
+
+
+export const getDeleteCustomFieldUrl = (id: string,) => {
+
+
+
+
+  return `/custom-field/${id}`
+}
+
+/**
+ * Delete a custom field definition by ID.
+ * @summary Delete custom field
+ */
+export const deleteCustomField = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<CustomFieldDefinition> => {
+
+  return kaneoFetch<CustomFieldDefinition>(getDeleteCustomFieldUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: CustomFieldDefinition
   }
 );}
 

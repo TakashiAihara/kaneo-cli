@@ -1,0 +1,174 @@
+{
+  "steps": [
+    {
+      "args": [
+        "field",
+        "add",
+        "Tags",
+        "--type",
+        "multiselect",
+        "--options",
+        "a, b, c",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"fld0008\",\n  \"projectId\": \"proj-alpha\",\n  \"name\": \"Tags\",\n  \"type\": \"multiselect\",\n  \"required\": false,\n  \"defaultValue\": null,\n  \"options\": [\n    \"a\",\n    \"b\",\n    \"c\"\n  ],\n  \"position\": 3,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "Tags",
+        "[\"a\",\"c\"]",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"cfv0009\",\n  \"taskId\": \"task-a1\",\n  \"fieldId\": \"fld0008\",\n  \"value\": \"[\\\"a\\\",\\\"c\\\"]\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "Tags",
+        "not json",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/custom-field/value: 400: Value must be a valid JSON array\"\n}\n",
+      "stderr": "Error: PUT /api/custom-field/value: 400: Value must be a valid JSON array\n"
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "Tags",
+        "[\"a\",\"zzz\"]",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/custom-field/value: 400: Invalid option(s) for this custom field\"\n}\n",
+      "stderr": "Error: PUT /api/custom-field/value: 400: Invalid option(s) for this custom field\n"
+    },
+    {
+      "args": [
+        "task",
+        "field",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "Priority note  text  needs review\nStory points  number  3\nTags  multiselect  [\"a\",\"c\"]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "field",
+        "values",
+        "Tags",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"fieldId\": \"fld0008\",\n  \"fieldName\": \"Tags\",\n  \"fieldType\": \"multiselect\",\n  \"values\": [\n    \"[\\\"a\\\",\\\"c\\\"]\"\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/custom-field",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "name": "Tags",
+        "type": "multiselect",
+        "required": false,
+        "options": [
+          "a",
+          "b",
+          "c"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "fieldId": "fld0008",
+        "value": "[\"a\",\"c\"]"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "fieldId": "fld0008",
+        "value": "not json"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "fieldId": "fld0008",
+        "value": "[\"a\",\"zzz\"]"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/filter-values",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1478,3 +1478,110 @@ test("listMyTasks asks for the workspace and keeps the total the server counted"
     { id: "t7", projectId: "p9", projectSlug: "GAM", number: 41, title: "Mine", status: "in-progress", priority: "urgent", dueDate: null },
   ]);
 });
+
+describe("custom fields", () => {
+  const fieldReply = () =>
+    `{"id":"f1","projectId":"p1","name":"Points","type":"number","required":true,"defaultValue":"1","options":null,"position":2,"createdAt":"${TIME}","updatedAt":"${TIME}"}`;
+  const fieldValueReply = `{"id":"v1","taskId":"t1","fieldId":"f1","value":"3","fieldName":"Points","fieldPosition":2,"fieldType":"number","fieldOptions":null}`;
+
+  test("list maps every field", async () => {
+    const seen = recorder(`[${fieldReply().replace('"options":null', () => '"options":["a","b"]')}]`);
+    expect(await api.listCustomFields("p1")).toEqual([
+      { id: "f1", projectId: "p1", name: "Points", type: "number", required: true, defaultValue: "1", options: ["a", "b"], position: 2, createdAt: TIME, updatedAt: TIME },
+    ]);
+    expect([seen.method, seen.path]).toEqual(["GET", "/api/custom-field/project/p1"]);
+  });
+
+  test("project values carry the definition's fields", async () => {
+    const seen = recorder(`[${fieldValueReply}]`);
+    expect(await api.listProjectFieldValues("p1")).toEqual([
+      { id: "v1", taskId: "t1", fieldId: "f1", value: "3", fieldName: "Points", fieldPosition: 2, fieldType: "number", fieldOptions: null },
+    ]);
+    expect([seen.method, seen.path]).toEqual(["GET", "/api/custom-field/project/p1/values"]);
+  });
+
+  test("task values", async () => {
+    const seen = recorder(`[${fieldValueReply}]`);
+    expect(await api.listTaskFieldValues("t1")).toEqual([
+      { id: "v1", taskId: "t1", fieldId: "f1", value: "3", fieldName: "Points", fieldPosition: 2, fieldType: "number", fieldOptions: null },
+    ]);
+    expect([seen.method, seen.path]).toEqual(["GET", "/api/custom-field/task/t1"]);
+  });
+
+  test("filter values", async () => {
+    const seen = recorder('[{"fieldId":"f1","fieldName":"Points","fieldType":"number","values":["1","3"]}]');
+    expect(await api.listFieldFilterValues("p1")).toEqual([{ fieldId: "f1", fieldName: "Points", fieldType: "number", values: ["1", "3"] }]);
+    expect([seen.method, seen.path]).toEqual(["GET", "/api/custom-field/project/p1/filter-values"]);
+  });
+
+  // defaultValue and options are sent only when given: the route stores what
+  // it is sent, and an empty options list is not the same as none.
+  test.each([
+    ["bare", { name: "Points", type: "number", required: true }, '{"projectId":"p1","name":"Points","type":"number","required":true}'],
+    [
+      "full",
+      { name: "Release", type: "dropdown", required: false, defaultValue: "Web", options: ["Web", "CLI"] },
+      '{"projectId":"p1","name":"Release","type":"dropdown","required":false,"defaultValue":"Web","options":["Web","CLI"]}',
+    ],
+  ])("create %s", async (_name, wanted, body) => {
+    const seen = recorder(fieldReply());
+    const got = await api.createCustomField("p1", wanted);
+    expect(seen.body).toBe(body);
+    expect([seen.method, seen.path]).toEqual(["POST", "/api/custom-field"]);
+    expect(got.name).toBe("Points");
+  });
+
+  // The whole new order in one request, numbered from zero, answered with the
+  // project's fields in their new order.
+  test("reorder", async () => {
+    const seen = recorder(`[${fieldReply()},${fieldReply().replace('"id":"f1"', () => '"id":"f2"').replace('"position":2', () => '"position":0')}]`);
+    const fields = await api.reorderCustomFields("p1", ["f2", "f1"]);
+    expect([seen.method, seen.path]).toEqual(["PUT", "/api/custom-field/reorder/p1"]);
+    expect(seen.body).toBe('{"fields":[{"id":"f2","position":0},{"id":"f1","position":1}]}');
+    expect(fields.map((f) => f.id)).toEqual(["f1", "f2"]);
+  });
+
+  // The document leaves the reply untyped; a reply that is not the list the
+  // server is known to send is reported rather than mapped into fields.
+  test("reorder answered with something else", async () => {
+    recorder("{}");
+    expect(String(await failure(api.reorderCustomFields("p1", ["f1"])))).toContain("/custom-field/reorder/p1");
+  });
+
+  // A row is a field only when it names its id; every other field the mapping
+  // lacks it fills itself.
+  test("reorder accepts a row that names only its id", async () => {
+    recorder('[{"id":"f1"}]');
+    const fields = await api.reorderCustomFields("p1", ["f1"]);
+    expect(fields.map((f) => f.id)).toEqual(["f1"]);
+  });
+
+  // A list whose rows carry no usable id fails the same way one that is not a
+  // list at all does.
+  test.each([
+    ["an object without an id", "[{}]"],
+    ["a null row", "[null]"],
+    ["an empty id", '[{"id":""}]'],
+    ["a non-string id", '[{"id":3}]'],
+    ["a bare string", '["f1"]'],
+  ])("reorder answered with %s", async (_shape, reply) => {
+    recorder(reply);
+    const e = String(await failure(api.reorderCustomFields("p1", ["f1"])));
+    expect(e).toContain("/custom-field/reorder/p1");
+    expect(e).toContain("is not a list of them");
+  });
+
+  test("set value", async () => {
+    const seen = recorder('{"id":"v1","taskId":"t1","fieldId":"f1","value":"3"}');
+    const got = await api.setCustomFieldValue("t1", "f1", "3");
+    expect([seen.method, seen.path]).toEqual(["PUT", "/api/custom-field/value"]);
+    expect(seen.body).toBe('{"taskId":"t1","fieldId":"f1","value":"3"}');
+    expect(got).toEqual({ id: "v1", taskId: "t1", fieldId: "f1", value: "3" });
+  });
+
+  test("delete escapes the id", async () => {
+    const seen = recorder(fieldReply());
+    await api.deleteCustomField("f/1");
+    expect([seen.method, seen.path]).toEqual(["DELETE", "/api/custom-field/f%2F1"]);
+  });
+});

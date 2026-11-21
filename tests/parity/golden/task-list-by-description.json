@@ -64,6 +64,11 @@
     },
     {
       "method": "GET",
+      "path": "/task/task-a5",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/task/tasks/proj-alpha",
       "query": ""
     },
@@ -71,6 +76,11 @@
       "method": "GET",
       "path": "/task/description-matches/proj-alpha",
       "query": "?query=NEEDLE"
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a5",
+      "query": ""
     },
     {
       "method": "GET",
@@ -84,6 +94,16 @@
     },
     {
       "method": "GET",
+      "path": "/task/task-a4",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a5",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/task/tasks/proj-alpha",
       "query": "?status=to-do"
     },
@@ -91,6 +111,11 @@
       "method": "GET",
       "path": "/task/description-matches/proj-alpha",
       "query": "?query=needle"
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a5",
+      "query": ""
     }
   ],
   "files": {}

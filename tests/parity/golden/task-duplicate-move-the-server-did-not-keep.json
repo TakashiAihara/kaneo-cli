@@ -10,8 +10,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"project is \\\"proj-alpha\\\" after setting it to \\\"proj-beta\\\"\"\n}\n",
-      "stderr": "Error: project is \"proj-alpha\" after setting it to \"proj-beta\"\n"
+      "stdout": "{\n  \"error\": \"duplicated #1 as #4, but the copy is still in proj-alpha: project is \\\"proj-alpha\\\" after setting it to \\\"proj-beta\\\"\"\n}\n",
+      "stderr": "Error: duplicated #1 as #4, but the copy is still in proj-alpha: project is \"proj-alpha\" after setting it to \"proj-beta\"\n"
     }
   ],
   "requests": [

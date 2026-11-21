@@ -2195,7 +2195,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // it rather than adding a second, as upstream's upsert does.
       const found = imageAssets.find((a) => a.key === key);
       if (found !== undefined) {
-        Object.assign(found, { taskId: t.id, projectId: t.projectId, filename: b.filename, contentType: stored.contentType, size: stored.bytes.byteLength, surface: b.surface });
+        // The asset read serves the object's current bytes upstream, so a
+        // re-PUT under the same key is what a re-finalize records.
+        Object.assign(found, { taskId: t.id, projectId: t.projectId, filename: b.filename, contentType: stored.contentType, size: stored.bytes.byteLength, surface: b.surface, bytes: stored.bytes });
       } else {
         imageAssets.push({ id: id("asset"), taskId: t.id, projectId: t.projectId, key, filename: b.filename, contentType: stored.contentType, size: stored.bytes.byteLength, surface: b.surface, bytes: stored.bytes, createdAt: now() });
       }

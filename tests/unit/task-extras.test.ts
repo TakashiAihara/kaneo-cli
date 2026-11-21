@@ -107,6 +107,99 @@ const TASK = {
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 
+// `task ls --description` matches the descriptions the listing carries and
+// asks the server about the deferred ones; a deferred task the server's search
+// does not return — its description shortened under the limit since the board
+// was read — is read back by id and matched on that text instead.
+describe("task list --description", () => {
+  const boardTask = (over: Record<string, unknown>) => ({
+    id: "t",
+    number: 1,
+    title: "t",
+    description: null,
+    status: "to-do",
+    priority: "no-priority",
+    position: 0,
+    projectId: "p1",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    userId: null,
+    assigneeId: null,
+    assigneeName: null,
+    labels: [],
+    ...over,
+  });
+  const deferred = (id: string, number: number, title: string) =>
+    boardTask({ id, number, title, descriptionDeferred: true });
+
+  const runList = async (description: string) => {
+    const requests: string[] = [];
+    const url = serve(async (req) => {
+      const u = new URL(req.url);
+      requests.push(`${req.method} ${u.pathname}${u.search}`);
+      if (u.pathname === "/api/task/tasks/p1") {
+        return Response.json({
+          data: {
+            id: "p1",
+            name: "P",
+            slug: "p",
+            columns: [
+              {
+                id: "c-todo",
+                name: "To do",
+                tasks: [
+                  deferred("task-big", 7, "Shrunken"),
+                  deferred("task-huge", 8, "Still big"),
+                  deferred("task-other", 9, "Other"),
+                  boardTask({ id: "task-plain", number: 10, title: "Plain", description: "a needle in plain text" }),
+                ],
+              },
+            ],
+            archivedTasks: [],
+            plannedTasks: [],
+          },
+          pagination: { total: 4, totalPages: 1, page: 1, pageSize: 50, relatedPage: 1, relatedPageSize: 100, relatedTotalPages: 1 },
+        });
+      }
+      if (u.pathname === "/api/task/description-matches/p1") {
+        // task-big was shortened under the limit since the listing, so the
+        // search — which covers only still-deferred descriptions — misses it.
+        return Response.json({ ids: ["task-huge"], nextCursor: null });
+      }
+      if (u.pathname === "/api/task/task-big") {
+        return Response.json(boardTask({ id: "task-big", number: 7, title: "Shrunken", description: "needle in the shortened text", projectId: "p1" }));
+      }
+      if (u.pathname === "/api/task/task-other") {
+        return Response.json(boardTask({ id: "task-other", number: 9, title: "Other", description: "nothing here", projectId: "p1" }));
+      }
+      return new Response("not found", { status: 404 });
+    });
+    using(url);
+    let listed: { id: string }[] = [];
+    const list = (
+      taskCommand.children as { name: string; run: (ctx: { flags: FlagValues; changed: ReadonlySet<string>; app: App }) => Promise<void> }[]
+    ).find((c) => c.name === "list")!;
+    const app = {
+      cfg: { apiKey: "test-key", projectIds: ["p1"], repo: "" },
+      out: { human: () => {}, data: (v: unknown) => (listed = v as { id: string }[]), status: () => {} },
+    } as unknown as App;
+    await list.run({ flags: { description }, changed: new Set(["description"]), app });
+    return { listed, requests };
+  };
+
+  test("a deferred task the search missed is read back and matched", async () => {
+    const { listed, requests } = await runList("needle");
+    expect(listed.map((t) => t.id)).toEqual(["task-big", "task-huge", "task-plain"]);
+    // Only the deferred tasks the search did not return are read back: the
+    // matched one and the plain one cost no detail request.
+    expect(requests).toEqual([
+      "GET /api/task/tasks/p1",
+      "GET /api/task/description-matches/p1?query=needle",
+      "GET /api/task/task-big",
+      "GET /api/task/task-other",
+    ]);
+  });
+});
+
 describe("duplicateTask", () => {
   test("sends an empty body without a title and the title with one", async () => {
     const bodies: unknown[] = [];

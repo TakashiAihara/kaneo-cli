@@ -911,7 +911,15 @@ export const taskCommand = {
             );
           }
           shown = await taskAfterWrite(copy, "the copy was moved");
-          readBack("project", shown.projectId, destId);
+          try {
+            readBack("project", shown.projectId, destId);
+          } catch (e) {
+            // The copy exists either way, so the failure names it and where it
+            // stayed: a bare read-back mismatch would read as nothing written.
+            throw new Error(
+              `duplicated #${task.number} as #${copy.number}, but the copy is still in ${shown.projectId}: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
         }
         app.out.human(`duplicated #${task.number} as #${shown.number} ${shown.title}`);
         app.out.data(shown);
@@ -1625,13 +1633,26 @@ const filterTasks = (tasks: Task[], status: string, priority: string, all: boole
 // descriptions match and their ids stand in for the text; the rest are matched
 // here. Both sides compare case-insensitively, as the server does. The search
 // is asked only when the listing actually deferred a description: with none,
-// every description is already on its task and the answer would be empty.
+// every description is already on its task and the answer would be empty. The
+// search sees only the descriptions still over the limit, though, so a
+// deferred task it did not return has its description read back and matched
+// too: one shortened since the listing would otherwise drop out.
 const describedTasks = async (projectId: string, tasks: Task[], query: string): Promise<Task[]> => {
   const deferred = tasks.some(descriptionDeferred)
     ? new Set(await findDeferredTaskDescriptions(projectId, query))
     : new Set<string>();
   const needle = query.toLowerCase();
-  return tasks.filter((task) => deferred.has(task.id) || task.description.toLowerCase().includes(needle));
+  const matched: Task[] = [];
+  for (const task of tasks) {
+    if (deferred.has(task.id) || task.description.toLowerCase().includes(needle)) {
+      matched.push(task);
+      continue;
+    }
+    if (descriptionDeferred(task) && (await getTask(task.id)).description.toLowerCase().includes(needle)) {
+      matched.push(task);
+    }
+  }
+  return matched;
 };
 
 const assignedLine = (task: AssignedTask): string =>

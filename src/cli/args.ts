@@ -83,7 +83,7 @@ const escaped = (char: string, delimiter: string): string => {
   // it, which is why it is here rather than in the table above.
   if ((code >= 0x20 && code <= 0x7e) || PRINTABLE.test(char)) return char;
   switch (char) {
-    case "\a":
+    case "\x07":
       return "\\a";
     case "\b":
       return "\\b";

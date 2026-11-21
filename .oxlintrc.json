@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // src/api/gen is Orval's output: the generated-client check in ci.yml owns
+  // its bytes, so a lint finding there could only be fixed by changing the
+  // generator.
+  "ignorePatterns": ["src/api/gen/**"],
+  "rules": {
+    // Strings, templates and regexes are checked too: twice a raw U+FEFF
+    // reached the tree inside one (kaneo-cli#289's comments).
+    "no-irregular-whitespace": [
+      "error",
+      {
+        "skipComments": false,
+        "skipJSXText": false,
+        "skipRegExps": false,
+        "skipStrings": false,
+        "skipTemplates": false
+      }
+    ],
+    // `{ a, ...rest }` destructures `a` out on purpose; it is not unused. The
+    // ignore patterns repeat the defaults, which naming any option drops.
+    "no-unused-vars": [
+      "error",
+      {
+        "ignoreRestSiblings": true,
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ]
+  }
+}

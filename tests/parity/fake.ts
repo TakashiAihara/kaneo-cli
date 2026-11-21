@@ -827,7 +827,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       webhookUrl: typeof i.webhookUrl === "string" ? i.webhookUrl : undefined,
       channelName: i.provider === "mattermost" && typeof i.channelName === "string" ? i.channelName : undefined,
       signingSecret: i.provider === "webhook" && typeof i.secret === "string" ? i.secret : undefined,
-      events: { ...(i.events ?? {}) },
+      events: { ...i.events },
       dueDateReminderLeadTimeMinutes: i.provider === "webhook" ? i.dueDateReminderLeadTimeMinutes : undefined,
       isActive: i.isActive === undefined ? true : i.isActive,
       createdAt: at,
@@ -3276,7 +3276,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         missingPermissions: [],
         message: "Token can access the project.",
         failureReason: null,
-        ...(opts.gitlabVerify ?? {}),
+        ...opts.gitlabVerify,
       });
     }
     if (req.method === "POST" && path === "/gitlab-integration/import-issues") {
@@ -3572,7 +3572,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           webhookUrl: String(b.webhookUrl ?? ""),
           channelName: kind === "mattermost" && typeof b.channelName === "string" ? b.channelName : undefined,
           signingSecret: kind === "generic-webhook" && typeof b["secret"] === "string" ? b["secret"] : undefined,
-          events: { ...(b.events ?? {}) },
+          events: { ...b.events },
           dueDateReminderLeadTimeMinutes: kind === "generic-webhook" ? b.dueDateReminderLeadTimeMinutes : undefined,
           isActive: true,
           createdAt: existing?.createdAt ?? at,
@@ -3593,7 +3593,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // row as it was.
         const merged: StoredIntegration = {
           ...existing,
-          events: { ...existing.events, ...(b.events ?? {}) },
+          events: { ...existing.events, ...b.events },
           updatedAt: now(),
         };
         if (b.webhookUrl !== undefined) merged.webhookUrl = String(b.webhookUrl) || existing.webhookUrl;

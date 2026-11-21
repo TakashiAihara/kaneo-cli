@@ -8,6 +8,9 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "knip": "knip",
+    "lint": "oxlint --deny-warnings",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
     "build": "bun scripts/build.ts",
     "parity:record": "bun scripts/record-golden.ts",
     "spec": "bun scripts/spec.ts"
@@ -26,6 +29,8 @@
     "@types/node": "^26.4.0",
     "knip": "6.39.0",
     "orval": "8.39.0",
+    "oxfmt": "0.79.0",
+    "oxlint": "1.94.0",
     "typescript": "^5.9.0"
   }
 }

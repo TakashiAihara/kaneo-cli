@@ -73,7 +73,12 @@ describe("requestShapes", () => {
   // regenerating) fails here as well as in CI's diff, which only runs there.
   test("requests.json is what the pinned document gives", () => {
     const doc = JSON.parse(readFileSync(SPEC_PATH, "utf8"));
-    expect(requestShapes(doc, OPERATIONS.map((o) => o.id))).toEqual(pinned);
+    expect(
+      requestShapes(
+        doc,
+        OPERATIONS.map((o) => o.id),
+      ),
+    ).toEqual(pinned);
   });
 
   test("spec-operations.json is what the pinned document serves", () => {
@@ -119,11 +124,15 @@ describe("clientShapes", () => {
 
 describe("requestDrift", () => {
   test("a field the server no longer takes", () => {
-    expect(requestDrift({ a: { "body.old": false } }, { a: {} })).toEqual([{ id: "a", field: "body.old", problem: "gone" }]);
+    expect(requestDrift({ a: { "body.old": false } }, { a: {} })).toEqual([
+      { id: "a", field: "body.old", problem: "gone" },
+    ]);
   });
 
   test("a field the server requires that the client does not know", () => {
-    expect(requestDrift({ a: {} }, { a: { "body.new": true } })).toEqual([{ id: "a", field: "body.new", problem: "required" }]);
+    expect(requestDrift({ a: {} }, { a: { "body.new": true } })).toEqual([
+      { id: "a", field: "body.new", problem: "required" },
+    ]);
   });
 
   test("a field the server requires that the client may leave out", () => {
@@ -145,7 +154,11 @@ describe("requestDrift", () => {
       { createTaskComment: { "body.a": false }, createTask: { "body.z": false, "body.b": false } },
       { createTaskComment: {}, createTask: {} },
     );
-    expect(got.map((d) => `${d.id} ${d.field}`)).toEqual(["createTask body.b", "createTask body.z", "createTaskComment body.a"]);
+    expect(got.map((d) => `${d.id} ${d.field}`)).toEqual([
+      "createTask body.b",
+      "createTask body.z",
+      "createTaskComment body.a",
+    ]);
   });
 
   test("the same document has no drift", () => {

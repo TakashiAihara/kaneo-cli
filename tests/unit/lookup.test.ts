@@ -30,7 +30,9 @@ const serve = (listing: (workspaceId: string) => Response | Promise<Response>) =
     fetch: (req) => {
       const url = new URL(req.url);
       if (url.pathname === "/api/auth/organization/list") {
-        return json(["w1", "w2", "w3"].map((id) => ({ id, name: `name-${id}`, slug: id, createdAt: "2026-01-01T00:00:00.000Z" })));
+        return json(
+          ["w1", "w2", "w3"].map((id) => ({ id, name: `name-${id}`, slug: id, createdAt: "2026-01-01T00:00:00.000Z" })),
+        );
       }
       if (url.pathname === "/api/project") return listing(url.searchParams.get("workspaceId") ?? "");
       return json({ error: "unexpected" }, 404);
@@ -52,12 +54,20 @@ test("workspaces are listed at the same time, and come back in workspace order",
     return json([project(`p-${workspaceId}`, workspaceId)]);
   });
   const { found, unlisted } = await allProjects(false);
-  expect(found.map((f) => `${f.workspaceName}/${f.project.id}`)).toEqual(["name-w1/p-w1", "name-w2/p-w2", "name-w3/p-w3"]);
+  expect(found.map((f) => `${f.workspaceName}/${f.project.id}`)).toEqual([
+    "name-w1/p-w1",
+    "name-w2/p-w2",
+    "name-w3/p-w3",
+  ]);
   expect(unlisted).toEqual([]);
 }, 5_000);
 
 test("a workspace that cannot be listed is reported beside the projects of the others", async () => {
-  serve((workspaceId) => (workspaceId === "w2" ? json({ success: false, error: "forbidden here" }, 403) : json([project(`p-${workspaceId}`, workspaceId)])));
+  serve((workspaceId) =>
+    workspaceId === "w2"
+      ? json({ success: false, error: "forbidden here" }, 403)
+      : json([project(`p-${workspaceId}`, workspaceId)]),
+  );
   const { found, unlisted } = await allProjects(false);
   expect(found.map((f) => f.project.id)).toEqual(["p-w1", "p-w3"]);
   expect(unlisted).toHaveLength(1);
@@ -66,7 +76,13 @@ test("a workspace that cannot be listed is reported beside the projects of the o
 });
 
 test("two workspaces that cannot be listed are reported in workspace order", async () => {
-  serve((workspaceId) => (workspaceId === "w1" ? json({ success: false, error: "first" }, 403) : workspaceId === "w3" ? json({ success: false, error: "third" }, 500) : json([project("p-w2", "w2")])));
+  serve((workspaceId) =>
+    workspaceId === "w1"
+      ? json({ success: false, error: "first" }, 403)
+      : workspaceId === "w3"
+        ? json({ success: false, error: "third" }, 500)
+        : json([project("p-w2", "w2")]),
+  );
   const { found, unlisted } = await allProjects(false);
   expect(found.map((f) => f.project.id)).toEqual(["p-w2"]);
   expect(unlisted.map((u) => u.workspaceName)).toEqual(["name-w1", "name-w3"]);
@@ -75,7 +91,11 @@ test("two workspaces that cannot be listed are reported in workspace order", asy
 });
 
 test("when the workspaces themselves cannot be listed there is no partial answer", async () => {
-  const s = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => json({ success: false, error: "no workspaces for you" }, 403) });
+  const s = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: () => json({ success: false, error: "no workspaces for you" }, 403),
+  });
   servers.push(s);
   configureClient({ baseUrl: `http://127.0.0.1:${s.port}`, apiKey: "test-key" });
   await expect(allProjects(false)).rejects.toThrow("no workspaces for you");
@@ -90,21 +110,33 @@ const byId = async (id: string) => {
 
 test("a destination resolved before is not reused for a task in another workspace", async () => {
   let both = false;
-  serve((workspaceId) => json(workspaceId === "w3" || (workspaceId === "w2" && !both) ? [] : [{ ...project(`p-${workspaceId}`, workspaceId), slug: "SAME0" }]));
+  serve((workspaceId) =>
+    json(
+      workspaceId === "w3" || (workspaceId === "w2" && !both)
+        ? []
+        : [{ ...project(`p-${workspaceId}`, workspaceId), slug: "SAME0" }],
+    ),
+  );
   expect(await withProject("SAME0", byId)).toBe("p-w1");
   both = true;
   expect(await withProject("SAME0", byId, { sameWorkspaceAs: "p-w2" })).toBe("p-w2");
 });
 
 test("a destination resolved for one workspace is not kept for later lookups", async () => {
-  serve((workspaceId) => json(workspaceId === "w3" ? [] : [{ ...project(`p-${workspaceId}`, workspaceId), slug: "SAME1" }]));
+  serve((workspaceId) =>
+    json(workspaceId === "w3" ? [] : [{ ...project(`p-${workspaceId}`, workspaceId), slug: "SAME1" }]),
+  );
   expect(await withProject("SAME1", byId, { sameWorkspaceAs: "p-w1" })).toBe("p-w1");
   await expect(withProject("SAME1", byId)).rejects.toThrow("matches several projects");
 });
 
 test("explain is added when the value names a project only in another workspace", async () => {
-  serve((workspaceId) => json(workspaceId === "w2" ? [{ ...project("p-w2", "w2"), slug: "SAME2" }] : [project("p-w1", "w1")]));
-  await expect(withProject("SAME2", byId, { sameWorkspaceAs: "p-w1", explain: async () => "; EXPLAINED" })).rejects.toThrow("only within its own workspace; EXPLAINED");
+  serve((workspaceId) =>
+    json(workspaceId === "w2" ? [{ ...project("p-w2", "w2"), slug: "SAME2" }] : [project("p-w1", "w1")]),
+  );
+  await expect(
+    withProject("SAME2", byId, { sameWorkspaceAs: "p-w1", explain: async () => "; EXPLAINED" }),
+  ).rejects.toThrow("only within its own workspace; EXPLAINED");
 });
 
 // Kaneo 2.50 sends every HTTPException as {"message","code"} JSON, where 2.32
@@ -120,7 +152,8 @@ test.each([
     port: 0,
     fetch: (req) => {
       const url = new URL(req.url);
-      if (url.pathname === "/api/auth/organization/list") return json([{ id: "w1", name: "name-w1", slug: "w1", createdAt: "2026-01-01T00:00:00.000Z" }]);
+      if (url.pathname === "/api/auth/organization/list")
+        return json([{ id: "w1", name: "name-w1", slug: "w1", createdAt: "2026-01-01T00:00:00.000Z" }]);
       if (url.pathname === "/api/project") return json([{ ...project("p-w1", "w1"), slug: `JSON${status}` }]);
       if (url.pathname === "/api/task/tasks/p-w1") return json({ tasks: [] });
       return json({ message, code }, status);

@@ -13,10 +13,24 @@ import { THIS_BUILD } from "../parity/run";
 test("time add without --start starts now, and stop ends now", async () => {
   const fake = startFake(SEED);
   const home = mkdtempSync(join(tmpdir(), "kaneo-time-"));
-  const env = { PATH: process.env.PATH ?? "", HOME: home, XDG_CONFIG_HOME: join(home, ".config"), KANEO_API_URL: fake.url, KANEO_API_KEY: "test-key", KANEO_WORKSPACE: WS, KANEO_PROJECT: P1, NO_COLOR: "1", TZ: "UTC" };
+  const env = {
+    PATH: process.env.PATH ?? "",
+    HOME: home,
+    XDG_CONFIG_HOME: join(home, ".config"),
+    KANEO_API_URL: fake.url,
+    KANEO_API_KEY: "test-key",
+    KANEO_WORKSPACE: WS,
+    KANEO_PROJECT: P1,
+    NO_COLOR: "1",
+    TZ: "UTC",
+  };
   const kaneo = async (...args: string[]) => {
     const p = Bun.spawn([...THIS_BUILD, ...args], { cwd: home, env, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
-    const [stdout, stderr, exit] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+    const [stdout, stderr, exit] = await Promise.all([
+      new Response(p.stdout).text(),
+      new Response(p.stderr).text(),
+      p.exited,
+    ]);
     return { stdout, stderr, exit };
   };
   try {

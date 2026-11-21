@@ -26,8 +26,7 @@
 // What the text is called when it is reported: `-` on a command line is stdin,
 // and a message has to say which of the two was meant. A path that is not there
 // is quoted, or the message reads as a complaint about a space.
-export const sourceName = (source: string): string =>
-  source === "-" ? "stdin" : source === "" ? '""' : source;
+export const sourceName = (source: string): string => (source === "-" ? "stdin" : source === "" ? '""' : source);
 
 // fatal turns a byte that is not UTF-8 into an error instead of a U+FFFD that
 // hides which byte it was. ignoreBOM leaves a BOM as the character it decodes

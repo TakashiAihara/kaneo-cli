@@ -11,13 +11,19 @@ import { requestShapes, serverOperations } from "../src/api/shape";
 // not carry that file. `bun run generate` runs it after Orval, whose clean
 // step empties src/api/gen first.
 const document = JSON.parse(readFileSync(SPEC_PATH, "utf8"));
-const shapes = requestShapes(document, OPERATIONS.map((op) => op.id));
+const shapes = requestShapes(
+  document,
+  OPERATIONS.map((op) => op.id),
+);
 const sorted = Object.fromEntries(
   Object.keys(shapes)
     .sort()
     .map((id) => [id, Object.fromEntries(Object.entries(shapes[id]!).sort(([a], [b]) => (a < b ? -1 : 1)))]),
 );
-writeFileSync(new URL("../src/api/gen/requests.json", import.meta.url).pathname, JSON.stringify(sorted, null, 2) + "\n");
+writeFileSync(
+  new URL("../src/api/gen/requests.json", import.meta.url).pathname,
+  JSON.stringify(sorted, null, 2) + "\n",
+);
 writeFileSync(
   new URL("../src/api/gen/spec-operations.json", import.meta.url).pathname,
   JSON.stringify(serverOperations(document), null, 2) + "\n",

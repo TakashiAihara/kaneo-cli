@@ -70,7 +70,13 @@ export const apiCheckCommand = {
         missing: result.missing.map(asReport),
         // The keys covered and missing have, with Command always empty since
         // nothing calls these yet, and Tag added: the document's first tag.
-        newOnServer: result.newOnServer.map((o) => ({ ID: o.id, Method: o.method, Path: o.path, Command: "", Tag: o.tag })),
+        newOnServer: result.newOnServer.map((o) => ({
+          ID: o.id,
+          Method: o.method,
+          Path: o.path,
+          Command: "",
+          Tag: o.tag,
+        })),
         // The same shape, with Command filled where the registry knows one:
         // an operation the client calls is in missing already, and the rest
         // are what a server upgrade can make available.

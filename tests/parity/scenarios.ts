@@ -29,10 +29,16 @@ export const SEED: Seed = {
     { id: "task-a3", projectId: P1, title: "Old news", status: "done" },
     { id: "task-b1", projectId: P2, title: "Beta first", priority: "urgent" },
   ],
-  comments: [{ taskId: "task-a1", content: "first comment" }, { taskId: "task-a3", content: "not mine", id: "cmt-other", userId: "user-1" }],
+  comments: [
+    { taskId: "task-a1", content: "first comment" },
+    { taskId: "task-a3", content: "not mine", id: "cmt-other", userId: "user-1" },
+  ],
   notifications: [
     { type: "info", title: "Welcome", content: "hello there", isRead: true },
-    { type: "task_status_changed", eventData: { taskTitle: "Write the parser", oldStatus: "to-do", newStatus: "in-progress" } },
+    {
+      type: "task_status_changed",
+      eventData: { taskTitle: "Write the parser", oldStatus: "to-do", newStatus: "in-progress" },
+    },
     { type: "info", content: "read state never set", isRead: null },
   ],
 };
@@ -54,8 +60,20 @@ const MEMBERS: Seed["members"] = [
 const INVITATIONS: Seed["invitations"] = [
   { id: "inv-open", workspaceId: "ws-other", inviterName: "Grace", expiresAt: "2026-01-01T13:00:00.000Z" },
   { id: "inv-expired", workspaceId: "ws-other", inviterName: "Grace", expiresAt: "2026-01-01T01:00:00.000Z" },
-  { id: "inv-accepted", workspaceId: WS, inviterName: "Grace", expiresAt: "2026-01-01T13:00:00.000Z", status: "accepted" },
-  { id: "inv-canceled", workspaceId: WS, inviterName: "Grace", expiresAt: "2026-01-01T13:00:00.000Z", status: "canceled" },
+  {
+    id: "inv-accepted",
+    workspaceId: WS,
+    inviterName: "Grace",
+    expiresAt: "2026-01-01T13:00:00.000Z",
+    status: "accepted",
+  },
+  {
+    id: "inv-canceled",
+    workspaceId: WS,
+    inviterName: "Grace",
+    expiresAt: "2026-01-01T13:00:00.000Z",
+    status: "canceled",
+  },
   // Expires at the very moment the fake judges at, which still counts as open.
   { id: "inv-boundary", workspaceId: WS, inviterName: "Grace", expiresAt: "2026-01-01T12:00:00.000Z" },
 ];
@@ -214,36 +232,84 @@ export const SCENARIOS: Scenario[] = [
   { name: "whoami on a server without user me", noCurrentUser: true, steps: [["whoami", "--human"]] },
   // The column first, then a description the create form kept in metadata,
   // sent as better-auth's JSON text or already an object.
-  ...both("workspace list with descriptions", ["workspace", "list"]).map(
-    (s): Scenario => ({
-      ...s,
-      seed: {
-        workspaces: [
-          { id: WS, name: "Main", slug: "main", description: "  Work for clients\r\n\tand more " },
-          { id: "ws-other", name: "Other", slug: "other", description: null, metadata: '{"description":"Kept in metadata"}' },
-          { id: "ws-obj", name: "Object", slug: "obj", description: null, metadata: { description: "Parsed already" } },
-          { id: "ws-both", name: "Both", slug: "both", description: "Column wins", metadata: '{"description":"Metadata loses"}' },
-          { id: "ws-plain", name: "Plain", slug: "plain", description: null, metadata: null },
-          { id: "ws-bad", name: "Bad\tmeta", slug: "bad", description: null, metadata: "{bad" },
-        ],
-      },
-    }),
-  ),
-  { name: "workspace rename", steps: [["workspace", "rename", WS, "Renamed", "--json"], ["workspace", "ls", "--human"]] },
+  ...both("workspace list with descriptions", ["workspace", "list"]).map((s): Scenario => ({
+    ...s,
+    seed: {
+      workspaces: [
+        { id: WS, name: "Main", slug: "main", description: "  Work for clients\r\n\tand more " },
+        {
+          id: "ws-other",
+          name: "Other",
+          slug: "other",
+          description: null,
+          metadata: '{"description":"Kept in metadata"}',
+        },
+        { id: "ws-obj", name: "Object", slug: "obj", description: null, metadata: { description: "Parsed already" } },
+        {
+          id: "ws-both",
+          name: "Both",
+          slug: "both",
+          description: "Column wins",
+          metadata: '{"description":"Metadata loses"}',
+        },
+        { id: "ws-plain", name: "Plain", slug: "plain", description: null, metadata: null },
+        { id: "ws-bad", name: "Bad\tmeta", slug: "bad", description: null, metadata: "{bad" },
+      ],
+    },
+  })),
+  {
+    name: "workspace rename",
+    steps: [
+      ["workspace", "rename", WS, "Renamed", "--json"],
+      ["workspace", "ls", "--human"],
+    ],
+  },
 
   ...both("project list", ["project", "list"]),
   ...both("project list archived", ["project", "ls", "--archived"]),
   ...both("project get", ["project", "get", P1]),
   ...both("project get from env", ["project", "get"]),
-  { name: "project create", steps: [["project", "create", "Gamma", "--slug", "GAM", "-d", "third", "--json"], ["project", "ls", "--human"]] },
+  {
+    name: "project create",
+    steps: [
+      ["project", "create", "Gamma", "--slug", "GAM", "-d", "third", "--json"],
+      ["project", "ls", "--human"],
+    ],
+  },
   // --name gives the name as project update takes it; with words too, empty, or
   // with neither, the create is refused before anything is asked.
-  { name: "project create with --name", steps: [["project", "create", "--name", "Flagged", "--slug", "FLG", "--json"], ["project", "ls", "--human"]] },
-  { name: "project create with --name and words", steps: [["project", "create", "Words", "--name", "Flagged", "--json"], ["project", "ls", "--human"]] },
+  {
+    name: "project create with --name",
+    steps: [
+      ["project", "create", "--name", "Flagged", "--slug", "FLG", "--json"],
+      ["project", "ls", "--human"],
+    ],
+  },
+  {
+    name: "project create with --name and words",
+    steps: [
+      ["project", "create", "Words", "--name", "Flagged", "--json"],
+      ["project", "ls", "--human"],
+    ],
+  },
   { name: "project create with no name", steps: [["project", "create", "--json"]] },
-  { name: "project create with an empty --name", steps: [["project", "create", "--name", " ", "--json"], ["project", "create", "--name", "", "--json"], ["project", "create", "Words", "--name", "", "--json"], ["project", "ls", "--human"]] },
+  {
+    name: "project create with an empty --name",
+    steps: [
+      ["project", "create", "--name", " ", "--json"],
+      ["project", "create", "--name", "", "--json"],
+      ["project", "create", "Words", "--name", "", "--json"],
+      ["project", "ls", "--human"],
+    ],
+  },
   { name: "project create derives the slug", steps: [["project", "create", "Gamma Ray!", "--human"]] },
-  { name: "project create keeps the description", steps: [["project", "create", "Delta", "--slug", "DEL", "-d", "fourth", "--json"], ["project", "get", "proj0002", "--human"]] },
+  {
+    name: "project create keeps the description",
+    steps: [
+      ["project", "create", "Delta", "--slug", "DEL", "-d", "fourth", "--json"],
+      ["project", "get", "proj0002", "--human"],
+    ],
+  },
   {
     // The project is made before the description fails, so the error has to
     // name it and say how to finish.
@@ -251,7 +317,14 @@ export const SCENARIOS: Scenario[] = [
     whitespaceOn: "^GET /project/",
     steps: [["project", "create", "Epsilon", "-d", "fifth", "--json"]],
   },
-  { name: "project create with a derived slug already taken", steps: [["project", "create", "Alphabet", "--json"], ["project", "create", "Old Lake Docs", "--json"], ["project", "create", "Alphabet", "--slug", "ALP2", "--json"]] },
+  {
+    name: "project create with a derived slug already taken",
+    steps: [
+      ["project", "create", "Alphabet", "--json"],
+      ["project", "create", "Old Lake Docs", "--json"],
+      ["project", "create", "Alphabet", "--slug", "ALP2", "--json"],
+    ],
+  },
 
   {
     name: "project create with a derived slug taken in another case",
@@ -264,7 +337,13 @@ export const SCENARIOS: Scenario[] = [
     steps: [["project", "create", "Wideworld", "--json"]],
   },
   { name: "project create with an underivable slug", steps: [["project", "create", "!!!", "--json"]] },
-  { name: "project update", steps: [["project", "update", P1, "--name", "Alpha 2", "--slug", "AL2", "--json"], ["project", "get", P1, "--human"]] },
+  {
+    name: "project update",
+    steps: [
+      ["project", "update", P1, "--name", "Alpha 2", "--slug", "AL2", "--json"],
+      ["project", "get", P1, "--human"],
+    ],
+  },
   // Kaneo 2.32.0 refuses a key another project in the workspace uses, ignoring
   // case and counting archived projects, with a 409 the CLI passes on.
   {
@@ -367,7 +446,10 @@ export const SCENARIOS: Scenario[] = [
       projects: [{ id: "p q$(x)", workspaceId: WS, name: "Odd", slug: "ODD" }],
       tasks: [{ id: "task-o1", projectId: "p q$(x)", title: "Held" }],
     },
-    steps: [["project", "rm", "ODD", "--human"], ["column", "rm", "to-do", "--yes", "-p", "ODD", "--human"]],
+    steps: [
+      ["project", "rm", "ODD", "--human"],
+      ["column", "rm", "to-do", "--yes", "-p", "ODD", "--human"],
+    ],
   },
   // A plain member is refused with a bare 403; the line says which permission the
   // route checks and the caller's role there.
@@ -392,12 +474,36 @@ export const SCENARIOS: Scenario[] = [
     noCurrentUser: true,
     steps: [["project", "archive", "BET", "--human"]],
   },
-  { name: "project archive and unarchive", steps: [["project", "archive", P2, "--json"], ["project", "ls", "--human"], ["project", "unarchive", P2, "--human"], ["project", "ls", "--json"]] },
-  { name: "project rm needs --yes", steps: [["project", "rm", P2, "--human"], ["project", "rm", "Beta", "--yes", "--json"], ["project", "ls", "--human"], ["project", "ls", "--archived", "--human"], ["task", "ls", "-p", P2, "--json"], ["project", "rm", "OLD", "--yes", "--human"]] },
+  {
+    name: "project archive and unarchive",
+    steps: [
+      ["project", "archive", P2, "--json"],
+      ["project", "ls", "--human"],
+      ["project", "unarchive", P2, "--human"],
+      ["project", "ls", "--json"],
+    ],
+  },
+  {
+    name: "project rm needs --yes",
+    steps: [
+      ["project", "rm", P2, "--human"],
+      ["project", "rm", "Beta", "--yes", "--json"],
+      ["project", "ls", "--human"],
+      ["project", "ls", "--archived", "--human"],
+      ["task", "ls", "-p", P2, "--json"],
+      ["project", "rm", "OLD", "--yes", "--human"],
+    ],
+  },
   // KANEO_PROJECT names proj-alpha in every scenario; deleting it leaves the
   // setting pointing at nothing, which the note says before the next command
   // finds out the hard way.
-  { name: "project rm of the configured project", steps: [["project", "rm", "ALP", "--yes", "--human"], ["project", "get", "--json"]] },
+  {
+    name: "project rm of the configured project",
+    steps: [
+      ["project", "rm", "ALP", "--yes", "--human"],
+      ["project", "get", "--json"],
+    ],
+  },
   // An attached session keeps the project in its attachment too; the note says
   // `session close` is what releases it, and status still shows the hold.
   {
@@ -410,8 +516,24 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   { name: "project rm unknown", steps: [["project", "rm", "nope", "--yes", "--json"]] },
-  { name: "project reorder", steps: [["project", "reorder", "Beta", "ALP", "--human"], ["project", "ls", "--archived", "--json"], ["project", "reorder", P1, P2, "--json"], ["project", "reorder", "bet", "alp", "--json"]] },
-  { name: "project reorder must name every project", steps: [["project", "reorder", "Alpha", "--json"], ["project", "reorder", "Alpha", "Alpha", "Beta", "--json"], ["project", "reorder", "Alpha", "nope", "Beta", "--json"], ["project", "reorder", "Alpha", "Beta", "Old", "--json"]] },
+  {
+    name: "project reorder",
+    steps: [
+      ["project", "reorder", "Beta", "ALP", "--human"],
+      ["project", "ls", "--archived", "--json"],
+      ["project", "reorder", P1, P2, "--json"],
+      ["project", "reorder", "bet", "alp", "--json"],
+    ],
+  },
+  {
+    name: "project reorder must name every project",
+    steps: [
+      ["project", "reorder", "Alpha", "--json"],
+      ["project", "reorder", "Alpha", "Alpha", "Beta", "--json"],
+      ["project", "reorder", "Alpha", "nope", "Beta", "--json"],
+      ["project", "reorder", "Alpha", "Beta", "Old", "--json"],
+    ],
+  },
   // The archived project between two active ones, so the ranks it holds are the
   // ones the request has to fill around: it keeps its place and the other two
   // swap.
@@ -424,7 +546,10 @@ export const SCENARIOS: Scenario[] = [
         { id: P2, workspaceId: WS, name: "Beta", slug: "BET" },
       ],
     },
-    steps: [["project", "reorder", "Beta", "Alpha", "--human"], ["project", "ls", "--archived", "--json"]],
+    steps: [
+      ["project", "reorder", "Beta", "Alpha", "--human"],
+      ["project", "ls", "--archived", "--json"],
+    ],
   },
   // The assignee of task-a2 belongs to the source workspace alone, so the move
   // unassigns it and the reply counts the one it did.
@@ -493,7 +618,7 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     name: "project background set refused",
-    files: { "notes.txt": "not an image", "bg.png": "PNG", "empty.png": "", "blob": "PNG" },
+    files: { "notes.txt": "not an image", "bg.png": "PNG", "empty.png": "", blob: "PNG" },
     steps: [
       ["project", "background", "set", P1, "missing.png", "--json"],
       ["project", "background", "set", P1, "notes.txt", "--json"],
@@ -528,7 +653,7 @@ export const SCENARIOS: Scenario[] = [
     failOn: "PUT /storage/",
     failStatus: 403,
     failMessage:
-      '<Error><Code>SignatureDoesNotMatch</Code><Message>The request signature does not match</Message><StringToSign>AWS4-HMAC-SHA256\n20260101\nshould-not-appear</StringToSign><SignatureProvided>deadbeef</SignatureProvided></Error>',
+      "<Error><Code>SignatureDoesNotMatch</Code><Message>The request signature does not match</Message><StringToSign>AWS4-HMAC-SHA256\n20260101\nshould-not-appear</StringToSign><SignatureProvided>deadbeef</SignatureProvided></Error>",
     steps: [["project", "background", "set", P1, "bg.png", "--json"]],
   },
   {
@@ -553,9 +678,31 @@ export const SCENARIOS: Scenario[] = [
   },
 
   ...both("column list", ["column", "list"]),
-  { name: "column create and reorder", steps: [["column", "create", "Waiting", "--json"], ["column", "reorder", "to-do", "waiting", "in-progress", "done", "--human"], ["column", "ls", "--json"], ["task", "status", "1", "waiting", "--json"], ["board", "--human"]] },
-  { name: "column reorder must name every column", steps: [["column", "reorder", "done", "to-do", "--json"], ["column", "reorder", "to-do", "to-do", "in-progress", "done", "--json"], ["column", "reorder", "to-do", "nope", "in-progress", "done", "--json"]] },
-  { name: "column rename", steps: [["column", "rename", "in-progress", "Doing", "--json"], ["column", "ls", "--human"]] },
+  {
+    name: "column create and reorder",
+    steps: [
+      ["column", "create", "Waiting", "--json"],
+      ["column", "reorder", "to-do", "waiting", "in-progress", "done", "--human"],
+      ["column", "ls", "--json"],
+      ["task", "status", "1", "waiting", "--json"],
+      ["board", "--human"],
+    ],
+  },
+  {
+    name: "column reorder must name every column",
+    steps: [
+      ["column", "reorder", "done", "to-do", "--json"],
+      ["column", "reorder", "to-do", "to-do", "in-progress", "done", "--json"],
+      ["column", "reorder", "to-do", "nope", "in-progress", "done", "--json"],
+    ],
+  },
+  {
+    name: "column rename",
+    steps: [
+      ["column", "rename", "in-progress", "Doing", "--json"],
+      ["column", "ls", "--human"],
+    ],
+  },
   // Name, icon, color and done state all move after creation; what is not
   // passed stays, and an empty --icon or --color clears it.
   {
@@ -609,15 +756,55 @@ export const SCENARIOS: Scenario[] = [
       ["column", "ls", "--human"],
     ],
   },
-  { name: "column rm needs --yes", steps: [["column", "rm", "done", "--human"], ["column", "rm", "done", "--yes", "--json"], ["column", "create", "Waiting", "--json"], ["column", "rm", "waiting", "--yes", "--json"], ["column", "ls", "--json"]] },
+  {
+    name: "column rm needs --yes",
+    steps: [
+      ["column", "rm", "done", "--human"],
+      ["column", "rm", "done", "--yes", "--json"],
+      ["column", "create", "Waiting", "--json"],
+      ["column", "rm", "waiting", "--yes", "--json"],
+      ["column", "ls", "--json"],
+    ],
+  },
   { name: "column unknown", steps: [["column", "rename", "nope", "x", "--json"]] },
   // A rule cannot outlive its column, so the delete takes the rules pointing at
   // it: done holds a task and would be refused, hence a column of this one's own.
-  { name: "column rm takes its workflow rules with it", steps: [["column", "create", "Waiting", "--json"], ["workflow", "set", "github", "pr_opened", "waiting", "--json"], ["column", "rm", "waiting", "--yes", "--json"], ["workflow", "ls", "--json"]] },
+  {
+    name: "column rm takes its workflow rules with it",
+    steps: [
+      ["column", "create", "Waiting", "--json"],
+      ["workflow", "set", "github", "pr_opened", "waiting", "--json"],
+      ["column", "rm", "waiting", "--yes", "--json"],
+      ["workflow", "ls", "--json"],
+    ],
+  },
 
-  { name: "workflow list", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }] }, steps: [["workflow", "ls", "--json"], ["workflow", "ls", "--human"]] },
-  { name: "workflow list empty", steps: [["workflow", "ls", "--json"], ["workflow", "ls", "--human"]] },
-  { name: "workflow set and rm", steps: [["workflow", "set", "github", "pr_opened", "in-progress", "--json"], ["workflow", "set", "github", "pr_opened", "Done", "--human"], ["workflow", "set", "gitea", "issue_closed", "col0003", "--json"], ["workflow", "ls", "--human"], ["workflow", "rm", "github", "pr_opened", "--json"], ["workflow", "ls", "--json"]] },
+  {
+    name: "workflow list",
+    seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }] },
+    steps: [
+      ["workflow", "ls", "--json"],
+      ["workflow", "ls", "--human"],
+    ],
+  },
+  {
+    name: "workflow list empty",
+    steps: [
+      ["workflow", "ls", "--json"],
+      ["workflow", "ls", "--human"],
+    ],
+  },
+  {
+    name: "workflow set and rm",
+    steps: [
+      ["workflow", "set", "github", "pr_opened", "in-progress", "--json"],
+      ["workflow", "set", "github", "pr_opened", "Done", "--human"],
+      ["workflow", "set", "gitea", "issue_closed", "col0003", "--json"],
+      ["workflow", "ls", "--human"],
+      ["workflow", "rm", "github", "pr_opened", "--json"],
+      ["workflow", "ls", "--json"],
+    ],
+  },
   // A pair no plugin of the shipped ones fires is stored all the same, and said so
   // on stderr rather than left as a rule that moves nothing.
   {
@@ -632,21 +819,127 @@ export const SCENARIOS: Scenario[] = [
       ["workflow", "ls", "--human"],
     ],
   },
-  { name: "workflow rm by id", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }] }, steps: [["workflow", "ls", "--json"], ["workflow", "rm", "rule0002", "--human"], ["workflow", "ls", "--json"]] },
-  { name: "workflow rm by pair matches the event", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }, { projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "in-progress" }] }, steps: [["workflow", "rm", "github", "pr_opened", "--human"], ["workflow", "ls", "--human"]] },
+  {
+    name: "workflow rm by id",
+    seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }] },
+    steps: [
+      ["workflow", "ls", "--json"],
+      ["workflow", "rm", "rule0002", "--human"],
+      ["workflow", "ls", "--json"],
+    ],
+  },
+  {
+    name: "workflow rm by pair matches the event",
+    seed: {
+      workflowRules: [
+        { projectId: P1, integrationType: "github", eventType: "pr_merged", columnSlug: "done" },
+        { projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "in-progress" },
+      ],
+    },
+    steps: [
+      ["workflow", "rm", "github", "pr_opened", "--human"],
+      ["workflow", "ls", "--human"],
+    ],
+  },
   // Every integration fires the same six events, so a pair's integration is what
   // tells two rules apart.
-  { name: "workflow rm by pair matches the integration", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "in-progress" }, { projectId: P1, integrationType: "gitea", eventType: "pr_opened", columnSlug: "done" }] }, steps: [["workflow", "rm", "gitea", "pr_opened", "--human"], ["workflow", "ls", "--human"]] },
+  {
+    name: "workflow rm by pair matches the integration",
+    seed: {
+      workflowRules: [
+        { projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "in-progress" },
+        { projectId: P1, integrationType: "gitea", eventType: "pr_opened", columnSlug: "done" },
+      ],
+    },
+    steps: [
+      ["workflow", "rm", "gitea", "pr_opened", "--human"],
+      ["workflow", "ls", "--human"],
+    ],
+  },
   // Nothing on the server keeps a pair to one rule, so a project can hold two, and
   // deleting one of them would leave the other live: both are named instead.
-  { name: "workflow rm refuses a pair it finds twice", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "in-progress" }, { projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "done" }] }, steps: [["workflow", "rm", "github", "pr_opened", "--json"], ["workflow", "ls", "--human"]] },
-  { name: "project reorder prefers an active project over an archived namesake", seed: { projects: [{ id: P1, workspaceId: WS, name: "Alpha", slug: "ALP" }, { id: P2, workspaceId: WS, name: "Beta", slug: "BET" }, { id: "proj-gone", workspaceId: WS, name: "Beta", slug: "beta", archived: true }] }, steps: [["project", "reorder", "Beta", "Alpha", "--human"], ["project", "reorder", "alpha", "bet", "--human"]] },
-  { name: "workflow rm by id needs no project", env: { KANEO_PROJECT: "" }, seed: { workflowRules: [{ projectId: P2, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }] }, steps: [["workflow", "rm", "rule0002", "--human"], ["workflow", "ls", "--json"]] },
-  { name: "workflow rm by id reports other failures as they are", whitespaceOn: "^DELETE /workflow-rule/", steps: [["workflow", "rm", "rule0002", "--json"]] },
-  { name: "workflow refused", steps: [["workflow", "set", "github", "pr_opened", "nope", "--json"], ["workflow", "set", "github", "pr_opened", "--json"], ["workflow", "set", "", "pr_opened", "done", "--json"], ["workflow", "set", "github", "", "done", "--json"], ["workflow", "rm", "github", "pr_opened", "--json"], ["workflow", "rm", "rule9999", "--json"], ["workflow", "rm", " ", "--json"], ["column", "create", "Waiting", "on", "review", "--json"], ["workflow", "set", "github", "pr_opened", "Waiting", "on", "review", "--human"]] },
-  { name: "column by id and name", steps: [["column", "rename", "col0002", "Doing", "--json"], ["column", "reorder", "col0001", "done", "Doing", "--human"]] },
-  { name: "column create with flags", steps: [["column", "create", "外部回答", "待ち", "--final", "--icon", "Clock", "--color", "#f00", "--json"], ["column", "rename", "外部回答-待ち", "Waiting", "on", "review", "--json"], ["column", "ls", "--human"]] },
-  { name: "column names refused", steps: [["column", "create", "Planned", "--json"], ["column", "create", "!!!", "--json"], ["column", "create", "To Do", "--json"], ["column", "create", " ", "--json"], ["column", "rename", "to-do", " ", "--json"], ["column", "rename", "in-progress", "To Do", "--json"], ["column", "rename", "To Do", "x", "--json"]] },
+  {
+    name: "workflow rm refuses a pair it finds twice",
+    seed: {
+      workflowRules: [
+        { projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "in-progress" },
+        { projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "done" },
+      ],
+    },
+    steps: [
+      ["workflow", "rm", "github", "pr_opened", "--json"],
+      ["workflow", "ls", "--human"],
+    ],
+  },
+  {
+    name: "project reorder prefers an active project over an archived namesake",
+    seed: {
+      projects: [
+        { id: P1, workspaceId: WS, name: "Alpha", slug: "ALP" },
+        { id: P2, workspaceId: WS, name: "Beta", slug: "BET" },
+        { id: "proj-gone", workspaceId: WS, name: "Beta", slug: "beta", archived: true },
+      ],
+    },
+    steps: [
+      ["project", "reorder", "Beta", "Alpha", "--human"],
+      ["project", "reorder", "alpha", "bet", "--human"],
+    ],
+  },
+  {
+    name: "workflow rm by id needs no project",
+    env: { KANEO_PROJECT: "" },
+    seed: { workflowRules: [{ projectId: P2, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }] },
+    steps: [
+      ["workflow", "rm", "rule0002", "--human"],
+      ["workflow", "ls", "--json"],
+    ],
+  },
+  {
+    name: "workflow rm by id reports other failures as they are",
+    whitespaceOn: "^DELETE /workflow-rule/",
+    steps: [["workflow", "rm", "rule0002", "--json"]],
+  },
+  {
+    name: "workflow refused",
+    steps: [
+      ["workflow", "set", "github", "pr_opened", "nope", "--json"],
+      ["workflow", "set", "github", "pr_opened", "--json"],
+      ["workflow", "set", "", "pr_opened", "done", "--json"],
+      ["workflow", "set", "github", "", "done", "--json"],
+      ["workflow", "rm", "github", "pr_opened", "--json"],
+      ["workflow", "rm", "rule9999", "--json"],
+      ["workflow", "rm", " ", "--json"],
+      ["column", "create", "Waiting", "on", "review", "--json"],
+      ["workflow", "set", "github", "pr_opened", "Waiting", "on", "review", "--human"],
+    ],
+  },
+  {
+    name: "column by id and name",
+    steps: [
+      ["column", "rename", "col0002", "Doing", "--json"],
+      ["column", "reorder", "col0001", "done", "Doing", "--human"],
+    ],
+  },
+  {
+    name: "column create with flags",
+    steps: [
+      ["column", "create", "外部回答", "待ち", "--final", "--icon", "Clock", "--color", "#f00", "--json"],
+      ["column", "rename", "外部回答-待ち", "Waiting", "on", "review", "--json"],
+      ["column", "ls", "--human"],
+    ],
+  },
+  {
+    name: "column names refused",
+    steps: [
+      ["column", "create", "Planned", "--json"],
+      ["column", "create", "!!!", "--json"],
+      ["column", "create", "To Do", "--json"],
+      ["column", "create", " ", "--json"],
+      ["column", "rename", "to-do", " ", "--json"],
+      ["column", "rename", "in-progress", "To Do", "--json"],
+      ["column", "rename", "To Do", "x", "--json"],
+    ],
+  },
 
   ...both("field list", ["field", "ls"]).map((s): Scenario => ({ ...s, seed: FIELD_SEED })),
   {
@@ -654,7 +947,19 @@ export const SCENARIOS: Scenario[] = [
     seed: FIELD_SEED,
     steps: [
       ["field", "add", "QA", "owner", "--type", "text", "--json"],
-      ["field", "add", "Ships in", "--type", "dropdown", "--options", "Web, CLI, Mobile", "--required", "--default", "Web", "--json"],
+      [
+        "field",
+        "add",
+        "Ships in",
+        "--type",
+        "dropdown",
+        "--options",
+        "Web, CLI, Mobile",
+        "--required",
+        "--default",
+        "Web",
+        "--json",
+      ],
       ["field", "ls", "--human"],
       ["field", "values", "--human"],
     ],
@@ -776,16 +1081,56 @@ export const SCENARIOS: Scenario[] = [
   ...both("search", ["search", "first"]),
   // A task other than #1, so a number that only happened to be 1 is caught.
   { name: "search gives a task match its number", steps: [["search", "Ship", "--type", "tasks", "--json"]] },
-  { name: "search narrowed", steps: [["search", "first", "--in-project", "--json"], ["search", "first", "-p", "BET", "--human"], ["search", "first", "--in-project", "-p", "nope", "--human"], ["search", "a", "--in-project", "--type", "projects", "--human"], ["search", "e", "--type", "tasks", "--limit", "1", "--json"], ["search", "e", "--limit", "50", "--human"], ["search", "beta", "--type", "projects", "--human"], ["search", "e", "--limit", "2", "--human"], ["search", "x", "--type", "bogus", "--json"], ["search", " ", "--json"]] },
-  { name: "search at the server's limit", seed: { tasks: Array.from({ length: 50 }, (_, i) => ({ id: `task-m${i}`, projectId: P1, title: `match ${i}` })) }, steps: [["search", "match", "--type", "tasks", "--limit", "50", "--human"], ["search", "match", "-A", "--type", "tasks", "--human"], ["search", "match", "-A", "--type", "tasks", "--limit", "50", "--human"]] },
-  { name: "search and members need a workspace", env: { KANEO_WORKSPACE: "" }, steps: [["search", "first", "--json"], ["workspace", "members", "--json"]] },
-  { name: "search across workspaces needs none", env: { KANEO_WORKSPACE: "" }, steps: [["search", "first", "-A", "--human"]] },
+  {
+    name: "search narrowed",
+    steps: [
+      ["search", "first", "--in-project", "--json"],
+      ["search", "first", "-p", "BET", "--human"],
+      ["search", "first", "--in-project", "-p", "nope", "--human"],
+      ["search", "a", "--in-project", "--type", "projects", "--human"],
+      ["search", "e", "--type", "tasks", "--limit", "1", "--json"],
+      ["search", "e", "--limit", "50", "--human"],
+      ["search", "beta", "--type", "projects", "--human"],
+      ["search", "e", "--limit", "2", "--human"],
+      ["search", "x", "--type", "bogus", "--json"],
+      ["search", " ", "--json"],
+    ],
+  },
+  {
+    name: "search at the server's limit",
+    seed: { tasks: Array.from({ length: 50 }, (_, i) => ({ id: `task-m${i}`, projectId: P1, title: `match ${i}` })) },
+    steps: [
+      ["search", "match", "--type", "tasks", "--limit", "50", "--human"],
+      ["search", "match", "-A", "--type", "tasks", "--human"],
+      ["search", "match", "-A", "--type", "tasks", "--limit", "50", "--human"],
+    ],
+  },
+  {
+    name: "search and members need a workspace",
+    env: { KANEO_WORKSPACE: "" },
+    steps: [
+      ["search", "first", "--json"],
+      ["workspace", "members", "--json"],
+    ],
+  },
+  {
+    name: "search across workspaces needs none",
+    env: { KANEO_WORKSPACE: "" },
+    steps: [["search", "first", "-A", "--human"]],
+  },
   {
     // Fifty members make the server fill each workspace's page of 50 with
     // repeats of "Other", so the tasks that match are pushed out: the output has
     // to say there may be more although only one match is left.
     name: "search across workspaces filled by repeats",
-    seed: { members: Array.from({ length: 50 }, (_, i) => ({ id: `user-m${i}`, name: `M${i}`, email: `m${i}@example.com`, role: "member" })) },
+    seed: {
+      members: Array.from({ length: 50 }, (_, i) => ({
+        id: `user-m${i}`,
+        name: `M${i}`,
+        email: `m${i}@example.com`,
+        role: "member",
+      })),
+    },
     steps: [["search", "er", "-A", "--human"]],
   },
   {
@@ -798,9 +1143,30 @@ export const SCENARIOS: Scenario[] = [
     seed: {
       members: MEMBERS,
       projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
-      tasks: [...SEED.tasks, { id: "task-g1", projectId: "proj-gamma", title: "Filed elsewhere first", priority: "low" }],
+      tasks: [
+        ...SEED.tasks,
+        { id: "task-g1", projectId: "proj-gamma", title: "Filed elsewhere first", priority: "low" },
+      ],
     },
-    steps: [["search", "elsewhere", "--json"], ["search", "elsewhere", "-A", "--human"], ["search", "first", "--all-workspaces", "--json"], ["search", "first", "-A", "--limit", "2", "--human"], ["search", "first", "-A", "--in-project", "--json"], ["search", "first", "-A", "-p", "BET", "--human"], ["search", "first", "-A", "-w", "ws-main", "--human"], ["search", "first", "--all-workspaces", "--workspace", "Other", "--json"], ["search", "other", "-A", "--type", "workspaces", "--json"], ["search", "er", "-A", "--limit", "2", "--human"], ["search", "first", "-A", "--limit", "1", "--json"], ["search", "x", "-A", "--limit", "0", "--json"], ["search", "x", "-A", "--limit", "51", "--human"], ["search", "x", "-A", "--limit", "1.5", "--human"], ["search", "first", "-A", "--limit", "3", "--human"], ["search", "er", "--limit", "3", "--human"], ["search", "er", "--limit", "2", "--json"]],
+    steps: [
+      ["search", "elsewhere", "--json"],
+      ["search", "elsewhere", "-A", "--human"],
+      ["search", "first", "--all-workspaces", "--json"],
+      ["search", "first", "-A", "--limit", "2", "--human"],
+      ["search", "first", "-A", "--in-project", "--json"],
+      ["search", "first", "-A", "-p", "BET", "--human"],
+      ["search", "first", "-A", "-w", "ws-main", "--human"],
+      ["search", "first", "--all-workspaces", "--workspace", "Other", "--json"],
+      ["search", "other", "-A", "--type", "workspaces", "--json"],
+      ["search", "er", "-A", "--limit", "2", "--human"],
+      ["search", "first", "-A", "--limit", "1", "--json"],
+      ["search", "x", "-A", "--limit", "0", "--json"],
+      ["search", "x", "-A", "--limit", "51", "--human"],
+      ["search", "x", "-A", "--limit", "1.5", "--human"],
+      ["search", "first", "-A", "--limit", "3", "--human"],
+      ["search", "er", "--limit", "3", "--human"],
+      ["search", "er", "--limit", "2", "--json"],
+    ],
   },
   {
     // The server's project query matches name and description but never slug
@@ -829,16 +1195,44 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   ...both("workspace members", ["workspace", "members"]).map((s) => ({ ...s, seed: { members: MEMBERS } })),
-  { name: "workspace members by name", seed: { members: MEMBERS }, env: { KANEO_WORKSPACE: "Other" }, steps: [["workspace", "members", "--human"]] },
-  { name: "invitation get", seed: { invitations: INVITATIONS }, steps: [["invitation", "get", "inv-open", "--json"], ["invitation", "get", "inv-open", "--human"], ["invitation", "get", "inv-expired", "--json"], ["invitation", "get", "inv-expired", "--human"], ["invitation", "get", "inv-accepted", "--json"], ["invitation", "get", "inv-canceled", "--human"], ["invitation", "get", "inv-boundary", "--human"], ["invitation", "get", "nope", "--human"]] },
+  {
+    name: "workspace members by name",
+    seed: { members: MEMBERS },
+    env: { KANEO_WORKSPACE: "Other" },
+    steps: [["workspace", "members", "--human"]],
+  },
+  {
+    name: "invitation get",
+    seed: { invitations: INVITATIONS },
+    steps: [
+      ["invitation", "get", "inv-open", "--json"],
+      ["invitation", "get", "inv-open", "--human"],
+      ["invitation", "get", "inv-expired", "--json"],
+      ["invitation", "get", "inv-expired", "--human"],
+      ["invitation", "get", "inv-accepted", "--json"],
+      ["invitation", "get", "inv-canceled", "--human"],
+      ["invitation", "get", "inv-boundary", "--human"],
+      ["invitation", "get", "nope", "--human"],
+    ],
+  },
 
   ...both("task list", ["task", "list"]),
   ...both("task list all", ["task", "ls", "--all"]),
   ...both("task list by status", ["task", "ls", "--status", "in-progress"]),
   ...both("task list by priority", ["task", "ls", "--priority", "high"]),
-  { name: "task list filters on the server", steps: [["task", "ls", "--status", "in-progress", "--priority", "no-priority", "--json"]] },
+  {
+    name: "task list filters on the server",
+    steps: [["task", "ls", "--status", "in-progress", "--priority", "no-priority", "--json"]],
+  },
   // What is printed does not rest on the server having applied the filters.
-  { name: "task list filters what the server did not", ignoreFilters: true, steps: [["task", "ls", "--status", "in-progress", "--json"], ["task", "ls", "--priority", "high", "--json"]] },
+  {
+    name: "task list filters what the server did not",
+    ignoreFilters: true,
+    steps: [
+      ["task", "ls", "--status", "in-progress", "--json"],
+      ["task", "ls", "--priority", "high", "--json"],
+    ],
+  },
   // The listing answers the tasks in no column beside the columns: both are
   // hidden unless asked for by name, and neither counts as work on the board.
   {
@@ -847,7 +1241,13 @@ export const SCENARIOS: Scenario[] = [
       { id: "task-a4", projectId: P1, title: "Next quarter", status: "planned" },
       { id: "task-a5", projectId: P1, title: "Last year's plan", status: "archived" },
     ],
-    steps: [["task", "ls", "--json"], ["task", "ls", "--all", "--human"], ["task", "ls", "--status", "planned", "--json"], ["task", "get", "5", "--json"], ["board", "--json"]],
+    steps: [
+      ["task", "ls", "--json"],
+      ["task", "ls", "--all", "--human"],
+      ["task", "ls", "--status", "planned", "--json"],
+      ["task", "get", "5", "--json"],
+      ["board", "--json"],
+    ],
   },
   {
     name: "task list of my tasks across projects",
@@ -856,7 +1256,10 @@ export const SCENARIOS: Scenario[] = [
       { id: "task-m2", projectId: "proj-beta", title: "Mine in beta", status: "in-progress", userId: "user-self" },
       { id: "task-m3", projectId: P1, title: "Mine but done", status: "done", userId: "user-self" },
     ],
-    steps: [["task", "ls", "--mine", "--json"], ["task", "ls", "--mine", "--human"]],
+    steps: [
+      ["task", "ls", "--mine", "--json"],
+      ["task", "ls", "--mine", "--human"],
+    ],
   },
   {
     name: "task list of my tasks says when the server cut it",
@@ -865,9 +1268,19 @@ export const SCENARIOS: Scenario[] = [
       { id: "task-m1", projectId: P1, title: "Mine in alpha", userId: "user-self" },
       { id: "task-m2", projectId: P1, title: "Mine too", userId: "user-self" },
     ],
-    steps: [["task", "ls", "--mine", "--human"], ["task", "ls", "--mine", "--json"]],
+    steps: [
+      ["task", "ls", "--mine", "--human"],
+      ["task", "ls", "--mine", "--json"],
+    ],
   },
-  { name: "task list of my tasks refuses a filter", steps: [["task", "ls", "--mine", "--status", "done"], ["task", "ls", "--mine", "--priority", "high"], ["task", "ls", "--mine", "--all"]] },
+  {
+    name: "task list of my tasks refuses a filter",
+    steps: [
+      ["task", "ls", "--mine", "--status", "done"],
+      ["task", "ls", "--mine", "--priority", "high"],
+      ["task", "ls", "--mine", "--all"],
+    ],
+  },
   {
     name: "task list says how many it left out",
     extraTasks: [
@@ -881,7 +1294,7 @@ export const SCENARIOS: Scenario[] = [
       ["task", "ls", "--jq", ".[].number"],
       ["task", "ls", "--status", "planned", "--json"],
       // A filter that fails at run time: the notice comes before jq's error.
-      ["task", "ls", "--jq", "error(\"boom\")"],
+      ["task", "ls", "--jq", 'error("boom")'],
     ],
   },
   // The count under --priority: the seed's done task has no priority and is
@@ -896,7 +1309,10 @@ export const SCENARIOS: Scenario[] = [
       { id: "task-a5", projectId: P1, title: "Last year's plan", status: "archived", priority: "high" },
       { id: "task-a6", projectId: P1, title: "Shelved", status: "archived", priority: "low" },
     ],
-    steps: [["task", "ls", "--priority", "high", "--human"], ["task", "ls", "--priority", "low", "--human"]],
+    steps: [
+      ["task", "ls", "--priority", "high", "--human"],
+      ["task", "ls", "--priority", "low", "--human"],
+    ],
   },
   // The server's filtering is not relied on for the count either: handed the
   // whole board, only the high-priority hidden tasks are counted.
@@ -912,7 +1328,10 @@ export const SCENARIOS: Scenario[] = [
   // Nothing hidden, nothing said.
   {
     name: "task list with nothing left out",
-    steps: [["task", "ls", "--status", "to-do", "--human"], ["task", "ls", "--priority", "high", "--json"]],
+    steps: [
+      ["task", "ls", "--status", "to-do", "--human"],
+      ["task", "ls", "--priority", "high", "--json"],
+    ],
   },
   ...both("task get by number", ["task", "get", "1"]),
   // A description above 64 KiB is left out of the listing, so resolving the task
@@ -945,21 +1364,70 @@ export const SCENARIOS: Scenario[] = [
   ...both("task get by id", ["task", "get", "task-a2"]),
   ...both("task get unknown", ["task", "get", "99"]),
   { name: "task get with no relations", steps: [["task", "get", "2", "--json"]] },
-  { name: "task create", steps: [["task", "create", "New one", "-d", "body", "--priority", "low", "--json"], ["task", "ls", "--human"]] },
-  { name: "task create assigned", seed: { members: MEMBERS }, steps: [["task", "create", "Mine", "--assignee", "user-1", "--status", "in-progress", "--human"], ["task", "get", "4", "--json"]] },
+  {
+    name: "task create",
+    steps: [
+      ["task", "create", "New one", "-d", "body", "--priority", "low", "--json"],
+      ["task", "ls", "--human"],
+    ],
+  },
+  {
+    name: "task create assigned",
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "create", "Mine", "--assignee", "user-1", "--status", "in-progress", "--human"],
+      ["task", "get", "4", "--json"],
+    ],
+  },
   { name: "task create bad priority", steps: [["task", "create", "x", "--priority", "huge", "--json"]] },
   // --title gives the title as task update takes it; given with words too, or
   // with neither, the create is refused before anything is asked.
-  { name: "task create with --title", steps: [["task", "create", "--title", "Flagged one", "--json"], ["task", "ls", "--human"]] },
-  { name: "task create with --title and words", steps: [["task", "create", "Words", "--title", "Flagged", "--json"], ["task", "ls", "--human"]] },
+  {
+    name: "task create with --title",
+    steps: [
+      ["task", "create", "--title", "Flagged one", "--json"],
+      ["task", "ls", "--human"],
+    ],
+  },
+  {
+    name: "task create with --title and words",
+    steps: [
+      ["task", "create", "Words", "--title", "Flagged", "--json"],
+      ["task", "ls", "--human"],
+    ],
+  },
   { name: "task create with no title", steps: [["task", "create", "--json"]] },
   // An empty --title is refused as task update refuses it, and an empty one
   // beside words still counts as giving the title twice.
-  { name: "task create with an empty --title", steps: [["task", "create", "--title", " ", "--json"], ["task", "create", "--title", "", "--json"], ["task", "create", "Words", "--title", "", "--json"], ["task", "ls", "--human"]] },
+  {
+    name: "task create with an empty --title",
+    steps: [
+      ["task", "create", "--title", " ", "--json"],
+      ["task", "create", "--title", "", "--json"],
+      ["task", "create", "Words", "--title", "", "--json"],
+      ["task", "ls", "--human"],
+    ],
+  },
   // Words that are blank make a blank title, refused as --title is. A title
   // refused is said before a missing key, as task update says it.
-  { name: "task create with blank words", steps: [["task", "create", " ", "--json"], ["task", "create", "", "--json"], ["task", "create", "a", "b", "--json"], ["task", "ls", "--human"]] },
-  { name: "task create with an empty --title and no key", env: { KANEO_API_KEY: "" }, steps: [["task", "create", "--title", "", "--json"], ["task", "create", " ", "--json"], ["task", "create", "Words", "--json"]] },
+  {
+    name: "task create with blank words",
+    steps: [
+      ["task", "create", " ", "--json"],
+      ["task", "create", "", "--json"],
+      ["task", "create", "a", "b", "--json"],
+      ["task", "ls", "--human"],
+    ],
+  },
+  {
+    name: "task create with an empty --title and no key",
+    env: { KANEO_API_KEY: "" },
+    steps: [
+      ["task", "create", "--title", "", "--json"],
+      ["task", "create", " ", "--json"],
+      ["task", "create", "Words", "--json"],
+    ],
+  },
   // Taken as task update takes it, and refused before the create when it is not
   // a date or comes after the due date.
   {
@@ -967,15 +1435,45 @@ export const SCENARIOS: Scenario[] = [
     steps: [
       ["task", "create", "Planned", "--start-date", "2026-01-01", "--due-date", "2026-01-01T12:00:00Z", "--json"],
       ["task", "get", "4", "--human"],
-      ["task", "create", "Late", "--start-date", "2026-01-01T13:00:00+00:00", "--due-date", "2026-01-01T12:00:00Z", "--json"],
+      [
+        "task",
+        "create",
+        "Late",
+        "--start-date",
+        "2026-01-01T13:00:00+00:00",
+        "--due-date",
+        "2026-01-01T12:00:00Z",
+        "--json",
+      ],
       ["task", "create", "Vague", "--start-date", "next week", "--json"],
       ["task", "create", "Someday", "--due-date", "someday", "--json"],
-      ["task", "create", "Same day", "--start-date", "2026-01-01T12:00:00Z", "--due-date", "2026-01-01T12:00:00Z", "--human"],
+      [
+        "task",
+        "create",
+        "Same day",
+        "--start-date",
+        "2026-01-01T12:00:00Z",
+        "--due-date",
+        "2026-01-01T12:00:00Z",
+        "--human",
+      ],
       ["task", "ls", "--human"],
     ],
   },
-  { name: "task update title and description", steps: [["task", "update", "1", "--title", "Renamed", "-d", "new body", "--json"], ["task", "get", "1", "--human"]] },
-  { name: "task update status and priority", steps: [["task", "edit", "2", "--status", "done", "--priority", "low", "--human"], ["task", "ls", "--all", "--json"]] },
+  {
+    name: "task update title and description",
+    steps: [
+      ["task", "update", "1", "--title", "Renamed", "-d", "new body", "--json"],
+      ["task", "get", "1", "--human"],
+    ],
+  },
+  {
+    name: "task update status and priority",
+    steps: [
+      ["task", "edit", "2", "--status", "done", "--priority", "low", "--human"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
   { name: "task update clears the description", steps: [["task", "update", "1", "-d", "", "--json"]] },
   { name: "task update with nothing to change", steps: [["task", "update", "1", "--json"]] },
   // --assignee takes what task assign takes, an empty one clears it, and a name
@@ -992,8 +1490,26 @@ export const SCENARIOS: Scenario[] = [
       ["task", "get", "2", "--json"],
     ],
   },
-  { name: "task update start date and position keep the rest", steps: [["task", "due", "2", "2026-11-01", "--json"], ["task", "update", "2", "--start-date", "2026-10-20", "--position", "5", "--json"], ["task", "get", "2", "--json"], ["task", "get", "2", "--human"], ["task", "update", "2", "--position", "6", "--human"], ["task", "update", "2", "--start-date", "", "--human"], ["task", "get", "2", "--json"]] },
-  { name: "task update start after the due date changes nothing", steps: [["task", "due", "1", "2026-11-01", "--json"], ["task", "update", "1", "--title", "Renamed", "--start-date", "2026-11-02", "--json"], ["task", "get", "1", "--json"]] },
+  {
+    name: "task update start date and position keep the rest",
+    steps: [
+      ["task", "due", "2", "2026-11-01", "--json"],
+      ["task", "update", "2", "--start-date", "2026-10-20", "--position", "5", "--json"],
+      ["task", "get", "2", "--json"],
+      ["task", "get", "2", "--human"],
+      ["task", "update", "2", "--position", "6", "--human"],
+      ["task", "update", "2", "--start-date", "", "--human"],
+      ["task", "get", "2", "--json"],
+    ],
+  },
+  {
+    name: "task update start after the due date changes nothing",
+    steps: [
+      ["task", "due", "1", "2026-11-01", "--json"],
+      ["task", "update", "1", "--title", "Renamed", "--start-date", "2026-11-02", "--json"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
   // Dates on 2026-01-01, which the recorder leaves as they are, so the instant
   // each one is sent as shows in the golden.
   {
@@ -1006,7 +1522,16 @@ export const SCENARIOS: Scenario[] = [
       ["task", "import", "-", "--json"],
     ],
   },
-  { name: "task update position with a stored start past the due date changes nothing", steps: [["task", "update", "1", "--start-date", "2026-11-05", "--json"], ["task", "due", "1", "2026-11-01", "--json"], ["task", "update", "1", "--title", "Renamed", "--position", "3", "--json"], ["task", "get", "1", "--json"], ["task", "update", "1", "--title", "Renamed", "--json"]] },
+  {
+    name: "task update position with a stored start past the due date changes nothing",
+    steps: [
+      ["task", "update", "1", "--start-date", "2026-11-05", "--json"],
+      ["task", "due", "1", "2026-11-01", "--json"],
+      ["task", "update", "1", "--title", "Renamed", "--position", "3", "--json"],
+      ["task", "get", "1", "--json"],
+      ["task", "update", "1", "--title", "Renamed", "--json"],
+    ],
+  },
   {
     name: "task dates need a calendar date or an offset",
     steps: [
@@ -1018,14 +1543,51 @@ export const SCENARIOS: Scenario[] = [
       ["task", "bulk", "1", "--due", "2026-10-22T09:00", "--json"],
     ],
   },
-  { name: "task update position with a title", steps: [["task", "update", "1", "--title", "Renamed", "--position", "3", "--human"], ["task", "get", "1", "--json"]] },
-  { name: "task update bad start date or position changes nothing", steps: [["task", "update", "1", "--title", "x", "--start-date", "soon", "--json"], ["task", "update", "1", "--title", "x", "--position", "-1", "--json"], ["task", "update", "1", "--position", "1.5", "--json"], ["task", "update", "1", "--position", "2147483647", "--json"], ["task", "get", "1", "--json"]] },
-  { name: "task update bad priority changes nothing", steps: [["task", "update", "1", "--title", "x", "--priority", "huge", "--json"], ["task", "get", "1", "--json"]] },
-  { name: "task update bad status changes nothing", steps: [["task", "update", "1", "--title", "x", "--status", "nope", "--json"], ["task", "get", "1", "--json"]] },
+  {
+    name: "task update position with a title",
+    steps: [
+      ["task", "update", "1", "--title", "Renamed", "--position", "3", "--human"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  {
+    name: "task update bad start date or position changes nothing",
+    steps: [
+      ["task", "update", "1", "--title", "x", "--start-date", "soon", "--json"],
+      ["task", "update", "1", "--title", "x", "--position", "-1", "--json"],
+      ["task", "update", "1", "--position", "1.5", "--json"],
+      ["task", "update", "1", "--position", "2147483647", "--json"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  {
+    name: "task update bad priority changes nothing",
+    steps: [
+      ["task", "update", "1", "--title", "x", "--priority", "huge", "--json"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  {
+    name: "task update bad status changes nothing",
+    steps: [
+      ["task", "update", "1", "--title", "x", "--status", "nope", "--json"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
   { name: "task update empty status", steps: [["task", "update", "1", "--status", "", "--json"]] },
   { name: "task update empty title", steps: [["task", "update", "1", "--title", " ", "--json"]] },
-  { name: "task update json matches task get", steps: [["task", "update", "1", "--priority", "low", "--json"], ["task", "get", "1", "--json"]] },
-  { name: "task update description from stdin", stdin: "line one\nline two\n", steps: [["task", "update", "1", "-d", "-", "--json"]] },
+  {
+    name: "task update json matches task get",
+    steps: [
+      ["task", "update", "1", "--priority", "low", "--json"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  {
+    name: "task update description from stdin",
+    stdin: "line one\nline two\n",
+    steps: [["task", "update", "1", "-d", "-", "--json"]],
+  },
   { name: "task update empty stdin", stdin: "", steps: [["task", "update", "1", "-d", "-", "--json"]] },
   { name: "task update blank stdin", stdin: " \n\t\n", steps: [["task", "update", "1", "-d", "-", "--json"]] },
   { name: "task update typed blank description", steps: [["task", "update", "1", "-d", "  ", "--json"]] },
@@ -1034,21 +1596,52 @@ export const SCENARIOS: Scenario[] = [
     files: { "body.md": "# Heading\n\n$HOME and `ticks`\n" },
     steps: [["task", "update", "1", "--description-file", "body.md", "--json"]],
   },
-  { name: "task update empty file", files: { "e.md": "" }, steps: [["task", "update", "1", "--description-file", "e.md", "--json"]] },
-  { name: "task update description twice", files: { "body.md": "x" }, steps: [["task", "update", "1", "-d", "a", "--description-file", "body.md", "--json"]] },
+  {
+    name: "task update empty file",
+    files: { "e.md": "" },
+    steps: [["task", "update", "1", "--description-file", "e.md", "--json"]],
+  },
+  {
+    name: "task update description twice",
+    files: { "body.md": "x" },
+    steps: [["task", "update", "1", "-d", "a", "--description-file", "body.md", "--json"]],
+  },
   { name: "task update missing file", steps: [["task", "update", "1", "--description-file", "nope.md", "--json"]] },
   { name: "task update to archived", steps: [["task", "update", "1", "--status", "archived", "--json"]] },
-  { name: "task update reports what landed", failOn: "^PUT /task/title/", steps: [["task", "update", "1", "--status", "done", "--title", "x", "--json"]] },
-  { name: "task update read-back mismatch", misstoreOn: "^PUT /task/title/", steps: [["task", "update", "1", "--title", "x", "--json"]] },
-  { name: "task update description read-back mismatch", misstoreOn: "^PUT /task/description/", steps: [["task", "update", "1", "-d", "abc", "--json"]] },
-  { name: "task update read-back fails", failOn: "^GET /task/task-a1$", steps: [["task", "update", "1", "--priority", "low", "--json"]] },
-  { name: "task create description from stdin", stdin: "from stdin\n", steps: [["task", "create", "Piped", "-d", "-", "--json"]] },
+  {
+    name: "task update reports what landed",
+    failOn: "^PUT /task/title/",
+    steps: [["task", "update", "1", "--status", "done", "--title", "x", "--json"]],
+  },
+  {
+    name: "task update read-back mismatch",
+    misstoreOn: "^PUT /task/title/",
+    steps: [["task", "update", "1", "--title", "x", "--json"]],
+  },
+  {
+    name: "task update description read-back mismatch",
+    misstoreOn: "^PUT /task/description/",
+    steps: [["task", "update", "1", "-d", "abc", "--json"]],
+  },
+  {
+    name: "task update read-back fails",
+    failOn: "^GET /task/task-a1$",
+    steps: [["task", "update", "1", "--priority", "low", "--json"]],
+  },
+  {
+    name: "task create description from stdin",
+    stdin: "from stdin\n",
+    steps: [["task", "create", "Piped", "-d", "-", "--json"]],
+  },
   // The marker, the attachment and the hook are `session attach`'s, reached in the
   // same command: the new number never has to be carried by hand to the next one.
   {
     name: "task create --attach",
     env: { KANEO_SESSION_ID: "sess-create" },
-    steps: [["task", "create", "Brand new", "--attach", "--next", "start", "--json"], ["board", "--json"]],
+    steps: [
+      ["task", "create", "Brand new", "--attach", "--next", "start", "--json"],
+      ["board", "--json"],
+    ],
   },
   // The hook is part of the attach, whichever command was reached for it: a
   // create that attached without running one leaves a statusline holding a task
@@ -1058,50 +1651,81 @@ export const SCENARIOS: Scenario[] = [
     env: { KANEO_SESSION_ID: "sess-create" },
     config: {
       hooks: {
-        attach: 'printf "%s %s %s %s\\n" "$KANEO_HOOK_EVENT" "$KANEO_TASK_ID" "$KANEO_TASK_NUMBER" "$KANEO_TASK_REF" >> "$HOME/.config/kaneo/hook.out"',
+        attach:
+          'printf "%s %s %s %s\\n" "$KANEO_HOOK_EVENT" "$KANEO_TASK_ID" "$KANEO_TASK_NUMBER" "$KANEO_TASK_REF" >> "$HOME/.config/kaneo/hook.out"',
       },
     },
     steps: [["task", "create", "Brand new", "--attach", "--next", "start", "--json"]],
   },
   // Checked before the create rather than after it, so nothing is left behind.
-  { name: "task create --attach without a session", steps: [["task", "create", "x", "--attach", "--json"], ["task", "ls", "--all", "--json"]] },
+  {
+    name: "task create --attach without a session",
+    steps: [
+      ["task", "create", "x", "--attach", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
   { name: "task create --next without --attach", steps: [["task", "create", "x", "--next", "y", "--json"]] },
   // The flag having been passed decides it, not what it holds.
-  { name: "task create --next empty without --attach", steps: [["task", "create", "x", "--next", "", "--json"], ["task", "ls", "--all", "--json"]] },
+  {
+    name: "task create --next empty without --attach",
+    steps: [
+      ["task", "create", "x", "--next", "", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
   // The attach fails once the task exists, so the message has to name what is
   // already on the board to close.
   {
     name: "task create --attach when the attach fails",
     env: { KANEO_SESSION_ID: "sess-create" },
     failOn: "^POST /comment/",
-    steps: [["task", "create", "Brand new", "--attach", "--json"], ["task", "ls", "--all", "--json"]],
+    steps: [
+      ["task", "create", "Brand new", "--attach", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
   },
   // Alike wording warns where a shared reference refuses: measured over real
   // boards alike wording flagged distinct work seven times out of ten, while
   // every pair that shared a reference was the same issue.
   {
     name: "task create warns about a similar title",
-    steps: [["task", "create", "Write the parser again", "--json"], ["task", "ls", "--all", "--json"]],
+    steps: [
+      ["task", "create", "Write the parser again", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
   },
   {
     name: "task create with a shared reference",
-    steps: [["task", "create", "Fix owner/repo#7 crash", "--force", "--json"], ["task", "create", "Follow up on owner/repo#7", "--json"]],
+    steps: [
+      ["task", "create", "Fix owner/repo#7 crash", "--force", "--json"],
+      ["task", "create", "Follow up on owner/repo#7", "--json"],
+    ],
   },
   // A spaced reference counts only right after an opening parenthesis: outside one
   // `name #N` is as often a word and a number ("PR #314"), so it is created.
   {
     name: "task create with a spaced reference outside parentheses",
-    steps: [["task", "create", "Fix ccx#7 crash", "--force", "--json"], ["task", "create", "Follow up ccx #7", "--human"]],
+    steps: [
+      ["task", "create", "Fix ccx#7 crash", "--force", "--json"],
+      ["task", "create", "Follow up ccx #7", "--human"],
+    ],
   },
   {
     name: "task create with a spaced reference in parentheses",
-    steps: [["task", "create", "Fix ccx#7 crash", "--force", "--json"], ["task", "create", "Follow up (ccx #7)", "--human"]],
+    steps: [
+      ["task", "create", "Fix ccx#7 crash", "--force", "--json"],
+      ["task", "create", "Follow up (ccx #7)", "--human"],
+    ],
   },
   // Every reference inside one pair of parentheses counts, so the second one
   // is not dropped, and the refusal names it as the title wrote it.
   {
     name: "task create with two references in one pair of parentheses",
-    steps: [["task", "create", "Fix ccx#7 crash", "--force", "--json"], ["task", "create", "Follow up (ccx #7 and alp #3)", "--human"]],
+    steps: [
+      ["task", "create", "Fix ccx#7 crash", "--force", "--json"],
+      ["task", "create", "Follow up (ccx #7 and alp #3)", "--human"],
+    ],
   },
   // Finished work is the project's own final columns, not a fixed list of
   // status names: `released` marked final closes the task naming ccx#9, while
@@ -1129,29 +1753,104 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "task create --attach with a session id the store refuses",
     env: { KANEO_SESSION_ID: "a/b" },
-    steps: [["task", "create", "x", "--attach", "--json"], ["task", "ls", "--all", "--json"]],
+    steps: [
+      ["task", "create", "x", "--attach", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
   },
-  { name: "task status", steps: [["task", "status", "1", "done", "--json"], ["task", "get", "1", "--human"]] },
-  { name: "task priority", steps: [["task", "priority", "1", "urgent", "--human"], ["task", "get", "1", "--json"]] },
-  { name: "task assign and clear", seed: { members: MEMBERS }, steps: [["task", "assign", "1", "user-1", "--json"], ["task", "assign", "1", "--human"], ["task", "get", "1", "--json"]] },
-  { name: "task assign by name and me", seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--human"], ["task", "assign", "1", "me", "--human"], ["task", "get", "1", "--json"]] },
+  {
+    name: "task status",
+    steps: [
+      ["task", "status", "1", "done", "--json"],
+      ["task", "get", "1", "--human"],
+    ],
+  },
+  {
+    name: "task priority",
+    steps: [
+      ["task", "priority", "1", "urgent", "--human"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  {
+    name: "task assign and clear",
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "assign", "1", "user-1", "--json"],
+      ["task", "assign", "1", "--human"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  {
+    name: "task assign by name and me",
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "assign", "1", "ada", "--human"],
+      ["task", "assign", "1", "me", "--human"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
   {
     name: "task assign refuses an unknown or shared name",
     seed: { members: [...MEMBERS!, { id: "user-2", name: "Ada", email: "ada2@example.com", role: "member" }] },
-    steps: [["task", "assign", "1", "Nobody", "--json"], ["task", "assign", "1", "ada", "--json"], ["task", "get", "1", "--json"]],
+    steps: [
+      ["task", "assign", "1", "Nobody", "--json"],
+      ["task", "assign", "1", "ada", "--json"],
+      ["task", "get", "1", "--json"],
+    ],
   },
-  { name: "task assign by id needs no configured workspace", env: { KANEO_WORKSPACE: "" }, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "user-1", "--human"], ["task", "get", "1", "--json"]] },
-  { name: "task assign stops when the project read has no workspace", readWithout: ["workspaceId"], seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--json"]] },
-  { name: "task assign names the project read that failed", failOn: "^GET /project/proj-alpha$", failStatus: 403, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--json"]] },
+  {
+    name: "task assign by id needs no configured workspace",
+    env: { KANEO_WORKSPACE: "" },
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "assign", "1", "user-1", "--human"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  {
+    name: "task assign stops when the project read has no workspace",
+    readWithout: ["workspaceId"],
+    seed: { members: MEMBERS },
+    steps: [["task", "assign", "1", "ada", "--json"]],
+  },
+  {
+    name: "task assign names the project read that failed",
+    failOn: "^GET /project/proj-alpha$",
+    failStatus: 403,
+    seed: { members: MEMBERS },
+    steps: [["task", "assign", "1", "ada", "--json"]],
+  },
   // A 401 a command wraps in its own words still says it may be the rate limit.
-  { name: "a wrapped 401 keeps the rate limit hint", failOn: "^GET /project/proj-alpha$", failStatus: 401, seed: { members: MEMBERS }, steps: [["task", "assign", "1", "ada", "--human"]] },
-  { name: "task assign me on a server without user me", noCurrentUser: true, steps: [["task", "assign", "1", "me", "--json"]] },
+  {
+    name: "a wrapped 401 keeps the rate limit hint",
+    failOn: "^GET /project/proj-alpha$",
+    failStatus: 401,
+    seed: { members: MEMBERS },
+    steps: [["task", "assign", "1", "ada", "--human"]],
+  },
+  {
+    name: "task assign me on a server without user me",
+    noCurrentUser: true,
+    steps: [["task", "assign", "1", "me", "--json"]],
+  },
   // A 404 that says the user is not found is the server answering about the
   // key's user, not a server without the route, so it is not called an old
   // server, and the refusal says what to give instead.
-  { name: "task assign me says what to give when the server has no user for the key", failOn: "^GET /user/me$", failStatus: 404, failMessage: "User not found", steps: [["task", "assign", "1", "me", "--json"]] },
+  {
+    name: "task assign me says what to give when the server has no user for the key",
+    failOn: "^GET /user/me$",
+    failStatus: 404,
+    failMessage: "User not found",
+    steps: [["task", "assign", "1", "me", "--json"]],
+  },
   // Any other failure of /user/me is the server's own answer, passed on as it is.
-  { name: "task assign me passes on another failure of the user read", failOn: "^GET /user/me$", failStatus: 500, steps: [["task", "assign", "1", "me", "--json"]] },
+  {
+    name: "task assign me passes on another failure of the user read",
+    failOn: "^GET /user/me$",
+    failStatus: 500,
+    steps: [["task", "assign", "1", "me", "--json"]],
+  },
   // The server's answer for a project it cannot place, beside the 403 above.
   {
     name: "task assign names the project read the server could not place",
@@ -1165,25 +1864,63 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "task assign uses the workspace of the task",
     env: { KANEO_WORKSPACE: "ws-other" },
-    seed: { members: [{ id: "user-1", name: "Ada", email: "ada@example.com", role: "member", workspaceId: WS }, { id: "user-9", name: "Zed", email: "zed@example.com", role: "member", workspaceId: "ws-other" }] },
-    steps: [["task", "assign", "1", "ada", "--human"], ["task", "assign", "1", "Zed", "--json"], ["task", "get", "1", "--json"]],
+    seed: {
+      members: [
+        { id: "user-1", name: "Ada", email: "ada@example.com", role: "member", workspaceId: WS },
+        { id: "user-9", name: "Zed", email: "zed@example.com", role: "member", workspaceId: "ws-other" },
+      ],
+    },
+    steps: [
+      ["task", "assign", "1", "ada", "--human"],
+      ["task", "assign", "1", "Zed", "--json"],
+      ["task", "get", "1", "--json"],
+    ],
   },
-  { name: "task assign trims the name", seed: { members: MEMBERS }, steps: [["task", "assign", "1", " ada ", "--human"], ["task", "get", "1", "--json"]] },
-  { name: "task assign refuses an empty user", seed: { members: MEMBERS }, steps: [["task", "assign", "1", "", "--json"], ["task", "get", "1", "--json"]] },
+  {
+    name: "task assign trims the name",
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "assign", "1", " ada ", "--human"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  {
+    name: "task assign refuses an empty user",
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "assign", "1", "", "--json"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
   // Task 2 already has an assignee, which a refused name must leave alone.
   {
     name: "task assign keeps the assignee when the name is refused",
     seed: { members: [...MEMBERS!, { id: "user-2", name: "Ada", email: "ada2@example.com", role: "member" }] },
-    steps: [["task", "assign", "2", "Nobody", "--json"], ["task", "assign", "2", "ada", "--json"], ["task", "get", "2", "--json"]],
+    steps: [
+      ["task", "assign", "2", "Nobody", "--json"],
+      ["task", "assign", "2", "ada", "--json"],
+      ["task", "get", "2", "--json"],
+    ],
   },
-  { name: "task assign me stops without a user id", blankCurrentUserId: true, steps: [["task", "assign", "2", "me", "--json"], ["task", "get", "2", "--json"]] },
+  {
+    name: "task assign me stops without a user id",
+    blankCurrentUserId: true,
+    steps: [
+      ["task", "assign", "2", "me", "--json"],
+      ["task", "get", "2", "--json"],
+    ],
+  },
   // Every write reads the task back and prints that, so a value the server did not
   // take cannot print as one it did. The assignment is read as a person reads it:
   // the name the server resolved the id to, rather than the id behind it.
   {
     name: "writes read back",
     seed: { members: MEMBERS },
-    steps: [["task", "status", "1", "in-progress", "--json"], ["task", "priority", "1", "low", "--human"], ["task", "assign", "1", "user-1", "--human"]],
+    steps: [
+      ["task", "status", "1", "in-progress", "--json"],
+      ["task", "priority", "1", "low", "--human"],
+      ["task", "assign", "1", "user-1", "--human"],
+    ],
   },
   // The labels of the task the write resolved come along with the read-back, since
   // only the board listing carries them: a report that dropped or replaced them
@@ -1200,11 +1937,26 @@ export const SCENARIOS: Scenario[] = [
     name: "a write the server did not keep",
     writesNotKept: true,
     seed: { members: MEMBERS },
-    steps: [["task", "status", "1", "done", "--json"], ["task", "priority", "1", "low", "--human"], ["task", "assign", "1", "user-1", "--json"], ["task", "move", "1", "--to", P2, "--human"]],
+    steps: [
+      ["task", "status", "1", "done", "--json"],
+      ["task", "priority", "1", "low", "--human"],
+      ["task", "assign", "1", "user-1", "--json"],
+      ["task", "move", "1", "--to", P2, "--human"],
+    ],
   },
   // The read that confirms a write is the one that can fail after it landed.
-  { name: "a read-back that fails after the write", failOn: "^GET /task/task-a1$", steps: [["task", "status", "1", "done", "--json"]] },
-  { name: "task move", steps: [["task", "move", "1", "--to", P2, "--json"], ["task", "ls", "-p", P2, "--human"]] },
+  {
+    name: "a read-back that fails after the write",
+    failOn: "^GET /task/task-a1$",
+    steps: [["task", "status", "1", "done", "--json"]],
+  },
+  {
+    name: "task move",
+    steps: [
+      ["task", "move", "1", "--to", P2, "--json"],
+      ["task", "ls", "-p", P2, "--human"],
+    ],
+  },
   // The destination as it was typed, so the line shows what was asked for rather
   // than the id behind it.
   { name: "task move human", steps: [["task", "move", "1", "--to", "BET", "--human"]] },
@@ -1214,7 +1966,10 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "task move to a project in another workspace",
     seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
-    steps: [["task", "move", "1", "--to", "GAM", "--human"], ["task", "move", "1", "--to", "proj-gamma", "--human"]],
+    steps: [
+      ["task", "move", "1", "--to", "GAM", "--human"],
+      ["task", "move", "1", "--to", "proj-gamma", "--human"],
+    ],
   },
   // A slug in both workspaces is the one in the task's own, not several.
   {
@@ -1222,16 +1977,29 @@ export const SCENARIOS: Scenario[] = [
     seed: { projects: [...SEED.projects, { id: "proj-bet2", workspaceId: "ws-other", name: "Bet Two", slug: "BET" }] },
     steps: [["task", "move", "1", "--to", "BET", "--human"]],
   },
-  { name: "task move to the project it is in", steps: [["task", "move", "1", "--to", "ALP", "--human"], ["task", "move", "1", "--to", P1, "--human"]] },
+  {
+    name: "task move to the project it is in",
+    steps: [
+      ["task", "move", "1", "--to", "ALP", "--human"],
+      ["task", "move", "1", "--to", P1, "--human"],
+    ],
+  },
   // The task lives in the second workspace: the destination is looked up there,
   // and a slug only the first workspace carries is said to be elsewhere.
   {
     name: "task move from the second workspace",
     seed: {
-      projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }, { id: "proj-delta", workspaceId: "ws-other", name: "Delta", slug: "DEL" }],
+      projects: [
+        ...SEED.projects,
+        { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" },
+        { id: "proj-delta", workspaceId: "ws-other", name: "Delta", slug: "DEL" },
+      ],
       tasks: [...SEED.tasks, { id: "task-g1", projectId: "proj-gamma", title: "Gamma first" }],
     },
-    steps: [["task", "move", "task-g1", "--to", "ALP", "--human"], ["task", "move", "task-g1", "--to", "DEL", "--human"]],
+    steps: [
+      ["task", "move", "task-g1", "--to", "ALP", "--human"],
+      ["task", "move", "task-g1", "--to", "DEL", "--human"],
+    ],
   },
   // A name two workspaces carry is the one in the task's own workspace.
   {
@@ -1257,7 +2025,11 @@ export const SCENARIOS: Scenario[] = [
   },
   // The lookup is what fails, so the report carries both the server's answer and
   // the lookup's.
-  { name: "task move when the lookup fails", failOn: "^GET /auth/organization/list$", steps: [["task", "move", "1", "--to", "BET", "--human"]] },
+  {
+    name: "task move when the lookup fails",
+    failOn: "^GET /auth/organization/list$",
+    steps: [["task", "move", "1", "--to", "BET", "--human"]],
+  },
   // A 404 that does not say the project is missing is not a reason to look one up.
   {
     name: "task move refused with another 404",
@@ -1266,23 +2038,123 @@ export const SCENARIOS: Scenario[] = [
     failMessage: "Workspace not found",
     steps: [["task", "move", "1", "--to", "BET", "--human"]],
   },
-  { name: "task due set and clear", steps: [["task", "due", "1", "2026-10-31", "--json"], ["task", "get", "1", "--json"], ["task", "due", "1", "--human"], ["task", "get", "1", "--json"]] },
-  { name: "task due refuses a bad date", steps: [["task", "due", "1", "someday", "--json"], ["task", "due", "1", "", "--json"], ["task", "due", "1", " 2026-10-31 ", "--human"], ["task", "get", "1", "--human"]] },
-  { name: "task bulk status", steps: [["task", "bulk", "1", "2", "ALP#1", "--status", "done", "--human"], ["task", "ls", "--all", "--json"]] },
-  { name: "task bulk assign, due and clear", seed: { members: MEMBERS }, steps: [["task", "bulk", "1", "2", "--assign", "user-1", "--json"], ["task", "bulk", "1", "--due", "2026-12-01", "--json"], ["task", "bulk", "1", "2", "--unassign", "--human"], ["task", "bulk", "1", "--clear-due", "--json"], ["task", "ls", "--json"]] },
-  { name: "task bulk takes exactly one change", steps: [["task", "bulk", "1", "--json"], ["task", "bulk", "1", "--status", "done", "--priority", "low", "--json"], ["task", "bulk", "1", "--priority", "soon", "--json"]] },
-  { name: "task bulk delete needs --yes", steps: [["task", "bulk", "1", "2", "--delete", "--human"], ["task", "bulk", "1", "2", "--delete", "--yes", "--json"], ["task", "ls", "--all", "--json"]] },
-  { name: "task bulk unknown task changes nothing", steps: [["task", "bulk", "1", "99", "--status", "done", "--json"]] },
+  {
+    name: "task due set and clear",
+    steps: [
+      ["task", "due", "1", "2026-10-31", "--json"],
+      ["task", "get", "1", "--json"],
+      ["task", "due", "1", "--human"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  {
+    name: "task due refuses a bad date",
+    steps: [
+      ["task", "due", "1", "someday", "--json"],
+      ["task", "due", "1", "", "--json"],
+      ["task", "due", "1", " 2026-10-31 ", "--human"],
+      ["task", "get", "1", "--human"],
+    ],
+  },
+  {
+    name: "task bulk status",
+    steps: [
+      ["task", "bulk", "1", "2", "ALP#1", "--status", "done", "--human"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  {
+    name: "task bulk assign, due and clear",
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "bulk", "1", "2", "--assign", "user-1", "--json"],
+      ["task", "bulk", "1", "--due", "2026-12-01", "--json"],
+      ["task", "bulk", "1", "2", "--unassign", "--human"],
+      ["task", "bulk", "1", "--clear-due", "--json"],
+      ["task", "ls", "--json"],
+    ],
+  },
+  {
+    name: "task bulk takes exactly one change",
+    steps: [
+      ["task", "bulk", "1", "--json"],
+      ["task", "bulk", "1", "--status", "done", "--priority", "low", "--json"],
+      ["task", "bulk", "1", "--priority", "soon", "--json"],
+    ],
+  },
+  {
+    name: "task bulk delete needs --yes",
+    steps: [
+      ["task", "bulk", "1", "2", "--delete", "--human"],
+      ["task", "bulk", "1", "2", "--delete", "--yes", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  {
+    name: "task bulk unknown task changes nothing",
+    steps: [["task", "bulk", "1", "99", "--status", "done", "--json"]],
+  },
   { name: "task bulk unknown label", steps: [["task", "bulk", "1", "--add-label", "lbl-x", "--json"]] },
-  { name: "task bulk status across projects", steps: [["column", "create", "Waiting", "--json"], ["task", "bulk", "1", "BET#1", "--status", "waiting", "--json"], ["task", "bulk", "1", "BET#1", "--status", "done", "--human"], ["task", "ls", "--all", "-p", P2, "--json"]] },
-  { name: "task bulk planned across projects", steps: [["task", "bulk", "1", "BET#1", "--status", "planned", "--human"]] },
-  { name: "task bulk --yes is only for --delete", steps: [["task", "bulk", "1", "--status", "done", "--yes", "--json"]] },
-  { name: "task bulk empty value", steps: [["task", "bulk", "1", "--status", "", "--json"], ["task", "bulk", "1", "--assign", " ", "--json"]] },
-  { name: "task create assigns by name and me", seed: { members: MEMBERS }, steps: [["task", "create", "ByName", "--assignee", "ada", "--human"], ["task", "create", "ByMe", "--assignee", "me", "--human"], ["task", "ls", "--all", "--json"]] },
-  { name: "task create with an unknown or empty assignee creates nothing", seed: { members: MEMBERS }, steps: [["task", "create", "Nobody's", "--assignee", "Nobody", "--json"], ["task", "create", "Blank", "--assignee", "  ", "--json"], ["task", "ls", "--all", "--json"]] },
-  { name: "task bulk assigns by name and me", seed: { members: MEMBERS }, steps: [["task", "bulk", "1", "2", "--assign", "ada", "--json"], ["task", "bulk", "1", "--assign", "me", "--human"], ["task", "ls", "--all", "--json"]] },
-  { name: "task bulk assigns only members", seed: { members: MEMBERS }, steps: [["task", "bulk", "1", "--assign", "user-nobody", "--json"]] },
-  { name: "task bulk names a board three ways", steps: [["task", "bulk", "1", "ALP#2", "proj-alpha#3", "--priority", "low", "--json"]] },
+  {
+    name: "task bulk status across projects",
+    steps: [
+      ["column", "create", "Waiting", "--json"],
+      ["task", "bulk", "1", "BET#1", "--status", "waiting", "--json"],
+      ["task", "bulk", "1", "BET#1", "--status", "done", "--human"],
+      ["task", "ls", "--all", "-p", P2, "--json"],
+    ],
+  },
+  {
+    name: "task bulk planned across projects",
+    steps: [["task", "bulk", "1", "BET#1", "--status", "planned", "--human"]],
+  },
+  {
+    name: "task bulk --yes is only for --delete",
+    steps: [["task", "bulk", "1", "--status", "done", "--yes", "--json"]],
+  },
+  {
+    name: "task bulk empty value",
+    steps: [
+      ["task", "bulk", "1", "--status", "", "--json"],
+      ["task", "bulk", "1", "--assign", " ", "--json"],
+    ],
+  },
+  {
+    name: "task create assigns by name and me",
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "create", "ByName", "--assignee", "ada", "--human"],
+      ["task", "create", "ByMe", "--assignee", "me", "--human"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  {
+    name: "task create with an unknown or empty assignee creates nothing",
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "create", "Nobody's", "--assignee", "Nobody", "--json"],
+      ["task", "create", "Blank", "--assignee", "  ", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  {
+    name: "task bulk assigns by name and me",
+    seed: { members: MEMBERS },
+    steps: [
+      ["task", "bulk", "1", "2", "--assign", "ada", "--json"],
+      ["task", "bulk", "1", "--assign", "me", "--human"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  {
+    name: "task bulk assigns only members",
+    seed: { members: MEMBERS },
+    steps: [["task", "bulk", "1", "--assign", "user-nobody", "--json"]],
+  },
+  {
+    name: "task bulk names a board three ways",
+    steps: [["task", "bulk", "1", "ALP#2", "proj-alpha#3", "--priority", "low", "--json"]],
+  },
   {
     // The human report names each board by its slug, the way the reference was
     // written, and a lone task reference is not a relation id.
@@ -1294,8 +2166,21 @@ export const SCENARIOS: Scenario[] = [
       ["task", "unlink", "BET-1", "--json"],
     ],
   },
-  { name: "task get by a reference with a dash", steps: [["task", "get", "BET-1", "--json"], ["task", "get", "bet-1", "--json"], ["task", "get", "ALP-2", "--human"]] },
-  { name: "task get by a reference with a dash that is not on the board", steps: [["task", "get", "NOPE-1", "--json"], ["task", "get", "ALP-99", "--json"]] },
+  {
+    name: "task get by a reference with a dash",
+    steps: [
+      ["task", "get", "BET-1", "--json"],
+      ["task", "get", "bet-1", "--json"],
+      ["task", "get", "ALP-2", "--human"],
+    ],
+  },
+  {
+    name: "task get by a reference with a dash that is not on the board",
+    steps: [
+      ["task", "get", "NOPE-1", "--json"],
+      ["task", "get", "ALP-99", "--json"],
+    ],
+  },
   {
     // The last dash splits the reference, so a slug that holds dashes is a slug.
     name: "task get by a reference whose slug holds a dash",
@@ -1303,7 +2188,10 @@ export const SCENARIOS: Scenario[] = [
       projects: [...SEED.projects, { id: "proj-kcli", workspaceId: WS, name: "Kaneo CLI", slug: "kaneo-cli" }],
       tasks: [...SEED.tasks, { id: "task-k1", projectId: "proj-kcli", title: "Dashed" }],
     },
-    steps: [["task", "get", "kaneo-cli-1", "--json"], ["task", "get", "KANEO-CLI-1", "--human"]],
+    steps: [
+      ["task", "get", "kaneo-cli-1", "--json"],
+      ["task", "get", "KANEO-CLI-1", "--human"],
+    ],
   },
   {
     // An active project answers before an archived namesake; two active ones
@@ -1323,7 +2211,10 @@ export const SCENARIOS: Scenario[] = [
         { id: "task-dup2", projectId: "proj-dup2", title: "Second dup" },
       ],
     },
-    steps: [["task", "get", "ALP-1", "--json"], ["task", "get", "DUP-1", "--json"]],
+    steps: [
+      ["task", "get", "ALP-1", "--json"],
+      ["task", "get", "DUP-1", "--json"],
+    ],
   },
   // `-1` reads as the number -1, `BET--1` as the ticket id whose slug ends in a
   // dash, `BET-x` as an id, and `a?b-1` as a ticket id whose reserved character
@@ -1341,24 +2232,54 @@ export const SCENARIOS: Scenario[] = [
   { name: "task bulk delete counts each task once", steps: [["task", "bulk", "1", "ALP#1", "--delete", "--json"]] },
   ...both("task export", ["task", "export"]),
   { name: "task export piped", steps: [["task", "export"]] },
-  { name: "task export keeps control characters", seed: { tasks: [{ id: "task-c1", projectId: P1, title: "odd\u0085title\u007f" }] }, steps: [["task", "export", "--human"], ["task", "export", "--json"]] },
+  {
+    name: "task export keeps control characters",
+    seed: { tasks: [{ id: "task-c1", projectId: P1, title: "odd\u0085title\u007f" }] },
+    steps: [
+      ["task", "export", "--human"],
+      ["task", "export", "--json"],
+    ],
+  },
   {
     name: "task import reports each task",
     files: {
       "tasks.json": JSON.stringify({
         project: { name: "Beta", slug: "BET", description: null, exportedAt: "2026-01-01T00:00:00.000Z" },
         tasks: [
-          { title: "Imported", description: "from a file", status: "in-progress", priority: "high", dueDate: "2026-11-01T00:00:00.000Z", startDate: null, userId: null, labels: [{ name: "bug", color: "#f00" }] },
+          {
+            title: "Imported",
+            description: "from a file",
+            status: "in-progress",
+            priority: "high",
+            dueDate: "2026-11-01T00:00:00.000Z",
+            startDate: null,
+            userId: null,
+            labels: [{ name: "bug", color: "#f00" }],
+          },
           { title: "Planned on purpose", status: "planned" },
           { title: "Stranger", status: "to-do", userId: "user-nobody" },
         ],
       }),
     },
-    steps: [["task", "import", "tasks.json", "--human"], ["task", "import", "tasks.json", "--json"], ["task", "ls", "--json"]],
+    steps: [
+      ["task", "import", "tasks.json", "--human"],
+      ["task", "import", "tasks.json", "--json"],
+      ["task", "ls", "--json"],
+    ],
   },
   {
     name: "task import refuses what the server would replace",
-    files: { "status.json": '[{"title":"ok","status":"to-do"},{"title":"Odd","status":"waiting"}]', "priority.json": '[{"title":"Odd","status":"to-do","priority":"soon"}]', "typed.json": '[{"title":"x","status":"to-do","priority":3}]', "null-title.json": '[{"title":null,"status":"to-do"}]', "typed-status.json": '[{"title":"x","status":3}]', "typed-description.json": '[{"title":"x","status":"to-do","description":3}]', "typed-start.json": '[{"title":"x","status":"to-do","startDate":3}]', "typed-due.json": '[{"title":"x","status":"to-do","dueDate":3}]', "typed-user.json": '[{"title":"x","status":"to-do","userId":3}]' },
+    files: {
+      "status.json": '[{"title":"ok","status":"to-do"},{"title":"Odd","status":"waiting"}]',
+      "priority.json": '[{"title":"Odd","status":"to-do","priority":"soon"}]',
+      "typed.json": '[{"title":"x","status":"to-do","priority":3}]',
+      "null-title.json": '[{"title":null,"status":"to-do"}]',
+      "typed-status.json": '[{"title":"x","status":3}]',
+      "typed-description.json": '[{"title":"x","status":"to-do","description":3}]',
+      "typed-start.json": '[{"title":"x","status":"to-do","startDate":3}]',
+      "typed-due.json": '[{"title":"x","status":"to-do","dueDate":3}]',
+      "typed-user.json": '[{"title":"x","status":"to-do","userId":3}]',
+    },
     steps: [
       ["task", "import", "status.json", "--json"],
       ["task", "import", "priority.json", "--json"],
@@ -1372,9 +2293,25 @@ export const SCENARIOS: Scenario[] = [
       ["task", "ls", "--json"],
     ],
   },
-  { name: "task import takes empty and null dates", stdin: '[{"title":"No dates","status":"to-do","dueDate":"","startDate":null,"userId":null}]', steps: [["task", "import", "-", "--json"]] },
-  { name: "task import from stdin", stdin: '[{"title":"From stdin","status":"to-do"}]', steps: [["task", "import", "-", "--human"], ["task", "ls", "--json"]] },
-  { name: "task import needs a key before reading", env: { KANEO_API_KEY: "" }, stdin: "[]", steps: [["task", "import", "-", "--json"]] },
+  {
+    name: "task import takes empty and null dates",
+    stdin: '[{"title":"No dates","status":"to-do","dueDate":"","startDate":null,"userId":null}]',
+    steps: [["task", "import", "-", "--json"]],
+  },
+  {
+    name: "task import from stdin",
+    stdin: '[{"title":"From stdin","status":"to-do"}]',
+    steps: [
+      ["task", "import", "-", "--human"],
+      ["task", "ls", "--json"],
+    ],
+  },
+  {
+    name: "task import needs a key before reading",
+    env: { KANEO_API_KEY: "" },
+    stdin: "[]",
+    steps: [["task", "import", "-", "--json"]],
+  },
   {
     name: "task import refuses a bad file",
     files: {
@@ -1402,24 +2339,140 @@ export const SCENARIOS: Scenario[] = [
       ["task", "import", "object.json", "--json"],
     ],
   },
-  { name: "task rm needs --yes", steps: [["task", "rm", "1", "--human"], ["task", "rm", "1", "--yes", "--json"], ["task", "ls", "--all", "--json"]] },
-  { name: "task link and links", steps: [["task", "link", "1", "2", "--type", "subtask", "--json"], ["task", "links", "2", "--human"], ["task", "link", "1", "3", "--type", "blocks", "--human"], ["task", "links", "1", "--json"], ["task", "links", "1", "--human"], ["task", "get", "1", "--human"], ["task", "get", "1", "--json"], ["task", "links", "3", "--human"], ["task", "link", "2", "3", "--type", "subtask", "--human"]] },
-  { name: "task links name a task on another board", steps: [["task", "link", "1", "BET#1", "--type", "blocks", "--json"], ["task", "link", "2", "1", "--type", "related", "--json"], ["task", "links", "1", "--human"], ["task", "get", "1", "--human"], ["task", "links", "BET#1", "--human"], ["task", "links", "BET#1", "--json"]] },
-  { name: "task links name a task on a board with no slug by its id", seed: { projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }] }, extraTasks: [{ id: "task-n1", projectId: "proj-noslug", title: "Unslugged" }], steps: [["task", "link", "1", "task-n1", "--type", "related", "--json"], ["task", "links", "1", "--human"]] },
-  { name: "task link unknown type", steps: [["task", "link", "1", "2", "--type", "blocker", "--json"], ["task", "unlink", "1", "2", "--type", "blocker", "--json"]] },
-  { name: "task link without --type", steps: [["task", "link", "1", "2", "--json"], ["task", "links", "1", "--json"]] },
-  { name: "task unlink by tasks", steps: [["task", "link", "1", "2", "--type", "related", "--json"], ["task", "unlink", "2", "1", "--human"], ["task", "links", "1", "--json"], ["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "unlink", "2", "1", "--json"]] },
-  { name: "task unlink by relation id", steps: [["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "unlink", "rel0002", "--type", "blocks", "--json"], ["task", "unlink", "rel0002", "--human"], ["task", "links", "1", "--json"]] },
-  { name: "task unlink one task number", steps: [["task", "unlink", "1", "--json"], ["task", "unlink", "#1", "--json"]] },
-  { name: "task unlink ambiguous", steps: [["task", "link", "1", "2", "--type", "related", "--json"], ["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "unlink", "1", "2", "--json"], ["task", "unlink", "1", "2", "--type", "blocks", "--human"], ["task", "links", "1", "--human"]] },
+  {
+    name: "task rm needs --yes",
+    steps: [
+      ["task", "rm", "1", "--human"],
+      ["task", "rm", "1", "--yes", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  {
+    name: "task link and links",
+    steps: [
+      ["task", "link", "1", "2", "--type", "subtask", "--json"],
+      ["task", "links", "2", "--human"],
+      ["task", "link", "1", "3", "--type", "blocks", "--human"],
+      ["task", "links", "1", "--json"],
+      ["task", "links", "1", "--human"],
+      ["task", "get", "1", "--human"],
+      ["task", "get", "1", "--json"],
+      ["task", "links", "3", "--human"],
+      ["task", "link", "2", "3", "--type", "subtask", "--human"],
+    ],
+  },
+  {
+    name: "task links name a task on another board",
+    steps: [
+      ["task", "link", "1", "BET#1", "--type", "blocks", "--json"],
+      ["task", "link", "2", "1", "--type", "related", "--json"],
+      ["task", "links", "1", "--human"],
+      ["task", "get", "1", "--human"],
+      ["task", "links", "BET#1", "--human"],
+      ["task", "links", "BET#1", "--json"],
+    ],
+  },
+  {
+    name: "task links name a task on a board with no slug by its id",
+    seed: { projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }] },
+    extraTasks: [{ id: "task-n1", projectId: "proj-noslug", title: "Unslugged" }],
+    steps: [
+      ["task", "link", "1", "task-n1", "--type", "related", "--json"],
+      ["task", "links", "1", "--human"],
+    ],
+  },
+  {
+    name: "task link unknown type",
+    steps: [
+      ["task", "link", "1", "2", "--type", "blocker", "--json"],
+      ["task", "unlink", "1", "2", "--type", "blocker", "--json"],
+    ],
+  },
+  {
+    name: "task link without --type",
+    steps: [
+      ["task", "link", "1", "2", "--json"],
+      ["task", "links", "1", "--json"],
+    ],
+  },
+  {
+    name: "task unlink by tasks",
+    steps: [
+      ["task", "link", "1", "2", "--type", "related", "--json"],
+      ["task", "unlink", "2", "1", "--human"],
+      ["task", "links", "1", "--json"],
+      ["task", "link", "1", "2", "--type", "blocks", "--json"],
+      ["task", "unlink", "2", "1", "--json"],
+    ],
+  },
+  {
+    name: "task unlink by relation id",
+    steps: [
+      ["task", "link", "1", "2", "--type", "blocks", "--json"],
+      ["task", "unlink", "rel0002", "--type", "blocks", "--json"],
+      ["task", "unlink", "rel0002", "--human"],
+      ["task", "links", "1", "--json"],
+    ],
+  },
+  {
+    name: "task unlink one task number",
+    steps: [
+      ["task", "unlink", "1", "--json"],
+      ["task", "unlink", "#1", "--json"],
+    ],
+  },
+  {
+    name: "task unlink ambiguous",
+    steps: [
+      ["task", "link", "1", "2", "--type", "related", "--json"],
+      ["task", "link", "1", "2", "--type", "blocks", "--json"],
+      ["task", "unlink", "1", "2", "--json"],
+      ["task", "unlink", "1", "2", "--type", "blocks", "--human"],
+      ["task", "links", "1", "--human"],
+    ],
+  },
   { name: "task unlink nothing to unlink", steps: [["task", "unlink", "1", "2", "--json"]] },
-  { name: "task external-links", seed: { externalLinks: [{ taskId: "task-a1", url: "https://example.com/spec", title: "Spec" }, { taskId: "task-a1", url: "https://github.com/o/r/pull/7", title: null, resourceType: "pull_request", externalId: "7", integration: { id: "int-1", type: "github" } }] }, steps: [["task", "external-links", "1", "--json"], ["task", "external-links", "1", "--human"], ["task", "external-links", "2", "--json"], ["task", "external-links", "2", "--human"], ["task", "external-links", "99", "--json"]] },
+  {
+    name: "task external-links",
+    seed: {
+      externalLinks: [
+        { taskId: "task-a1", url: "https://example.com/spec", title: "Spec" },
+        {
+          taskId: "task-a1",
+          url: "https://github.com/o/r/pull/7",
+          title: null,
+          resourceType: "pull_request",
+          externalId: "7",
+          integration: { id: "int-1", type: "github" },
+        },
+      ],
+    },
+    steps: [
+      ["task", "external-links", "1", "--json"],
+      ["task", "external-links", "1", "--human"],
+      ["task", "external-links", "2", "--json"],
+      ["task", "external-links", "2", "--human"],
+      ["task", "external-links", "99", "--json"],
+    ],
+  },
   // --add and --rm mutate and then list, so the answer shows the links as the
   // server now holds them; an integration's link is not the endpoint's to
   // remove, and neither is an id no link has.
   {
     name: "task external-links add and remove",
-    seed: { externalLinks: [{ taskId: "task-a1", url: "https://example.com/spec", title: "Spec" }, { taskId: "task-a1", url: "https://github.com/o/r/pull/7", title: null, resourceType: "pull_request", externalId: "7", integration: { id: "int-1", type: "github" } }] },
+    seed: {
+      externalLinks: [
+        { taskId: "task-a1", url: "https://example.com/spec", title: "Spec" },
+        {
+          taskId: "task-a1",
+          url: "https://github.com/o/r/pull/7",
+          title: null,
+          resourceType: "pull_request",
+          externalId: "7",
+          integration: { id: "int-1", type: "github" },
+        },
+      ],
+    },
     steps: [
       ["task", "external-links", "1", "--add", "https://example.com/notes", "--title", "Notes", "--json"],
       ["task", "external-links", "1", "--add", "https://example.com/plain", "--human"],
@@ -1478,7 +2531,12 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "task list by description",
     extraTasks: [
-      { id: "task-a4", projectId: P1, title: "Deferred needle", description: `${"x".repeat(65_537)}Needle in the deferred text` },
+      {
+        id: "task-a4",
+        projectId: P1,
+        title: "Deferred needle",
+        description: `${"x".repeat(65_537)}Needle in the deferred text`,
+      },
       { id: "task-a5", projectId: P1, title: "Deferred other", description: `${"y".repeat(65_537)}nothing here` },
       { id: "task-a6", projectId: P1, title: "Plain needle", description: "a Needle in plain text" },
     ],
@@ -1603,13 +2661,19 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "task upload refuses an empty file",
     files: { "empty.png": "" },
-    steps: [["task", "upload", "1", "empty.png", "--json"], ["task", "ls", "--all", "--json"]],
+    steps: [
+      ["task", "upload", "1", "empty.png", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
   },
   {
     name: "task upload storage refuses the bytes",
     files: { "pixel.png": "fake png bytes" },
     failOn: "^PUT /uploads/",
-    steps: [["task", "upload", "1", "pixel.png", "--json"], ["task", "ls", "--all", "--json"]],
+    steps: [
+      ["task", "upload", "1", "pixel.png", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
   },
   // The stage and the finalize are /api routes, so failOn reaches them as it
   // does every other write: the stage failing means no bytes are PUT, and the
@@ -1618,13 +2682,19 @@ export const SCENARIOS: Scenario[] = [
     name: "task upload stage is refused",
     files: { "pixel.png": "fake png bytes" },
     failOn: "^PUT /task/image-upload/",
-    steps: [["task", "upload", "1", "pixel.png", "--json"], ["task", "ls", "--all", "--json"]],
+    steps: [
+      ["task", "upload", "1", "pixel.png", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
   },
   {
     name: "task upload finalize is refused",
     files: { "pixel.png": "fake png bytes" },
     failOn: "^POST /task/image-upload/",
-    steps: [["task", "upload", "1", "pixel.png", "--json"], ["task", "ls", "--all", "--json"]],
+    steps: [
+      ["task", "upload", "1", "pixel.png", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
   },
 
   // --jq, the one flag every command carries: what a caller pipes a field into
@@ -1637,7 +2707,7 @@ export const SCENARIOS: Scenario[] = [
       ["task", "get", "1", "--jq", "empty"],
     ],
   },
-  { name: "jq over a list", steps: [["task", "ls", "--all", "--jq", ".[] | \"\\(.number) \\(.title)\""]] },
+  { name: "jq over a list", steps: [["task", "ls", "--all", "--jq", '.[] | "\\(.number) \\(.title)"']] },
   // Nothing is asked of the server: the expression cannot compile, which is known
   // before the command would have asked anything.
   { name: "jq with a bad expression", steps: [["task", "ls", "--jq", ".[", "--json"]] },
@@ -1651,20 +2721,48 @@ export const SCENARIOS: Scenario[] = [
   { name: "jq timeout bounds the filter", steps: [["task", "get", "1", "--jq", "def f: f; f", "--timeout", "1s"]] },
   { name: "jq leaves stdout empty on a command error", steps: [["task", "get", "99", "--jq", ".number"]] },
   // Refused while parsing, before the filter exists, and still kept off stdout.
-  { name: "jq leaves stdout empty on a usage error", steps: [["task", "get", "--jq", ".number"], ["task", "get", "1", "--bogus", "--jq=.number"]] },
+  {
+    name: "jq leaves stdout empty on a usage error",
+    steps: [
+      ["task", "get", "--jq", ".number"],
+      ["task", "get", "1", "--bogus", "--jq=.number"],
+    ],
+  },
   { name: "jq keeps empty strings", steps: [["task", "ls", "--all", "--jq", ".[] | .description"]] },
   // Fail-open hides an unreachable server, not a broken expression.
-  { name: "jq fails a fail-open command", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "1", "--jq", ".nope | tonumber"]] },
+  {
+    name: "jq fails a fail-open command",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [["session", "attach", "1", "--jq", ".nope | tonumber"]],
+  },
   { name: "jq empty means no filter", steps: [["task", "get", "1", "--jq", "", "--json"]] },
   // The parser uses the last --jq, so a refused line is judged by that one: an
   // empty last expression leaves the error where it would have been without the
   // flag, a non-empty one keeps stdout empty.
-  { name: "jq last expression wins on a usage error", steps: [["task", "get", "--jq", "", "--jq", ".number"], ["task", "get", "--jq", ".x", "--jq", ""]] },
+  {
+    name: "jq last expression wins on a usage error",
+    steps: [
+      ["task", "get", "--jq", "", "--jq", ".number"],
+      ["task", "get", "--jq", ".x", "--jq", ""],
+    ],
+  },
   // The value of a string flag is not a flag, whatever it looks like.
-  { name: "jq as the value of another flag", steps: [["task", "create", "--description", "--jq"], ["task", "create", "--description", "--", "--jq", ".x"]] },
+  {
+    name: "jq as the value of another flag",
+    steps: [
+      ["task", "create", "--description", "--jq"],
+      ["task", "create", "--description", "--", "--jq", ".x"],
+    ],
+  },
   // Everything after "--" is an argument.
   { name: "jq after the end of the flags", steps: [["task", "get", "--", "--jq", ".x"]] },
-  { name: "jq empty on a usage error", steps: [["task", "get", "--jq", ""], ["task", "get", "--jq="]] },
+  {
+    name: "jq empty on a usage error",
+    steps: [
+      ["task", "get", "--jq", ""],
+      ["task", "get", "--jq="],
+    ],
+  },
   ...["--jq=.serverOperations", "--jq=.missing | tonumber"].map((flag, i): Scenario => ({
     name: `api-check with a jq expression (${i === 0 ? "picks" : "fails"})`,
     steps: [["api-check", flag]],
@@ -1672,11 +2770,20 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "api-check missing operation with a jq expression that fails",
     specWithoutOperation: true,
-    steps: [["api-check", "--jq=.covered | tonumber"], ["api-check", "--jq", ".missing | length"]],
+    steps: [
+      ["api-check", "--jq=.covered | tonumber"],
+      ["api-check", "--jq", ".missing | length"],
+    ],
   },
 
   ...both("comment list", ["comment", "list", "1"]),
-  { name: "comment add", steps: [["comment", "add", "1", "hello", "world", "--json"], ["comment", "ls", "1", "--human"]] },
+  {
+    name: "comment add",
+    steps: [
+      ["comment", "add", "1", "hello", "world", "--json"],
+      ["comment", "ls", "1", "--human"],
+    ],
+  },
   {
     name: "comment delete",
     steps: [
@@ -1692,7 +2799,17 @@ export const SCENARIOS: Scenario[] = [
       ["comment", "ls", "1", "--json"],
     ],
   },
-  { name: "comment edit", steps: [["comment", "edit", "2", "cmt0001", "x"], ["comment", "edit", "1", "nope", "x"], ["comment", "edit", "1", "cmt0001", ""], ["comment", "edit", "3", "cmt-other", "x"], ["comment", "edit", "1", "cmt0001", "rewritten", "text", "--json"], ["comment", "ls", "1", "--human"]] },
+  {
+    name: "comment edit",
+    steps: [
+      ["comment", "edit", "2", "cmt0001", "x"],
+      ["comment", "edit", "1", "nope", "x"],
+      ["comment", "edit", "1", "cmt0001", ""],
+      ["comment", "edit", "3", "cmt-other", "x"],
+      ["comment", "edit", "1", "cmt0001", "rewritten", "text", "--json"],
+      ["comment", "ls", "1", "--human"],
+    ],
+  },
 
   ...both("activity list", ["activity", "list", "1"]),
   {
@@ -1709,10 +2826,30 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
 
-  { name: "label create with --name", steps: [["label", "create", "--name", " flagged one ", "--color", "red", "--json"], ["label", "ls", "--human"]] },
-  { name: "label create with --name and words", steps: [["label", "create", "Words", "--name", "Flagged", "--json"], ["label", "ls", "--human"]] },
+  {
+    name: "label create with --name",
+    steps: [
+      ["label", "create", "--name", " flagged one ", "--color", "red", "--json"],
+      ["label", "ls", "--human"],
+    ],
+  },
+  {
+    name: "label create with --name and words",
+    steps: [
+      ["label", "create", "Words", "--name", "Flagged", "--json"],
+      ["label", "ls", "--human"],
+    ],
+  },
   { name: "label create with no name", steps: [["label", "create", "--json"]] },
-  { name: "label create with an empty --name", steps: [["label", "create", "--name", " ", "--json"], ["label", "create", "--name", "", "--json"], ["label", "create", "Words", "--name", "", "--json"], ["label", "ls", "--human"]] },
+  {
+    name: "label create with an empty --name",
+    steps: [
+      ["label", "create", "--name", " ", "--json"],
+      ["label", "create", "--name", "", "--json"],
+      ["label", "create", "Words", "--name", "", "--json"],
+      ["label", "ls", "--human"],
+    ],
+  },
   {
     name: "label create, attach, detach",
     steps: [
@@ -1776,9 +2913,22 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     name: "label get",
-    steps: [["label", "create", "bug", "--json"], ["label", "attach", "1", "bug", "--json"], ["label", "get", "bug", "--human"], ["label", "get", "lbl0003", "--json"], ["label", "get", "nope", "--json"]],
+    steps: [
+      ["label", "create", "bug", "--json"],
+      ["label", "attach", "1", "bug", "--json"],
+      ["label", "get", "bug", "--human"],
+      ["label", "get", "lbl0003", "--json"],
+      ["label", "get", "nope", "--json"],
+    ],
   },
-  { name: "label without a workspace", env: { KANEO_WORKSPACE: "" }, steps: [["label", "ls", "--json"], ["label", "create", "bug", "--human"]] },
+  {
+    name: "label without a workspace",
+    env: { KANEO_WORKSPACE: "" },
+    steps: [
+      ["label", "ls", "--json"],
+      ["label", "create", "bug", "--human"],
+    ],
+  },
   {
     name: "label ids and names",
     steps: [
@@ -1817,7 +2967,14 @@ export const SCENARIOS: Scenario[] = [
       calendarFeeds: [{ projectId: P1, labels: ["bug"] }],
     },
     extraTasks: [
-      { id: "task-cal", projectId: P1, title: "Ship the feed", description: "line one\nline two", startDate: "2026-01-05T00:00:00Z", dueDate: "2026-01-07T00:00:00Z" },
+      {
+        id: "task-cal",
+        projectId: P1,
+        title: "Ship the feed",
+        description: "line one\nline two",
+        startDate: "2026-01-05T00:00:00Z",
+        dueDate: "2026-01-07T00:00:00Z",
+      },
       { id: "task-cal2", projectId: P1, title: "Solo dated", startDate: "2026-01-09T00:00:00Z" },
       { id: "task-cal3", projectId: P1, title: "Undated" },
     ],
@@ -1857,7 +3014,11 @@ export const SCENARIOS: Scenario[] = [
     name: "feed without a workspace",
     env: { KANEO_WORKSPACE: "" },
     seed: { calendarFeeds: [{ projectId: P1, labels: ["bug"] }] },
-    steps: [["feed", "ls", "--human"], ["feed", "ls", "--json"], ["feed", "create", "bug", "--json"]],
+    steps: [
+      ["feed", "ls", "--human"],
+      ["feed", "ls", "--json"],
+      ["feed", "create", "bug", "--json"],
+    ],
   },
   {
     // -w takes an id, a slug or a name, and the feed commands resolve it to the
@@ -1883,17 +3044,41 @@ export const SCENARIOS: Scenario[] = [
     failOn: "^GET /label/workspace/",
     failOnSkip: 1,
     seed: { calendarFeeds: [{ projectId: P1, labels: ["bug"] }] },
-    steps: [["feed", "create", "bug", "--human"], ["feed", "ls", "--human"]],
+    steps: [
+      ["feed", "create", "bug", "--human"],
+      ["feed", "ls", "--human"],
+    ],
   },
-  { name: "comment add from stdin", stdin: "multi\nline $comment\n", steps: [["comment", "add", "1", "-", "--json"], ["comment", "ls", "1", "--json"]] },
-  { name: "comment add from a file", files: { "c.md": "from a file\n" }, steps: [["comment", "add", "1", "--file", "c.md", "--human"]] },
-  { name: "comment add with text and a file", files: { "c.md": "x" }, steps: [["comment", "add", "1", "hi", "--file", "c.md", "--json"]] },
+  {
+    name: "comment add from stdin",
+    stdin: "multi\nline $comment\n",
+    steps: [
+      ["comment", "add", "1", "-", "--json"],
+      ["comment", "ls", "1", "--json"],
+    ],
+  },
+  {
+    name: "comment add from a file",
+    files: { "c.md": "from a file\n" },
+    steps: [["comment", "add", "1", "--file", "c.md", "--human"]],
+  },
+  {
+    name: "comment add with text and a file",
+    files: { "c.md": "x" },
+    steps: [["comment", "add", "1", "hi", "--file", "c.md", "--json"]],
+  },
   { name: "comment add empty stdin", stdin: "", steps: [["comment", "add", "1", "-", "--json"]] },
   { name: "comment add nothing", steps: [["comment", "add", "1", "--json"]] },
   { name: "comment add blank", steps: [["comment", "add", "1", "   ", "--json"]] },
 
   ...both("notification list", ["notification", "list"]),
-  { name: "notification list unread", steps: [["notification", "ls", "--unread", "--json"], ["notification", "ls", "--unread", "--human"]] },
+  {
+    name: "notification list unread",
+    steps: [
+      ["notification", "ls", "--unread", "--json"],
+      ["notification", "ls", "--unread", "--human"],
+    ],
+  },
   {
     name: "notification read",
     steps: [
@@ -1905,12 +3090,38 @@ export const SCENARIOS: Scenario[] = [
       ["notification", "ls", "--json"],
     ],
   },
-  { name: "notification read all", steps: [["notification", "read", "--all", "--human"], ["notification", "ls", "--json"]] },
-  { name: "notification clear needs --yes", steps: [["notification", "clear", "--human"], ["notification", "clear", "--yes", "--json"], ["notification", "ls", "--json"]] },
+  {
+    name: "notification read all",
+    steps: [
+      ["notification", "read", "--all", "--human"],
+      ["notification", "ls", "--json"],
+    ],
+  },
+  {
+    name: "notification clear needs --yes",
+    steps: [
+      ["notification", "clear", "--human"],
+      ["notification", "clear", "--yes", "--json"],
+      ["notification", "ls", "--json"],
+    ],
+  },
   {
     name: "notification create",
     steps: [
-      ["notification", "create", "build", "is", "green", "--title", "CI", "--resource-type", "task", "--resource-id", "task-a1", "--json"],
+      [
+        "notification",
+        "create",
+        "build",
+        "is",
+        "green",
+        "--title",
+        "CI",
+        "--resource-type",
+        "task",
+        "--resource-id",
+        "task-a1",
+        "--json",
+      ],
       ["notification", "create", "plain", "--human"],
       ["notification", "create", "x", "--resource-type", "task", "--json"],
       ["notification", "create", "x", "--resource-type", "banana", "--resource-id", "b1", "--json"],
@@ -1925,7 +3136,22 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "notification preferences set",
     steps: [
-      ["notification", "prefs", "set", "--ntfy", "--ntfy-server", "https://ntfy.example", "--ntfy-topic", "kaneo", "--ntfy-token", "tk_abcdef123456", "--email", "--reminder-lead", "2h", "--json"],
+      [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy",
+        "--ntfy-server",
+        "https://ntfy.example",
+        "--ntfy-topic",
+        "kaneo",
+        "--ntfy-token",
+        "tk_abcdef123456",
+        "--email",
+        "--reminder-lead",
+        "2h",
+        "--json",
+      ],
       ["notification", "prefs", "set", "--ntfy-token", "", "--human"],
       ["notification", "prefs", "set", "--ntfy-server", "", "--json"],
       ["notification", "prefs", "set", "--human"],
@@ -1937,31 +3163,61 @@ export const SCENARIOS: Scenario[] = [
     name: "notification preferences set ntfy token from stdin",
     stdin: "tk_from_stdin_77\n",
     steps: [
-      ["notification", "prefs", "set", "--ntfy", "--ntfy-server", "https://ntfy.example", "--ntfy-topic", "kaneo", "--ntfy-token", "-", "--json"],
+      [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy",
+        "--ntfy-server",
+        "https://ntfy.example",
+        "--ntfy-topic",
+        "kaneo",
+        "--ntfy-token",
+        "-",
+        "--json",
+      ],
     ],
   },
   {
     name: "notification preferences set webhook secret from stdin",
     stdin: "whsec_from_stdin_88\r\n",
-    steps: [["notification", "prefs", "set", "--webhook-url", "https://example.com/hook", "--webhook-secret", "-", "--json"]],
+    steps: [
+      ["notification", "prefs", "set", "--webhook-url", "https://example.com/hook", "--webhook-secret", "-", "--json"],
+    ],
   },
-  { name: "notification preferences set gotify token from stdin", stdin: " gt_from_stdin_99 \n", steps: [["notification", "prefs", "set", "--gotify-token", "-", "--human"]] },
-  { name: "notification preferences set empty stdin", stdin: "\n", steps: [["notification", "prefs", "set", "--ntfy-token", "-", "--json"]] },
+  {
+    name: "notification preferences set gotify token from stdin",
+    stdin: " gt_from_stdin_99 \n",
+    steps: [["notification", "prefs", "set", "--gotify-token", "-", "--human"]],
+  },
+  {
+    name: "notification preferences set empty stdin",
+    stdin: "\n",
+    steps: [["notification", "prefs", "set", "--ntfy-token", "-", "--json"]],
+  },
   {
     name: "notification preferences set topic dash stays literal",
     stdin: "tk_unused\n",
     steps: [["notification", "prefs", "set", "--ntfy-topic", "-", "--json"]],
   },
-  { name: "notification preferences set truly empty stdin", stdin: "", steps: [["notification", "prefs", "set", "--ntfy-token", "-", "--json"]] },
+  {
+    name: "notification preferences set truly empty stdin",
+    stdin: "",
+    steps: [["notification", "prefs", "set", "--ntfy-token", "-", "--json"]],
+  },
   {
     name: "notification preferences set drops one line ending only",
     stdin: "whsec_two\n\n",
-    steps: [["notification", "prefs", "set", "--webhook-url", "https://example.com/hook", "--webhook-secret", "-", "--json"]],
+    steps: [
+      ["notification", "prefs", "set", "--webhook-url", "https://example.com/hook", "--webhook-secret", "-", "--json"],
+    ],
   },
   {
     name: "notification preferences set keeps whitespace-only stdin",
     stdin: "  ",
-    steps: [["notification", "prefs", "set", "--webhook-url", "https://example.com/hook", "--webhook-secret", "-", "--json"]],
+    steps: [
+      ["notification", "prefs", "set", "--webhook-url", "https://example.com/hook", "--webhook-secret", "-", "--json"],
+    ],
   },
   // Empty stdin would be its own error if it were read first.
   {
@@ -1977,7 +3233,25 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "notification preferences set one secret from stdin beside another",
     stdin: "tk_one\n",
-    steps: [["notification", "prefs", "set", "--ntfy", "--ntfy-server", "https://ntfy.example", "--ntfy-topic", "kaneo", "--ntfy-token", "-", "--webhook-url", "https://example.com/hook", "--webhook-secret", "", "--json"]],
+    steps: [
+      [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy",
+        "--ntfy-server",
+        "https://ntfy.example",
+        "--ntfy-topic",
+        "kaneo",
+        "--ntfy-token",
+        "-",
+        "--webhook-url",
+        "https://example.com/hook",
+        "--webhook-secret",
+        "",
+        "--json",
+      ],
+    ],
   },
   {
     name: "notification preferences carry into rules",
@@ -2022,7 +3296,18 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "time add, list, update, stop",
     steps: [
-      ["time", "add", "1", "--start", "2026-01-01T09:00:00Z", "--end", "2026-01-01T10:30:00Z", "-d", "review", "--json"],
+      [
+        "time",
+        "add",
+        "1",
+        "--start",
+        "2026-01-01T09:00:00Z",
+        "--end",
+        "2026-01-01T10:30:00Z",
+        "-d",
+        "review",
+        "--json",
+      ],
       ["time", "start", "1", "--start", "2026-01-01T08:00:00Z", "--human"],
       ["time", "ls", "1", "--human"],
       ["time", "list", "1", "--json"],
@@ -2050,7 +3335,14 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "session attach, next, close",
     env: { KANEO_SESSION_ID: "sess-test" },
-    steps: [["session", "attach", "1", "write", "tests", "--strict"], ["session", "next", "ship", "--strict"], ["board", "--json"], ["board", "--human"], ["session", "close", "--strict"], ["board", "--json"]],
+    steps: [
+      ["session", "attach", "1", "write", "tests", "--strict"],
+      ["session", "next", "ship", "--strict"],
+      ["board", "--json"],
+      ["board", "--human"],
+      ["session", "close", "--strict"],
+      ["board", "--json"],
+    ],
   },
   // task get names the sessions holding the task, as board does: the running one
   // is listed with its newest marker, the one that closed and the human comment
@@ -2059,19 +3351,51 @@ export const SCENARIOS: Scenario[] = [
     name: "task get names the sessions holding it",
     seed: {
       comments: [
-        { taskId: "task-a1", content: "<!-- kn:session id=sess-old host=h1 cwd=/work/old branch=b1 state=running enc=1 -->\nfirst step" },
-        { taskId: "task-a1", content: "<!-- kn:session id=sess-old host=h1 cwd=/work/old branch=b1 state=closed enc=1 -->" },
-        { taskId: "task-a1", content: "<!-- kn:session id=sess-live-0123 host=h2 cwd=/work/live%20dir branch=b2 state=running enc=1 -->\nwrite tests" },
-        { taskId: "task-a1", content: "<!-- kn:session id=sess-bare host=h3 cwd=/work/bare branch=b3 state=running enc=1 -->" },
+        {
+          taskId: "task-a1",
+          content: "<!-- kn:session id=sess-old host=h1 cwd=/work/old branch=b1 state=running enc=1 -->\nfirst step",
+        },
+        {
+          taskId: "task-a1",
+          content: "<!-- kn:session id=sess-old host=h1 cwd=/work/old branch=b1 state=closed enc=1 -->",
+        },
+        {
+          taskId: "task-a1",
+          content:
+            "<!-- kn:session id=sess-live-0123 host=h2 cwd=/work/live%20dir branch=b2 state=running enc=1 -->\nwrite tests",
+        },
+        {
+          taskId: "task-a1",
+          content: "<!-- kn:session id=sess-bare host=h3 cwd=/work/bare branch=b3 state=running enc=1 -->",
+        },
         { taskId: "task-a1", content: "a human comment" },
       ],
     },
-    steps: [["task", "get", "1", "--json"], ["task", "get", "1", "--human"], ["task", "get", "2", "--json"]],
+    steps: [
+      ["task", "get", "1", "--json"],
+      ["task", "get", "1", "--human"],
+      ["task", "get", "2", "--json"],
+    ],
   },
   // A task whose comments cannot be read is not reported as held by nobody.
-  { name: "task get stops when the comments cannot be read", failOn: "^GET /comment/task-a1$", steps: [["task", "get", "1", "--json"], ["task", "get", "1", "--human"]] },
-  { name: "session attach fails quietly", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "99"]] },
-  { name: "session attach strict reports", env: { KANEO_SESSION_ID: "sess-test" }, steps: [["session", "attach", "99", "--strict"]] },
+  {
+    name: "task get stops when the comments cannot be read",
+    failOn: "^GET /comment/task-a1$",
+    steps: [
+      ["task", "get", "1", "--json"],
+      ["task", "get", "1", "--human"],
+    ],
+  },
+  {
+    name: "session attach fails quietly",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [["session", "attach", "99"]],
+  },
+  {
+    name: "session attach strict reports",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [["session", "attach", "99", "--strict"]],
+  },
   // The server takes the marker and its listing does not hold it. Reported without
   // --strict, like the local record that could not be written: the session has a
   // marker on a board nothing here can read.
@@ -2117,12 +3441,19 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "session status before attaching",
     env: { KANEO_SESSION_ID: "sess-test" },
-    steps: [["session", "status", "--json"], ["session", "status", "--human"]],
+    steps: [
+      ["session", "status", "--json"],
+      ["session", "status", "--human"],
+    ],
   },
   {
     name: "session history survives close",
     env: { KANEO_SESSION_ID: "sess-test" },
-    steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"], ["session", "status", "--json"]],
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "close", "--strict"],
+      ["session", "status", "--json"],
+    ],
   },
   // A session may hold several tasks, and closing one of them must leave the
   // attachment on the other alone.
@@ -2143,14 +3474,22 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "session close names the attached task",
     env: { KANEO_SESSION_ID: "sess-test" },
-    steps: [["session", "attach", "1", "--strict"], ["session", "close", "--task", "1", "--strict"], ["session", "status", "--json"]],
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "close", "--task", "1", "--strict"],
+      ["session", "status", "--json"],
+    ],
   },
   // The dash form the server writes a task as names the held task too, so the
   // close takes it without a lookup of its own.
   {
     name: "session close --task names the held task by its ticket id",
     env: { KANEO_SESSION_ID: "sess-test" },
-    steps: [["session", "attach", "1", "--strict"], ["session", "close", "--task", "ALP-1", "--strict"], ["session", "status", "--json"]],
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "close", "--task", "ALP-1", "--strict"],
+      ["session", "status", "--json"],
+    ],
   },
   {
     name: "session close --task without an attachment",
@@ -2167,7 +3506,11 @@ export const SCENARIOS: Scenario[] = [
     env: { KANEO_SESSION_ID: "sess-test" },
     // The closed marker alone, so the attach above it is confirmed as usual.
     dropCommentsMatching: "state=closed",
-    steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"], ["session", "status", "--json"]],
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "close", "--strict"],
+      ["session", "status", "--json"],
+    ],
   },
   // The listing that would confirm the closed marker fails: the close is done here
   // and fail-open stays quiet about the unverified marker unless --strict asks.
@@ -2175,14 +3518,22 @@ export const SCENARIOS: Scenario[] = [
     name: "session close when the listing fails",
     env: { KANEO_SESSION_ID: "sess-test" },
     failOn: "^GET /comment/task-a1$",
-    steps: [["session", "close", "--task", "1"], ["session", "close", "--task", "1", "--strict"]],
+    steps: [
+      ["session", "close", "--task", "1"],
+      ["session", "close", "--task", "1", "--strict"],
+    ],
   },
   // The held task is gone from the server, so the marker cannot be written; the
   // attachment is released anyway and the close says so even without --strict.
   {
     name: "session close releases a task the server no longer has",
     env: { KANEO_SESSION_ID: "sess-test" },
-    steps: [["session", "attach", "1", "--strict"], ["task", "rm", "1", "--yes", "--json"], ["session", "close"], ["session", "status", "--json"]],
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["task", "rm", "1", "--yes", "--json"],
+      ["session", "close"],
+      ["session", "status", "--json"],
+    ],
   },
   // Named the way the attachment knows it, a gone task is still released: by
   // id, as session status prints it (in another case), and as a bare number in
@@ -2190,7 +3541,9 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "session close --task releases a held task the server no longer has",
     env: { KANEO_SESSION_ID: "sess-test" },
-    config: { hooks: { close: 'printf "%s %s\\n" "$KANEO_HOOK_EVENT" "$KANEO_TASK_ID" >> "$HOME/.config/kaneo/hook.out"' } },
+    config: {
+      hooks: { close: 'printf "%s %s\\n" "$KANEO_HOOK_EVENT" "$KANEO_TASK_ID" >> "$HOME/.config/kaneo/hook.out"' },
+    },
     steps: [
       ["session", "attach", "1", "--strict"],
       ["task", "rm", "1", "--yes", "--json"],
@@ -2211,7 +3564,11 @@ export const SCENARIOS: Scenario[] = [
     env: { KANEO_SESSION_ID: "sess-test" },
     failOn: "^POST /comment/task-a1$",
     failOnSkip: 1,
-    steps: [["session", "attach", "1", "--strict"], ["session", "close"], ["session", "status", "--json"]],
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "close"],
+      ["session", "status", "--json"],
+    ],
   },
   {
     name: "session status without a session id",
@@ -2240,9 +3597,13 @@ export const SCENARIOS: Scenario[] = [
     name: "session status names a slug-less record by project id",
     env: { KANEO_SESSION_ID: "sess-old" },
     homeFiles: {
-      ".config/kaneo/sessions/sess-old.json": '{"taskId":"task-a1","number":1,"title":"Write the parser","projectId":"proj-alpha"}',
+      ".config/kaneo/sessions/sess-old.json":
+        '{"taskId":"task-a1","number":1,"title":"Write the parser","projectId":"proj-alpha"}',
     },
-    steps: [["session", "status", "--human"], ["session", "status", "--json"]],
+    steps: [
+      ["session", "status", "--human"],
+      ["session", "status", "--json"],
+    ],
   },
   // With no board fields at all the task id is the only name that still
   // resolves, so it is what the record is shown as.
@@ -2295,8 +3656,14 @@ export const SCENARIOS: Scenario[] = [
     env: { KANEO_SESSION_ID: "sess-here" },
     seed: {
       comments: [
-        { taskId: "task-a1", content: "<!-- kn:session id=sess-gone host=oldhost cwd=/old branch=main state=running enc=1 -->\nnext step" },
-        { taskId: "task-a2", content: "<!-- kn:session id=sess-gone2 host=oldhost cwd=/old branch=main state=running enc=1 -->" },
+        {
+          taskId: "task-a1",
+          content: "<!-- kn:session id=sess-gone host=oldhost cwd=/old branch=main state=running enc=1 -->\nnext step",
+        },
+        {
+          taskId: "task-a2",
+          content: "<!-- kn:session id=sess-gone2 host=oldhost cwd=/old branch=main state=running enc=1 -->",
+        },
       ],
     },
     steps: [
@@ -2371,8 +3738,14 @@ export const SCENARIOS: Scenario[] = [
     },
     seed: {
       comments: [
-        { taskId: "task-a1", content: "<!-- kn:session id=sess-gone host=oldhost cwd=/old branch=main state=running enc=1 -->\nnext step" },
-        { taskId: "task-b1", content: "<!-- kn:session id=sess-gone host=oldhost cwd=/old branch=main state=running enc=1 -->\nnext step" },
+        {
+          taskId: "task-a1",
+          content: "<!-- kn:session id=sess-gone host=oldhost cwd=/old branch=main state=running enc=1 -->\nnext step",
+        },
+        {
+          taskId: "task-b1",
+          content: "<!-- kn:session id=sess-gone host=oldhost cwd=/old branch=main state=running enc=1 -->\nnext step",
+        },
       ],
     },
     steps: [
@@ -2413,10 +3786,23 @@ export const SCENARIOS: Scenario[] = [
   },
   ...both("board", ["board"]),
   ...both("board archived", ["board", "--archived"]),
-  { name: "board pages past one page", pageSize: 2, steps: [["task", "ls", "--all", "--json"], ["board", "--json"]] },
+  {
+    name: "board pages past one page",
+    pageSize: 2,
+    steps: [
+      ["task", "ls", "--all", "--json"],
+      ["board", "--json"],
+    ],
+  },
   // The board gains a task while it is being read, so the total the listing
   // reports moves under the reader and the read is taken again.
-  { name: "board changed mid-read", pageSize: 2, growOnPage: 2, growTimes: 1, steps: [["task", "ls", "--all", "--json"]] },
+  {
+    name: "board changed mid-read",
+    pageSize: 2,
+    growOnPage: 2,
+    growTimes: 1,
+    steps: [["task", "ls", "--all", "--json"]],
+  },
   // A board that keeps moving is reported rather than passed on as if it were
   // whole.
   { name: "board keeps changing", pageSize: 2, growOnPage: 2, steps: [["task", "ls", "--all", "--json"]] },
@@ -2430,7 +3816,10 @@ export const SCENARIOS: Scenario[] = [
     promoteOnPage: 2,
     promoteTaskId: "task-a4",
     promoteTimes: 1,
-    steps: [["task", "ls", "--all", "--json"], ["board", "--json"]],
+    steps: [
+      ["task", "ls", "--all", "--json"],
+      ["board", "--json"],
+    ],
   },
   // A session can attach to a planned or archived task, so the board reports
   // those holds too: the session list reads every task the listing answered,
@@ -2439,15 +3828,24 @@ export const SCENARIOS: Scenario[] = [
     name: "board lists sessions on planned and archived tasks",
     seed: {
       comments: [
-        { taskId: "task-p1", content: "<!-- kn:session id=sess-planned host=h1 cwd=/w branch=b state=running enc=1 -->\nnext" },
-        { taskId: "task-arch1", content: "<!-- kn:session id=sess-arch host=h2 cwd=/w branch=b state=running enc=1 -->\nnext" },
+        {
+          taskId: "task-p1",
+          content: "<!-- kn:session id=sess-planned host=h1 cwd=/w branch=b state=running enc=1 -->\nnext",
+        },
+        {
+          taskId: "task-arch1",
+          content: "<!-- kn:session id=sess-arch host=h2 cwd=/w branch=b state=running enc=1 -->\nnext",
+        },
       ],
     },
     extraTasks: [
       { id: "task-p1", projectId: P1, title: "Planned held", status: "planned" },
       { id: "task-arch1", projectId: P1, title: "Archived held", status: "archived" },
     ],
-    steps: [["board", "--json"], ["board", "--human"]],
+    steps: [
+      ["board", "--json"],
+      ["board", "--human"],
+    ],
   },
 
   ...both("api-check", ["api-check"]),
@@ -2456,7 +3854,14 @@ export const SCENARIOS: Scenario[] = [
   ...both("api-check missing operation", ["api-check"]).map((s): Scenario => ({ ...s, specWithoutOperation: true })),
 
   { name: "no api key", env: { KANEO_API_KEY: "" }, steps: [["whoami"], ["task", "ls"]] },
-  { name: "wrong api key", env: { KANEO_API_KEY: "nope" }, steps: [["whoami", "--json"], ["task", "ls", "--json"]] },
+  {
+    name: "wrong api key",
+    env: { KANEO_API_KEY: "nope" },
+    steps: [
+      ["whoami", "--json"],
+      ["task", "ls", "--json"],
+    ],
+  },
   { name: "no workspace", env: { KANEO_WORKSPACE: "" }, steps: [["project", "ls", "--json"]] },
   { name: "no project", env: { KANEO_PROJECT: "" }, steps: [["task", "ls", "--json"]] },
   { name: "unknown command", steps: [["frobnicate"]] },
@@ -2485,8 +3890,25 @@ export const SCENARIOS: Scenario[] = [
   ].map((args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] })),
   { name: "unknown flag", steps: [["task", "ls", "--bogus"], ["task", "ls", "-x"], ["--bogus"]] },
   { name: "control characters in an unknown command", steps: [["\u0001"], ["a\u007fb"], ["tab\there"]] },
-  { name: "completion help", steps: [["completion", "zsh", "--help"], ["completion", "fish", "--help"], ["completion", "powershell", "--help"], ["completion", "bash", "--help"]] },
-  { name: "completion", steps: [["completion", "zsh"], ["completion", "bash"], ["completion", "fish"], ["completion", "powershell"], ["completion"]] },
+  {
+    name: "completion help",
+    steps: [
+      ["completion", "zsh", "--help"],
+      ["completion", "fish", "--help"],
+      ["completion", "powershell", "--help"],
+      ["completion", "bash", "--help"],
+    ],
+  },
+  {
+    name: "completion",
+    steps: [
+      ["completion", "zsh"],
+      ["completion", "bash"],
+      ["completion", "fish"],
+      ["completion", "powershell"],
+      ["completion"],
+    ],
+  },
   // What a shell asks once the script is installed: cobra's answer carries a
   // directive line and reports it on stderr, and the NoDesc spelling leaves the
   // descriptions out.
@@ -2510,17 +3932,49 @@ export const SCENARIOS: Scenario[] = [
     ["__complete", "session", "attach", ""],
   ].map((args, i): Scenario => ({ name: `shell asks ${i + 1}: ${args.join(" ")}`, steps: [args] })),
 
-  { name: "server unreachable", env: { KANEO_API_URL: "http://127.0.0.1:9" }, steps: [["whoami", "--json"], ["task", "ls"], ["board"]] },
-  { name: "request timeout", delayMs: 1500, steps: [["whoami", "--json", "--timeout", "300ms"], ["task", "ls", "--timeout", "300ms"]] },
+  {
+    name: "server unreachable",
+    env: { KANEO_API_URL: "http://127.0.0.1:9" },
+    steps: [["whoami", "--json"], ["task", "ls"], ["board"]],
+  },
+  {
+    name: "request timeout",
+    delayMs: 1500,
+    steps: [
+      ["whoami", "--json", "--timeout", "300ms"],
+      ["task", "ls", "--timeout", "300ms"],
+    ],
+  },
   // A 429 is waited out, up to three times and a minute of waiting, and is
   // reported as it came past either.
   { name: "rate limit waited out", rateLimitTimes: 2, rateLimitWaitMs: 200, steps: [["workspace", "ls", "--human"]] },
-  { name: "rate limit longer than the budget", rateLimitTimes: 1, rateLimitWaitMs: 61000, steps: [["workspace", "ls", "--human"]] },
-  { name: "rate limit past the retries", rateLimitTimes: 5, rateLimitWaitMs: 0, steps: [["workspace", "ls", "--json"]] },
+  {
+    name: "rate limit longer than the budget",
+    rateLimitTimes: 1,
+    rateLimitWaitMs: 61000,
+    steps: [["workspace", "ls", "--human"]],
+  },
+  {
+    name: "rate limit past the retries",
+    rateLimitTimes: 5,
+    rateLimitWaitMs: 0,
+    steps: [["workspace", "ls", "--json"]],
+  },
   // Each attempt gets a --timeout of its own: two 200 ms waits pass a 300 ms one.
-  { name: "rate limit waits outlast one timeout", rateLimitTimes: 2, rateLimitWaitMs: 200, steps: [["workspace", "ls", "--human", "--timeout", "300ms"]] },
+  {
+    name: "rate limit waits outlast one timeout",
+    rateLimitTimes: 2,
+    rateLimitWaitMs: 200,
+    steps: [["workspace", "ls", "--human", "--timeout", "300ms"]],
+  },
   // Only the limiter's own answer is waited for.
-  { name: "a 429 that is not the rate limiter", rateLimitTimes: 1, rateLimitWaitMs: 0, rateLimitCode: "IMPORT_RUNNING", steps: [["workspace", "ls", "--human"]] },
+  {
+    name: "a 429 that is not the rate limiter",
+    rateLimitTimes: 1,
+    rateLimitWaitMs: 0,
+    rateLimitCode: "IMPORT_RUNNING",
+    steps: [["workspace", "ls", "--human"]],
+  },
   // A fail-open command run from a hook does not sit a rate limit out, and says
   // nothing; --strict does wait.
   {
@@ -2528,19 +3982,44 @@ export const SCENARIOS: Scenario[] = [
     env: { KANEO_SESSION_ID: "sess-test" },
     rateLimitTimes: 1,
     rateLimitWaitMs: 0,
-    steps: [["session", "attach", "1"], ["session", "status", "--json"]],
+    steps: [
+      ["session", "attach", "1"],
+      ["session", "status", "--json"],
+    ],
   },
-  { name: "timeout zero or negative", steps: [["whoami", "--json", "--timeout", "0"], ["whoami", "--json", "--timeout", "-1s"], ["whoami", "--timeout", "nonsense"]] },
+  {
+    name: "timeout zero or negative",
+    steps: [
+      ["whoami", "--json", "--timeout", "0"],
+      ["whoami", "--json", "--timeout", "-1s"],
+      ["whoami", "--timeout", "nonsense"],
+    ],
+  },
 
-  { name: "config that is not JSON", env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" }, rawConfig: "{not json", steps: [["context", "--json"], ["task", "ls"]] },
-  { name: "config with a null profile", rawConfig: '{"profiles":{"dev":null},"default_profile":"dev"}', steps: [["context", "--json"]] },
+  {
+    name: "config that is not JSON",
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
+    rawConfig: "{not json",
+    steps: [
+      ["context", "--json"],
+      ["task", "ls"],
+    ],
+  },
+  {
+    name: "config with a null profile",
+    rawConfig: '{"profiles":{"dev":null},"default_profile":"dev"}',
+    steps: [["context", "--json"]],
+  },
   { name: "config that is null", rawConfig: "null", steps: [["context", "--json"]] },
   { name: "config with a malformed number", rawConfig: '{"unknown":1.}', steps: [["context", "--json"]] },
   {
     name: "config with a wrong type",
     env: { KANEO_SESSION_ID: "sess-types" },
     config: { hooks: { attach: 5 } },
-    steps: [["session", "attach", "1", "--strict"], ["context", "--json"]],
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["context", "--json"],
+    ],
   },
   {
     name: "config keys in another case",
@@ -2549,16 +4028,60 @@ export const SCENARIOS: Scenario[] = [
     steps: [["context", "--json"]],
   },
 
-  { name: "ids that need escaping", steps: [["task", "get", "a b/c?#%é", "--json"], ["comment", "ls", "x/y", "--json"], ["project", "get", "p/q", "--json"]] },
+  {
+    name: "ids that need escaping",
+    steps: [
+      ["task", "get", "a b/c?#%é", "--json"],
+      ["comment", "ls", "x/y", "--json"],
+      ["project", "get", "p/q", "--json"],
+    ],
+  },
 
-  ...[["project", "ls", "--json"], ["project", "get", "--json"], ["task", "ls", "--json"], ["task", "ls", "--human"], ["board", "--json"], ["board", "--human"], ["comment", "ls", "1", "--json"], ["comment", "ls", "1", "--human"], ["task", "links", "1", "--json"]].map(
-    (args): Scenario => ({ name: `older server: ${args.join(" ")}`, legacy: true, steps: [args] }),
-  ),
-  { name: "older server: task get", legacy: true, steps: [["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "get", "1", "--human"], ["task", "get", "1", "--json"]] },
-  { name: "older server: task links human", legacy: true, steps: [["task", "link", "1", "2", "--type", "blocks", "--json"], ["task", "links", "1", "--human"]] },
+  ...[
+    ["project", "ls", "--json"],
+    ["project", "get", "--json"],
+    ["task", "ls", "--json"],
+    ["task", "ls", "--human"],
+    ["board", "--json"],
+    ["board", "--human"],
+    ["comment", "ls", "1", "--json"],
+    ["comment", "ls", "1", "--human"],
+    ["task", "links", "1", "--json"],
+  ].map((args): Scenario => ({ name: `older server: ${args.join(" ")}`, legacy: true, steps: [args] })),
+  {
+    name: "older server: task get",
+    legacy: true,
+    steps: [
+      ["task", "link", "1", "2", "--type", "blocks", "--json"],
+      ["task", "get", "1", "--human"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  {
+    name: "older server: task links human",
+    legacy: true,
+    steps: [
+      ["task", "link", "1", "2", "--type", "blocks", "--json"],
+      ["task", "links", "1", "--human"],
+    ],
+  },
 
-  { name: "no git on PATH", env: { PATH: "/nonexistent" }, steps: [["task", "ls", "--json"], ["context", "--json"]] },
-  { name: "no git on PATH, session", env: { PATH: "/nonexistent", KANEO_SESSION_ID: "sess-nogit" }, steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"]] },
+  {
+    name: "no git on PATH",
+    env: { PATH: "/nonexistent" },
+    steps: [
+      ["task", "ls", "--json"],
+      ["context", "--json"],
+    ],
+  },
+  {
+    name: "no git on PATH, session",
+    env: { PATH: "/nonexistent", KANEO_SESSION_ID: "sess-nogit" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "close", "--strict"],
+    ],
+  },
 
   {
     name: "a failing hook's output keeps both streams",
@@ -2570,16 +4093,43 @@ export const SCENARIOS: Scenario[] = [
     name: "a hook killed by a signal",
     env: { KANEO_SESSION_ID: "sess-signal" },
     config: { hooks: { attach: "kill -USR1 $$", close: "kill -SEGV $$" } },
-    steps: [["session", "attach", "1", "--strict"], ["session", "close", "--strict"]],
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "close", "--strict"],
+    ],
   },
   // Each request alone fits in the timeout, and the command's requests together
   // do not. Every request gets the whole of it, so both steps pass; one budget
   // for the command failed a board that takes several pages.
-  { name: "one timeout per request", delayMs: 400, env: { KANEO_SESSION_ID: "sess-budget" }, steps: [["session", "attach", "1", "--strict", "--timeout", "1s"], ["board", "--json", "--timeout", "1s"]] },
-  { name: "whitespace reply to the marker post", whitespaceOn: "^POST /comment/", env: { KANEO_SESSION_ID: "sess-ws" }, config: { hooks: { attach: 'echo ran > "$HOME/hook-ran"' } }, steps: [["session", "attach", "1", "--strict"], ["session", "next", "x", "--strict"]] },
+  {
+    name: "one timeout per request",
+    delayMs: 400,
+    env: { KANEO_SESSION_ID: "sess-budget" },
+    steps: [
+      ["session", "attach", "1", "--strict", "--timeout", "1s"],
+      ["board", "--json", "--timeout", "1s"],
+    ],
+  },
+  {
+    name: "whitespace reply to the marker post",
+    whitespaceOn: "^POST /comment/",
+    env: { KANEO_SESSION_ID: "sess-ws" },
+    config: { hooks: { attach: 'echo ran > "$HOME/hook-ran"' } },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "next", "x", "--strict"],
+    ],
+  },
   { name: "whitespace reply to project get", whitespaceOn: "^GET /project/", steps: [["project", "get", "--json"]] },
   { name: "whitespace reply to task create", whitespaceOn: "^POST /task/", steps: [["task", "create", "x", "--json"]] },
-  { name: "whitespace reply to the project list", whitespaceOn: "^GET /project$", steps: [["project", "ls", "--json"], ["board", "--json"]] },
+  {
+    name: "whitespace reply to the project list",
+    whitespaceOn: "^GET /project$",
+    steps: [
+      ["project", "ls", "--json"],
+      ["board", "--json"],
+    ],
+  },
   {
     name: "hook failure logged in local time",
     env: { KANEO_SESSION_ID: "sess-tz", TZ: "Asia/Tokyo" },
@@ -2594,27 +4144,39 @@ export const SCENARIOS: Scenario[] = [
     name: "profile supplies workspace and project",
     env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
     config: { default_profile: "self", profiles: { self: { workspace_id: WS, project_id: P2 } } },
-    steps: [["context", "--json"], ["task", "ls", "--json"]],
+    steps: [
+      ["context", "--json"],
+      ["task", "ls", "--json"],
+    ],
   },
   {
     name: ".kaneo.json found by walking up",
     env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
     local: { workspace: WS, project: P2 },
-    steps: [["context", "--json"], ["task", "ls", "--human"]],
+    steps: [
+      ["context", "--json"],
+      ["task", "ls", "--human"],
+    ],
   },
   {
     name: "repo map and owner map",
     env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
     repo: "acme/widget",
     config: { repos: { "acme/widget": [P1, P2] }, owners: { acme: WS } },
-    steps: [["context", "--json"], ["board", "--json"]],
+    steps: [
+      ["context", "--json"],
+      ["board", "--json"],
+    ],
   },
   {
     name: "context for another repo",
     env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
     local: { project: "proj-local" },
     repo: "acme/other",
-    config: { owners: { acme: "ws-acme" }, repos: { "acme/thing": ["proj-x", "proj-y"], "acme/other": ["proj-other"] } },
+    config: {
+      owners: { acme: "ws-acme" },
+      repos: { "acme/thing": ["proj-x", "proj-y"], "acme/other": ["proj-other"] },
+    },
     steps: [
       ["context", "--repo", "acme/thing", "--json"],
       ["context", "--repo", "git@github.com:acme/thing.git", "--human"],
@@ -2626,7 +4188,11 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     name: "context --repo under a profile with a project",
-    config: { owners: { acme: "ws-acme" }, repos: { "acme/thing": ["proj-x"] }, profiles: { main: { project_id: "proj-profile" } } },
+    config: {
+      owners: { acme: "ws-acme" },
+      repos: { "acme/thing": ["proj-x"] },
+      profiles: { main: { project_id: "proj-profile" } },
+    },
     env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
     steps: [["context", "--repo", "acme/thing", "--json"]],
   },
@@ -2662,7 +4228,10 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "--api-url and --api-key beat the environment",
     env: { KANEO_API_URL: "http://127.0.0.1:9", KANEO_API_KEY: "wrong-key" },
-    steps: [["whoami", "--json", "--api-url", "<URL>", "--api-key", "test-key"], ["context", "--json", "--api-url", "<URL>"]],
+    steps: [
+      ["whoami", "--json", "--api-url", "<URL>", "--api-key", "test-key"],
+      ["context", "--json", "--api-url", "<URL>"],
+    ],
   },
   {
     // The key comes from the command's stdout, trailing newline and all, and
@@ -2672,7 +4241,10 @@ export const SCENARIOS: Scenario[] = [
     name: "api_key_command supplies the key",
     env: { KANEO_API_KEY: "" },
     config: { profiles: { self: { api_key_command: "echo ran >&2; printf 'test-key\\n'" } } },
-    steps: [["whoami", "--json"], ["context", "--repo", "acme/thing", "--json"]],
+    steps: [
+      ["whoami", "--json"],
+      ["context", "--repo", "acme/thing", "--json"],
+    ],
   },
   {
     name: "the profile's api_key beats api_key_command",
@@ -2701,7 +4273,14 @@ export const SCENARIOS: Scenario[] = [
       calendarFeeds: [{ projectId: P1 }],
       projects: [
         ...SEED.projects,
-        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+        {
+          id: "proj-public",
+          workspaceId: WS,
+          name: "Public",
+          slug: "PUB",
+          isPublic: true,
+          description: "shared board ".repeat(90),
+        },
       ],
       avatars: [{ id: "av-1", body: "avatar-one-bytes", contentType: "image/webp" }],
     },
@@ -2758,18 +4337,25 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "flag beats env beats profile",
     config: { default_profile: "self", profiles: { self: { workspace_id: "ws-other", project_id: P2 } } },
-    steps: [["context", "--json"], ["context", "-p", "proj-old", "--json"]],
+    steps: [
+      ["context", "--json"],
+      ["context", "-p", "proj-old", "--json"],
+    ],
   },
   {
     name: "hooks run after attach and close",
     env: { KANEO_SESSION_ID: "sess-hook" },
     config: {
       hooks: {
-        attach: 'printf "%s %s %s %s\\n" "$KANEO_HOOK_EVENT" "$KANEO_TASK_ID" "$KANEO_TASK_NUMBER" "$KANEO_TASK_REF" >> "$HOME/.config/kaneo/hook.out"',
+        attach:
+          'printf "%s %s %s %s\\n" "$KANEO_HOOK_EVENT" "$KANEO_TASK_ID" "$KANEO_TASK_NUMBER" "$KANEO_TASK_REF" >> "$HOME/.config/kaneo/hook.out"',
         close: 'printf "%s %s\\n" "$KANEO_HOOK_EVENT" "$KANEO_TASK_ID" >> "$HOME/.config/kaneo/hook.out"',
       },
     },
-    steps: [["session", "attach", "2", "--strict"], ["session", "close", "--strict"]],
+    steps: [
+      ["session", "attach", "2", "--strict"],
+      ["session", "close", "--strict"],
+    ],
   },
   {
     name: "a failing hook does not fail the attach",
@@ -2780,16 +4366,55 @@ export const SCENARIOS: Scenario[] = [
 
   // The settings take a project's id, a slug or a name, and a value the server
   // does not know is looked up across the workspaces the key can reach.
-  { name: "project by slug", steps: [["task", "ls", "-p", "BET", "--json"], ["task", "create", "x", "-p", "bet", "--human"], ["project", "get", "ALP", "--human"], ["board", "-p", "BET", "--json"]] },
+  {
+    name: "project by slug",
+    steps: [
+      ["task", "ls", "-p", "BET", "--json"],
+      ["task", "create", "x", "-p", "bet", "--human"],
+      ["project", "get", "ALP", "--human"],
+      ["board", "-p", "BET", "--json"],
+    ],
+  },
   { name: "project by name", steps: [["task", "ls", "-p", "Beta", "--human"]] },
   // Columns and workflow rules take the same values as tasks do.
-  { name: "project by slug for columns and workflow rules", steps: [["column", "ls", "-p", "BET", "--human"], ["column", "create", "Waiting", "-p", "bet", "--human"], ["column", "rename", "waiting", "Held", "-p", "Beta", "--human"], ["column", "reorder", "to-do", "in-progress", "waiting", "done", "-p", "BET", "--human"], ["workflow", "set", "github", "pr_opened", "Held", "-p", "BET", "--human"], ["workflow", "ls", "-p", "BET", "--human"], ["workflow", "rm", "github", "pr_opened", "-p", "BET", "--human"], ["column", "rm", "waiting", "--yes", "-p", "BET", "--human"], ["column", "rm", "to-do", "--yes", "-p", "BET", "--json"], ["column", "ls", "-p", "nope", "--json"], ["column", "create", "Waiting", "-p", "nope", "--json"], ["workflow", "ls", "-p", "nope", "--json"], ["workflow", "set", "github", "pr_opened", "done", "-p", "nope", "--json"]] },
+  {
+    name: "project by slug for columns and workflow rules",
+    steps: [
+      ["column", "ls", "-p", "BET", "--human"],
+      ["column", "create", "Waiting", "-p", "bet", "--human"],
+      ["column", "rename", "waiting", "Held", "-p", "Beta", "--human"],
+      ["column", "reorder", "to-do", "in-progress", "waiting", "done", "-p", "BET", "--human"],
+      ["workflow", "set", "github", "pr_opened", "Held", "-p", "BET", "--human"],
+      ["workflow", "ls", "-p", "BET", "--human"],
+      ["workflow", "rm", "github", "pr_opened", "-p", "BET", "--human"],
+      ["column", "rm", "waiting", "--yes", "-p", "BET", "--human"],
+      ["column", "rm", "to-do", "--yes", "-p", "BET", "--json"],
+      ["column", "ls", "-p", "nope", "--json"],
+      ["column", "create", "Waiting", "-p", "nope", "--json"],
+      ["workflow", "ls", "-p", "nope", "--json"],
+      ["workflow", "set", "github", "pr_opened", "done", "-p", "nope", "--json"],
+    ],
+  },
   // With no project configured, a hint naming the task by number would not
   // resolve at all; it names the task by id, and that command, as printed in
   // step 1, lists the task's comments with no project.
-  { name: "comment delete hint with no project configured", env: { KANEO_PROJECT: "", KANEO_WORKSPACE: "" }, steps: [["comment", "delete", "BET#1", "nope", "--json"], ["comment", "list", "task-b1", "--json"], ["comment", "list", "1", "--json"]] },
+  {
+    name: "comment delete hint with no project configured",
+    env: { KANEO_PROJECT: "", KANEO_WORKSPACE: "" },
+    steps: [
+      ["comment", "delete", "BET#1", "nope", "--json"],
+      ["comment", "list", "task-b1", "--json"],
+      ["comment", "list", "1", "--json"],
+    ],
+  },
   { name: "project not found", steps: [["task", "ls", "-p", "nope", "--json"]] },
-  { name: "task reference with a slug", steps: [["task", "get", "BET#1", "--json"], ["comment", "add", "ALP#2", "hi", "--human"]] },
+  {
+    name: "task reference with a slug",
+    steps: [
+      ["task", "get", "BET#1", "--json"],
+      ["comment", "add", "ALP#2", "hi", "--human"],
+    ],
+  },
   {
     // A workspace whose name is not its slug, with a project in it, so the
     // output itself shows which workspace a name or a slug reached.
@@ -2805,7 +4430,14 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   { name: "workspace not found", steps: [["project", "ls", "-w", "nope", "--json"]] },
-  { name: "task lookup error names the project", steps: [["task", "get", "99", "--json"], ["task", "get", "#99", "--human"], ["task", "get", "BET#99", "--human"]] },
+  {
+    name: "task lookup error names the project",
+    steps: [
+      ["task", "get", "99", "--json"],
+      ["task", "get", "#99", "--human"],
+      ["task", "get", "BET#99", "--human"],
+    ],
+  },
   // A workspace's name where a project's belongs, for a task number (in a
   // reference or by -p): the error says numbers are per project and names the
   // projects that can hold the number. Elsewhere a value that names no project
@@ -2821,7 +4453,11 @@ export const SCENARIOS: Scenario[] = [
       ["project", "get", "Main", "--human"],
     ],
   },
-  { name: "task reference with a workspace name to an older server", legacy: true, steps: [["task", "get", "Main#2", "--human"]] },
+  {
+    name: "task reference with a workspace name to an older server",
+    legacy: true,
+    steps: [["task", "get", "Main#2", "--human"]],
+  },
   {
     // Slugs are not unique on the server, so one that two projects carry names
     // both rather than picking one; an exact-case match still wins over a folded one.
@@ -2833,13 +4469,19 @@ export const SCENARIOS: Scenario[] = [
         { id: "proj-lower", workspaceId: "ws-other", name: "Lower", slug: "alp" },
       ],
     },
-    steps: [["task", "ls", "-p", "BET", "--json"], ["project", "get", "alp", "--human"]],
+    steps: [
+      ["task", "ls", "-p", "BET", "--json"],
+      ["project", "get", "alp", "--human"],
+    ],
   },
   {
     // An archived project is still found by its slug, which is how one gets
     // unarchived, and the report carries the id the slug resolved to.
     name: "project by slug in a write",
-    steps: [["project", "unarchive", "OLD", "--json"], ["task", "move", "1", "--to", "Beta", "--json"]],
+    steps: [
+      ["project", "unarchive", "OLD", "--json"],
+      ["task", "move", "1", "--to", "Beta", "--json"],
+    ],
   },
   {
     // The same failure with the project named by a .kaneo.json rather than the
@@ -2854,12 +4496,19 @@ export const SCENARIOS: Scenario[] = [
     // something there to show and `find` has somewhere else to look.
     name: "project list across workspaces",
     seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
-    steps: [["project", "ls", "-A", "--json"], ["project", "ls", "--all-workspaces", "--archived", "--human"]],
+    steps: [
+      ["project", "ls", "-A", "--json"],
+      ["project", "ls", "--all-workspaces", "--archived", "--human"],
+    ],
   },
   {
     name: "project list with an empty slug",
     seed: { projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }] },
-    steps: [["project", "ls", "--human"], ["project", "ls", "-A", "--human"], ["project", "ls", "-A", "--json"]],
+    steps: [
+      ["project", "ls", "--human"],
+      ["project", "ls", "-A", "--human"],
+      ["project", "ls", "-A", "--json"],
+    ],
   },
   {
     // A project with no slug is named without an empty [] or a leading blank,
@@ -2872,14 +4521,21 @@ export const SCENARIOS: Scenario[] = [
         { id: "proj-twin", workspaceId: WS, name: "Twin", slug: "TWN" },
       ],
     },
-    steps: [["project", "rm", "proj-noslug", "--human"], ["project", "rm", "Twin", "--human"]],
+    steps: [
+      ["project", "rm", "proj-noslug", "--human"],
+      ["project", "rm", "Twin", "--human"],
+    ],
   },
   {
     // The other messages that name a project or a workspace by its slug fall
     // back to the id (or, in an export, the name) when the slug is empty.
     name: "messages naming a project or workspace with an empty slug",
     seed: {
-      workspaces: [...SEED.workspaces, { id: "ws-twin", name: "Twin", slug: "" }, { id: "ws-twin2", name: "Twin", slug: "tw2" }],
+      workspaces: [
+        ...SEED.workspaces,
+        { id: "ws-twin", name: "Twin", slug: "" },
+        { id: "ws-twin2", name: "Twin", slug: "tw2" },
+      ],
       projects: [...SEED.projects, { id: "proj-noslug", workspaceId: WS, name: "No slug", slug: "" }],
       tasks: [...SEED.tasks, { id: "task-n1", projectId: "proj-noslug", title: "Slugless" }],
     },
@@ -2924,7 +4580,10 @@ export const SCENARIOS: Scenario[] = [
     failOn: "^GET /project$",
     failOnQuery: "workspaceId=ws-other",
     failStatus: 403,
-    steps: [["project", "ls", "-A", "--human"], ["project", "ls", "-A", "--json"]],
+    steps: [
+      ["project", "ls", "-A", "--human"],
+      ["project", "ls", "-A", "--json"],
+    ],
   },
   {
     name: "project find with one workspace unlisted",
@@ -2932,7 +4591,10 @@ export const SCENARIOS: Scenario[] = [
     failOn: "^GET /project$",
     failOnQuery: "workspaceId=ws-other",
     failStatus: 403,
-    steps: [["project", "find", "be", "--human"], ["project", "find", "gam", "--human"]],
+    steps: [
+      ["project", "find", "be", "--human"],
+      ["project", "find", "gam", "--human"],
+    ],
   },
   {
     // A slug that is found in a listed workspace still resolves; one that is
@@ -2942,7 +4604,12 @@ export const SCENARIOS: Scenario[] = [
     failOn: "^GET /project$",
     failOnQuery: "workspaceId=ws-other",
     failStatus: 403,
-    steps: [["task", "ls", "-p", "BET", "--human"], ["task", "ls", "-p", "nope", "--human"], ["task", "ls", "-p", "Beta", "--human"], ["task", "ls", "-p", "proj-beta", "--human"]],
+    steps: [
+      ["task", "ls", "-p", "BET", "--human"],
+      ["task", "ls", "-p", "nope", "--human"],
+      ["task", "ls", "-p", "Beta", "--human"],
+      ["task", "ls", "-p", "proj-beta", "--human"],
+    ],
   },
   {
     // The hint a caller adds to a value that names no project survives the
@@ -2965,7 +4632,13 @@ export const SCENARIOS: Scenario[] = [
     // -A is accepted as the no-op it is — find already searches every
     // workspace — while -w names a scope the command does not have, so it is
     // refused rather than silently ignored.
-    steps: [["project", "find", "be", "--json"], ["project", "find", "be", "-A", "--json"], ["project", "find", "be", "-w", "ws-main", "--human"], ["project", "find", "OLD", "--human"], ["project", "find", "zzz", "--json"]],
+    steps: [
+      ["project", "find", "be", "--json"],
+      ["project", "find", "be", "-A", "--json"],
+      ["project", "find", "be", "-w", "ws-main", "--human"],
+      ["project", "find", "OLD", "--human"],
+      ["project", "find", "zzz", "--json"],
+    ],
   },
 
   // Gitea integration: the whole lifecycle against the fake's one instance.
@@ -2981,9 +4654,29 @@ export const SCENARIOS: Scenario[] = [
     stdin: "fake-gitea-token\n",
     steps: [
       ["integration", "gitea", "get", "--json"],
-      ["integration", "gitea", "verify", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json",
+      ],
       ["integration", "gitea", "repos", "--base-url", "https://gitea.example.com", "--token", "-", "--human"],
-      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json",
+      ],
       ["integration", "gitea", "get", "--human"],
       ["integration", "gitea", "update", "--active=false", "--comment-task-link=false", "--json"],
       // No --token: the stored one answers because the base URL is unchanged.
@@ -3001,8 +4694,23 @@ export const SCENARIOS: Scenario[] = [
     plainMember: true,
     stdin: "fake-gitea-token\n",
     seed: {
-      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
-      giteaRepoIssues: [{ baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "Member may import this" }] }],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
+      giteaRepoIssues: [
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [{ number: 1, title: "Member may import this" }],
+        },
+      ],
     },
     steps: [
       ["integration", "gitea", "get", "--human"],
@@ -3024,7 +4732,15 @@ export const SCENARIOS: Scenario[] = [
         { owner: "acme", name: "app" },
         { owner: "acme", name: "other" },
       ],
-      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "scenario-stored-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "scenario-stored-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
     },
     steps: [
       ["integration", "gitea", "verify", "acme/app", "--base-url", "https://gitea.example.com/", "--json"],
@@ -3046,9 +4762,39 @@ export const SCENARIOS: Scenario[] = [
     },
     stdin: "fake-gitea-token\n",
     steps: [
-      ["integration", "gitea", "verify", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "--human"],
-      ["integration", "gitea", "verify", "acme/readonly", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
-      ["integration", "gitea", "verify", "acme/missing", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--human",
+      ],
+      [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/readonly",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json",
+      ],
+      [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/missing",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json",
+      ],
       // With no integration stored and no token sent, the server refuses.
       ["integration", "gitea", "verify", "acme/app", "--base-url", "https://gitea.example.com", "--json"],
     ],
@@ -3057,13 +4803,27 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitea verify not a gitea instance",
     seed: { giteaInstance: { mode: "not-gitea" } },
     stdin: "fake-gitea-token\n",
-    steps: [["integration", "gitea", "verify", "acme/app", "--base-url", "https://example.com", "--token", "-", "--json"]],
+    steps: [
+      ["integration", "gitea", "verify", "acme/app", "--base-url", "https://example.com", "--token", "-", "--json"],
+    ],
   },
   {
     name: "integration gitea verify redirected",
     seed: { giteaInstance: { mode: "redirected" } },
     stdin: "fake-gitea-token\n",
-    steps: [["integration", "gitea", "verify", "acme/app", "--base-url", "http://gitea.example.com", "--token", "-", "--json"]],
+    steps: [
+      [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/app",
+        "--base-url",
+        "http://gitea.example.com",
+        "--token",
+        "-",
+        "--json",
+      ],
+    ],
   },
   // Every route that trusts a token fails the same way when the instance
   // rejects it.
@@ -3073,7 +4833,17 @@ export const SCENARIOS: Scenario[] = [
     stdin: "fake-gitea-token\n",
     steps: [
       ["integration", "gitea", "repos", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
-      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json",
+      ],
     ],
   },
   {
@@ -3081,15 +4851,55 @@ export const SCENARIOS: Scenario[] = [
     seed: { giteaRepositories: [{ owner: "acme", name: "app" }] },
     stdin: "fake-gitea-token\n",
     steps: [
-      ["integration", "gitea", "connect", "acme/missing", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/missing",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json",
+      ],
       // No stored integration and no token sent: the server asks for one.
       ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--json"],
       // A token is a credential, so a literal flag value is refused client-side.
-      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--token", "literal", "--json"],
-      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://other.example.com", "--token", "-", "--json"],
+      [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "literal",
+        "--json",
+      ],
+      [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://other.example.com",
+        "--token",
+        "-",
+        "--json",
+      ],
       // The stored token belongs to the instance it was saved for.
       ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--json"],
-      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json",
+      ],
     ],
   },
   // A repository already linked to another project cannot be linked again.
@@ -3097,11 +4907,31 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitea connect repository already linked",
     seed: {
       giteaRepositories: [{ owner: "acme", name: "app" }],
-      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
     },
     stdin: "fake-gitea-token\n",
     steps: [
-      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "-p", "proj-beta", "--json"],
+      [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "-p",
+        "proj-beta",
+        "--json",
+      ],
       ["integration", "gitea", "rm", "--yes", "-p", "proj-beta", "--json"],
     ],
   },
@@ -3114,13 +4944,33 @@ export const SCENARIOS: Scenario[] = [
     steps: [
       ["integration", "gitea", "verify", "acme/app", "--token", "-", "--json"],
       ["integration", "gitea", "connect", "acme", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
-      ["integration", "gitea", "connect", "acme/app/extra", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app/extra",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json",
+      ],
       ["integration", "gitea", "repos", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
     ],
   },
   {
     name: "integration gitea update needs a change",
-    seed: { giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }] },
+    seed: {
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
+    },
     steps: [
       ["integration", "gitea", "update", "--json"],
       ["integration", "gitea", "update", "--active=false", "--json"],
@@ -3139,9 +4989,24 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "integration gitea rm needs --yes",
     seed: {
-      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
       externalLinks: [
-        { taskId: "task-a1", url: "https://gitea.example.com/acme/app/issues/7", title: "Write the parser", resourceType: "issue", externalId: "7", integration: { id: "git0001", type: "gitea" } },
+        {
+          taskId: "task-a1",
+          url: "https://gitea.example.com/acme/app/issues/7",
+          title: "Write the parser",
+          resourceType: "issue",
+          externalId: "7",
+          integration: { id: "git0001", type: "gitea" },
+        },
         { taskId: "task-a1", url: "https://example.com/notes", title: "Notes" },
       ],
     },
@@ -3179,17 +5044,36 @@ export const SCENARIOS: Scenario[] = [
           repositoryOwner: "acme",
           repositoryName: "app",
           issues: [
-            { number: 1, title: "Fix login bug", body: "Steps to reproduce", labels: ["bug", "priority:high", "status:in-progress"] },
+            {
+              number: 1,
+              title: "Fix login bug",
+              body: "Steps to reproduce",
+              labels: ["bug", "priority:high", "status:in-progress"],
+            },
             { number: 2, title: "Write the docs", labels: ["docs"] },
             { number: 3, title: "Already closed", state: "closed", labels: ["bug"] },
             { number: 4, title: "A chore with a wontfix label", labels: ["wontfix"] },
             { number: 5, title: "Cannot be fetched", labels: ["bug"], fail: "Gitea API error 502" },
             { number: 6, title: "A pull request, not an issue", labels: ["bug"], pullRequest: true },
-            { number: 7, title: "Parser, refreshed", body: "refreshed body", labels: ["status:done", "priority:urgent"] },
+            {
+              number: 7,
+              title: "Parser, refreshed",
+              body: "refreshed body",
+              labels: ["status:done", "priority:urgent"],
+            },
           ],
         },
       ],
-      externalLinks: [{ taskId: "task-a1", url: "https://gitea.example.com/acme/app/issues/7", title: "Write the parser", resourceType: "issue", externalId: "7", integration: { id: "git0001", type: "gitea" } }],
+      externalLinks: [
+        {
+          taskId: "task-a1",
+          url: "https://gitea.example.com/acme/app/issues/7",
+          title: "Write the parser",
+          resourceType: "issue",
+          externalId: "7",
+          integration: { id: "git0001", type: "gitea" },
+        },
+      ],
     },
     steps: [
       ["integration", "gitea", "import", "--json"],
@@ -3201,7 +5085,18 @@ export const SCENARIOS: Scenario[] = [
   { name: "integration gitea import without integration", steps: [["integration", "gitea", "import", "--json"]] },
   {
     name: "integration gitea import inactive",
-    seed: { giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app", isActive: false }] },
+    seed: {
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          isActive: false,
+        },
+      ],
+    },
     steps: [["integration", "gitea", "import", "--json"]],
   },
 
@@ -3213,8 +5108,23 @@ export const SCENARIOS: Scenario[] = [
     seed: {
       giteaInstance: { mode: "bad-token" },
       giteaRepositories: [{ owner: "acme", name: "app" }],
-      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
-      giteaRepoIssues: [{ baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "Never imported" }] }],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
+      giteaRepoIssues: [
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [{ number: 1, title: "Never imported" }],
+        },
+      ],
     },
     steps: [["integration", "gitea", "import", "--json"]],
   },
@@ -3228,7 +5138,15 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitea import reimports links to missing or foreign tasks",
     seed: {
       giteaRepositories: [{ owner: "acme", name: "app" }],
-      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
       giteaRepoIssues: [
         {
           baseUrl: "https://gitea.example.com",
@@ -3241,8 +5159,22 @@ export const SCENARIOS: Scenario[] = [
         },
       ],
       externalLinks: [
-        { taskId: "task-gone", url: "https://gitea.example.com/acme/app/issues/8", title: "Old link", resourceType: "issue", externalId: "8", integration: { id: "git0001", type: "gitea" } },
-        { taskId: "task-b1", url: "https://gitea.example.com/acme/app/issues/9", title: "Foreign link", resourceType: "issue", externalId: "9", integration: { id: "git0001", type: "gitea" } },
+        {
+          taskId: "task-gone",
+          url: "https://gitea.example.com/acme/app/issues/8",
+          title: "Old link",
+          resourceType: "issue",
+          externalId: "8",
+          integration: { id: "git0001", type: "gitea" },
+        },
+        {
+          taskId: "task-b1",
+          url: "https://gitea.example.com/acme/app/issues/9",
+          title: "Foreign link",
+          resourceType: "issue",
+          externalId: "9",
+          integration: { id: "git0001", type: "gitea" },
+        },
       ],
     },
     steps: [
@@ -3258,7 +5190,15 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitea import human with errors",
     seed: {
       giteaRepositories: [{ owner: "acme", name: "app" }],
-      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
       giteaRepoIssues: [
         {
           baseUrl: "https://gitea.example.com",
@@ -3277,7 +5217,18 @@ export const SCENARIOS: Scenario[] = [
   // "unknown" rather than active or inactive.
   {
     name: "integration gitea get with a null active flag",
-    seed: { giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app", isActive: null }] },
+    seed: {
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          isActive: null,
+        },
+      ],
+    },
     steps: [
       ["integration", "gitea", "get", "--human"],
       ["integration", "gitea", "get", "--json"],
@@ -3291,11 +5242,33 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "integration gitea reconnect lists the new repository's issues",
     seed: {
-      giteaRepositories: [{ owner: "acme", name: "app" }, { owner: "acme", name: "other" }, { owner: "acme", name: "third" }],
-      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepositories: [
+        { owner: "acme", name: "app" },
+        { owner: "acme", name: "other" },
+        { owner: "acme", name: "third" },
+      ],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
       giteaRepoIssues: [
-        { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "App issue" }] },
-        { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "other", issues: [{ number: 2, title: "Other issue" }] },
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [{ number: 1, title: "App issue" }],
+        },
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "other",
+          issues: [{ number: 2, title: "Other issue" }],
+        },
       ],
     },
     steps: [
@@ -3317,13 +5290,43 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "integration gitea reconnect refreshes matching issue numbers",
     seed: {
-      giteaRepositories: [{ owner: "acme", name: "app" }, { owner: "acme", name: "other" }],
-      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
-      giteaRepoIssues: [
-        { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "App issue one" }] },
-        { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "other", issues: [{ number: 1, title: "Other issue one", labels: ["priority:urgent"] }] },
+      giteaRepositories: [
+        { owner: "acme", name: "app" },
+        { owner: "acme", name: "other" },
       ],
-      externalLinks: [{ taskId: "task-a1", url: "https://gitea.example.com/acme/app/issues/1", title: "App issue one", resourceType: "issue", externalId: "1", integration: { id: "git0001", type: "gitea" } }],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
+      giteaRepoIssues: [
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [{ number: 1, title: "App issue one" }],
+        },
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "other",
+          issues: [{ number: 1, title: "Other issue one", labels: ["priority:urgent"] }],
+        },
+      ],
+      externalLinks: [
+        {
+          taskId: "task-a1",
+          url: "https://gitea.example.com/acme/app/issues/1",
+          title: "App issue one",
+          resourceType: "issue",
+          externalId: "1",
+          integration: { id: "git0001", type: "gitea" },
+        },
+      ],
     },
     steps: [
       ["integration", "gitea", "connect", "acme/other", "--base-url", "https://gitea.example.com", "--json"],
@@ -3341,8 +5344,23 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitea import after the task moved projects",
     seed: {
       giteaRepositories: [{ owner: "acme", name: "app" }],
-      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
-      giteaRepoIssues: [{ baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "Gitea issue one", labels: ["bug"] }] }],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
+      giteaRepoIssues: [
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [{ number: 1, title: "Gitea issue one", labels: ["bug"] }],
+        },
+      ],
     },
     steps: [
       ["integration", "gitea", "import", "--json"],
@@ -3362,7 +5380,15 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitea import after imported tasks are deleted",
     seed: {
       giteaRepositories: [{ owner: "acme", name: "app" }],
-      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
       giteaRepoIssues: [
         {
           baseUrl: "https://gitea.example.com",
@@ -3389,18 +5415,25 @@ export const SCENARIOS: Scenario[] = [
   // answers it masked, and each refusal is the server's own words.
   {
     name: "integration gitlab get without a link",
-    steps: [["integration", "gitlab", "get", "--human"], ["integration", "gitlab", "get", "--json"]],
+    steps: [
+      ["integration", "gitlab", "get", "--human"],
+      ["integration", "gitlab", "get", "--json"],
+    ],
   },
-  ...both("integration gitlab get", ["integration", "gitlab", "get"]).map(
-    (s): Scenario => ({ ...s, seed: { gitlabIntegrations: GITLAB } }),
-  ),
+  ...both("integration gitlab get", ["integration", "gitlab", "get"]).map((s): Scenario => ({
+    ...s,
+    seed: { gitlabIntegrations: GITLAB },
+  })),
   {
     // A plain member still reads the link, but the secrets come back empty and
     // the human line for the webhook secret is left out.
     name: "integration gitlab get as a plain member",
     plainMember: true,
     seed: { gitlabIntegrations: GITLAB },
-    steps: [["integration", "gitlab", "get", "--human"], ["integration", "gitlab", "get", "--json"]],
+    steps: [
+      ["integration", "gitlab", "get", "--human"],
+      ["integration", "gitlab", "get", "--json"],
+    ],
   },
   {
     // connect reads the token from stdin, the link answers masked, update
@@ -3409,7 +5442,20 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitlab connect update import rm",
     stdin: "cli-token-0123456789abcdef\n",
     steps: [
-      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--token-type", "bearer", "--json"],
+      [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--token-type",
+        "bearer",
+        "--json",
+      ],
       ["integration", "gitlab", "get", "--human"],
       ["integration", "gitlab", "update", "--comment-task-link=false", "--json"],
       ["integration", "gitlab", "import", "--human"],
@@ -3425,8 +5471,26 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitlab connect reuses or refuses the stored token",
     seed: { gitlabIntegrations: GITLAB },
     steps: [
-      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "acme/other-project", "--human"],
-      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.other.example.com", "--project-path", "acme/web-app", "--human"],
+      [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/other-project",
+        "--human",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.other.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--human",
+      ],
       ["integration", "gitlab", "get", "--json"],
     ],
   },
@@ -3435,8 +5499,34 @@ export const SCENARIOS: Scenario[] = [
     seed: { gitlabIntegrations: GITLAB },
     stdin: "cli-token-0123456789abcdef\n",
     steps: [
-      ["integration", "gitlab", "connect", "-p", P2, "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
-      ["integration", "gitlab", "connect", "-p", P2, "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"],
+      [
+        "integration",
+        "gitlab",
+        "connect",
+        "-p",
+        P2,
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "connect",
+        "-p",
+        P2,
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--json",
+      ],
     ],
   },
   {
@@ -3445,13 +5535,75 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitlab token rules",
     stdin: "",
     steps: [
-      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--human"],
-      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "literal-value", "--json"],
-      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"],
+      [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--human",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "literal-value",
+        "--json",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--json",
+      ],
       ["integration", "gitlab", "projects", "--base-url", "https://gitlab.example.com", "--human"],
-      ["integration", "gitlab", "projects", "--base-url", "https://gitlab.example.com", "--access-token", "literal-value", "--json"],
-      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "literal-value", "--json"],
-      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"],
+      [
+        "integration",
+        "gitlab",
+        "projects",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--access-token",
+        "literal-value",
+        "--json",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "literal-value",
+        "--json",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--json",
+      ],
     ],
   },
   {
@@ -3461,19 +5613,96 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitlab refuses bad instance addresses",
     stdin: "addr-token-0123456789abcdef\n",
     steps: [
-      ["integration", "gitlab", "connect", "--base-url", "gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
-      ["integration", "gitlab", "connect", "--base-url", "http://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
-      ["integration", "gitlab", "verify", "--base-url", "http://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
-      ["integration", "gitlab", "projects", "--base-url", "http://gitlab.example.com", "--access-token", "-", "--human"],
-      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "web-app", "--access-token", "-", "--human"],
+      [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "http://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "http://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "projects",
+        "--base-url",
+        "http://gitlab.example.com",
+        "--access-token",
+        "-",
+        "--human",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "web-app",
+        "--access-token",
+        "-",
+        "--human",
+      ],
     ],
   },
   {
     name: "integration gitlab verify",
     stdin: "verify-token-0123456789abcdef\n",
     steps: [
-      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"],
-      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--token-type", "bearer", "--human"],
+      [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--json",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--token-type",
+        "bearer",
+        "--human",
+      ],
     ],
   },
   {
@@ -3491,8 +5720,30 @@ export const SCENARIOS: Scenario[] = [
       failureReason: "project_not_found",
     },
     steps: [
-      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
-      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"],
+      [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--json",
+      ],
     ],
   },
   {
@@ -3503,14 +5754,45 @@ export const SCENARIOS: Scenario[] = [
       missingPermissions: ["Developer"],
       message: "Token may not have sufficient permissions to manage issues and labels.",
     },
-    steps: [["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"]],
+    steps: [
+      [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--json",
+      ],
+    ],
   },
   {
     name: "integration gitlab projects",
     stdin: "list-token-0123456789abcdef\n",
     steps: [
-      ["integration", "gitlab", "projects", "--base-url", "https://gitlab.example.com", "--access-token", "-", "--json"],
-      ["integration", "gitlab", "projects", "--base-url", "https://gitlab.example.com", "--access-token", "-", "--human"],
+      [
+        "integration",
+        "gitlab",
+        "projects",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--access-token",
+        "-",
+        "--json",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "projects",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--access-token",
+        "-",
+        "--human",
+      ],
     ],
   },
   {
@@ -3552,7 +5834,10 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitlab import partial errors",
     seed: { gitlabIntegrations: GITLAB },
     gitlabImportErrors: ["Issue !12: the assignee is gone", "Merge request !34: labels refused"],
-    steps: [["integration", "gitlab", "import", "--human"], ["integration", "gitlab", "import", "--json"]],
+    steps: [
+      ["integration", "gitlab", "import", "--human"],
+      ["integration", "gitlab", "import", "--json"],
+    ],
   },
   {
     name: "integration gitlab import an inactive link",
@@ -3569,11 +5854,42 @@ export const SCENARIOS: Scenario[] = [
     stdin: "member-token-0123456789abcdef\n",
     steps: [
       ["integration", "gitlab", "get", "--human"],
-      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
+      [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human",
+      ],
       ["integration", "gitlab", "update", "--active=false", "--human"],
       ["integration", "gitlab", "rm", "--yes", "--human"],
-      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
-      ["integration", "gitlab", "projects", "--base-url", "https://gitlab.example.com", "--access-token", "-", "--human"],
+      [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human",
+      ],
+      [
+        "integration",
+        "gitlab",
+        "projects",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--access-token",
+        "-",
+        "--human",
+      ],
       ["integration", "gitlab", "import", "--human"],
     ],
   },
@@ -3610,16 +5926,27 @@ export const SCENARIOS: Scenario[] = [
     name: "integration github get",
     seed: {
       githubIntegrations: [
-        { projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", branchPattern: "feature/{slug}-{number}", commentTaskLinkOnGitHubIssue: false },
+        {
+          projectId: P1,
+          repositoryOwner: "acme",
+          repositoryName: "kaneo",
+          branchPattern: "feature/{slug}-{number}",
+          commentTaskLinkOnGitHubIssue: false,
+        },
       ],
     },
-    steps: [["integration", "github", "get", "--json"], ["integration", "github", "get", "--human"]],
+    steps: [
+      ["integration", "github", "get", "--json"],
+      ["integration", "github", "get", "--human"],
+    ],
   },
   {
     // An unverified binding reads as requiring verification and folds into
     // isActive, the way get-github-integration.ts answers it.
     name: "integration github get unverified",
-    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", verified: false }] },
+    seed: {
+      githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", verified: false }],
+    },
     steps: [["integration", "github", "get", "--json"]],
   },
   {
@@ -3686,12 +6013,16 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     name: "integration github import paused",
-    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", isActive: false }] },
+    seed: {
+      githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", isActive: false }],
+    },
     steps: [["integration", "github", "import", "--json"]],
   },
   {
     name: "integration github import unverified",
-    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", verified: false }] },
+    seed: {
+      githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", verified: false }],
+    },
     steps: [["integration", "github", "import", "--json"]],
   },
   {
@@ -3701,7 +6032,9 @@ export const SCENARIOS: Scenario[] = [
     // rather than default it, or this state cannot be reproduced.
     name: "integration github no installation",
     seed: {
-      githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", installationId: null, verified: true }],
+      githubIntegrations: [
+        { projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", installationId: null, verified: true },
+      ],
     },
     steps: [
       ["integration", "github", "get", "--json"],
@@ -3742,7 +6075,17 @@ export const SCENARIOS: Scenario[] = [
     name: "integration mattermost set create update remove",
     stdin: "https://example.com/mm-alpha\n",
     steps: [
-      ["integration", "mattermost", "set", WF, "-", "--channel-name", "alerts", "--task-comment-created=false", "--human"],
+      [
+        "integration",
+        "mattermost",
+        "set",
+        WF,
+        "-",
+        "--channel-name",
+        "alerts",
+        "--task-comment-created=false",
+        "--human",
+      ],
       ["integration", "mattermost", "get", "--json"],
       // The channel is cleared by an empty value, one toggle merges into the
       // stored set, and pausing is an explicit false.
@@ -3777,7 +6120,15 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "integration mattermost url rotation",
     seed: {
-      integrations: [{ projectId: P1, provider: "mattermost", webhookUrl: "https://example.com/mm-old", channelName: "alerts", isActive: false }],
+      integrations: [
+        {
+          projectId: P1,
+          provider: "mattermost",
+          webhookUrl: "https://example.com/mm-old",
+          channelName: "alerts",
+          isActive: false,
+        },
+      ],
     },
     stdin: "https://example.com/mm-new\n",
     steps: [
@@ -3792,7 +6143,14 @@ export const SCENARIOS: Scenario[] = [
     seed: {
       integrations: [
         { projectId: P1, provider: "mattermost", webhookUrl: "https://example.com/mm-seeded", isActive: null },
-        { projectId: P1, provider: "webhook", webhookUrl: "https://example.com/wh-seeded", secret: "whsec_seed_12", isActive: null, dueDateReminderLeadTimeMinutes: 90 },
+        {
+          projectId: P1,
+          provider: "webhook",
+          webhookUrl: "https://example.com/wh-seeded",
+          secret: "whsec_seed_12",
+          isActive: null,
+          dueDateReminderLeadTimeMinutes: 90,
+        },
       ],
     },
     steps: [
@@ -3805,7 +6163,10 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "integration mattermost url from stdin",
     stdin: "https://example.com/mm-stdin\n",
-    steps: [["integration", "mattermost", "set", WF, "-", "--json"], ["integration", "mattermost", "get", "--human"]],
+    steps: [
+      ["integration", "mattermost", "set", WF, "-", "--json"],
+      ["integration", "mattermost", "get", "--human"],
+    ],
   },
   ...both("integration webhook get empty", ["integration", "webhook", "get"]),
   {
@@ -3852,7 +6213,10 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "integration webhook url from stdin",
     stdin: "https://example.com/wh-stdin\n",
-    steps: [["integration", "webhook", "set", WF, "-", "--json"], ["integration", "webhook", "get", "--human"]],
+    steps: [
+      ["integration", "webhook", "set", WF, "-", "--json"],
+      ["integration", "webhook", "get", "--human"],
+    ],
   },
   {
     // stdin is per-scenario, so the secret's own pipe gets its own scenario;
@@ -3925,7 +6289,9 @@ export const SCENARIOS: Scenario[] = [
     // A refused PATCH writes nothing: the stored row still has the old URL.
     name: "integration mattermost patch scheme refused keeps stored",
     seed: {
-      integrations: [{ projectId: P1, provider: "mattermost", webhookUrl: "https://example.com/mm-kept", channelName: "alerts" }],
+      integrations: [
+        { projectId: P1, provider: "mattermost", webhookUrl: "https://example.com/mm-kept", channelName: "alerts" },
+      ],
     },
     stdin: "http://insecure.example/mm\n",
     steps: [
@@ -3981,7 +6347,9 @@ export const SCENARIOS: Scenario[] = [
     name: "integration mattermost as a plain member",
     plainMember: true,
     seed: {
-      integrations: [{ projectId: P1, provider: "mattermost", webhookUrl: "https://example.com/mm-member", channelName: "alerts" }],
+      integrations: [
+        { projectId: P1, provider: "mattermost", webhookUrl: "https://example.com/mm-member", channelName: "alerts" },
+      ],
     },
     stdin: "https://example.com/mm-member-new\n",
     steps: [
@@ -3997,7 +6365,9 @@ export const SCENARIOS: Scenario[] = [
     name: "integration webhook as a plain member",
     plainMember: true,
     seed: {
-      integrations: [{ projectId: P1, provider: "webhook", webhookUrl: "https://example.com/wh-member", secret: "whsec_member_3" }],
+      integrations: [
+        { projectId: P1, provider: "webhook", webhookUrl: "https://example.com/wh-member", secret: "whsec_member_3" },
+      ],
     },
     stdin: "https://example.com/wh-member-new\n",
     steps: [
@@ -4018,7 +6388,10 @@ export const SCENARIOS: Scenario[] = [
     // The routes are security: [], so no key, workspace or project is needed.
     name: "instance reads without a key",
     env: { KANEO_API_KEY: "", KANEO_PROJECT: "", KANEO_WORKSPACE: "" },
-    steps: [["instance", "status", "--human"], ["instance", "config", "--json"]],
+    steps: [
+      ["instance", "status", "--human"],
+      ["instance", "config", "--json"],
+    ],
   },
   ...both("whoami session", ["whoami", "session"]),
   {
@@ -4096,7 +6469,11 @@ export const SCENARIOS: Scenario[] = [
         // Not UTF-8: the PNG signature followed by bytes no text decode
         // survives, so the goldens pin that the download's bytes — to stdout
         // or to --out — arrive as they were served, not as text would.
-        { id: "asset-bin", body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00]), contentType: "image/png" },
+        {
+          id: "asset-bin",
+          body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00]),
+          contentType: "image/png",
+        },
       ],
     },
     steps: [
@@ -4136,21 +6513,56 @@ export const SCENARIOS: Scenario[] = [
     seed: {
       projects: [
         ...SEED.projects,
-        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+        {
+          id: "proj-public",
+          workspaceId: WS,
+          name: "Public",
+          slug: "PUB",
+          isPublic: true,
+          description: "shared board ".repeat(90),
+        },
       ],
     },
     // The three tasks differ on every field the filters read, so the filtered
     // read answers with task-pub1 alone.
     extraTasks: [
-      { id: "task-pub1", projectId: "proj-public", title: "Public first", priority: "high", userId: "user-1", dueDate: "2026-01-10T00:00:00.000Z" },
-      { id: "task-pub2", projectId: "proj-public", title: "Public second", status: "done", priority: "low", userId: "user-2", dueDate: "2026-03-10T00:00:00.000Z" },
+      {
+        id: "task-pub1",
+        projectId: "proj-public",
+        title: "Public first",
+        priority: "high",
+        userId: "user-1",
+        dueDate: "2026-01-10T00:00:00.000Z",
+      },
+      {
+        id: "task-pub2",
+        projectId: "proj-public",
+        title: "Public second",
+        status: "done",
+        priority: "low",
+        userId: "user-2",
+        dueDate: "2026-03-10T00:00:00.000Z",
+      },
       { id: "task-pub3", projectId: "proj-public", title: "Public third", status: "archived" },
     ],
     steps: [
       ["public", "project", "proj-public", "--human"],
       ["public", "project", "proj-public", "--status", "to-do", "--json"],
       ["public", "project", "proj-public", "--sort-by", "title", "--sort-order", "desc", "--limit", "1", "--json"],
-      ["public", "project", "proj-public", "--priority", "high", "--assignee-id", "user-1", "--due-before", "2026-02-01T00:00:00.000Z", "--due-after", "2026-01-01T00:00:00.000Z", "--json"],
+      [
+        "public",
+        "project",
+        "proj-public",
+        "--priority",
+        "high",
+        "--assignee-id",
+        "user-1",
+        "--due-before",
+        "2026-02-01T00:00:00.000Z",
+        "--due-after",
+        "2026-01-01T00:00:00.000Z",
+        "--json",
+      ],
       ["public", "project", "proj-alpha", "--json"],
       ["public", "project", "proj-public", "--sort-by", "sideways", "--json"],
     ],
@@ -4161,11 +6573,21 @@ export const SCENARIOS: Scenario[] = [
     seed: {
       projects: [
         ...SEED.projects,
-        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+        {
+          id: "proj-public",
+          workspaceId: WS,
+          name: "Public",
+          slug: "PUB",
+          isPublic: true,
+          description: "shared board ".repeat(90),
+        },
       ],
     },
     extraTasks: [{ id: "task-pub1", projectId: "proj-public", title: "Public first" }],
-    steps: [["public", "project", "proj-public", "--human"], ["public", "description", "proj-public", "--json"]],
+    steps: [
+      ["public", "project", "proj-public", "--human"],
+      ["public", "description", "proj-public", "--json"],
+    ],
   },
   {
     // The project description pages at 1024 characters a page; the task's by
@@ -4174,7 +6596,14 @@ export const SCENARIOS: Scenario[] = [
     seed: {
       projects: [
         ...SEED.projects,
-        { id: "proj-public", workspaceId: WS, name: "Public", slug: "PUB", isPublic: true, description: "shared board ".repeat(90) },
+        {
+          id: "proj-public",
+          workspaceId: WS,
+          name: "Public",
+          slug: "PUB",
+          isPublic: true,
+          description: "shared board ".repeat(90),
+        },
       ],
     },
     extraTasks: [
@@ -4226,10 +6655,29 @@ export const SCENARIOS: Scenario[] = [
     name: "integration discord set, rotate and rm",
     stdin: "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz0123456789\n",
     steps: [
-      ["integration", "discord", "set", WEBHOOK_URL_FLAG, "-", "--channel-name", "general", "--task-created=false", "--json"],
+      [
+        "integration",
+        "discord",
+        "set",
+        WEBHOOK_URL_FLAG,
+        "-",
+        "--channel-name",
+        "general",
+        "--task-created=false",
+        "--json",
+      ],
       ["integration", "discord", "get", "--human"],
       ["integration", "discord", "set", WEBHOOK_URL_FLAG, "-", "--json"],
-      ["integration", "discord", "set", "--channel-name", "alerts", "--task-title-changed", "--active=false", "--human"],
+      [
+        "integration",
+        "discord",
+        "set",
+        "--channel-name",
+        "alerts",
+        "--task-title-changed",
+        "--active=false",
+        "--human",
+      ],
       ["integration", "discord", "delete", "--yes", "--json"],
       ["integration", "discord", "get", "--json"],
     ],
@@ -4241,9 +6689,35 @@ export const SCENARIOS: Scenario[] = [
       ["integration", "telegram", "get", "--json"],
       // The chat id is required on create, checked after the token is read.
       ["integration", "telegram", "set", "--bot-token", "-", "--json"],
-      ["integration", "telegram", "set", "--bot-token", "-", "--chat-id", "123456789", "--chat-label", "ops alerts", "--thread-id", "42", "--json"],
+      [
+        "integration",
+        "telegram",
+        "set",
+        "--bot-token",
+        "-",
+        "--chat-id",
+        "123456789",
+        "--chat-label",
+        "ops alerts",
+        "--thread-id",
+        "42",
+        "--json",
+      ],
       ["integration", "telegram", "get", "--human"],
-      ["integration", "telegram", "set", "--chat-id", "-1001234567890", "--thread-id", "", "--chat-label", "", "--task-comment-created=false", "--active=false", "--json"],
+      [
+        "integration",
+        "telegram",
+        "set",
+        "--chat-id",
+        "-1001234567890",
+        "--thread-id",
+        "",
+        "--chat-label",
+        "",
+        "--task-comment-created=false",
+        "--active=false",
+        "--json",
+      ],
       // --thread-id takes a decimal integer of at least 1; other spellings
       // are refused before the write goes out.
       ["integration", "telegram", "set", "--thread-id", "abc", "--json"],
@@ -4263,10 +6737,33 @@ export const SCENARIOS: Scenario[] = [
     name: "integration seeded on two projects",
     seed: {
       integrations: [
-        { projectId: P1, provider: "slack", webhookUrl: "https://hooks.slack.com/services/T11111111/B22222222/seededseededseed99", channelName: "seeded", isActive: null },
-        { projectId: P1, provider: "discord", webhookUrl: "https://discordapp.com/api/webhooks/555444333/seedDiscordWebhookValue1234567890", events: { taskCreated: false } },
-        { projectId: P1, provider: "telegram", botToken: "987654321:qwertyuiopasdfghjklzxcvbnm123456789", chatId: "-100987654321", threadId: 7, chatLabel: " seeded ops ", isActive: false },
-        { projectId: "proj-beta", provider: "slack", webhookUrl: "https://hooks.slack.com/services/T33333333/B44444444/betaprojectvalue123" },
+        {
+          projectId: P1,
+          provider: "slack",
+          webhookUrl: "https://hooks.slack.com/services/T11111111/B22222222/seededseededseed99",
+          channelName: "seeded",
+          isActive: null,
+        },
+        {
+          projectId: P1,
+          provider: "discord",
+          webhookUrl: "https://discordapp.com/api/webhooks/555444333/seedDiscordWebhookValue1234567890",
+          events: { taskCreated: false },
+        },
+        {
+          projectId: P1,
+          provider: "telegram",
+          botToken: "987654321:qwertyuiopasdfghjklzxcvbnm123456789",
+          chatId: "-100987654321",
+          threadId: 7,
+          chatLabel: " seeded ops ",
+          isActive: false,
+        },
+        {
+          projectId: "proj-beta",
+          provider: "slack",
+          webhookUrl: "https://hooks.slack.com/services/T33333333/B44444444/betaprojectvalue123",
+        },
       ],
     },
     steps: [
@@ -4295,7 +6792,15 @@ export const SCENARIOS: Scenario[] = [
     // shape check, so the CLI refuses it before the write goes out — on the
     // create path for two providers and the update path for the third.
     name: "integration secrets refuse whitespace-only stdin",
-    seed: { integrations: [{ projectId: P1, provider: "slack", webhookUrl: "https://hooks.slack.com/services/T99999999/B00000000/keptsecretvalue000" }] },
+    seed: {
+      integrations: [
+        {
+          projectId: P1,
+          provider: "slack",
+          webhookUrl: "https://hooks.slack.com/services/T99999999/B00000000/keptsecretvalue000",
+        },
+      ],
+    },
     stdin: "   \n",
     steps: [
       ["integration", "discord", "set", WEBHOOK_URL_FLAG, "-", "--json"],
@@ -4314,8 +6819,24 @@ export const SCENARIOS: Scenario[] = [
     steps: [
       ["integration", "slack", "set", "--json"],
       ["integration", "telegram", "set", "--chat-id", "1", "--json"],
-      ["integration", "slack", "set", WEBHOOK_URL_FLAG, "https://hooks.slack.com/services/T00000000/B00000000/abcdefghijklmnop", "--json"],
-      ["integration", "telegram", "set", "--bot-token", "123456789:abcdefghijklmnopqrstuvwxyz012345678", "--chat-id", "1", "--json"],
+      [
+        "integration",
+        "slack",
+        "set",
+        WEBHOOK_URL_FLAG,
+        "https://hooks.slack.com/services/T00000000/B00000000/abcdefghijklmnop",
+        "--json",
+      ],
+      [
+        "integration",
+        "telegram",
+        "set",
+        "--bot-token",
+        "123456789:abcdefghijklmnopqrstuvwxyz012345678",
+        "--chat-id",
+        "1",
+        "--json",
+      ],
       ["integration", "slack", "set", WEBHOOK_URL_FLAG, "-", "--json"],
       ["integration", "telegram", "set", "--bot-token", "-", "--chat-id", "1", "--json"],
     ],
@@ -4330,8 +6851,19 @@ export const SCENARIOS: Scenario[] = [
     name: "integration commands take a project slug or name",
     seed: {
       integrations: [
-        { projectId: P1, provider: "slack", webhookUrl: "https://hooks.slack.com/services/T55555555/B66666666/sluglookupvalue99", isActive: null },
-        { projectId: P2, provider: "telegram", botToken: "987654321:abcdefghijklmnopqrstuvwxyz012345678", chatId: "-100555444333", isActive: null },
+        {
+          projectId: P1,
+          provider: "slack",
+          webhookUrl: "https://hooks.slack.com/services/T55555555/B66666666/sluglookupvalue99",
+          isActive: null,
+        },
+        {
+          projectId: P2,
+          provider: "telegram",
+          botToken: "987654321:abcdefghijklmnopqrstuvwxyz012345678",
+          chatId: "-100555444333",
+          isActive: null,
+        },
       ],
     },
     stdin: "https://hooks.slack.com/services/T77777777/B88888888/namedlookupvalue888\n",
@@ -4354,4 +6886,3 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
 ];
-

@@ -14,7 +14,15 @@ import { readFileSync } from "node:fs";
 
 export type Seed = {
   workspaces: { id: string; name: string; slug: string; description?: string | null; metadata?: unknown }[];
-  projects: { id: string; workspaceId: string; name: string; slug: string; archived?: boolean; isPublic?: boolean; description?: string | null }[];
+  projects: {
+    id: string;
+    workspaceId: string;
+    name: string;
+    slug: string;
+    archived?: boolean;
+    isPublic?: boolean;
+    description?: string | null;
+  }[];
   columns?: { slug: string; name: string; isFinal?: boolean }[];
   tasks: {
     id: string;
@@ -39,7 +47,13 @@ export type Seed = {
   // Users the server knows, so assign has a name to report.
   users?: { id: string; name: string }[];
   // The key's own notifications, oldest first.
-  notifications?: { type: string; title?: string | null; content?: string | null; isRead?: boolean | null; eventData?: unknown }[];
+  notifications?: {
+    type: string;
+    title?: string | null;
+    content?: string | null;
+    isRead?: boolean | null;
+    eventData?: unknown;
+  }[];
   // Every workspace's members, as the members route lists them.
   // A member with a workspaceId belongs to that workspace alone; one without is in all.
   members?: { id: string; name: string; email: string; role: string; workspaceId?: string }[];
@@ -49,10 +63,25 @@ export type Seed = {
   // handed out when the fake starts.
   workflowRules?: { projectId: string; integrationType: string; eventType: string; columnSlug: string }[];
   // A link without an integration is one a person added by hand.
-  externalLinks?: { taskId: string; url: string; title?: string | null; resourceType?: string; externalId?: string; integration?: { id: string; type: string } }[];
+  externalLinks?: {
+    taskId: string;
+    url: string;
+    title?: string | null;
+    resourceType?: string;
+    externalId?: string;
+    integration?: { id: string; type: string };
+  }[];
   // Custom field definitions. position defaults to the field's place in the
   // project's list, as the create route assigns it.
-  customFields?: { projectId: string; name: string; type: string; required?: boolean; defaultValue?: string | null; options?: string[]; position?: number }[];
+  customFields?: {
+    projectId: string;
+    name: string;
+    type: string;
+    required?: boolean;
+    defaultValue?: string | null;
+    options?: string[];
+    position?: number;
+  }[];
   // Values tasks hold for fields, named by the field's name in the task's
   // project: only fields somebody set a value on have a row.
   customFieldValues?: { taskId: string; field: string; value: string | null }[];
@@ -82,7 +111,15 @@ export type Seed = {
     baseUrl: string;
     repositoryOwner: string;
     repositoryName: string;
-    issues?: { number: number; title: string; body?: string; labels?: string[]; state?: string; pullRequest?: boolean; fail?: string }[];
+    issues?: {
+      number: number;
+      title: string;
+      body?: string;
+      labels?: string[];
+      state?: string;
+      pullRequest?: boolean;
+      fail?: string;
+    }[];
   }[];
   // The repositories the fake's Gitea instance knows a token can reach: what
   // repos lists and what verify and connect check owner/name against. Every
@@ -406,7 +443,18 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const comments: z.input<typeof M.Comment>[] = [];
   const addComment = (taskId: string, content: string, commentId = id("cmt"), userId = "user-self") => {
     const at = now();
-    const c = { id: commentId, taskId, userId, content, createdAt: at, updatedAt: at, user: { name: userId === "user-self" ? "Self" : (seed.users?.find((u) => u.id === userId)?.name ?? userId), image: null } };
+    const c = {
+      id: commentId,
+      taskId,
+      userId,
+      content,
+      createdAt: at,
+      updatedAt: at,
+      user: {
+        name: userId === "user-self" ? "Self" : (seed.users?.find((u) => u.id === userId)?.name ?? userId),
+        image: null,
+      },
+    };
     comments.push(c);
     return c;
   };
@@ -415,7 +463,18 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   // Comments are activity rows on the server, so the feed is the comments plus
   // the events recorded beside them.
   const events: z.input<typeof M.Activity>[] = [];
-  const asActivity = (a: { id: string; taskId: string; userId: string | null; content: string | null; createdAt: string; updatedAt: string }, type = "comment", eventData: unknown = null) => ({
+  const asActivity = (
+    a: {
+      id: string;
+      taskId: string;
+      userId: string | null;
+      content: string | null;
+      createdAt: string;
+      updatedAt: string;
+    },
+    type = "comment",
+    eventData: unknown = null,
+  ) => ({
     ...a,
     type,
     eventData,
@@ -431,7 +490,16 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const labels: z.input<typeof M.Label>[] = [];
   const addLabel = (name: string, color: string, workspaceId: string, taskId: string | null, deleting = false) => {
     const at = now();
-    const l = { id: id("lbl"), name, color, createdAt: at, updatedAt: at, deletionStartedAt: deleting ? at : null, taskId, workspaceId };
+    const l = {
+      id: id("lbl"),
+      name,
+      color,
+      createdAt: at,
+      updatedAt: at,
+      deletionStartedAt: deleting ? at : null,
+      taskId,
+      workspaceId,
+    };
     labels.push(l);
     return l;
   };
@@ -450,7 +518,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   // The binary documents, seeded and then kept as the avatar route writes
   // them. Response takes a string or bytes as they are.
   const assets = new Map(
-    (seed.assets ?? []).map((a) => [a.id, { body: a.body, contentType: a.contentType ?? "application/octet-stream", public: a.public ?? true }]),
+    (seed.assets ?? []).map((a) => [
+      a.id,
+      { body: a.body, contentType: a.contentType ?? "application/octet-stream", public: a.public ?? true },
+    ]),
   );
   const avatars = new Map(
     (seed.avatars ?? []).map((a) => [a.id, { body: a.body, contentType: a.contentType ?? "image/png" }]),
@@ -475,9 +546,29 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const fid = (prefix: string) => `${prefix}${String(++fseq).padStart(4, "0")}`;
   const fnow = () => new Date(T0 + 2 * 86_400_000 + 1000 * fclock++).toISOString();
   let notifications: z.input<typeof M.Notification>[] = [];
-  const addNotification = (n: { type: string; title?: string | null; content?: string | null; isRead?: boolean | null; eventData?: unknown; resourceId?: string | null; resourceType?: string | null }) => {
+  const addNotification = (n: {
+    type: string;
+    title?: string | null;
+    content?: string | null;
+    isRead?: boolean | null;
+    eventData?: unknown;
+    resourceId?: string | null;
+    resourceType?: string | null;
+  }) => {
     const at = nnow();
-    const row = { id: nid("ntf"), userId: "user-self", title: n.title ?? null, content: n.content ?? null, type: n.type, eventData: n.eventData ?? null, isRead: n.isRead === undefined ? false : n.isRead, resourceId: n.resourceId ?? null, resourceType: n.resourceType ?? null, createdAt: at, updatedAt: at };
+    const row = {
+      id: nid("ntf"),
+      userId: "user-self",
+      title: n.title ?? null,
+      content: n.content ?? null,
+      type: n.type,
+      eventData: n.eventData ?? null,
+      isRead: n.isRead === undefined ? false : n.isRead,
+      resourceId: n.resourceId ?? null,
+      resourceType: n.resourceType ?? null,
+      createdAt: at,
+      updatedAt: at,
+    };
     notifications.push(row);
     return row;
   };
@@ -542,7 +633,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   for (const r of seed.workflowRules ?? []) {
     const at = now();
     const column = columnsOf(r.projectId).find((c) => c.slug === r.columnSlug)!;
-    workflowRules.push({ id: id("rule"), projectId: r.projectId, integrationType: r.integrationType, eventType: r.eventType, columnId: column.id!, createdAt: at, updatedAt: at });
+    workflowRules.push({
+      id: id("rule"),
+      projectId: r.projectId,
+      integrationType: r.integrationType,
+      eventType: r.eventType,
+      columnId: column.id!,
+      createdAt: at,
+      updatedAt: at,
+    });
   }
   const links: z.input<typeof M.ExternalLink>[] = [];
   for (const l of seed.externalLinks ?? []) {
@@ -590,7 +689,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     // A default fills the tasks that already exist, as the create route's
     // insert does for a field made after them.
     if (field.defaultValue != null && field.defaultValue.trim() !== "") {
-      for (const t of tasks.filter((t) => t.projectId === f.projectId)) addFieldValue(t.id, field.id, field.defaultValue);
+      for (const t of tasks.filter((t) => t.projectId === f.projectId))
+        addFieldValue(t.id, field.id, field.defaultValue);
     }
   }
   for (const v of seed.customFieldValues ?? []) {
@@ -646,7 +746,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   };
   const dateValueError = (value: string, fieldName: string): string | null => {
     const isoMatch = /^(\d{4})-(\d{2})-(\d{2})(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?)?$/.exec(value);
-    if (!isoMatch) return `Custom field "${fieldName}" expects a date in YYYY-MM-DD or ISO 8601 format, got "${value}".`;
+    if (!isoMatch)
+      return `Custom field "${fieldName}" expects a date in YYYY-MM-DD or ISO 8601 format, got "${value}".`;
     const timestamp = Date.parse(value);
     if (Number.isNaN(timestamp)) return `Custom field "${fieldName}" expects a valid ISO 8601 date, got "${value}".`;
     const year = Number(isoMatch[1]);
@@ -655,7 +756,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     const calendarDate = new Date(0);
     calendarDate.setUTCFullYear(year, month - 1, day);
     calendarDate.setUTCHours(0, 0, 0, 0);
-    if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 || calendarDate.getUTCDate() !== day)
+    if (
+      calendarDate.getUTCFullYear() !== year ||
+      calendarDate.getUTCMonth() !== month - 1 ||
+      calendarDate.getUTCDate() !== day
+    )
       return `Custom field "${fieldName}" expects a valid ISO 8601 date, got "${value}".`;
     return null;
   };
@@ -666,10 +771,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     } catch {
       return `Custom field "${fieldName}" expects a JSON array of selected options, got "${value}".`;
     }
-    if (!Array.isArray(selectedValues) || selectedValues.length === 0) return `Custom field "${fieldName}" expects at least one selected option.`;
+    if (!Array.isArray(selectedValues) || selectedValues.length === 0)
+      return `Custom field "${fieldName}" expects at least one selected option.`;
     const parsedOptions = options ?? [];
     const invalidValues = selectedValues.filter((v) => typeof v !== "string" || !parsedOptions.includes(v));
-    if (invalidValues.length > 0) return `Custom field "${fieldName}" expects values from: ${parsedOptions.join(", ")}, got invalid value(s): ${invalidValues.join(", ")}.`;
+    if (invalidValues.length > 0)
+      return `Custom field "${fieldName}" expects values from: ${parsedOptions.join(", ")}, got invalid value(s): ${invalidValues.join(", ")}.`;
     return null;
   };
 
@@ -702,7 +809,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (!root) root = addLabel(name, "gray", project.workspaceId, null);
       return root;
     });
-    addFeed(f.projectId, roots.map((r) => r.id), f.timeZone ?? "UTC");
+    addFeed(
+      f.projectId,
+      roots.map((r) => r.id),
+      f.timeZone ?? "UTC",
+    );
   }
 
   // A project's board background, as v2.32.0 keeps it: the project row carries
@@ -715,9 +826,20 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const bgVersion = () => `bg${String(++bgSeq).padStart(4, "0")}`;
   // The image types and size cap v2.32.0's validateProjectBackgroundUploadInput
   // enforces, in its order, for both the prepare and the finalize call.
-  const ALLOWED_IMAGE_TYPES = new Set(["image/apng", "image/avif", "image/gif", "image/heic", "image/heif", "image/jpeg", "image/jpg", "image/png", "image/webp"]);
+  const ALLOWED_IMAGE_TYPES = new Set([
+    "image/apng",
+    "image/avif",
+    "image/gif",
+    "image/heic",
+    "image/heif",
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+  ]);
   const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
-  const backgroundKeyPrefix = (proj: (typeof projects)[number]) => `workspace/${proj.workspaceId}/project/${proj.id}/backgrounds/`;
+  const backgroundKeyPrefix = (proj: (typeof projects)[number]) =>
+    `workspace/${proj.workspaceId}/project/${proj.id}/backgrounds/`;
 
   // GitHub integrations, at most one per project as the table's uniqueness
   // gives them. importRun is the resumable import the routes continue; its
@@ -734,7 +856,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     branchPattern?: string;
     commentTaskLinkOnGitHubIssue?: boolean;
     importPages: number;
-    importRun: { runId: string; pagesLeft: number; done: boolean; imported: number; updated: number; skipped: number } | null;
+    importRun: {
+      runId: string;
+      pagesLeft: number;
+      done: boolean;
+      imported: number;
+      updated: number;
+      skipped: number;
+    } | null;
     createdAt: string;
     updatedAt: string;
   };
@@ -750,7 +879,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     isActive: g.isActive ?? true,
     verified: g.verified ?? true,
     ...(g.branchPattern === undefined ? {} : { branchPattern: g.branchPattern }),
-    ...(g.commentTaskLinkOnGitHubIssue === undefined ? {} : { commentTaskLinkOnGitHubIssue: g.commentTaskLinkOnGitHubIssue }),
+    ...(g.commentTaskLinkOnGitHubIssue === undefined
+      ? {}
+      : { commentTaskLinkOnGitHubIssue: g.commentTaskLinkOnGitHubIssue }),
     importPages: g.importPages ?? 0,
     importRun: null,
     createdAt: seededAt,
@@ -815,8 +946,23 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   // plugins/generic-webhook in usekaneo/kaneo): created, status and comment
   // on for both — the webhook's six extras are off — and the reminder lead
   // defaults to a day.
-  const MM_EVENTS = { taskCreated: true, taskStatusChanged: true, taskPriorityChanged: false, taskTitleChanged: false, taskDescriptionChanged: false, taskCommentCreated: true };
-  const GW_EVENTS = { ...MM_EVENTS, taskDeleted: false, taskMoved: false, taskDueDateChanged: false, taskAssigneeChanged: false, taskUnassigned: false, dueDateReminder: false };
+  const MM_EVENTS = {
+    taskCreated: true,
+    taskStatusChanged: true,
+    taskPriorityChanged: false,
+    taskTitleChanged: false,
+    taskDescriptionChanged: false,
+    taskCommentCreated: true,
+  };
+  const GW_EVENTS = {
+    ...MM_EVENTS,
+    taskDeleted: false,
+    taskMoved: false,
+    taskDueDateChanged: false,
+    taskAssigneeChanged: false,
+    taskUnassigned: false,
+    dueDateReminder: false,
+  };
   for (const i of seed.integrations ?? []) {
     if (i["provider"] !== "mattermost" && i["provider"] !== "webhook") continue;
     const at = now();
@@ -858,9 +1004,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     createdAt: i.createdAt,
     updatedAt: i.updatedAt,
   });
-  const integrationResponse = (i: StoredIntegration) => (i.kind === "mattermost" ? mattermostResponse(i) : genericResponse(i));
-  const integrationSchema = (kind: string) => (kind === "mattermost" ? M.MattermostIntegration : M.GenericWebhookIntegration);
-  const integrationDeleteSchema = (kind: string) => (kind === "mattermost" ? M.DeleteMattermostIntegration200 : M.DeleteGenericWebhookIntegration200);
+  const integrationResponse = (i: StoredIntegration) =>
+    i.kind === "mattermost" ? mattermostResponse(i) : genericResponse(i);
+  const integrationSchema = (kind: string) =>
+    kind === "mattermost" ? M.MattermostIntegration : M.GenericWebhookIntegration;
+  const integrationDeleteSchema = (kind: string) =>
+    kind === "mattermost" ? M.DeleteMattermostIntegration200 : M.DeleteGenericWebhookIntegration200;
 
   // The description page's version is the task row's xmin upstream: any write
   // to the row moves it, so the fake counts writes and answers the count.
@@ -908,13 +1057,22 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   };
   // One seeded issue with the seed's defaults applied, as the instance's
   // issue listing holds it.
-  type GiteaIssueRow = { number: number; title: string; body: string | null; labels: string[]; state: string; pullRequest: boolean; fail: string | null };
+  type GiteaIssueRow = {
+    number: number;
+    title: string;
+    body: string | null;
+    labels: string[];
+    state: string;
+    pullRequest: boolean;
+    fail: string | null;
+  };
   // plugins/gitea/config.ts's normalizeGiteaBaseUrl: origin plus path, trailing
   // slashes off, and only http(s) URLs without credentials, query or fragment.
   const normalizeGiteaUrl = (raw: string): string => {
     const trimmed = raw.trim().replace(/\/+$/, "");
     const parsed = new URL(trimmed);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("Gitea base URL must use http or https");
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+      throw new Error("Gitea base URL must use http or https");
     if (parsed.search || parsed.hash || parsed.username || parsed.password) {
       throw new Error("Gitea base URL must not contain a query, fragment, or credentials");
     }
@@ -947,12 +1105,21 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   for (const repo of seed.giteaRepoIssues ?? []) {
     giteaIssues.set(
       giteaRepoKey(normalizeGiteaUrl(repo.baseUrl), repo.repositoryOwner, repo.repositoryName),
-      (repo.issues ?? []).map((i) => ({ number: i.number, title: i.title, body: i.body ?? null, labels: i.labels ?? [], state: i.state ?? "open", pullRequest: i.pullRequest ?? false, fail: i.fail ?? null })),
+      (repo.issues ?? []).map((i) => ({
+        number: i.number,
+        title: i.title,
+        body: i.body ?? null,
+        labels: i.labels ?? [],
+        state: i.state ?? "open",
+        pullRequest: i.pullRequest ?? false,
+        fail: i.fail ?? null,
+      })),
     );
   }
   // What import-issues would list for the row's current repository: its own
   // list, or none when the seed names no issues for it.
-  const giteaIssuesFor = (row: GiteaRow) => giteaIssues.get(giteaRepoKey(row.baseUrl, row.repositoryOwner, row.repositoryName)) ?? [];
+  const giteaIssuesFor = (row: GiteaRow) =>
+    giteaIssues.get(giteaRepoKey(row.baseUrl, row.repositoryOwner, row.repositoryName)) ?? [];
   // The one Gitea instance every base URL is answered as.
   const giteaRepos = seed.giteaRepositories ?? [];
   const giteaRepo = (owner: string, name: string) => giteaRepos.find((r) => r.owner === owner && r.name === name);
@@ -960,7 +1127,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const giteaMode = seed.giteaInstance?.mode ?? "ok";
   // get-gitea-integration.ts's maskToken: short tokens mask whole, longer ones
   // keep their ends.
-  const maskGiteaToken = (token: string) => (token.length <= 8 ? "••••••••" : `${token.slice(0, 4)}••••••${token.slice(-4)}`);
+  const maskGiteaToken = (token: string) =>
+    token.length <= 8 ? "••••••••" : `${token.slice(0, 4)}••••••${token.slice(-4)}`;
   // get-gitea-integration.ts always answers webhookSecret: the stored secret
   // when the caller may manage the workspace's settings, "" for anyone else.
   const giteaIntegrationReply = (row: GiteaRow, origin: string, includeSecrets = true) => ({
@@ -982,7 +1150,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   });
   // resolve-verification-token.ts: a sent token wins; without one the stored
   // token answers only while the normalized base URL is the saved one.
-  const giteaTokenFor = (projectId: string, rawBaseUrl: string, sent: unknown): { baseUrl: string; token: string } | Response => {
+  const giteaTokenFor = (
+    projectId: string,
+    rawBaseUrl: string,
+    sent: unknown,
+  ): { baseUrl: string; token: string } | Response => {
     let baseUrl: string;
     try {
       baseUrl = normalizeGiteaUrl(rawBaseUrl);
@@ -1162,8 +1334,22 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   // GitLab instance to ask, so a well-formed request succeeds and failOn /
   // failMessage inject the failures a scenario needs.
   const GITLAB_PROJECTS = [
-    { id: 101, name: "Web App", path_with_namespace: "acme/web-app", name_with_namespace: "Acme / Web App", visibility: "private", web_url: "https://gitlab.example.com/acme/web-app" },
-    { id: 102, name: "Docs", path_with_namespace: "acme/docs", name_with_namespace: "Acme / Docs", visibility: "internal", web_url: "https://gitlab.example.com/acme/docs" },
+    {
+      id: 101,
+      name: "Web App",
+      path_with_namespace: "acme/web-app",
+      name_with_namespace: "Acme / Web App",
+      visibility: "private",
+      web_url: "https://gitlab.example.com/acme/web-app",
+    },
+    {
+      id: 102,
+      name: "Docs",
+      path_with_namespace: "acme/docs",
+      name_with_namespace: "Acme / Docs",
+      visibility: "internal",
+      web_url: "https://gitlab.example.com/acme/docs",
+    },
   ];
 
   // As upstream's get-gitlab-integration.ts: a token of eight characters or
@@ -1241,9 +1427,23 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     // telegram no-op check stringifies.
     const config: ChatConfig =
       i.provider === "telegram"
-        ? { token: i.botToken?.trim() ?? "", chatId: i.chatId?.trim() ?? "", threadId: i.threadId ?? undefined, chatLabel: trimField(i.chatLabel), events }
+        ? {
+            token: i.botToken?.trim() ?? "",
+            chatId: i.chatId?.trim() ?? "",
+            threadId: i.threadId ?? undefined,
+            chatLabel: trimField(i.chatLabel),
+            events,
+          }
         : { webhookUrl: i.webhookUrl ?? "", channelName: trimField(i.channelName), events };
-    chatIntegrations.push({ kind: i.provider, projectId: i.projectId, id: iid("int"), config, isActive: i.isActive === undefined ? true : i.isActive, createdAt: at, updatedAt: at });
+    chatIntegrations.push({
+      kind: i.provider,
+      projectId: i.projectId,
+      id: iid("int"),
+      config,
+      isActive: i.isActive === undefined ? true : i.isActive,
+      createdAt: at,
+      updatedAt: at,
+    });
   }
 
   const telegramConfigErrors = (config: { token?: string; chatId?: string; threadId?: number }): string[] => {
@@ -1289,7 +1489,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   // The config a PATCH stores and the active flag it resolves to, or the 400
   // the server's validation answers. noop marks telegram's unchanged-answer,
   // which skips the write so updatedAt stays where it was.
-  const patchedConfig = (kind: ChatKind, b: Record<string, any>, row: ChatRow): { config: ChatConfig; isActive: boolean | null; noop: boolean } | Response => {
+  const patchedConfig = (
+    kind: ChatKind,
+    b: Record<string, any>,
+    row: ChatRow,
+  ): { config: ChatConfig; isActive: boolean | null; noop: boolean } | Response => {
     const current = row.config;
     if (kind === "telegram") {
       const next: ChatConfig = {
@@ -1345,7 +1549,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
   const chatResponse = (row: ChatRow): Record<string, unknown> => {
     const c = row.config;
-    const base = { id: row.id, projectId: row.projectId, events: chatEvents(c.events), isActive: row.isActive, createdAt: row.createdAt, updatedAt: row.updatedAt };
+    const base = {
+      id: row.id,
+      projectId: row.projectId,
+      events: chatEvents(c.events),
+      isActive: row.isActive,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
     if (row.kind === "telegram") {
       return {
         ...base,
@@ -1362,7 +1573,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       webhookConfigured: Boolean(c.webhookUrl),
       // Slack masks unconditionally and Discord only when one is set; a
       // stored config always has one, so the two answer the same.
-      maskedWebhookUrl: row.kind === "slack" ? maskWebhookUrl(c.webhookUrl ?? "") : c.webhookUrl ? maskWebhookUrl(c.webhookUrl) : "",
+      maskedWebhookUrl:
+        row.kind === "slack" ? maskWebhookUrl(c.webhookUrl ?? "") : c.webhookUrl ? maskWebhookUrl(c.webhookUrl) : "",
     };
   };
   const chatRespond = (kind: ChatKind, body: unknown): Response => {
@@ -1393,7 +1605,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (built instanceof Response) return built;
       const at = inow();
       if (row === undefined) {
-        const created: ChatRow = { kind, projectId, id: iid("int"), config: built, isActive: true, createdAt: at, updatedAt: at };
+        const created: ChatRow = {
+          kind,
+          projectId,
+          id: iid("int"),
+          config: built,
+          isActive: true,
+          createdAt: at,
+          updatedAt: at,
+        };
         chatIntegrations.push(created);
         return chatRespond(kind, chatResponse(created));
       }
@@ -1432,7 +1652,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (failing === undefined || !failing.test(`${method} ${path}`)) return undefined;
     if (!(failingQuery?.test(query) ?? true)) return undefined;
     if (skipped++ < (opts.failOnSkip ?? 0)) return undefined;
-    return opts.failMessage === undefined ? fail(opts.failStatus ?? 500, "injected failure") : failText(opts.failStatus ?? 500, opts.failMessage);
+    return opts.failMessage === undefined
+      ? fail(opts.failStatus ?? 500, "injected failure")
+      : failText(opts.failStatus ?? 500, opts.failMessage);
   };
 
   // The checks 2.32.0's storage layer runs on an image upload, with the same
@@ -1441,7 +1663,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const uploadInvalid = (contentType: string, size: number): string | null => {
     if (!contentType.trim()) return "A valid content type is required.";
     if (!Number.isSafeInteger(size) || size <= 0) return "Upload size must be a positive safe integer.";
-    if (size > MAX_UPLOAD_BYTES) return `Upload exceeds the maximum upload size of ${Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))}MB.`;
+    if (size > MAX_UPLOAD_BYTES)
+      return `Upload exceeds the maximum upload size of ${Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))}MB.`;
     return null;
   };
   // The object key a stage issues, shaped like upstream's buildObjectKey: the
@@ -1488,10 +1711,19 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "PUT" && url.pathname.startsWith("/storage/")) {
       const key = decodeURIComponent(url.pathname.slice("/storage/".length));
       const bytes = new Uint8Array(await req.arrayBuffer());
-      requests.push({ method: req.method, path: url.pathname, query: url.search, body: { key, bytes: bytes.byteLength } });
+      requests.push({
+        method: req.method,
+        path: url.pathname,
+        query: url.search,
+        body: { key, bytes: bytes.byteLength },
+      });
       // A storage refusal is not an API error: it answers with the storage
       // server's own body, which is what failMessage carries here.
-      if (failing?.test(`${req.method} ${url.pathname}`) && (failingQuery?.test(url.search) ?? true) && skipped++ >= (opts.failOnSkip ?? 0)) {
+      if (
+        failing?.test(`${req.method} ${url.pathname}`) &&
+        (failingQuery?.test(url.search) ?? true) &&
+        skipped++ >= (opts.failOnSkip ?? 0)
+      ) {
         return failText(opts.failStatus ?? 500, opts.failMessage ?? "injected failure");
       }
       staged.set(key, { bytes, contentType: req.headers.get("content-type") ?? "" });
@@ -1508,7 +1740,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       requests.push({ method: req.method, path: url.pathname, query: url.search, body: { bytes: bytes.byteLength } });
       const refused = injectedFailure(req.method, path, url.search);
       if (refused !== undefined) return refused;
-      objects.set(decodeURIComponent(url.pathname.slice("/uploads/".length)), { bytes, contentType: req.headers.get("content-type") ?? "" });
+      objects.set(decodeURIComponent(url.pathname.slice("/uploads/".length)), {
+        bytes,
+        contentType: req.headers.get("content-type") ?? "",
+      });
       return new Response(null, { status: 200 });
     }
     const assetMatch = url.pathname.match(/^\/asset\/([^/]+)$/);
@@ -1522,7 +1757,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     const body = req.method === "GET" || req.method === "DELETE" ? undefined : await req.json().catch(() => null);
     requests.push({ method: req.method, path, query: url.search, body });
 
-    if (!url.pathname.startsWith("/api/")) return new Response("<html>app</html>", { headers: { "content-type": "text/html" } });
+    if (!url.pathname.startsWith("/api/"))
+      return new Response("<html>app</html>", { headers: { "content-type": "text/html" } });
     // The document and the security: [] routes are served without
     // authentication, as the real server does; get-session among them still
     // reads the credential when one is sent, and the calendar's token in its
@@ -1644,12 +1880,22 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     // Kaneo sets the request's user from the key, so /user/me answers for it.
     if (req.method === "GET" && path === "/user/me" && !opts.noCurrentUser) {
-      return ok(M.CurrentUser, { id: opts.blankCurrentUserId ? "" : "user-self", name: "Self", email: "self@example.com", image: null, role: "user" });
+      return ok(M.CurrentUser, {
+        id: opts.blankCurrentUserId ? "" : "user-self",
+        name: "Self",
+        email: "self@example.com",
+        image: null,
+        role: "user",
+      });
     }
     if (req.method === "GET" && path === "/auth/organization/list" && limited < (opts.rateLimitTimes ?? 0)) {
       limited++;
       return Response.json(
-        { message: "Rate limit exceeded.", code: opts.rateLimitCode ?? "RATE_LIMITED", details: { tryAgainIn: opts.rateLimitWaitMs ?? 0 } },
+        {
+          message: "Rate limit exceeded.",
+          code: opts.rateLimitCode ?? "RATE_LIMITED",
+          details: { tryAgainIn: opts.rateLimitWaitMs ?? 0 },
+        },
         { status: 429 },
       );
     }
@@ -1664,7 +1910,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "GET" && (p = m(/^\/workspace\/([^/]+)\/members$/))) {
       const ws = decodeURIComponent(p[1]);
       if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
-      return ok(z.array(M.WorkspaceMember), (seed.members ?? []).filter((u) => u.workspaceId === undefined || u.workspaceId === ws).map(({ workspaceId: _, ...u }) => ({ ...u, image: null })));
+      return ok(
+        z.array(M.WorkspaceMember),
+        (seed.members ?? [])
+          .filter((u) => u.workspaceId === undefined || u.workspaceId === ws)
+          .map(({ workspaceId: _, ...u }) => ({ ...u, image: null })),
+      );
     }
 
     // Expiry is judged at a fixed moment, so the outcome does not depend on when
@@ -1674,8 +1925,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const found = (seed.invitations ?? []).find((i) => i.id === decodeURIComponent(p![1]));
       if (!found) return ok(M.InvitationDetails, { valid: false, error: "Invitation not found" });
       const status = found.status ?? "pending";
-      if (status === "accepted") return ok(M.InvitationDetails, { valid: false, error: "This invitation has already been accepted" });
-      if (status === "canceled") return ok(M.InvitationDetails, { valid: false, error: "This invitation has been canceled" });
+      if (status === "accepted")
+        return ok(M.InvitationDetails, { valid: false, error: "This invitation has already been accepted" });
+      if (status === "canceled")
+        return ok(M.InvitationDetails, { valid: false, error: "This invitation has been canceled" });
       const expired = Date.parse(found.expiresAt) < INVITATIONS_JUDGED_AT;
       const details = {
         id: found.id,
@@ -1686,7 +1939,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         status,
         expired,
       };
-      if (expired) return ok(M.InvitationDetails, { valid: false, invitation: details, error: "This invitation has expired" });
+      if (expired)
+        return ok(M.InvitationDetails, { valid: false, invitation: details, error: "This invitation has expired" });
       return ok(M.InvitationDetails, { valid: true, invitation: details });
     }
 
@@ -1706,7 +1960,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const capped = <T>(list: T[]) => list.slice(0, limit);
       const inWorkspace = projects.filter((x) => x.workspaceId === ws);
       const inScope = inWorkspace.filter((x) => only === null || x.id === only);
-      const where = (x: (typeof projects)[number]) => ({ projectId: x.id, projectName: x.name, projectSlug: x.slug, workspaceId: ws, workspaceName: workspaces.find((w) => w.id === ws)!.name });
+      const where = (x: (typeof projects)[number]) => ({
+        projectId: x.id,
+        projectName: x.name,
+        projectSlug: x.slug,
+        workspaceId: ws,
+        workspaceName: workspaces.find((w) => w.id === ws)!.name,
+      });
       type Hit = z.input<typeof M.SearchResult>;
       const found: Hit[] = [];
       const taskHits: Hit[] = [];
@@ -1719,7 +1979,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       for (const w of workspaces) {
         if ((type === "all" || type === "workspaces") && hit(w.name)) {
           for (let n = 0; n < Math.max(1, seed.members?.length ?? 0); n++) {
-            workspaceHits.push({ id: w.id, type: "workspace", title: w.name, createdAt: seededAt, relevanceScore: 3, workspaceId: w.id, workspaceName: w.name });
+            workspaceHits.push({
+              id: w.id,
+              type: "workspace",
+              title: w.name,
+              createdAt: seededAt,
+              relevanceScore: 3,
+              workspaceId: w.id,
+              workspaceName: w.name,
+            });
           }
         }
       }
@@ -1745,18 +2013,50 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       for (const x of inScope) {
         for (const t of tasks.filter((t) => t.projectId === x.id)) {
           if ((type === "all" || type === "tasks") && hit(t.title, t.description)) {
-            taskHits.push({ id: t.id, type: "task", title: t.title, ...(t.description ? { description: t.description } : {}), createdAt: t.createdAt, relevanceScore: 2, taskNumber: t.number ?? undefined, priority: t.priority, status: t.status, ...where(x) });
+            taskHits.push({
+              id: t.id,
+              type: "task",
+              title: t.title,
+              ...(t.description ? { description: t.description } : {}),
+              createdAt: t.createdAt,
+              relevanceScore: 2,
+              taskNumber: t.number ?? undefined,
+              priority: t.priority,
+              status: t.status,
+              ...where(x),
+            });
           }
           for (const c of comments.filter((c) => c.taskId === t.id)) {
             if ((type === "all" || type === "comments" || type === "activities") && hit(c.content)) {
-              commentHits.push({ id: c.id, type: "comment", title: `Comment on ${t.title}`, content: c.content, createdAt: c.createdAt, relevanceScore: 1, taskNumber: t.number ?? undefined, userId: c.userId, userName: users.get(c.userId) ?? "", ...where(x) });
+              commentHits.push({
+                id: c.id,
+                type: "comment",
+                title: `Comment on ${t.title}`,
+                content: c.content,
+                createdAt: c.createdAt,
+                relevanceScore: 1,
+                taskNumber: t.number ?? undefined,
+                userId: c.userId,
+                userName: users.get(c.userId) ?? "",
+                ...where(x),
+              });
             }
           }
         }
       }
-      const ranked = (list: Hit[]) => list.sort((a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt));
-      const results = ranked([...capped(ranked(found)), ...capped(ranked(taskHits)), ...capped(workspaceHits), ...capped(ranked(commentHits))]);
-      return ok(M.SearchResponse, { results: capped(results), totalCount: results.length, searchQuery: url.searchParams.get("q") ?? "" });
+      const ranked = (list: Hit[]) =>
+        list.sort((a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt));
+      const results = ranked([
+        ...capped(ranked(found)),
+        ...capped(ranked(taskHits)),
+        ...capped(workspaceHits),
+        ...capped(ranked(commentHits)),
+      ]);
+      return ok(M.SearchResponse, {
+        results: capped(results),
+        totalCount: results.length,
+        searchQuery: url.searchParams.get("q") ?? "",
+      });
     }
 
     if (req.method === "GET" && path === "/project") {
@@ -1772,7 +2072,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         .filter((x) => x.workspaceId === ws && (all || !x.archivedAt))
         .map((x) => ({
           ...x,
-          statistics: { completionPercentage: 0, totalTasks: tasks.filter((t) => t.projectId === x.id).length, dueDate: null },
+          statistics: {
+            completionPercentage: 0,
+            totalTasks: tasks.filter((t) => t.projectId === x.id).length,
+            dueDate: null,
+          },
           archivedTasks: [],
           plannedTasks: [],
           columns: [],
@@ -1783,11 +2087,25 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const b = body as any;
       const taken = keyTaken(b.workspaceId, b.slug);
       if (taken) return failText(409, keyTakenMessage(b.slug, taken.name));
-      const proj = { id: id("proj"), workspaceId: b.workspaceId, backgroundVersion: null, slug: b.slug, icon: b.icon, name: b.name, description: null, createdAt: now(), isPublic: false, archivedAt: null, position: projects.length, lastTaskNumber: 0 };
+      const proj = {
+        id: id("proj"),
+        workspaceId: b.workspaceId,
+        backgroundVersion: null,
+        slug: b.slug,
+        icon: b.icon,
+        name: b.name,
+        description: null,
+        createdAt: now(),
+        isPublic: false,
+        archivedAt: null,
+        position: projects.length,
+        lastTaskNumber: 0,
+      };
       projects.push(proj);
       return ok(M.Project, proj);
     }
-    if (req.method === "PUT" && path === "/project/reorder" && opts.plainMember) return failText(403, "Insufficient permissions");
+    if (req.method === "PUT" && path === "/project/reorder" && opts.plainMember)
+      return failText(403, "Insufficient permissions");
     if (req.method === "PUT" && path === "/project/reorder") {
       // As upstream's reorder-projects.ts: the payload's positions only say an
       // order, a project left out keeps its rank, and the requested ones fill the
@@ -1800,10 +2118,16 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const existing = projects.filter((x) => x.workspaceId === ws).sort((a, b) => a.position - b.position);
       const foreign = ids.find((x) => !existing.some((e) => e.id === x));
       if (foreign) return fail(400, `Project ${foreign} does not belong to this workspace`);
-      const requested = [...wanted].sort((a, b) => a.position - b.position).map((x) => x.id)[Symbol.iterator]();
+      const requested = [...wanted]
+        .sort((a, b) => a.position - b.position)
+        .map((x) => x.id)
+        [Symbol.iterator]();
       const order = existing.map((e) => (ids.includes(e.id) ? requested.next().value! : e.id));
       for (const [at, pid] of order.entries()) projects.find((x) => x.id === pid)!.position = at;
-      return ok(z.array(M.Project), projects.filter((x) => x.workspaceId === ws).sort((a, b) => a.position - b.position));
+      return ok(
+        z.array(M.Project),
+        projects.filter((x) => x.workspaceId === ws).sort((a, b) => a.position - b.position),
+      );
     }
     if ((p = m(/^\/project\/([^/]+)(\/(archive|unarchive))?$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
@@ -1815,7 +2139,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "PUT" && !p[2]) {
         // Upstream's update body requires the slug; the CLI always sends it.
         const slug = (body as any).slug;
-        const taken = typeof slug === "string" && !sameKey(slug, proj.slug) ? keyTaken(proj.workspaceId, slug, proj.id) : undefined;
+        const taken =
+          typeof slug === "string" && !sameKey(slug, proj.slug) ? keyTaken(proj.workspaceId, slug, proj.id) : undefined;
         if (taken) return failText(409, keyTakenMessage(slug, taken.name));
         Object.assign(proj, body);
         return projectReply(proj);
@@ -1824,7 +2149,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "PUT" && p[3] === "unarchive") {
         const taken = keyTaken(proj.workspaceId, proj.slug, proj.id);
         if (taken) {
-          return failText(409, `This workspace already has a project using the key "${proj.slug}" (${taken.name}). Change one of the keys before unarchiving this project.`);
+          return failText(
+            409,
+            `This workspace already has a project using the key "${proj.slug}" (${taken.name}). Change one of the keys before unarchiving this project.`,
+          );
         }
         return ok(M.Project, Object.assign(proj, { archivedAt: null }));
       }
@@ -1871,7 +2199,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (opts.moveDeniedTarget === target.id) return failText(403, "Insufficient permissions");
       const taken = keyTaken(target.id, proj.slug, proj.id);
       if (taken) {
-        return failText(409, `The target workspace already has a project using the key "${proj.slug}" (${taken.name}). Change this project's key before moving it.`);
+        return failText(
+          409,
+          `The target workspace already has a project using the key "${proj.slug}" (${taken.name}). Change this project's key before moving it.`,
+        );
       }
       const crossProject = relations.some((r) => {
         const inProject = (taskId: string) => tasks.find((t) => t.id === taskId)?.projectId === proj.id;
@@ -1881,7 +2212,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       proj.workspaceId = target.id;
       proj.position = Math.max(-1, ...projects.filter((x) => x.workspaceId === target.id).map((x) => x.position)) + 1;
       const memberOf = (userId: string) =>
-        (seed.members ?? []).some((mm) => mm.id === userId && (mm.workspaceId === undefined || mm.workspaceId === target.id));
+        (seed.members ?? []).some(
+          (mm) => mm.id === userId && (mm.workspaceId === undefined || mm.workspaceId === target.id),
+        );
       let unassignedTaskCount = 0;
       for (const t of tasks) {
         if (t.projectId === proj.id && t.userId && !memberOf(t.userId)) {
@@ -1930,12 +2263,18 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // assertProjectBackgroundKeyMatchesContext: the key must sit under this
       // project's backgrounds prefix and name this version, with nothing else
       // after it.
-      if (!key.startsWith(backgroundKeyPrefix(proj)) || key.slice(backgroundKeyPrefix(proj).length) !== `background-${version}` || !/^[A-Za-z0-9_-]+$/.test(version)) {
+      if (
+        !key.startsWith(backgroundKeyPrefix(proj)) ||
+        key.slice(backgroundKeyPrefix(proj).length) !== `background-${version}` ||
+        !/^[A-Za-z0-9_-]+$/.test(version)
+      ) {
         return failText(400, "Image upload key does not match the project context.");
       }
       proj.backgroundVersion = version;
       backgrounds.set(proj.id, { key, version, contentType: String(b.contentType), size: Number(b.size) });
-      return ok(M.ProjectBackgroundFinalize, { url: `${new URL(req.url).origin}/project/${proj.id}/background?v=${encodeURIComponent(version)}` });
+      return ok(M.ProjectBackgroundFinalize, {
+        url: `${new URL(req.url).origin}/project/${proj.id}/background?v=${encodeURIComponent(version)}`,
+      });
     }
     if (req.method === "GET" && (p = m(/^\/project\/([^/]+)\/background$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
@@ -1950,7 +2289,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         return failText(404, "Project background not found");
       }
       const etag = `"${bg.version}"`;
-      const headers: Record<string, string> = { "Cache-Control": "private, max-age=300, must-revalidate", "Content-Type": contentType, ETag: etag, "X-Content-Type-Options": "nosniff" };
+      const headers: Record<string, string> = {
+        "Cache-Control": "private, max-age=300, must-revalidate",
+        "Content-Type": contentType,
+        ETag: etag,
+        "X-Content-Type-Options": "nosniff",
+      };
       if (req.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers });
       return new Response(object.bytes, { headers });
     }
@@ -1987,8 +2331,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // refused rather than given a second column of the same name.
         const slug = slugOf(wanted.name);
         if (slug === "") return fail(400, "Column name must contain at least one alphanumeric character");
-        if (VIRTUAL_STATUSES.includes(slug)) return fail(409, `Column slug "${slug}" is reserved for virtual task statuses`);
-        if (columnsOf(key).some((c) => c.slug === slug)) return fail(409, `Column with slug "${slug}" already exists in this project`);
+        if (VIRTUAL_STATUSES.includes(slug))
+          return fail(409, `Column slug "${slug}" is reserved for virtual task statuses`);
+        if (columnsOf(key).some((c) => c.slug === slug))
+          return fail(409, `Column with slug "${slug}" already exists in this project`);
         return ok(M.Column, addColumn(key, wanted));
       }
       const column = columns.find((c) => c.id === key);
@@ -2006,7 +2352,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         }
         // The rules that point at it go with it, as workflow_rule.column_id does
         // on delete: a rule cannot outlive its column.
-        for (let i = workflowRules.length - 1; i >= 0; i--) if (workflowRules[i]!.columnId === column.id) workflowRules.splice(i, 1);
+        for (let i = workflowRules.length - 1; i >= 0; i--)
+          if (workflowRules[i]!.columnId === column.id) workflowRules.splice(i, 1);
         columns.splice(columns.indexOf(column), 1);
         return ok(M.Column, column);
       }
@@ -2028,7 +2375,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // Moved before the page is cut, as growOnPage grows before it: the order
       // the page is sliced from is the one the change left, while the pages
       // already answered keep the old one and the total never moves.
-      if (opts.promoteOnPage === page && promoted < (opts.promoteTimes ?? Infinity) && opts.promoteTaskId !== undefined) {
+      if (
+        opts.promoteOnPage === page &&
+        promoted < (opts.promoteTimes ?? Infinity) &&
+        opts.promoteTaskId !== undefined
+      ) {
         promoted += 1;
         const at = tasks.findIndex((t) => t.id === opts.promoteTaskId);
         if (at > 0) tasks.unshift(tasks.splice(at, 1)[0]!);
@@ -2043,17 +2394,36 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           (filterPriority === null || t.priority === filterPriority),
       );
       const size = opts.pageSize ?? 50;
-      const slice = url.searchParams.has("page") || url.searchParams.has("limit") || opts.pageSize ? mine.slice((page - 1) * size, page * size) : mine;
+      const slice =
+        url.searchParams.has("page") || url.searchParams.has("limit") || opts.pageSize
+          ? mine.slice((page - 1) * size, page * size)
+          : mine;
       const { lastTaskNumber, archivedAt, createdAt, position, ...head } = proj;
       return ok(M.BoardResponse, {
         data: {
           ...head,
-          columns: columnsOf(proj.id).map((c) => ({ id: c.slug, slug: c.slug, name: c.name, icon: c.icon, isFinal: c.isFinal, position: c.position, tasks: slice.filter((t) => t.status === c.slug).map(boardTask) })),
+          columns: columnsOf(proj.id).map((c) => ({
+            id: c.slug,
+            slug: c.slug,
+            name: c.name,
+            icon: c.icon,
+            isFinal: c.isFinal,
+            position: c.position,
+            tasks: slice.filter((t) => t.status === c.slug).map(boardTask),
+          })),
           // A task in no column is answered beside the columns, one list each.
           archivedTasks: slice.filter((t) => t.status === "archived").map(boardTask),
           plannedTasks: slice.filter((t) => t.status === "planned").map(boardTask),
         },
-        pagination: { total: mine.length, page, pageSize: size, totalPages: Math.max(1, Math.ceil(mine.length / size)), relatedPage: 1, relatedPageSize: 100, relatedTotalPages: 1 },
+        pagination: {
+          total: mine.length,
+          page,
+          pageSize: size,
+          totalPages: Math.max(1, Math.ceil(mine.length / size)),
+          relatedPage: 1,
+          relatedPageSize: 100,
+          relatedTotalPages: 1,
+        },
       });
     }
     if (req.method === "PUT" && (p = m(/^\/task\/due-date\/([^/]+)$/))) {
@@ -2115,10 +2485,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
             if (!columnsOf(projectId).some((c) => c.slug === value) && !VIRTUAL_STATUSES.includes(value)) {
               return fail(400, `Invalid status "${value}"`);
             }
-            for (const t of found) if (t.projectId === projectId) {
-              t.status = value;
-              touch(t);
-            }
+            for (const t of found)
+              if (t.projectId === projectId) {
+                t.status = value;
+                touch(t);
+              }
           }
           break;
         case "updatePriority":
@@ -2168,7 +2539,16 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         tasks: tasks
           .filter((t) => t.projectId === proj.id)
           .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-          .map((t) => ({ title: t.title, description: t.description || "", status: t.status, priority: t.priority || "low", dueDate: t.dueDate ?? null, startDate: t.startDate ?? null, userId: t.userId || null, labels: [] })),
+          .map((t) => ({
+            title: t.title,
+            description: t.description || "",
+            status: t.status,
+            priority: t.priority || "low",
+            dueDate: t.dueDate ?? null,
+            startDate: t.startDate ?? null,
+            userId: t.userId || null,
+            labels: [],
+          })),
       });
     }
     if (req.method === "POST" && (p = m(/^\/task\/import\/([^/]+)$/))) {
@@ -2176,7 +2556,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (!proj) return fail(400, "Workspace ID could not be determined");
       const results = ((body as any).tasks as z.input<typeof M.ImportTasksBody>["tasks"]).map((wanted) => {
         const assignee = wanted.userId?.trim() || null;
-        if (assignee && !users.has(assignee)) return { success: false, error: "Assignee is not a member of this workspace", task: wanted };
+        if (assignee && !users.has(assignee))
+          return { success: false, error: "Assignee is not a member of this workspace", task: wanted };
         const warnings: string[] = [];
         let status = wanted.status;
         if (!columnsOf(proj.id).some((c) => c.slug === status) && !VIRTUAL_STATUSES.includes(status)) {
@@ -2192,13 +2573,24 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // does not parse fails that task alone.
         const bad = [wanted.dueDate, wanted.startDate].find((d) => d && Number.isNaN(Date.parse(d)));
         if (bad) return { success: false, error: "Invalid time value", task: wanted };
-        const created = addTask(proj.id, { title: wanted.title, description: wanted.description || "", status, priority, userId: assignee });
+        const created = addTask(proj.id, {
+          title: wanted.title,
+          description: wanted.description || "",
+          status,
+          priority,
+          userId: assignee,
+        });
         created.dueDate = wanted.dueDate ? new Date(wanted.dueDate).toISOString() : null;
         created.startDate = wanted.startDate ? new Date(wanted.startDate).toISOString() : null;
         return { success: true, task: created, ...(warnings.length > 0 && { warnings }) };
       });
       return ok(M.TaskImportResult, {
-        results: { total: results.length, successful: results.filter((r) => r.success).length, failed: results.filter((r) => !r.success).length, tasks: results },
+        results: {
+          total: results.length,
+          successful: results.filter((r) => r.success).length,
+          failed: results.filter((r) => !r.success).length,
+          tasks: results,
+        },
       });
     }
     // v2.32.0's get-task-by-ticket-id.ts, as far as the CLI can reach it: the
@@ -2216,7 +2608,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (ticketId.length > 128 || !/^(.+)-(\d+)$/u.test(ticketId)) return failText(400, "Invalid task ticket ID");
       const match = ticketId.normalize("NFKC").match(/^(.+)-(\d+)$/u);
       const number = Number(match?.[2]);
-      if (!match || !Number.isSafeInteger(number) || number < 1 || number > 2_147_483_647) return failText(400, "Invalid task ticket ID");
+      if (!match || !Number.isSafeInteger(number) || number < 1 || number > 2_147_483_647)
+        return failText(400, "Invalid task ticket ID");
       const key = match[1]!.toLowerCase();
       // The key's user sees only the workspaces it is a member of. The members
       // seed says where user-self belongs: an entry with a workspaceId limits
@@ -2269,8 +2662,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // stores anything: what the server accepted is not what the task holds.
       if (opts.writesNotKept) {
         if (p[1] !== "move") return ok(M.Task, t);
-        if (!b?.destinationProjectId) return fail(400, 'Invalid key: Expected "destinationProjectId" but received undefined');
-        return ok(M.MoveTaskResult, { task: t, sourceProjectId: t.projectId, destinationProjectId: b.destinationProjectId });
+        if (!b?.destinationProjectId)
+          return fail(400, 'Invalid key: Expected "destinationProjectId" but received undefined');
+        return ok(M.MoveTaskResult, {
+          task: t,
+          sourceProjectId: t.projectId,
+          destinationProjectId: b.destinationProjectId,
+        });
       }
       if (p[1] === "status") {
         // The only write the server judges against the project rather than
@@ -2292,22 +2690,33 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         t.userId = b.userId;
       }
       if (p[1] === "move") {
-        if (!b?.destinationProjectId) return fail(400, 'Invalid key: Expected "destinationProjectId" but received undefined');
+        if (!b?.destinationProjectId)
+          return fail(400, 'Invalid key: Expected "destinationProjectId" but received undefined');
         const from = t.projectId;
         const dest = projects.find((x) => x.id === b.destinationProjectId);
         // A destination in another workspace is answered as not found, per issue
         // #246; the status text of the same-project refusal is from there too.
-        if (!dest || dest.workspaceId !== projects.find((x) => x.id === from)?.workspaceId) return failText(404, "Project not found");
+        if (!dest || dest.workspaceId !== projects.find((x) => x.id === from)?.workspaceId)
+          return failText(404, "Project not found");
         if (dest.id === from) return fail(400, "Task is already in that project");
         dest.lastTaskNumber += 1;
-        Object.assign(t, { projectId: dest.id, number: dest.lastTaskNumber, status: b.destinationStatus ?? firstColumn });
+        Object.assign(t, {
+          projectId: dest.id,
+          number: dest.lastTaskNumber,
+          status: b.destinationStatus ?? firstColumn,
+        });
         touch(t);
         // move-task.ts drops the moved task's links through integrations the
         // destination project does not own; links with no integration — the
         // ones added by hand — stay.
         for (let i = links.length - 1; i >= 0; i--) {
           const link = links[i]!;
-          if (link.taskId === t.id && link.integrationId !== null && integrationProjectOf(link.integrationId) !== dest.id) links.splice(i, 1);
+          if (
+            link.taskId === t.id &&
+            link.integrationId !== null &&
+            integrationProjectOf(link.integrationId) !== dest.id
+          )
+            links.splice(i, 1);
         }
         return ok(M.MoveTaskResult, { task: t, sourceProjectId: from, destinationProjectId: dest.id });
       }
@@ -2396,7 +2805,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // themselves are not checked for workspace here, as the fake checks no
       // relation's reach.
       for (const r of relations.filter((r) => r.targetTaskId === source.id && r.relationType === "subtask")) {
-        relations.push({ id: id("rel"), sourceTaskId: r.sourceTaskId, targetTaskId: copy.id, relationType: r.relationType, createdAt: now() });
+        relations.push({
+          id: id("rel"),
+          sourceTaskId: r.sourceTaskId,
+          targetTaskId: copy.id,
+          relationType: r.relationType,
+          createdAt: now(),
+        });
       }
       // Assets the description references are copied like upstream's
       // duplicateDescriptionAssets: new rows and objects, the text rewritten
@@ -2407,7 +2822,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           const ref = new RegExp(`/asset/${a.id}(?![A-Za-z0-9])`, "g");
           if (!ref.test(description)) continue;
           const assetId = id("asset");
-          const key = taskObjectKey(project.workspaceId, copy.projectId, copy.id, a.surface === "comment" ? "comment" : "description", a.filename);
+          const key = taskObjectKey(
+            project.workspaceId,
+            copy.projectId,
+            copy.id,
+            a.surface === "comment" ? "comment" : "description",
+            a.filename,
+          );
           objects.set(key, objects.get(a.key) ?? { bytes: a.bytes, contentType: a.contentType });
           imageAssets.push({ ...a, id: assetId, taskId: copy.id, key, createdAt: copy.createdAt });
           description = description.replace(ref, () => `/asset/${assetId}`);
@@ -2429,7 +2850,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (t === undefined) return failText(404, "Task not found");
       const project = projects.find((x) => x.id === t.projectId)!;
       const key = taskObjectKey(project.workspaceId, t.projectId, t.id, b.surface, b.filename);
-      return ok(M.TaskImageUpload, { key, uploadUrl: `${url.origin}/uploads/${key}`, headers: { "Content-Type": b.contentType } });
+      return ok(M.TaskImageUpload, {
+        key,
+        uploadUrl: `${url.origin}/uploads/${key}`,
+        headers: { "Content-Type": b.contentType },
+      });
     }
     if (req.method === "POST" && (p = m(/^\/task\/image-upload\/([^/]+)\/finalize$/))) {
       const b = body as z.input<typeof M.FinalizeTaskImageUploadBody>;
@@ -2453,9 +2878,28 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (found !== undefined) {
         // The asset read serves the object's current bytes upstream, so a
         // re-PUT under the same key is what a re-finalize records.
-        Object.assign(found, { taskId: t.id, projectId: t.projectId, filename: b.filename, contentType: stored.contentType, size: stored.bytes.byteLength, surface: b.surface, bytes: stored.bytes });
+        Object.assign(found, {
+          taskId: t.id,
+          projectId: t.projectId,
+          filename: b.filename,
+          contentType: stored.contentType,
+          size: stored.bytes.byteLength,
+          surface: b.surface,
+          bytes: stored.bytes,
+        });
       } else {
-        imageAssets.push({ id: id("asset"), taskId: t.id, projectId: t.projectId, key, filename: b.filename, contentType: stored.contentType, size: stored.bytes.byteLength, surface: b.surface, bytes: stored.bytes, createdAt: now() });
+        imageAssets.push({
+          id: id("asset"),
+          taskId: t.id,
+          projectId: t.projectId,
+          key,
+          filename: b.filename,
+          contentType: stored.contentType,
+          size: stored.bytes.byteLength,
+          surface: b.surface,
+          bytes: stored.bytes,
+          createdAt: now(),
+        });
       }
       const asset = found ?? imageAssets[imageAssets.length - 1]!;
       return ok(M.TaskImageAsset, { id: asset.id, url: `${url.origin}/asset/${asset.id}` });
@@ -2524,7 +2968,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (i < 0) return failText(400, "Workspace ID could not be determined");
       if (comments[i]!.userId !== "user-self") return fail(404, "Comment not found or you are not the author");
       const { user: _, ...c } = comments[i]!;
-      const reply = ok(M.Activity, { ...c, type: "comment", externalUserName: null, externalUserAvatar: null, externalSource: null, externalUrl: null });
+      const reply = ok(M.Activity, {
+        ...c,
+        type: "comment",
+        externalUserName: null,
+        externalUserAvatar: null,
+        externalSource: null,
+        externalUrl: null,
+      });
       comments.splice(i, 1);
       return reply;
     }
@@ -2535,7 +2986,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // its HTTPException is plain text.
       if (!tasks.some((t) => t.id === taskId)) return failText(400, "Workspace ID could not be determined");
       if (req.method === "GET") {
-        return ok(z.array(M.Comment), comments.filter((c) => c.taskId === taskId && !(dropped?.test(c.content) ?? false)));
+        return ok(
+          z.array(M.Comment),
+          comments.filter((c) => c.taskId === taskId && !(dropped?.test(c.content) ?? false)),
+        );
       }
       if (req.method === "POST") {
         const added = addComment(taskId, (body as any).content);
@@ -2558,8 +3012,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if ((p = m(/^\/activity\/([^/]+)$/)) && req.method === "GET") {
       const taskId = decodeURIComponent(p[1]);
-      const feed = [...comments.filter((c) => c.taskId === taskId).map((c) => asActivity(c)), ...events.filter((e) => e.taskId === taskId)];
-      return ok(z.array(M.Activity), feed.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      const feed = [
+        ...comments.filter((c) => c.taskId === taskId).map((c) => asActivity(c)),
+        ...events.filter((e) => e.taskId === taskId),
+      ];
+      return ok(
+        z.array(M.Activity),
+        feed.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      );
     }
     if (req.method === "POST" && path === "/activity/create") {
       const b = body as any;
@@ -2567,7 +3027,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (!tasks.some((t) => t.id === b.taskId)) return fail(400, "Task not found");
       if (b.type === "comment") return fail(400, "Use the comment endpoint");
       const at = now();
-      const e = asActivity({ id: id("act"), taskId: b.taskId, userId: "user-self", content: b.message, createdAt: at, updatedAt: at }, b.type, b.eventData ?? null);
+      const e = asActivity(
+        { id: id("act"), taskId: b.taskId, userId: "user-self", content: b.message, createdAt: at, updatedAt: at },
+        b.type,
+        b.eventData ?? null,
+      );
       events.push(e);
       return ok(M.Activity, e);
     }
@@ -2588,7 +3052,17 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const d = duration(b.startTime, b.endTime);
       if (d === undefined) return fail(400, "Start time cannot be after end time. Please adjust the time range.");
       const at = now();
-      const e = { id: id("time"), taskId: b.taskId, userId: "user-self", description: b.description || "", startTime: new Date(b.startTime).toISOString(), endTime: b.endTime ? new Date(b.endTime).toISOString() : null, duration: d, createdAt: at, updatedAt: at };
+      const e = {
+        id: id("time"),
+        taskId: b.taskId,
+        userId: "user-self",
+        description: b.description || "",
+        startTime: new Date(b.startTime).toISOString(),
+        endTime: b.endTime ? new Date(b.endTime).toISOString() : null,
+        duration: d,
+        createdAt: at,
+        updatedAt: at,
+      };
       timeEntries.push(e);
       return ok(M.TimeEntry, e);
     }
@@ -2610,7 +3084,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         const end = b.endTime ? new Date(b.endTime).toISOString() : e.endTime;
         const d = duration(b.startTime, end);
         if (d === undefined) return fail(400, "Start time cannot be after end time. Please adjust the time range.");
-        Object.assign(e, { startTime: new Date(b.startTime).toISOString(), endTime: end, duration: d, updatedAt: now() }, b.description === undefined ? {} : { description: b.description });
+        Object.assign(
+          e,
+          { startTime: new Date(b.startTime).toISOString(), endTime: end, duration: d, updatedAt: now() },
+          b.description === undefined ? {} : { description: b.description },
+        );
         return ok(M.TimeEntry, e);
       }
     }
@@ -2638,11 +3116,22 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       if (req.method === "PUT") {
         const b = body as z.input<typeof M.UpsertWorkflowRuleBody>;
-        if (!columnsOf(key).some((c) => c.id === b.columnId)) return fail(400, "Column does not belong to the provided project");
-        const found = workflowRules.find((r) => r.projectId === key && r.integrationType === b.integrationType && r.eventType === b.eventType);
+        if (!columnsOf(key).some((c) => c.id === b.columnId))
+          return fail(400, "Column does not belong to the provided project");
+        const found = workflowRules.find(
+          (r) => r.projectId === key && r.integrationType === b.integrationType && r.eventType === b.eventType,
+        );
         if (found) return ok(M.WorkflowRuleRow, Object.assign(found, { columnId: b.columnId, updatedAt: now() }));
         const at = now();
-        const rule = { id: id("rule"), projectId: key, integrationType: b.integrationType, eventType: b.eventType, columnId: b.columnId, createdAt: at, updatedAt: at };
+        const rule = {
+          id: id("rule"),
+          projectId: key,
+          integrationType: b.integrationType,
+          eventType: b.eventType,
+          columnId: b.columnId,
+          createdAt: at,
+          updatedAt: at,
+        };
         workflowRules.push(rule);
         return ok(M.WorkflowRuleRow, rule);
       }
@@ -2651,7 +3140,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "GET" && (p = m(/^\/external-link\/task\/([^/]+)$/))) {
       const taskId = decodeURIComponent(p[1]);
       if (!tasks.some((t) => t.id === taskId)) return fail(400, "Workspace ID could not be determined");
-      return ok(z.array(M.ExternalLink), links.filter((l) => l.taskId === taskId));
+      return ok(
+        z.array(M.ExternalLink),
+        links.filter((l) => l.taskId === taskId),
+      );
     }
     // 2.32.0's manual link routes: a hand-added link is a "url" resource whose
     // external id is the URL itself, and only manual links can be removed.
@@ -2663,7 +3155,19 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // to http or https.
       if (!/^https?:\/\//i.test(b.url)) return failText(400, "URL must use http or https");
       const at = now();
-      const link = { id: id("link"), taskId, integrationId: null, resourceType: "url", externalId: b.url, url: b.url, title: b.title ?? null, metadata: null, createdAt: at, updatedAt: at, integration: null };
+      const link = {
+        id: id("link"),
+        taskId,
+        integrationId: null,
+        resourceType: "url",
+        externalId: b.url,
+        url: b.url,
+        title: b.title ?? null,
+        metadata: null,
+        createdAt: at,
+        updatedAt: at,
+        integration: null,
+      };
       links.push(link);
       const { integration: _integration, ...created } = link;
       return ok(M.CreatedExternalLink, created);
@@ -2674,14 +3178,26 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (!tasks.some((t) => t.id === taskId)) return fail(400, "Workspace ID could not be determined");
       // Only a manual link goes: an integration's own rows are not the
       // endpoint's to remove.
-      const i = links.findIndex((l) => l.id === linkId && l.taskId === taskId && l.integrationId === null && (l.resourceType === "url" || l.resourceType === "pull_request"));
+      const i = links.findIndex(
+        (l) =>
+          l.id === linkId &&
+          l.taskId === taskId &&
+          l.integrationId === null &&
+          (l.resourceType === "url" || l.resourceType === "pull_request"),
+      );
       if (i < 0) return failText(404, "Manual resource link not found");
       return ok(M.DeletedExternalLink, { id: links.splice(i, 1)[0]!.id });
     }
 
     if (req.method === "POST" && path === "/task-relation") {
       const b = body as any;
-      const r = { id: id("rel"), sourceTaskId: b.sourceTaskId, targetTaskId: b.targetTaskId, relationType: b.relationType, createdAt: now() };
+      const r = {
+        id: id("rel"),
+        sourceTaskId: b.sourceTaskId,
+        targetTaskId: b.targetTaskId,
+        relationType: b.relationType,
+        createdAt: now(),
+      };
       relations.push(r);
       return ok(M.TaskRelation, r);
     }
@@ -2690,7 +3206,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "GET") {
         const list = relations
           .filter((r) => r.sourceTaskId === key || r.targetTaskId === key)
-          .map((r) => ({ ...r, sourceTask: related(tasks.find((t) => t.id === r.sourceTaskId)), targetTask: related(tasks.find((t) => t.id === r.targetTaskId)) }));
+          .map((r) => ({
+            ...r,
+            sourceTask: related(tasks.find((t) => t.id === r.sourceTaskId)),
+            targetTask: related(tasks.find((t) => t.id === r.targetTaskId)),
+          }));
         return ok(z.array(M.TaskRelationWithTasks), list);
       }
       if (req.method === "DELETE") {
@@ -2711,7 +3231,16 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         (b.relatedEntityType === "workspace" && workspaces.some((w) => w.id === b.relatedEntityId));
       const category = CATEGORY[b.type];
       if (!reachable || (category && settings[category] === false)) return Response.json(null);
-      return ok(M.Notification, addNotification({ type: b.type, title: b.title, content: b.message, resourceId: b.relatedEntityId, resourceType: b.relatedEntityType }));
+      return ok(
+        M.Notification,
+        addNotification({
+          type: b.type,
+          title: b.title,
+          content: b.message,
+          resourceId: b.relatedEntityId,
+          resourceType: b.relatedEntityType,
+        }),
+      );
     }
     if (req.method === "PATCH" && path === "/notification/read-all") {
       for (const n of notifications) n.isRead = true;
@@ -2727,11 +3256,17 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       n.isRead = true;
       return ok(M.Notification, n);
     }
-    if (req.method === "GET" && path === "/notification-preferences") return ok(M.NotificationPreferences, preferences());
+    if (req.method === "GET" && path === "/notification-preferences")
+      return ok(M.NotificationPreferences, preferences());
     if (req.method === "PUT" && path === "/notification-preferences") {
       const b = body as Record<string, unknown>;
       // Stored flags before the write: the carry-over below compares with them.
-      const had = { emailEnabled: settings.emailEnabled, ntfyEnabled: settings.ntfyEnabled, gotifyEnabled: settings.gotifyEnabled, webhookEnabled: settings.webhookEnabled };
+      const had = {
+        emailEnabled: settings.emailEnabled,
+        ntfyEnabled: settings.ntfyEnabled,
+        gotifyEnabled: settings.gotifyEnabled,
+        webhookEnabled: settings.webhookEnabled,
+      };
       const next = { ...settings };
       const nextSecrets = { ...secrets };
       for (const [k, v] of Object.entries(b)) {
@@ -2741,11 +3276,18 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // A null address keeps the stored one: the server reads `input ?? existing`.
         else if (v !== null) (next as any)[k] = v;
       }
-      if (next.emailEnabled && !next.emailAddress) return new Response("Email notifications require an account email address", { status: 400 });
-      if ((next.ntfyEnabled || "ntfyServerUrl" in b || "ntfyTopic" in b || "ntfyToken" in b) && (!next.ntfyServerUrl || !next.ntfyTopic)) {
+      if (next.emailEnabled && !next.emailAddress)
+        return new Response("Email notifications require an account email address", { status: 400 });
+      if (
+        (next.ntfyEnabled || "ntfyServerUrl" in b || "ntfyTopic" in b || "ntfyToken" in b) &&
+        (!next.ntfyServerUrl || !next.ntfyTopic)
+      ) {
         return new Response("ntfy requires a server URL and topic", { status: 400 });
       }
-      if ((next.gotifyEnabled || "gotifyServerUrl" in b || "gotifyToken" in b) && (!next.gotifyServerUrl || !nextSecrets.gotifyToken)) {
+      if (
+        (next.gotifyEnabled || "gotifyServerUrl" in b || "gotifyToken" in b) &&
+        (!next.gotifyServerUrl || !nextSecrets.gotifyToken)
+      ) {
         return new Response("Gotify requires a server URL and app token", { status: 400 });
       }
       if ((next.webhookEnabled || "webhookUrl" in b || "webhookSecret" in b) && !next.webhookUrl) {
@@ -2770,7 +3312,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         webhookEnabled: settings.webhookEnabled && !had.webhookEnabled && !off.webhookEnabled,
       };
       for (const rule of rules) {
-        if (!rule.isActive || !(rule.emailEnabled || rule.ntfyEnabled || rule.gotifyEnabled || rule.webhookEnabled)) continue;
+        if (!rule.isActive || !(rule.emailEnabled || rule.ntfyEnabled || rule.gotifyEnabled || rule.webhookEnabled))
+          continue;
         for (const channel of Object.keys(off) as (keyof typeof off)[]) {
           if (off[channel]) rule[channel] = false;
           else if (on[channel]) rule[channel] = true;
@@ -2786,18 +3329,33 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         const b = body as any;
         if (b.projectMode === "selected") {
           const ids: string[] = b.selectedProjectIds ?? [];
-          if (ids.length === 0) return new Response("Select at least one project for selected project mode", { status: 400 });
+          if (ids.length === 0)
+            return new Response("Select at least one project for selected project mode", { status: 400 });
           // Counted as rows found, so a repeated id fails like an unknown one.
           if (projects.filter((x) => x.workspaceId === ws.id && ids.includes(x.id)).length !== ids.length) {
             return new Response("One or more selected projects are invalid", { status: 400 });
           }
         }
         const can = usable();
-        for (const [channel, name] of [["emailEnabled", "email"], ["ntfyEnabled", "ntfy"], ["webhookEnabled", "webhook"], ["gotifyEnabled", "Gotify"]] as const) {
-          if (b[channel] && !can[channel]) return new Response(`Enable ${name} notifications globally before using them here`, { status: 400 });
+        for (const [channel, name] of [
+          ["emailEnabled", "email"],
+          ["ntfyEnabled", "ntfy"],
+          ["webhookEnabled", "webhook"],
+          ["gotifyEnabled", "Gotify"],
+        ] as const) {
+          if (b[channel] && !can[channel])
+            return new Response(`Enable ${name} notifications globally before using them here`, { status: 400 });
         }
         const at = nnow();
-        const rule = { id: i < 0 ? nid("rule") : rules[i]!.id, workspaceId: ws.id, workspaceName: ws.name, ...b, selectedProjectIds: b.projectMode === "selected" ? b.selectedProjectIds : [], createdAt: i < 0 ? at : rules[i]!.createdAt, updatedAt: at } as z.input<typeof M.NotificationPreferenceWorkspaceRule>;
+        const rule = {
+          id: i < 0 ? nid("rule") : rules[i]!.id,
+          workspaceId: ws.id,
+          workspaceName: ws.name,
+          ...b,
+          selectedProjectIds: b.projectMode === "selected" ? b.selectedProjectIds : [],
+          createdAt: i < 0 ? at : rules[i]!.createdAt,
+          updatedAt: at,
+        } as z.input<typeof M.NotificationPreferenceWorkspaceRule>;
         if (i < 0) rules.push(rule);
         else rules[i] = rule;
         return ok(M.NotificationPreferences, preferences());
@@ -2809,12 +3367,19 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
     }
 
-    const workspaceOf = (taskId: string) => projects.find((x) => x.id === tasks.find((t) => t.id === taskId)?.projectId)?.workspaceId;
+    const workspaceOf = (taskId: string) =>
+      projects.find((x) => x.id === tasks.find((t) => t.id === taskId)?.projectId)?.workspaceId;
     if (req.method === "GET" && (p = m(/^\/label\/workspace\/([^/]+)$/))) {
-      return ok(z.array(M.Label), labels.filter((l) => l.workspaceId === decodeURIComponent(p![1])));
+      return ok(
+        z.array(M.Label),
+        labels.filter((l) => l.workspaceId === decodeURIComponent(p![1])),
+      );
     }
     if (req.method === "GET" && (p = m(/^\/label\/task\/([^/]+)$/))) {
-      return ok(z.array(M.Label), labels.filter((l) => l.taskId === decodeURIComponent(p![1])));
+      return ok(
+        z.array(M.Label),
+        labels.filter((l) => l.taskId === decodeURIComponent(p![1])),
+      );
     }
     if (req.method === "POST" && path === "/label") {
       const b = body as any;
@@ -2831,13 +3396,19 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "PUT" && !p[2]) {
         const b = body as any;
         // A workspace label carries the change to its copies.
-        if (l.taskId === null) for (const c of labels) if (c.taskId !== null && c.workspaceId === l.workspaceId && c.name === l.name) Object.assign(c, { name: b.name, color: b.color });
+        if (l.taskId === null)
+          for (const c of labels)
+            if (c.taskId !== null && c.workspaceId === l.workspaceId && c.name === l.name)
+              Object.assign(c, { name: b.name, color: b.color });
         return ok(M.Label, Object.assign(l, { name: b.name, color: b.color, updatedAt: now() }));
       }
       if (req.method === "DELETE" && !p[2]) {
         // The server removes copies 25 at a time and answers 202 until none
         // are left; one at a time here, so two copies go through the repeat.
-        const copies = l.taskId === null ? labels.filter((c) => c.taskId !== null && c.workspaceId === l.workspaceId && c.name === l.name) : [];
+        const copies =
+          l.taskId === null
+            ? labels.filter((c) => c.taskId !== null && c.workspaceId === l.workspaceId && c.name === l.name)
+            : [];
         if (copies.length > 0) {
           labels.splice(labels.indexOf(copies[0]!), 1);
           if (copies.length > 1) return ok(M.PendingLabelDeletion, { ...l, pendingDeletion: true }, 202);
@@ -2871,17 +3442,31 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "GET" && (p = m(/^\/custom-field\/project\/([^/]+)\/filter-values$/))) {
       const projectId = decodeURIComponent(p[1]);
       if (!knownProject(projectId)) return failText(400, "Workspace ID could not be determined");
-      return ok(z.array(M.CustomFieldFilterValues), fields.filter((f) => f.projectId === projectId).map((f) => ({
-        fieldId: f.id,
-        fieldName: f.name,
-        fieldType: f.type,
-        values: [...new Set(fieldValues.filter((v) => v.fieldId === f.id && v.value !== null && v.value !== "").map((v) => v.value!))],
-      })));
+      return ok(
+        z.array(M.CustomFieldFilterValues),
+        fields
+          .filter((f) => f.projectId === projectId)
+          .map((f) => ({
+            fieldId: f.id,
+            fieldName: f.name,
+            fieldType: f.type,
+            values: [
+              ...new Set(
+                fieldValues
+                  .filter((v) => v.fieldId === f.id && v.value !== null && v.value !== "")
+                  .map((v) => v.value!),
+              ),
+            ],
+          })),
+      );
     }
     if (req.method === "GET" && (p = m(/^\/custom-field\/project\/([^/]+)$/))) {
       const projectId = decodeURIComponent(p[1]);
       if (!knownProject(projectId)) return failText(400, "Workspace ID could not be determined");
-      return ok(z.array(M.CustomFieldDefinition), fields.filter((f) => f.projectId === projectId).sort((a, b) => a.position - b.position));
+      return ok(
+        z.array(M.CustomFieldDefinition),
+        fields.filter((f) => f.projectId === projectId).sort((a, b) => a.position - b.position),
+      );
     }
     if (req.method === "GET" && (p = m(/^\/custom-field\/task\/([^/]+)$/))) {
       const taskId = decodeURIComponent(p[1]);
@@ -2897,27 +3482,34 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const required = b.required ?? false;
       const defaultValue = b.defaultValue as string | undefined;
       const options = b.options as string[] | undefined;
-      if (required && (defaultValue === undefined || defaultValue === null || defaultValue.trim() === "")) return bad("Required fields must have a default value");
+      if (required && (defaultValue === undefined || defaultValue === null || defaultValue.trim() === ""))
+        return bad("Required fields must have a default value");
       if (defaultValue !== undefined && defaultValue !== null) {
         const trimmedValue = defaultValue.trim();
         if (trimmedValue !== "") {
           if (type === "number") {
             const numberRegex = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i;
             const parsed = Number(trimmedValue);
-            if (!numberRegex.test(trimmedValue) || Number.isNaN(parsed) || !Number.isFinite(parsed)) return bad("Default value must be a valid number for number type fields");
+            if (!numberRegex.test(trimmedValue) || Number.isNaN(parsed) || !Number.isFinite(parsed))
+              return bad("Default value must be a valid number for number type fields");
           } else if (type === "boolean") {
-            if (trimmedValue !== "true" && trimmedValue !== "false") return bad("Default value must be 'true' or 'false' for boolean type fields");
+            if (trimmedValue !== "true" && trimmedValue !== "false")
+              return bad("Default value must be 'true' or 'false' for boolean type fields");
           } else if (type === "date") {
             const error = dateValueError(trimmedValue, b.name);
             if (error) return bad(error);
           } else if (type === "dropdown" && options && options.length > 0) {
-            if (!options.map((opt) => opt.trim()).includes(trimmedValue)) return bad("Default value must be one of the dropdown options");
+            if (!options.map((opt) => opt.trim()).includes(trimmedValue))
+              return bad("Default value must be one of the dropdown options");
           }
         }
       }
-      if (type === "dropdown" && (!options || options.length < 1)) return bad("Dropdown fields must have at least one option");
+      if (type === "dropdown" && (!options || options.length < 1))
+        return bad("Dropdown fields must have at least one option");
       if (type === "multiselect") {
-        const normalizedOptions = [...new Set((options ?? []).map((opt) => opt.trim()).filter((opt) => opt.length > 0))];
+        const normalizedOptions = [
+          ...new Set((options ?? []).map((opt) => opt.trim()).filter((opt) => opt.length > 0)),
+        ];
         if (normalizedOptions.length < 2) return bad("Multiselect fields must have at least 2 options");
       }
       if (type === "multiselect" && defaultValue != null) {
@@ -2946,7 +3538,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       fields.push(field);
       if (storedDefaultValue != null && storedDefaultValue.trim() !== "") {
         for (const t of tasks.filter((t) => t.projectId === b.projectId)) {
-          if (!fieldValues.some((v) => v.taskId === t.id && v.fieldId === field.id)) addFieldValue(t.id, field.id, storedDefaultValue);
+          if (!fieldValues.some((v) => v.taskId === t.id && v.fieldId === field.id))
+            addFieldValue(t.id, field.id, storedDefaultValue);
         }
       }
       return ok(M.CustomFieldDefinition, field);
@@ -2958,9 +3551,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const wanted = ((body as any)?.fields ?? []) as { id: string; position: number }[];
       // The transaction checks every id before it writes any, so a foreign id
       // leaves the order untouched.
-      for (const f of wanted) if (!mine.some((x) => x.id === f.id)) return failText(400, `Custom field ${f.id} does not belong to this project`);
+      for (const f of wanted)
+        if (!mine.some((x) => x.id === f.id))
+          return failText(400, `Custom field ${f.id} does not belong to this project`);
       for (const f of wanted) mine.find((x) => x.id === f.id)!.position = f.position;
-      return ok(z.array(M.CustomFieldDefinition), mine.slice().sort((a, b) => a.position - b.position));
+      return ok(
+        z.array(M.CustomFieldDefinition),
+        mine.slice().sort((a, b) => a.position - b.position),
+      );
     }
     if (req.method === "PUT" && path === "/custom-field/value") {
       const b = body as any;
@@ -2972,11 +3570,25 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const bad = (message: string) => failText(400, message);
       const fieldOptions = Array.isArray(field.options) ? field.options : null;
       if (field.required) {
-        if (field.type === "multiselect" ? multiselectValueEmpty(normalizedValue) : normalizedValue.length === 0) return bad("This custom field is required");
+        if (field.type === "multiselect" ? multiselectValueEmpty(normalizedValue) : normalizedValue.length === 0)
+          return bad("This custom field is required");
       }
-      if (field.type === "dropdown" && normalizedValue.length > 0 && fieldOptions !== null && !fieldOptions.includes(normalizedValue)) return bad("Invalid option for this custom field");
-      if (field.type === "number" && normalizedValue.length > 0 && Number.isNaN(Number(normalizedValue))) return bad("Value must be a valid number");
-      if (field.type === "boolean" && normalizedValue.length > 0 && normalizedValue !== "true" && normalizedValue !== "false") return bad("Value must be true or false");
+      if (
+        field.type === "dropdown" &&
+        normalizedValue.length > 0 &&
+        fieldOptions !== null &&
+        !fieldOptions.includes(normalizedValue)
+      )
+        return bad("Invalid option for this custom field");
+      if (field.type === "number" && normalizedValue.length > 0 && Number.isNaN(Number(normalizedValue)))
+        return bad("Value must be a valid number");
+      if (
+        field.type === "boolean" &&
+        normalizedValue.length > 0 &&
+        normalizedValue !== "true" &&
+        normalizedValue !== "false"
+      )
+        return bad("Value must be true or false");
       if (field.type === "multiselect" && normalizedValue.length > 0) {
         let parsed: unknown;
         try {
@@ -2991,8 +3603,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         }
       }
       const row = fieldValues.find((v) => v.taskId === b.taskId && v.fieldId === b.fieldId);
-      const saved = row ? Object.assign(row, { value: normalizedValue }) : addFieldValue(b.taskId, b.fieldId, normalizedValue);
-      return ok(M.SetCustomFieldValueResponse, { id: saved.id, taskId: saved.taskId, fieldId: saved.fieldId, value: saved.value });
+      const saved = row
+        ? Object.assign(row, { value: normalizedValue })
+        : addFieldValue(b.taskId, b.fieldId, normalizedValue);
+      return ok(M.SetCustomFieldValueResponse, {
+        id: saved.id,
+        taskId: saved.taskId,
+        fieldId: saved.fieldId,
+        value: saved.value,
+      });
     }
     if (req.method === "DELETE" && (p = m(/^\/custom-field\/([^/]+)$/))) {
       const id = decodeURIComponent(p[1]);
@@ -3028,7 +3647,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       // list-gitea-repositories.ts verifies the token first and turns any
       // failure of that check into the same 400.
-      if (giteaMode !== "ok" || b.accessToken.trim() === "") return failText(400, "Invalid Gitea token or could not reach instance.");
+      if (giteaMode !== "ok" || b.accessToken.trim() === "")
+        return failText(400, "Invalid Gitea token or could not reach instance.");
       return ok(M.GiteaRepositoryList, {
         repositories: giteaRepos.map((r, i) => ({
           id: i + 1,
@@ -3049,15 +3669,40 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // verify-gitea-access.ts reports what the checks found rather than
       // failing the request, except an unauthorized token, which is a 400.
       if (giteaMode === "not-gitea") {
-        return ok(M.GiteaVerificationResult, { isInstalled: false, hasRequiredPermissions: false, repositoryExists: false, repositoryPrivate: null, missingPermissions: [], message: "The URL does not point to a Gitea instance.", failureReason: "not_a_gitea_instance" });
+        return ok(M.GiteaVerificationResult, {
+          isInstalled: false,
+          hasRequiredPermissions: false,
+          repositoryExists: false,
+          repositoryPrivate: null,
+          missingPermissions: [],
+          message: "The URL does not point to a Gitea instance.",
+          failureReason: "not_a_gitea_instance",
+        });
       }
       if (giteaMode === "redirected") {
-        return ok(M.GiteaVerificationResult, { isInstalled: false, hasRequiredPermissions: false, repositoryExists: false, repositoryPrivate: null, missingPermissions: [], message: "The Gitea URL redirected (HTTP 301). This usually means the server forces HTTPS. Please use the final URL directly.", failureReason: "redirected" });
+        return ok(M.GiteaVerificationResult, {
+          isInstalled: false,
+          hasRequiredPermissions: false,
+          repositoryExists: false,
+          repositoryPrivate: null,
+          missingPermissions: [],
+          message:
+            "The Gitea URL redirected (HTTP 301). This usually means the server forces HTTPS. Please use the final URL directly.",
+          failureReason: "redirected",
+        });
       }
       if (giteaMode === "bad-token") return failText(400, "Invalid Gitea token or unauthorized.");
       const repo = giteaRepo(b.repositoryOwner, b.repositoryName);
       if (repo === undefined) {
-        return ok(M.GiteaVerificationResult, { isInstalled: false, hasRequiredPermissions: false, repositoryExists: false, repositoryPrivate: null, missingPermissions: [], message: "Repository not found or not accessible with this token.", failureReason: "repository_not_found" });
+        return ok(M.GiteaVerificationResult, {
+          isInstalled: false,
+          hasRequiredPermissions: false,
+          repositoryExists: false,
+          repositoryPrivate: null,
+          missingPermissions: [],
+          message: "Repository not found or not accessible with this token.",
+          failureReason: "repository_not_found",
+        });
       }
       const canWrite = repo.canWriteIssues !== false;
       return ok(M.GiteaVerificationResult, {
@@ -3066,7 +3711,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         repositoryExists: true,
         repositoryPrivate: repo.private ?? false,
         missingPermissions: canWrite ? [] : ["issues (write)"],
-        message: canWrite ? "Token can access the repository." : "Token may not have sufficient permissions to manage issues.",
+        message: canWrite
+          ? "Token can access the repository."
+          : "Token may not have sufficient permissions to manage issues.",
         failureReason: null,
       });
     }
@@ -3075,7 +3722,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "GET") {
         if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
         const row = giteaRow(projectId);
-        return ok(M.GiteaIntegration, row === undefined ? null : giteaIntegrationReply(row, url.origin, !opts.plainMember));
+        return ok(
+          M.GiteaIntegration,
+          row === undefined ? null : giteaIntegrationReply(row, url.origin, !opts.plainMember),
+        );
       }
       if (req.method === "POST") {
         if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
@@ -3095,14 +3745,24 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // becomes an HTTPException carrying its status and message.
         if (giteaMode !== "ok") {
           const status = giteaMode === "redirected" ? 301 : giteaMode === "bad-token" ? 401 : 404;
-          const message = giteaMode === "redirected" ? `Gitea request was redirected (HTTP ${status})` : `Gitea API error ${status}`;
+          const message =
+            giteaMode === "redirected" ? `Gitea request was redirected (HTTP ${status})` : `Gitea API error ${status}`;
           return failText(status, message);
         }
         if (giteaRepo(b.repositoryOwner, b.repositoryName) === undefined) return failText(404, "Gitea API error 404");
         const clash = gitea.find(
-          (x) => x.projectId !== projectId && x.isActive && x.baseUrl === normalized && x.repositoryOwner === b.repositoryOwner && x.repositoryName === b.repositoryName,
+          (x) =>
+            x.projectId !== projectId &&
+            x.isActive &&
+            x.baseUrl === normalized &&
+            x.repositoryOwner === b.repositoryOwner &&
+            x.repositoryName === b.repositoryName,
         );
-        if (clash !== undefined) return failText(409, `Repository ${b.repositoryOwner}/${b.repositoryName} on this Gitea instance is already linked to another project`);
+        if (clash !== undefined)
+          return failText(
+            409,
+            `Repository ${b.repositoryOwner}/${b.repositoryName} on this Gitea instance is already linked to another project`,
+          );
         const existing = giteaRow(projectId);
         let row: GiteaRow;
         if (existing === undefined) {
@@ -3173,7 +3833,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const row = giteaRow(b.projectId);
       if (row === undefined) return failText(404, "Gitea integration not found");
       if (!row.isActive) return failText(400, "Gitea integration is not active");
-      if (row.token.trim() === "" || row.baseUrl.trim() === "") return failText(400, "Gitea access token or base URL not configured");
+      if (row.token.trim() === "" || row.baseUrl.trim() === "")
+        return failText(400, "Gitea access token or base URL not configured");
       // import-gitea-issues.ts's listIssues runs before the per-issue try/catch
       // and nothing translates its GiteaApiError, so a failing instance ends
       // the call in the app's plain 500 rather than an errors entry.
@@ -3194,16 +3855,24 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // imported; upstream's skipped is reachable only through a race the
         // sequential fake never has.
         const link = links.find((l) => {
-          if (l.integrationId !== row.id || l.resourceType !== "issue" || l.externalId !== String(issue.number)) return false;
+          if (l.integrationId !== row.id || l.resourceType !== "issue" || l.externalId !== String(issue.number))
+            return false;
           return tasks.some((t) => t.id === l.taskId && t.projectId === project.id);
         });
         try {
           if (issue.fail !== null) throw new Error(issue.fail);
           // extract-priority.ts: the first priority:/status: label decides, and
           // only values in the known sets count.
-          const priorityName = issue.labels.map((n) => (n.startsWith("priority:") ? n.slice("priority:".length) : null)).find((v): v is string => v !== null);
-          const priority = priorityName !== undefined && ["low", "medium", "high", "urgent"].includes(priorityName) ? priorityName : null;
-          const statusName = issue.labels.map((n) => (n.startsWith("status:") ? n.slice("status:".length).trim().toLowerCase() : null)).find((v): v is string => v !== null);
+          const priorityName = issue.labels
+            .map((n) => (n.startsWith("priority:") ? n.slice("priority:".length) : null))
+            .find((v): v is string => v !== null);
+          const priority =
+            priorityName !== undefined && ["low", "medium", "high", "urgent"].includes(priorityName)
+              ? priorityName
+              : null;
+          const statusName = issue.labels
+            .map((n) => (n.startsWith("status:") ? n.slice("status:".length).trim().toLowerCase() : null))
+            .find((v): v is string => v !== null);
           const status = statusName !== undefined && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(statusName) ? statusName : null;
           if (link !== undefined) {
             // The scope check above already proved the task exists in this
@@ -3331,7 +4000,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           if (g.projectId === key || !g.isActive) return false;
           const otherBase = gitlabBase(g.baseUrl);
           const otherPath = gitlabPath(g.projectPath);
-          return !(otherBase instanceof Response) && !(otherPath instanceof Response) && otherBase === base && otherPath === projectPath;
+          return (
+            !(otherBase instanceof Response) &&
+            !(otherPath instanceof Response) &&
+            otherBase === base &&
+            otherPath === projectPath
+          );
         });
         if (clash !== undefined) {
           return failText(409, `Project ${projectPath} on this GitLab instance is already linked to another project`);
@@ -3390,7 +4064,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           z.array(M.CalendarFeed),
           [...feeds]
             .filter((f) => f.projectId === projectId)
-            .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+            .sort(
+              (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+            ),
         );
       }
       if (req.method === "POST") {
@@ -3406,15 +4082,33 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // all be live labels of the project's workspace, then resolve by name
         // to the workspace's definitions, materializing the ones it lacks.
         const ids = [...new Set(b.labelIds)];
-        const found = labels.filter((l) => l.workspaceId === project.workspaceId && ids.includes(l.id) && l.deletionStartedAt === null);
+        const found = labels.filter(
+          (l) => l.workspaceId === project.workspaceId && ids.includes(l.id) && l.deletionStartedAt === null,
+        );
         if (found.length !== ids.length) return failText(400, "Select labels from this workspace");
         const byName = new Map(found.map((l) => [l.name, l]));
-        const roots = [...byName.keys()].sort((a, b2) => a.localeCompare(b2)).map((name) => {
-          let root = labels.find((l) => l.workspaceId === project.workspaceId && l.name === name && l.taskId === null && l.deletionStartedAt === null);
-          if (!root) root = addLabel(name, byName.get(name)!.color, project.workspaceId, null);
-          return root;
-        });
-        return ok(M.CalendarFeed, addFeed(projectId, roots.map((r) => r.id), b.timeZone ?? "UTC"), 201);
+        const roots = [...byName.keys()]
+          .sort((a, b2) => a.localeCompare(b2))
+          .map((name) => {
+            let root = labels.find(
+              (l) =>
+                l.workspaceId === project.workspaceId &&
+                l.name === name &&
+                l.taskId === null &&
+                l.deletionStartedAt === null,
+            );
+            if (!root) root = addLabel(name, byName.get(name)!.color, project.workspaceId, null);
+            return root;
+          });
+        return ok(
+          M.CalendarFeed,
+          addFeed(
+            projectId,
+            roots.map((r) => r.id),
+            b.timeZone ?? "UTC",
+          ),
+          201,
+        );
       }
     }
     if (req.method === "DELETE" && (p = m(/^\/calendar-feed\/project\/([^/]+)\/([^/]+)$/))) {
@@ -3439,7 +4133,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const names = new Set(
         feed.labelIds.length === 0
           ? []
-          : labels.filter((l) => l.workspaceId === project.workspaceId && feed.labelIds.includes(l.id)).map((l) => l.name),
+          : labels
+              .filter((l) => l.workspaceId === project.workspaceId && feed.labelIds.includes(l.id))
+              .map((l) => l.name),
       );
       const matched =
         names.size === 0
@@ -3491,12 +4187,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "POST") return SESSION();
       if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
       if (req.method === "GET") return ok(M.GitHubIntegration, integ === undefined ? null : githubView(integ));
-      if ((req.method === "PATCH" || req.method === "DELETE") && opts.plainMember) return failText(403, "Insufficient permissions");
+      if ((req.method === "PATCH" || req.method === "DELETE") && opts.plainMember)
+        return failText(403, "Insufficient permissions");
       if (req.method === "PATCH") {
         // The route answers its own not-found shape, not the error envelope.
         if (integ === undefined) return Response.json({ error: "Integration not found" }, { status: 404 });
         const b = (body ?? {}) as { isActive?: boolean; commentTaskLinkOnGitHubIssue?: boolean };
-        if (b.commentTaskLinkOnGitHubIssue !== undefined) integ.commentTaskLinkOnGitHubIssue = b.commentTaskLinkOnGitHubIssue;
+        if (b.commentTaskLinkOnGitHubIssue !== undefined)
+          integ.commentTaskLinkOnGitHubIssue = b.commentTaskLinkOnGitHubIssue;
         if (b.isActive !== undefined) integ.isActive = b.isActive;
         integ.updatedAt = now();
         return ok(M.GitHubIntegration, githubView(integ));
@@ -3518,7 +4216,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // readConfig's order: the row's own isActive first, then the verified
       // binding the import needs.
       if (!integ.isActive) return failText(400, "GitHub integration is not active");
-      if (!githubBound(integ)) return failText(400, "GitHub integration must be reconnected by a repository administrator");
+      if (!githubBound(integ))
+        return failText(400, "GitHub integration must be reconnected by a repository administrator");
       if (b.runId !== undefined && (integ.importRun === null || integ.importRun.runId !== b.runId)) {
         return failText(409, "GitHub integration or import changed; refresh before resuming");
       }
@@ -3528,7 +4227,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // No runId continues an unfinished run and starts a fresh one over a
       // finished one, as the route's reset does.
       if (integ.importRun === null || integ.importRun.done) {
-        integ.importRun = { runId: `run-${String(++importSeq).padStart(4, "0")}`, pagesLeft: integ.importPages, done: false, imported: 0, updated: 0, skipped: 0 };
+        integ.importRun = {
+          runId: `run-${String(++importSeq).padStart(4, "0")}`,
+          pagesLeft: integ.importPages,
+          done: false,
+          imported: 0,
+          updated: 0,
+          skipped: 0,
+        };
       }
       const run = integ.importRun;
       const processed = Math.min(4, run.pagesLeft);
@@ -3605,7 +4311,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           merged.signingSecret = s === null ? undefined : String(s);
         }
         if (b.isActive !== undefined) merged.isActive = b.isActive;
-        if (kind === "generic-webhook" && b.dueDateReminderLeadTimeMinutes !== undefined) merged.dueDateReminderLeadTimeMinutes = b.dueDateReminderLeadTimeMinutes;
+        if (kind === "generic-webhook" && b.dueDateReminderLeadTimeMinutes !== undefined)
+          merged.dueDateReminderLeadTimeMinutes = b.dueDateReminderLeadTimeMinutes;
         if (kind === "mattermost" && !(merged.webhookUrl ?? "").startsWith("https://")) {
           return new Response("Webhook URL must be an HTTPS URL", { status: 400 });
         }
@@ -3618,7 +4325,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (req.method === "GET" && path === "/instance/status") {
       return ok(M.InstanceStatus, {
-        hasUsers: seed.instance?.hasUsers ?? (users.size > 0 || tasks.some((t) => t.userId !== null && t.userId !== undefined)),
+        hasUsers:
+          seed.instance?.hasUsers ?? (users.size > 0 || tasks.some((t) => t.userId !== null && t.userId !== undefined)),
         hasAdmin: seed.instance?.hasAdmin ?? true,
       });
     }
@@ -3690,20 +4398,31 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     const descriptionMiss = (gone: boolean): Response | undefined => {
       const version = url.searchParams.get("version");
       if (!gone && (version === null || version === DESCRIPTION_VERSION)) return undefined;
-      return fail(version === null ? 404 : 409, "Description changed or is unavailable; refresh before loading it again");
+      return fail(
+        version === null ? 404 : 409,
+        "Description changed or is unavailable; refresh before loading it again",
+      );
     };
     if (req.method === "GET" && (p = m(/^\/public-project\/([^/]+)\/description$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       const miss = descriptionMiss(proj === undefined || !proj.isPublic);
       if (miss !== undefined) return miss;
-      return ok(M.TaskDescriptionPage, descriptionPage(proj!.description ?? "", Number(url.searchParams.get("offset") ?? 0)));
+      return ok(
+        M.TaskDescriptionPage,
+        descriptionPage(proj!.description ?? "", Number(url.searchParams.get("offset") ?? 0)),
+      );
     }
     if (req.method === "GET" && (p = m(/^\/public-project\/([^/]+)\/task\/([^/]+)\/description$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       const task = tasks.find((t) => t.id === decodeURIComponent(p![2]!));
-      const miss = descriptionMiss(proj === undefined || !proj.isPublic || task === undefined || task.projectId !== proj.id);
+      const miss = descriptionMiss(
+        proj === undefined || !proj.isPublic || task === undefined || task.projectId !== proj.id,
+      );
       if (miss !== undefined) return miss;
-      return ok(M.TaskDescriptionPage, descriptionPage(task!.description ?? "", Number(url.searchParams.get("offset") ?? 0)));
+      return ok(
+        M.TaskDescriptionPage,
+        descriptionPage(task!.description ?? "", Number(url.searchParams.get("offset") ?? 0)),
+      );
     }
     if (req.method === "GET" && (p = m(/^\/public-project\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
@@ -3826,7 +4545,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const delayed = async (req: Request) => {
     if (opts.delayMs) await Bun.sleep(opts.delayMs);
     if (whitespace?.test(`${req.method} ${new URL(req.url).pathname.replace(/^\/api/, "")}`)) {
-      requests.push({ method: req.method, path: new URL(req.url).pathname.replace(/^\/api/, ""), query: new URL(req.url).search, body: req.method === "GET" ? undefined : await req.json().catch(() => null) });
+      requests.push({
+        method: req.method,
+        path: new URL(req.url).pathname.replace(/^\/api/, ""),
+        query: new URL(req.url).search,
+        body: req.method === "GET" ? undefined : await req.json().catch(() => null),
+      });
       return new Response("  \n", { status: 200, headers: { "content-type": "application/json" } });
     }
     return route(req);
@@ -3845,14 +4569,27 @@ const excerpt = (value: string, characters: number): string => {
   const chars = [...value];
   return chars.length > characters ? `${chars.slice(0, characters).join("")}…` : value;
 };
-const excerptOrNull = (value: string | null, characters: number): string | null => (value === null ? null : excerpt(value, characters));
+const excerptOrNull = (value: string | null, characters: number): string | null =>
+  value === null ? null : excerpt(value, characters);
 
 // The document the public route streams, as apps/api/src/calendar-feed/ical.ts
 // writes it at v2.32.0: CRLF lines folded at 75 octets, all-day dates in the
 // feed's zone, and a due date made exclusive the way iCalendar's DTEND wants.
-type IcsTask = { id: string; title: string; description: string | null; startDate: string | null; dueDate: string | null; createdAt: string };
+type IcsTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  startDate: string | null;
+  dueDate: string | null;
+  createdAt: string;
+};
 
-const icsEscape = (value: string): string => value.replaceAll("\\", "\\\\").replace(/\r\n|\r|\n/g, "\\n").replaceAll(";", "\\;").replaceAll(",", "\\,");
+const icsEscape = (value: string): string =>
+  value
+    .replaceAll("\\", "\\\\")
+    .replace(/\r\n|\r|\n/g, "\\n")
+    .replaceAll(";", "\\;")
+    .replaceAll(",", "\\,");
 
 const icsFold = (line: string): string => {
   const lines: string[] = [];
@@ -3872,7 +4609,11 @@ const icsFold = (line: string): string => {
   return lines.join("\r\n");
 };
 
-const icsTimestamp = (iso: string): string => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+const icsTimestamp = (iso: string): string =>
+  new Date(iso)
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
 
 const icsDay = (iso: string, formatter: Intl.DateTimeFormat): string => {
   const parts = formatter.formatToParts(new Date(iso));
@@ -3955,7 +4696,16 @@ const fileExtension = (filename: string): string => {
 // isFinal among them: final columns are a v2.2.0 feature, and a server this
 // old has none, so the listing answers without the field the way its columns
 // route would not exist either.
-const LEGACY_DROPPED = new Set(["backgroundVersion", "pagination", "labels", "externalLinks", "subtaskCounts", "assigneeImage", "lastTaskNumber", "isFinal"]);
+const LEGACY_DROPPED = new Set([
+  "backgroundVersion",
+  "pagination",
+  "labels",
+  "externalLinks",
+  "subtaskCounts",
+  "assigneeImage",
+  "lastTaskNumber",
+  "isFinal",
+]);
 // What it sends as null. The relation summaries are nullable in the document,
 // so the id fallback is exercised here.
 const LEGACY_NULLED = new Set(["user", "sourceTask", "targetTask"]);

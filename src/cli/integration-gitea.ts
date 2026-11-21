@@ -35,7 +35,9 @@ const repository = (arg: string): Pick<GiteaTarget, "repositoryOwner" | "reposit
 const accessToken = async (flags: FlagValues, changed: ReadonlySet<string>): Promise<string | undefined> => {
   if (!changed.has("token")) return undefined;
   if (String(flags.token ?? "") !== "-") {
-    throw new Error("a Gitea access token as a flag value is visible in the process list and shell history; pass --token - and pipe it instead");
+    throw new Error(
+      "a Gitea access token as a flag value is visible in the process list and shell history; pass --token - and pipe it instead",
+    );
   }
   // The one line ending a pipe adds is not part of the token.
   const token = (await readInput("-")).replace(/\r?\n$/, "");
@@ -65,7 +67,10 @@ const integrationLines = (i: GiteaIntegration): string[] => [
   ...(i.webhookSecret === null || i.webhookSecret === "" ? [] : [detail("webhook secret", i.webhookSecret)]),
   ...(i.branchPattern === null || i.branchPattern === "" ? [] : [detail("branches", i.branchPattern)]),
   detail("state", i.isActive === null ? "unknown" : i.isActive ? "active" : "inactive"),
-  detail("issue links", i.commentTaskLinkOnGiteaIssue === null ? "unknown" : i.commentTaskLinkOnGiteaIssue ? "on" : "off"),
+  detail(
+    "issue links",
+    i.commentTaskLinkOnGiteaIssue === null ? "unknown" : i.commentTaskLinkOnGiteaIssue ? "on" : "off",
+  ),
 ];
 
 const boolFlag = (name: string, usage: string) => ({ name, type: "bool" as const, usage, defaultValue: "false" });
@@ -201,7 +206,9 @@ export const giteaCommand = {
           }
           return { found: current, result: await deleteGiteaIntegration(id) };
         });
-        app.out.human(`deleted the gitea integration of ${found.repositoryOwner}/${found.repositoryName} on ${found.baseUrl}`);
+        app.out.human(
+          `deleted the gitea integration of ${found.repositoryOwner}/${found.repositoryName} on ${found.baseUrl}`,
+        );
         app.out.data(result);
       },
     },

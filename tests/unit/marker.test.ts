@@ -34,12 +34,30 @@ describe("marker", () => {
   });
 
   test("TestFormatIsReadableByThePythonParser", () => {
-    const got = format(mk({ sessionId: "abc-123", host: "d1", cwd: "/root/repo", branch: "main", state: RUNNING, nextStep: "CI を待つ" }));
-    expect(got).toBe("<!-- kn:session id=abc-123 host=d1 cwd=/root/repo branch=main state=running enc=1 -->\nCI を待つ");
+    const got = format(
+      mk({
+        sessionId: "abc-123",
+        host: "d1",
+        cwd: "/root/repo",
+        branch: "main",
+        state: RUNNING,
+        nextStep: "CI を待つ",
+      }),
+    );
+    expect(got).toBe(
+      "<!-- kn:session id=abc-123 host=d1 cwd=/root/repo branch=main state=running enc=1 -->\nCI を待つ",
+    );
   });
 
   test("TestRoundTrip", () => {
-    const input = mk({ sessionId: "s1", host: "pi", cwd: "/home/x/repo", branch: "feat/thing", state: CLOSED, nextStep: "done" });
+    const input = mk({
+      sessionId: "s1",
+      host: "pi",
+      cwd: "/home/x/repo",
+      branch: "feat/thing",
+      state: CLOSED,
+      nextStep: "done",
+    });
     const out = parse(format(input), "t0");
     expect(out).toBeDefined();
     expect({ ...out!, createdAt: "" }).toEqual(input);
@@ -87,7 +105,13 @@ describe("marker", () => {
   // A value containing a space followed by something shaped like a key would
   // otherwise end the field early.
   test("TestValueContainingAFieldSeparatorSurvives", () => {
-    for (const cwd of ["/work/client foo=bar", "/work/my client", "/work/100% sure", "/work/a\tb", "/work/trailing branch=notreal"]) {
+    for (const cwd of [
+      "/work/client foo=bar",
+      "/work/my client",
+      "/work/100% sure",
+      "/work/a\tb",
+      "/work/trailing branch=notreal",
+    ]) {
       const input = mk({ sessionId: "s1", host: "h", cwd, branch: "main", state: RUNNING });
       const out = parse(format(input), "t0");
       expect(out, `cwd ${cwd} did not parse`).toBeDefined();
@@ -155,7 +179,8 @@ describe("marker", () => {
       expect(m!.cwd, c.content).not.toBe("");
       markers.push(m!);
     }
-    for (const m of markers) expect(m.nextStep.startsWith("次の一手"), `next step kept its label: ${m.nextStep}`).toBe(false);
+    for (const m of markers)
+      expect(m.nextStep.startsWith("次の一手"), `next step kept its label: ${m.nextStep}`).toBe(false);
     const got = latestPerSession(markers);
     expect(got.length).toBeGreaterThan(0);
     expect(got.length).toBeLessThanOrEqual(markers.length);

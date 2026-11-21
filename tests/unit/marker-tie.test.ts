@@ -6,7 +6,14 @@ import { latestPerSession, RUNNING, CLOSED, type Marker } from "../../src/sessio
 // marker.go itself.
 
 const mk = (m: Partial<Marker>): Marker => ({
-  sessionId: "", host: "", cwd: "", branch: "", state: "", nextStep: "", createdAt: "", ...m,
+  sessionId: "",
+  host: "",
+  cwd: "",
+  branch: "",
+  state: "",
+  nextStep: "",
+  createdAt: "",
+  ...m,
 });
 
 test("TestLatestPerSessionTieLaterCommentWins", () => {

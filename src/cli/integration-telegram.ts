@@ -31,11 +31,16 @@ const threadId = (flags: FlagValues): number | null => {
   const value = String(flags["thread-id"] ?? "");
   if (value === "") return null;
   const id = /^\d+$/.test(value) ? Number(value) : Number.NaN;
-  if (!Number.isInteger(id) || id < 1) throw new Error(`--thread-id must be a positive integer, not ${JSON.stringify(value)}`);
+  if (!Number.isInteger(id) || id < 1)
+    throw new Error(`--thread-id must be a positive integer, not ${JSON.stringify(value)}`);
   return id;
 };
 
-const telegramCreateBody = (flags: FlagValues, changed: ReadonlySet<string>, secret: ChatSecret): NewTelegramIntegration => {
+const telegramCreateBody = (
+  flags: FlagValues,
+  changed: ReadonlySet<string>,
+  secret: ChatSecret,
+): NewTelegramIntegration => {
   const wanted: NewTelegramIntegration = {
     botToken: requiredSecret(secret),
     chatId: requiredText("chat-id", "chat id", flags, changed),
@@ -51,7 +56,11 @@ const telegramCreateBody = (flags: FlagValues, changed: ReadonlySet<string>, sec
   return wanted;
 };
 
-const telegramUpdateBody = (flags: FlagValues, changed: ReadonlySet<string>, secret: ChatSecret): TelegramIntegrationChanges => {
+const telegramUpdateBody = (
+  flags: FlagValues,
+  changed: ReadonlySet<string>,
+  secret: ChatSecret,
+): TelegramIntegrationChanges => {
   const changes: TelegramIntegrationChanges = {};
   if (secret.value !== undefined) changes.botToken = secret.value;
   if (changed.has("chat-id")) changes.chatId = requiredTextValue(flags, "chat-id");

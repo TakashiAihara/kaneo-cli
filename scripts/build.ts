@@ -37,7 +37,11 @@ for (const t of TARGETS) {
   const archive = `kaneo_${t.os}_${t.arch}.tar.gz`;
   await $`tar -czf ${dist}${archive} -C ${stage} kaneo README.md LICENSE THIRD_PARTY_NOTICES`;
   rmSync(stage, { recursive: true });
-  sums.push(`${createHash("sha256").update(readFileSync(`${dist}${archive}`)).digest("hex")}  ${archive}`);
+  sums.push(
+    `${createHash("sha256")
+      .update(readFileSync(`${dist}${archive}`))
+      .digest("hex")}  ${archive}`,
+  );
   console.log(archive);
 }
 // Sorted by archive name, the order goreleaser wrote.

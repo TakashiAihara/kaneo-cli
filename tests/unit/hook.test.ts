@@ -1,5 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFake } from "../parity/fake";
@@ -21,7 +31,14 @@ const INDEX = join(import.meta.dir, "../../src/index.ts");
 // it, where a slice of it (pid % 10000) could collide.
 const RUN = String(process.pid);
 const sleepArg = (base: "120.0" | "29.5" | "29.4" | "29.3" | "29.2" | "29.1"): string => `${base}${RUN}`;
-const SLEEPS = [sleepArg("120.0"), sleepArg("29.5"), sleepArg("29.4"), sleepArg("29.3"), sleepArg("29.2"), sleepArg("29.1")];
+const SLEEPS = [
+  sleepArg("120.0"),
+  sleepArg("29.5"),
+  sleepArg("29.4"),
+  sleepArg("29.3"),
+  sleepArg("29.2"),
+  sleepArg("29.1"),
+];
 
 type Run = { exit: number | null; signal: string | null; stdout: string; stderr: string; ms: number };
 
@@ -93,7 +110,9 @@ const writeConfig = (hooks: Record<string, string>) =>
     join(config, "kaneo", "config.json"),
     JSON.stringify({
       default_profile: "t",
-      profiles: { t: { api_url: `http://127.0.0.1:${proxy.port}`, api_key: "test-key", workspace_id: WS, project_id: P1 } },
+      profiles: {
+        t: { api_url: `http://127.0.0.1:${proxy.port}`, api_key: "test-key", workspace_id: WS, project_id: P1 },
+      },
       hooks,
     }),
   );
@@ -107,9 +126,19 @@ const kaneo = async (...args: string[]): Promise<Run> => {
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
-    env: { PATH: process.env.PATH ?? "", HOME: home, XDG_CONFIG_HOME: config, CLAUDE_CODE_SESSION_ID: "s1", NO_COLOR: "1" },
+    env: {
+      PATH: process.env.PATH ?? "",
+      HOME: home,
+      XDG_CONFIG_HOME: config,
+      CLAUDE_CODE_SESSION_ID: "s1",
+      NO_COLOR: "1",
+    },
   });
-  const [stdout, stderr, exit] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+  const [stdout, stderr, exit] = await Promise.all([
+    new Response(p.stdout).text(),
+    new Response(p.stderr).text(),
+    p.exited,
+  ]);
   return { exit, signal: p.signalCode, stdout, stderr, ms: Date.now() - start };
 };
 
@@ -177,7 +206,10 @@ describe("hooks", () => {
     const r = await kaneo("session", "attach", "2", "--strict");
     expect(r.exit, r.stderr).toBe(0);
     expect(r.ms, `attach took ${r.ms}ms`).toBeLessThan(15_000);
-    expect(sleepersLeft().filter((s) => s.arg === sleepArg("29.5")), "the hook's child outlived the timeout").toEqual([]);
+    expect(
+      sleepersLeft().filter((s) => s.arg === sleepArg("29.5")),
+      "the hook's child outlived the timeout",
+    ).toEqual([]);
     expect(existsSync(join(home, "late"))).toBe(false);
     expect(hooksLog()).toContain("attach hook failed: killed after 10s");
   }, 40_000);
@@ -221,10 +253,15 @@ describe("hooks", () => {
   test("TestHookIsKilledWhenKaneoIsSignalled", async () => {
     // The child is started before the signal, so killing sh alone would leave
     // it running. $PPID is kaneo.
-    writeConfig({ attach: `(sleep ${sleepArg("29.3")}; touch ` + join(home, "late") + ") & sleep 0.2; kill -TERM $PPID; wait" });
+    writeConfig({
+      attach: `(sleep ${sleepArg("29.3")}; touch ` + join(home, "late") + ") & sleep 0.2; kill -TERM $PPID; wait",
+    });
     const r = await kaneo("session", "attach", "2", "--strict");
     expect(r.ms, `attach took ${r.ms}ms`).toBeLessThan(5000);
-    expect(sleepersLeft().filter((s) => s.arg === sleepArg("29.3")), "the hook outlived the signal").toEqual([]);
+    expect(
+      sleepersLeft().filter((s) => s.arg === sleepArg("29.3")),
+      "the hook outlived the signal",
+    ).toEqual([]);
     expect(existsSync(join(home, "late"))).toBe(false);
     expect(hooksLog()).toContain("attach hook failed: killed: kaneo received a signal");
   }, 30_000);
@@ -249,7 +286,14 @@ describe("signals around the hook's lifetime", () => {
       stdin: "ignore",
       stdout: "pipe",
       stderr,
-      env: { PATH: process.env.PATH ?? "", HOME: home, XDG_CONFIG_HOME: config, CLAUDE_CODE_SESSION_ID: "s1", NO_COLOR: "1", ...env },
+      env: {
+        PATH: process.env.PATH ?? "",
+        HOME: home,
+        XDG_CONFIG_HOME: config,
+        CLAUDE_CODE_SESSION_ID: "s1",
+        NO_COLOR: "1",
+        ...env,
+      },
     });
 
   // A signal can reach kaneo before it has had a chance to listen for one. If
@@ -326,7 +370,10 @@ describe("signals around the hook's lifetime", () => {
     if (p.exitCode === null && p.signalCode === null) p.kill("SIGKILL");
     expect(p.signalCode).toBe("SIGTERM");
     expect(logged).toContain("attach hook failed: exit status 3");
-    expect(sleepersLeft().filter((s) => s.arg === sleepArg("29.2")), "the group was killed after the hook exited").toHaveLength(1);
+    expect(
+      sleepersLeft().filter((s) => s.arg === sleepArg("29.2")),
+      "the group was killed after the hook exited",
+    ).toHaveLength(1);
   }, 30_000);
 
   // A signal the hook sends as it exits is the hook's own doing, not a signal
@@ -341,7 +388,9 @@ describe("signals around the hook's lifetime", () => {
       const r = await kaneo("session", "attach", "1", "--strict");
       expect(r.signal, `run ${run}: ended with exit ${r.exit}, want killed by SIGTERM`).toBe("SIGTERM");
     }
-    const failures = hooksLog().split("\n").filter((l) => l.includes("hook failed"));
+    const failures = hooksLog()
+      .split("\n")
+      .filter((l) => l.includes("hook failed"));
     expect(failures.length).toBe(10);
     for (const line of failures) expect(line).toContain("exit status 3");
     expect(hooksLog()).not.toContain("killed: kaneo received a signal");
@@ -359,15 +408,19 @@ describe("signals around the hook's lifetime", () => {
   // hooks.log is where a failure goes when stderr is lost, so a stderr that
   // cannot be written to must neither fail the command nor keep the failure
   // from the log. /dev/full is Linux's always-full device.
-  test.skipIf(!existsSync("/dev/full"))("a failure is logged when stderr cannot be written to", async () => {
-    writeConfig({ attach: "exit 3" });
-    const full = openSync("/dev/full", "w");
-    try {
-      const p = kaneoTo(full, {}, "session", "attach", "1", "--strict");
-      expect(await p.exited).toBe(0);
-    } finally {
-      closeSync(full);
-    }
-    expect(hooksLog()).toContain("session=s1 attach hook failed: exit status 3");
-  }, 30_000);
+  test.skipIf(!existsSync("/dev/full"))(
+    "a failure is logged when stderr cannot be written to",
+    async () => {
+      writeConfig({ attach: "exit 3" });
+      const full = openSync("/dev/full", "w");
+      try {
+        const p = kaneoTo(full, {}, "session", "attach", "1", "--strict");
+        expect(await p.exited).toBe(0);
+      } finally {
+        closeSync(full);
+      }
+      expect(hooksLog()).toContain("session=s1 attach hook failed: exit status 3");
+    },
+    30_000,
+  );
 });

@@ -26,7 +26,12 @@ const recorder = (reply: string) => {
   const seen: Seen = { method: "", path: "", query: "", body: "" };
   newServer(async (req) => {
     const url = new URL(req.url);
-    Object.assign(seen, { method: req.method, path: url.pathname, query: url.search.replace(/^\?/, ""), body: await req.text() });
+    Object.assign(seen, {
+      method: req.method,
+      path: url.pathname,
+      query: url.search.replace(/^\?/, ""),
+      body: await req.text(),
+    });
     return new Response(reply, { headers: { "content-type": "application/json" } });
   });
   return seen;
@@ -52,7 +57,15 @@ const columnReply = `{"id":"c1","projectId":"p1","name":"Waiting","slug":"waitin
 const ruleRow = (extra = "") =>
   `{"id":"rule1","projectId":"p1","integrationType":"github","eventType":"pr_opened","columnId":"c1","createdAt":"${TIME}","updatedAt":"${TIME}"${extra}}`;
 
-const emptyNewTask: api.NewTask = { title: "", description: "", priority: "", status: "", startDate: "", dueDate: "", assigneeId: "" };
+const emptyNewTask: api.NewTask = {
+  title: "",
+  description: "",
+  priority: "",
+  status: "",
+  startDate: "",
+  dueDate: "",
+  assigneeId: "",
+};
 const newTask = (t: Partial<api.NewTask>): api.NewTask => ({ ...emptyNewTask, ...t });
 
 // The server's move route reads destinationProjectId. Sending anything else is
@@ -139,7 +152,15 @@ test.each([
 const boardPage = (page: number, pages: number, related: number, relatedPages: number, columns: unknown[]) =>
   JSON.stringify({
     data: { id: "p1", name: "Board", slug: "b", workspaceId: "w", columns, archivedTasks: [], plannedTasks: [] },
-    pagination: { total: 3, page, pageSize: 2, totalPages: pages, relatedPage: related, relatedPageSize: 100, relatedTotalPages: relatedPages },
+    pagination: {
+      total: 3,
+      page,
+      pageSize: 2,
+      totalPages: pages,
+      relatedPage: related,
+      relatedPageSize: 100,
+      relatedTotalPages: relatedPages,
+    },
   });
 
 const boardTask = (id: string, n: number, labels: unknown[]) => ({
@@ -153,7 +174,16 @@ const boardTask = (id: string, n: number, labels: unknown[]) => ({
   subtaskCounts: { completed: 0, total: 0 },
   labels,
   externalLinks: [
-    { id: "l", taskId: id, resourceType: "issue", externalId: "1", url: "u", metadata: { state: "open" }, createdAt: TIME, updatedAt: TIME },
+    {
+      id: "l",
+      taskId: id,
+      resourceType: "issue",
+      externalId: "1",
+      url: "u",
+      metadata: { state: "open" },
+      createdAt: TIME,
+      updatedAt: TIME,
+    },
   ],
 });
 
@@ -257,7 +287,12 @@ const boardWith = (cols: { id: string; isFinal?: boolean }[]): api.Board => ({
   projectId: "p1",
   projectName: "Board",
   projectSlug: "b",
-  columns: cols.map((c) => ({ id: c.id, name: c.id, tasks: [], ...(c.isFinal === undefined ? {} : { isFinal: c.isFinal }) })),
+  columns: cols.map((c) => ({
+    id: c.id,
+    name: c.id,
+    tasks: [],
+    ...(c.isFinal === undefined ? {} : { isFinal: c.isFinal }),
+  })),
 });
 
 // The statuses that hold finished work are the project's own final columns
@@ -379,9 +414,7 @@ test("TestFindTaskByNumberStopsRereadingAMovingBoard", async () => {
     stderr.mockRestore();
   }
   expect(reads()).toBe(3);
-  expect(lines).toEqual([
-    "kaneo: the board of project p1 changed while it was read; the listing may be incomplete",
-  ]);
+  expect(lines).toEqual(["kaneo: the board of project p1 changed while it was read; the listing may be incomplete"]);
 });
 
 // archivedAt is a timestamp string, and it is printed back as the server sent it.
@@ -443,7 +476,9 @@ test("TestUnechoedWritesFail", async () => {
 
 // The server sends the feed newest first; the CLI reads it oldest first, like comments.
 test("TestListActivitiesIsOldestFirst", async () => {
-  recorder(`[${activityRow("new", "2026-09-30T00:00:02.000Z")},${activityRow("old", "2026-09-30T00:00:01.000Z", ',"eventData":{"a":1}')}]`);
+  recorder(
+    `[${activityRow("new", "2026-09-30T00:00:02.000Z")},${activityRow("old", "2026-09-30T00:00:01.000Z", ',"eventData":{"a":1}')}]`,
+  );
   const got = await api.listActivities("t1");
   expect(got.map((a) => a.id)).toEqual(["old", "new"]);
   expect(got[0]!.eventData).toEqual({ a: 1 });
@@ -453,9 +488,16 @@ test("TestListActivitiesIsOldestFirst", async () => {
 test("TestAddActivitySendsAnEmptyMessageAsNull", async () => {
   let seen = recorder(activityRow("a1", TIME).replace('"type":"comment"', '"type":"status_changed"'));
   await api.addActivity("t1", "status_changed", "", { newStatus: "done" });
-  expect(JSON.parse(seen.body)).toEqual({ taskId: "t1", type: "status_changed", message: null, eventData: { newStatus: "done" } });
+  expect(JSON.parse(seen.body)).toEqual({
+    taskId: "t1",
+    type: "status_changed",
+    message: null,
+    eventData: { newStatus: "done" },
+  });
 
-  seen = recorder(activityRow("a1", TIME).replace('"type":"comment"', '"type":"note"').replace('"content":"hi"', '"content":"hello"'));
+  seen = recorder(
+    activityRow("a1", TIME).replace('"type":"comment"', '"type":"note"').replace('"content":"hi"', '"content":"hello"'),
+  );
   const got = await api.addActivity("t1", "note", "hello", null);
   expect(JSON.parse(seen.body)).toEqual({ taskId: "t1", type: "note", message: "hello", eventData: null });
   expect(got).toEqual({ id: "a1", type: "note", content: "hello", eventData: null, userId: "u1", createdAt: TIME });
@@ -481,7 +523,12 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["Archive", "PUT", "/api/project/a%2Fb/archive", () => api.setProjectArchived(id, true)],
     ["Unarchive", "PUT", "/api/project/a%2Fb/unarchive", () => api.setProjectArchived(id, false)],
     ["ListColumns", "GET", "/api/column/a%2Fb", () => api.listColumns(id)],
-    ["CreateColumn", "POST", "/api/column/a%2Fb", () => api.createColumn(id, { name: "n", icon: "", color: "", isFinal: false })],
+    [
+      "CreateColumn",
+      "POST",
+      "/api/column/a%2Fb",
+      () => api.createColumn(id, { name: "n", icon: "", color: "", isFinal: false }),
+    ],
     ["ReorderColumns", "PUT", "/api/column/reorder/a%2Fb", () => api.reorderColumns(id, [id])],
     ["RenameColumn", "PUT", "/api/column/a%2Fb", () => api.renameColumn(id, "n")],
     ["UpdateColumn", "PUT", "/api/column/a%2Fb", () => api.updateColumn(id, { name: "n", icon: null, isFinal: true })],
@@ -489,15 +536,30 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["DeleteProject", "DELETE", "/api/project/a%2Fb", () => api.deleteProject(id)],
     ["ReorderProjects", "PUT", "/api/project/reorder", () => api.reorderProjects(id, [id])],
     ["ListWorkflowRules", "GET", "/api/workflow-rule/a%2Fb", () => api.listWorkflowRules(id)],
-    ["SetWorkflowRule", "PUT", "/api/workflow-rule/a%2Fb", () => api.setWorkflowRule(id, { integrationType: "i", eventType: "e", columnId: "c" })],
+    [
+      "SetWorkflowRule",
+      "PUT",
+      "/api/workflow-rule/a%2Fb",
+      () => api.setWorkflowRule(id, { integrationType: "i", eventType: "e", columnId: "c" }),
+    ],
     ["DeleteWorkflowRule", "DELETE", "/api/workflow-rule/a%2Fb", () => api.deleteWorkflowRule(id)],
     ["ListExternalLinks", "GET", "/api/external-link/task/a%2Fb", () => api.listExternalLinks(id)],
-    ["CreateExternalLink", "POST", "/api/external-link/task/a%2Fb", () => api.createExternalLink(id, { url: "https://example.com" })],
+    [
+      "CreateExternalLink",
+      "POST",
+      "/api/external-link/task/a%2Fb",
+      () => api.createExternalLink(id, { url: "https://example.com" }),
+    ],
     ["DeleteExternalLink", "DELETE", "/api/external-link/task/a%2Fb/a%2Fb", () => api.deleteExternalLink(id, id)],
     ["GetBoard", "GET", "/api/task/tasks/a%2Fb", () => api.getBoard(id)],
     ["GetTask", "GET", "/api/task/a%2Fb", () => api.getTask(id)],
     ["GetTaskDescription", "GET", "/api/task/a%2Fb/description", () => api.getTaskDescription(id)],
-    ["FindDeferredTaskDescriptions", "GET", "/api/task/description-matches/a%2Fb", () => api.findDeferredTaskDescriptions(id, "q")],
+    [
+      "FindDeferredTaskDescriptions",
+      "GET",
+      "/api/task/description-matches/a%2Fb",
+      () => api.findDeferredTaskDescriptions(id, "q"),
+    ],
     ["SetTaskStatus", "PUT", "/api/task/status/a%2Fb", () => api.setTaskStatus(id, "x")],
     ["SetTaskPriority", "PUT", "/api/task/priority/a%2Fb", () => api.setTaskPriority(id, "low")],
     ["SetTaskAssignee", "PUT", "/api/task/assignee/a%2Fb", () => api.setTaskAssignee(id, "")],
@@ -505,7 +567,12 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["SetStartAndPosition", "GET", "/api/task/a%2Fb", () => api.setStartAndPosition(id, { position: 1 })],
     ["SetTaskDueDate", "PUT", "/api/task/due-date/a%2Fb", () => api.setTaskDueDate(id, "")],
     ["ExportTasks", "GET", "/api/task/export/a%2Fb", () => api.exportProjectTasks(id)],
-    ["ImportTasks", "POST", "/api/task/import/a%2Fb", () => api.importProjectTasks(id, [{ title: "t", status: "to-do" }])],
+    [
+      "ImportTasks",
+      "POST",
+      "/api/task/import/a%2Fb",
+      () => api.importProjectTasks(id, [{ title: "t", status: "to-do" }]),
+    ],
     ["BulkUpdate", "PATCH", "/api/task/bulk", () => api.bulkUpdate([id], "delete", null)],
     ["DeleteTask", "DELETE", "/api/task/a%2Fb", () => api.deleteTask(id)],
     ["CreateTask", "POST", "/api/task/a%2Fb", () => api.createTask(id, newTask({}))],
@@ -520,7 +587,14 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
       "FinalizeTaskImage",
       "POST",
       "/api/task/image-upload/a%2Fb/finalize",
-      () => api.finalizeTaskImage(id, { filename: "f.png", contentType: "image/png", size: 1, surface: "description", key: "k" }),
+      () =>
+        api.finalizeTaskImage(id, {
+          filename: "f.png",
+          contentType: "image/png",
+          size: 1,
+          surface: "description",
+          key: "k",
+        }),
     ],
     ["ListComments", "GET", "/api/comment/a%2Fb", () => api.listComments(id)],
     ["AddComment", "POST", "/api/comment/a%2Fb", () => api.addComment(id, "x")],
@@ -531,7 +605,12 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["ListRelations", "GET", "/api/task-relation/a%2Fb", () => api.listRelations(id)],
     ["LinkTasks", "POST", "/api/task-relation", () => api.linkTasks("s", "d", "blocks")],
     ["DeleteRelation", "DELETE", "/api/task-relation/a%2Fb", () => api.deleteRelation(id)],
-    ["CreateProject", "POST", "/api/project", () => api.createProject({ name: "n", workspaceId: "w", icon: "", slug: "" })],
+    [
+      "CreateProject",
+      "POST",
+      "/api/project",
+      () => api.createProject({ name: "n", workspaceId: "w", icon: "", slug: "" }),
+    ],
     ["ListTimeEntries", "GET", "/api/time-entry/task/a%2Fb", () => api.listTimeEntries(id)],
     ["GetTimeEntry", "GET", "/api/time-entry/a%2Fb", () => api.getTimeEntryById(id)],
     ["UpdateTimeEntry", "PUT", "/api/time-entry/a%2Fb", () => api.updateTimeEntryById(id, { startTime: TIME })],
@@ -552,30 +631,77 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["MoveProject", "PUT", "/api/project/a%2Fb/move", () => api.moveProject(id, "w2")],
     ["GetProjectBackground", "GET", "/api/project/a%2Fb/background", () => api.getProjectBackground(id)],
     ["DeleteProjectBackground", "DELETE", "/api/project/a%2Fb/background", () => api.deleteProjectBackground(id)],
-    ["SetProjectBackground", "PUT", "/api/project/a%2Fb/background-upload", () => api.setProjectBackground(id, "image/png", new Uint8Array([1]))],
+    [
+      "SetProjectBackground",
+      "PUT",
+      "/api/project/a%2Fb/background-upload",
+      () => api.setProjectBackground(id, "image/png", new Uint8Array([1])),
+    ],
     ["GitHubAppInfo", "GET", "/api/github-integration/app-info", () => api.githubAppInfo()],
     ["GitHubRepositories", "GET", "/api/github-integration/repositories/a%2Fb", () => api.listGitHubRepositories(id)],
     ["GitHubVerify", "POST", "/api/github-integration/verify", () => api.verifyGitHubRepository("p1", "o", "n")],
     ["GitHubGet", "GET", "/api/github-integration/project/a%2Fb", () => api.getGitHubIntegration(id)],
     ["GitHubConnect", "POST", "/api/github-integration/project/a%2Fb", () => api.connectGitHubRepository(id, "o", "n")],
-    ["GitHubUpdate", "PATCH", "/api/github-integration/project/a%2Fb", () => api.updateGitHubIntegration(id, { isActive: true })],
+    [
+      "GitHubUpdate",
+      "PATCH",
+      "/api/github-integration/project/a%2Fb",
+      () => api.updateGitHubIntegration(id, { isActive: true }),
+    ],
     ["GitHubDelete", "DELETE", "/api/github-integration/project/a%2Fb", () => api.deleteGitHubIntegration(id)],
     ["GitHubImport", "POST", "/api/github-integration/import-issues", () => api.importGitHubIssues("p1")],
     ["GetSlackIntegration", "GET", "/api/slack-integration/project/a%2Fb", () => api.getSlackIntegration(id)],
-    ["CreateSlackIntegration", "POST", "/api/slack-integration/project/a%2Fb", () =>
-      api.createSlackIntegration(id, { webhookUrl: "https://hooks.slack.com/services/T0/B0/x" })],
-    ["UpdateSlackIntegration", "PATCH", "/api/slack-integration/project/a%2Fb", () => api.updateSlackIntegration(id, { isActive: false })],
+    [
+      "CreateSlackIntegration",
+      "POST",
+      "/api/slack-integration/project/a%2Fb",
+      () => api.createSlackIntegration(id, { webhookUrl: "https://hooks.slack.com/services/T0/B0/x" }),
+    ],
+    [
+      "UpdateSlackIntegration",
+      "PATCH",
+      "/api/slack-integration/project/a%2Fb",
+      () => api.updateSlackIntegration(id, { isActive: false }),
+    ],
     ["DeleteSlackIntegration", "DELETE", "/api/slack-integration/project/a%2Fb", () => api.deleteSlackIntegration(id)],
     ["GetDiscordIntegration", "GET", "/api/discord-integration/project/a%2Fb", () => api.getDiscordIntegration(id)],
-    ["CreateDiscordIntegration", "POST", "/api/discord-integration/project/a%2Fb", () =>
-      api.createDiscordIntegration(id, { webhookUrl: "https://discord.com/api/webhooks/1/x" })],
-    ["UpdateDiscordIntegration", "PATCH", "/api/discord-integration/project/a%2Fb", () => api.updateDiscordIntegration(id, { channelName: null })],
-    ["DeleteDiscordIntegration", "DELETE", "/api/discord-integration/project/a%2Fb", () => api.deleteDiscordIntegration(id)],
+    [
+      "CreateDiscordIntegration",
+      "POST",
+      "/api/discord-integration/project/a%2Fb",
+      () => api.createDiscordIntegration(id, { webhookUrl: "https://discord.com/api/webhooks/1/x" }),
+    ],
+    [
+      "UpdateDiscordIntegration",
+      "PATCH",
+      "/api/discord-integration/project/a%2Fb",
+      () => api.updateDiscordIntegration(id, { channelName: null }),
+    ],
+    [
+      "DeleteDiscordIntegration",
+      "DELETE",
+      "/api/discord-integration/project/a%2Fb",
+      () => api.deleteDiscordIntegration(id),
+    ],
     ["GetTelegramIntegration", "GET", "/api/telegram-integration/project/a%2Fb", () => api.getTelegramIntegration(id)],
-    ["CreateTelegramIntegration", "POST", "/api/telegram-integration/project/a%2Fb", () =>
-      api.createTelegramIntegration(id, { botToken: "123456:fake", chatId: "-100" })],
-    ["UpdateTelegramIntegration", "PATCH", "/api/telegram-integration/project/a%2Fb", () => api.updateTelegramIntegration(id, { threadId: null })],
-    ["DeleteTelegramIntegration", "DELETE", "/api/telegram-integration/project/a%2Fb", () => api.deleteTelegramIntegration(id)],
+    [
+      "CreateTelegramIntegration",
+      "POST",
+      "/api/telegram-integration/project/a%2Fb",
+      () => api.createTelegramIntegration(id, { botToken: "123456:fake", chatId: "-100" }),
+    ],
+    [
+      "UpdateTelegramIntegration",
+      "PATCH",
+      "/api/telegram-integration/project/a%2Fb",
+      () => api.updateTelegramIntegration(id, { threadId: null }),
+    ],
+    [
+      "DeleteTelegramIntegration",
+      "DELETE",
+      "/api/telegram-integration/project/a%2Fb",
+      () => api.deleteTelegramIntegration(id),
+    ],
   ];
   test.each(calls)("%s", async (name, method, path, call) => {
     const seen: { method: string; path: string }[] = [];
@@ -640,7 +766,15 @@ test("TestGetProjectBackgroundReturnsTheBytes", async () => {
 // presigned PUT, the bytes go to it with the headers it signed and no key,
 // and the finalize names the staged key and version back.
 test("TestSetProjectBackgroundRunsThePresignedUpload", async () => {
-  type SeenRequest = { method: string; path: string; query: string; body: string; auth: string | null; type: string | null; bytes: Uint8Array };
+  type SeenRequest = {
+    method: string;
+    path: string;
+    query: string;
+    body: string;
+    auth: string | null;
+    type: string | null;
+    bytes: Uint8Array;
+  };
   const seen: SeenRequest[] = [];
   newServer(async (req) => {
     const url = new URL(req.url);
@@ -655,7 +789,12 @@ test("TestSetProjectBackgroundRunsThePresignedUpload", async () => {
       bytes: new Uint8Array(buf),
     });
     if (url.pathname === "/api/project/p1/background-upload") {
-      return Response.json({ key: "k1", uploadUrl: `${url.origin}/storage/k1?signature=s3cr3t`, version: "v1", headers: { "Content-Type": "image/png" } });
+      return Response.json({
+        key: "k1",
+        uploadUrl: `${url.origin}/storage/k1?signature=s3cr3t`,
+        version: "v1",
+        headers: { "Content-Type": "image/png" },
+      });
     }
     if (url.pathname === "/storage/k1") return new Response(null, { status: 200 });
     if (url.pathname === "/api/project/p1/background-upload/finalize") {
@@ -702,7 +841,12 @@ test("TestSetProjectBackgroundRefusesAFinalizeWithoutAURL", async () => {
   newServer((req) => {
     const path = new URL(req.url).pathname;
     if (path === "/api/project/p1/background-upload") {
-      return Response.json({ key: "k1", uploadUrl: `${new URL(req.url).origin}/storage/k1`, version: "v1", headers: {} });
+      return Response.json({
+        key: "k1",
+        uploadUrl: `${new URL(req.url).origin}/storage/k1`,
+        version: "v1",
+        headers: {},
+      });
     }
     if (path === "/storage/k1") return new Response(null, { status: 200 });
     if (path === "/api/project/p1/background-upload/finalize") return Response.json({});
@@ -722,7 +866,12 @@ test("TestSetProjectBackgroundRefusesAPlainHTTPUploadURL", async () => {
     const path = new URL(req.url).pathname;
     seen.push(`${req.method} ${path}`);
     if (path === "/api/project/p1/background-upload") {
-      return Response.json({ key: "k1", uploadUrl: "http://storage.example.invalid/k1?sig=1", version: "v1", headers: {} });
+      return Response.json({
+        key: "k1",
+        uploadUrl: "http://storage.example.invalid/k1?sig=1",
+        version: "v1",
+        headers: {},
+      });
     }
     return new Response("unexpected", { status: 500 });
   });
@@ -785,8 +934,12 @@ test("TestDeleteLabelWaitsOutABusyServer", async () => {
   let calls = 0;
   newServer(() => {
     const status = replies[calls++]!;
-    if (status === 429) return new Response("Label deletion is busy; retry this request", { status, headers: { "Retry-After": "1" } });
-    return new Response(LABEL(status === 202 ? `,"pendingDeletion":true` : ""), { status, headers: { "content-type": "application/json" } });
+    if (status === 429)
+      return new Response("Label deletion is busy; retry this request", { status, headers: { "Retry-After": "1" } });
+    return new Response(LABEL(status === 202 ? `,"pendingDeletion":true` : ""), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
   });
   expect((await api.deleteLabel("l1")).id).toBe("l1");
   expect(calls).toBe(8);
@@ -810,7 +963,11 @@ test("TestDeleteLabelGivesUpOnAServerThatStaysBusy", async () => {
 // and says how to finish it. The failure keeps its type, so a caller can
 // still read the status.
 test("TestDeleteLabelSaysAPartialDeletionResumes", async () => {
-  for (const [replies, partly] of [[[202, 500], true], [[500], true], [[403], false]] as const) {
+  for (const [replies, partly] of [
+    [[202, 500], true],
+    [[500], true],
+    [[403], false],
+  ] as const) {
     let calls = 0;
     newServer(() => {
       const status = replies[calls++]!;
@@ -852,7 +1009,9 @@ test("TestUpdateLabelWritesToItsRouteWithTheIDEscaped", async () => {
   const seen: string[] = [];
   newServer((req) => {
     seen.push(`${req.method} ${new URL(req.url).pathname}`);
-    return new Response(LABEL().replace('"id":"l1"', '"id":"a/b"'), { headers: { "content-type": "application/json" } });
+    return new Response(LABEL().replace('"id":"l1"', '"id":"a/b"'), {
+      headers: { "content-type": "application/json" },
+    });
   });
   await api.updateLabel("a/b", { color: "green" });
   expect(seen).toEqual(["GET /api/label/a%2Fb", "PUT /api/label/a%2Fb"]);
@@ -899,7 +1058,14 @@ describe("calendar feeds", () => {
   test("list maps every field", async () => {
     recorder(`[${FEED}]`);
     expect(await api.listCalendarFeeds("p1")).toEqual([
-      { id: "feed1", projectId: "p1", token: `${"0".repeat(63)}1`, labelIds: ["l1", "l2"], timeZone: "Asia/Tokyo", createdAt: TIME },
+      {
+        id: "feed1",
+        projectId: "p1",
+        token: `${"0".repeat(63)}1`,
+        labelIds: ["l1", "l2"],
+        timeZone: "Asia/Tokyo",
+        createdAt: TIME,
+      },
     ]);
   });
 
@@ -913,7 +1079,10 @@ describe("calendar feeds", () => {
     });
     await api.createCalendarFeed("p1", ["l1", "l2"], "");
     await api.createCalendarFeed("p1", ["l1"], "Asia/Tokyo");
-    expect(sent.map((s) => JSON.parse(s))).toEqual([{ labelIds: ["l1", "l2"] }, { labelIds: ["l1"], timeZone: "Asia/Tokyo" }]);
+    expect(sent.map((s) => JSON.parse(s))).toEqual([
+      { labelIds: ["l1", "l2"] },
+      { labelIds: ["l1"], timeZone: "Asia/Tokyo" },
+    ]);
   });
 
   test("create maps the reply", async () => {
@@ -964,7 +1133,13 @@ describe("calendar feeds", () => {
     newServer(() => new Response(ics, { headers: { "content-type": "text/calendar; charset=utf-8" } }));
     expect(await api.calendarFeedIcs("t")).toBe(ics);
 
-    newServer(() => new Response("Calendar feed not found", { status: 404, headers: { "content-type": "text/plain;charset=UTF-8" } }));
+    newServer(
+      () =>
+        new Response("Calendar feed not found", {
+          status: 404,
+          headers: { "content-type": "text/plain;charset=UTF-8" },
+        }),
+    );
     const err = await failure(api.calendarFeedIcs("t"));
     expect(err).toBeInstanceOf(KaneoApiError);
     expect((err as KaneoApiError).messages).toEqual(["Calendar feed not found"]);
@@ -1014,7 +1189,12 @@ describe("TestReadsMapEveryField", () => {
         `"assigneeId":"u1","assigneeName":"Ann","dueDate":"2026-10-01T00:00:00.000Z"}`,
     );
     const got = await api.getTask("t1");
-    expect([got.number, got.assigneeId, got.assigneeName, got.dueDate]).toEqual([7, "u1", "Ann", "2026-10-01T00:00:00.000Z"]);
+    expect([got.number, got.assigneeId, got.assigneeName, got.dueDate]).toEqual([
+      7,
+      "u1",
+      "Ann",
+      "2026-10-01T00:00:00.000Z",
+    ]);
   });
 
   // The listing answers with a summary of each linked task, which is what a link
@@ -1054,7 +1234,14 @@ describe("TestReadsMapEveryField", () => {
     );
     const removed = await api.deleteRelation("r1");
     expect([seen.method, seen.path]).toEqual(["DELETE", "/api/task-relation/r1"]);
-    expect(removed).toEqual({ id: "r1", sourceTaskId: "s", targetTaskId: "d", relationType: "blocks", sourceTask: null, targetTask: null });
+    expect(removed).toEqual({
+      id: "r1",
+      sourceTaskId: "s",
+      targetTaskId: "d",
+      relationType: "blocks",
+      sourceTask: null,
+      targetTask: null,
+    });
   });
 
   // icon and color are nullable on the wire, and a column carries neither.
@@ -1102,7 +1289,7 @@ describe("TestReadsMapEveryField", () => {
   // whose joined column fields are null is the decoder's case, not a rule the
   // server could have written.
   test("workflow rule row decodes absent joined-column fields as null", async () => {
-    recorder(`[${ruleRow(",\"columnName\":null,\"columnSlug\":null")}]`);
+    recorder(`[${ruleRow(',"columnName":null,"columnSlug":null')}]`);
     const got = await api.listWorkflowRules("p1");
     expect([got[0]!.columnName, got[0]!.columnSlug, got[0]!.columnId]).toEqual([null, null, "c1"]);
   });
@@ -1250,7 +1437,11 @@ describe("TestChatIntegrations", () => {
 
   test("telegram create sends the wanted row", async () => {
     const seen = recorder(telegramReply);
-    const got = await api.createTelegramIntegration("p1", { botToken: "123456:fake-bot-token", chatId: "-100123", threadId: 7 });
+    const got = await api.createTelegramIntegration("p1", {
+      botToken: "123456:fake-bot-token",
+      chatId: "-100123",
+      threadId: 7,
+    });
     expect([seen.method, seen.path]).toEqual(["POST", "/api/telegram-integration/project/p1"]);
     expect(seen.body).toBe('{"botToken":"123456:fake-bot-token","chatId":"-100123","threadId":7}');
     expect(got?.chatId).toBe("-100123");
@@ -1310,7 +1501,13 @@ describe("TestStartAndPositionSendTheTaskBack", () => {
       // The server stores a date as an instant and answers it in ISO form.
       const iso = (value: unknown) => (typeof value === "string" ? new Date(value).toISOString() : null);
       const reply = echo(JSON.parse(body) as Record<string, unknown>);
-      return Response.json({ ...stored, ...reply, startDate: iso(reply.startDate), dueDate: iso(reply.dueDate), userId: reply.userId ?? null });
+      return Response.json({
+        ...stored,
+        ...reply,
+        startDate: iso(reply.startDate),
+        dueDate: iso(reply.dueDate),
+        userId: reply.userId ?? null,
+      });
     });
     return seen;
   };
@@ -1324,7 +1521,12 @@ describe("TestStartAndPositionSendTheTaskBack", () => {
     expect(seen[1]!.body).toBe(
       '{"title":"x","description":"body","priority":"high","status":"to-do","projectId":"p1","position":7,"dueDate":"2026-11-01T00:00:00.000Z","userId":"u1"}',
     );
-    expect([after.position, after.startDate, after.dueDate, after.assigneeId]).toEqual([7, null, "2026-11-01T00:00:00.000Z", "u1"]);
+    expect([after.position, after.startDate, after.dueDate, after.assigneeId]).toEqual([
+      7,
+      null,
+      "2026-11-01T00:00:00.000Z",
+      "u1",
+    ]);
   });
 
   test("start date", async () => {
@@ -1433,14 +1635,18 @@ describe("TestWritesSendEveryField", () => {
     ["2026-10-31", ""],
   ])("due date %j not echoed by %j", async (given, reply) => {
     recorder(taskReply(reply));
-    expect(String(await failure(api.setTaskDueDate("t1", given)))).toContain("/task/due-date/t1: server answered with task");
+    expect(String(await failure(api.setTaskDueDate("t1", given)))).toContain(
+      "/task/due-date/t1: server answered with task",
+    );
   });
 
   // The instant is compared, not the spelling: a bare date comes back as the
   // same moment written out in full, and a different moment is refused.
   test("due date echoed as another instant", async () => {
     recorder(taskReply(`,"dueDate":"2026-12-31T00:00:00.000Z"`));
-    expect(String(await failure(api.setTaskDueDate("t1", "2026-10-31")))).toContain("/task/due-date/t1: server answered with task");
+    expect(String(await failure(api.setTaskDueDate("t1", "2026-10-31")))).toContain(
+      "/task/due-date/t1: server answered with task",
+    );
   });
 
   test("due date from another task", async () => {
@@ -1475,12 +1681,16 @@ describe("TestWritesSendEveryField", () => {
     ["no count for a label", "addLabel", '{"success":true}'],
   ] as const)("bulk with %s", async (_, operation, reply) => {
     recorder(reply);
-    expect(String(await failure(api.bulkUpdate(["t1", "t2"], operation, "done")))).toContain("/task/bulk: sent 2 task(s)");
+    expect(String(await failure(api.bulkUpdate(["t1", "t2"], operation, "done")))).toContain(
+      "/task/bulk: sent 2 task(s)",
+    );
   });
 
   test("bulk answered with success false", async () => {
     recorder('{"success":false,"updatedCount":2}');
-    expect(String(await failure(api.bulkUpdate(["t1", "t2"], "updateStatus", "done")))).toContain("PATCH /api/task/bulk: 200");
+    expect(String(await failure(api.bulkUpdate(["t1", "t2"], "updateStatus", "done")))).toContain(
+      "PATCH /api/task/bulk: 200",
+    );
   });
 
   // The summary has to account for every task sent, as total and as successes
@@ -1488,13 +1698,29 @@ describe("TestWritesSendEveryField", () => {
   test.each([
     ["no results", "{}"],
     ["a short total", `{"results":{"total":1,"successful":1,"failed":0,"tasks":[]}}`],
-    ["counts that do not add up", `{"results":{"total":2,"successful":1,"failed":0,"tasks":[{"success":true},{"success":true}]}}`],
-    ["a total past what was sent", `{"results":{"total":3,"successful":2,"failed":0,"tasks":[{"success":true},{"success":true}]}}`],
+    [
+      "counts that do not add up",
+      `{"results":{"total":2,"successful":1,"failed":0,"tasks":[{"success":true},{"success":true}]}}`,
+    ],
+    [
+      "a total past what was sent",
+      `{"results":{"total":3,"successful":2,"failed":0,"tasks":[{"success":true},{"success":true}]}}`,
+    ],
     ["a short task list", `{"results":{"total":2,"successful":2,"failed":0,"tasks":[{"success":true}]}}`],
-    ["a count that hides a failure", `{"results":{"total":2,"successful":2,"failed":0,"tasks":[{"success":true},{"success":false}]}}`],
+    [
+      "a count that hides a failure",
+      `{"results":{"total":2,"successful":2,"failed":0,"tasks":[{"success":true},{"success":false}]}}`,
+    ],
   ])("import with %s", async (_, reply) => {
     recorder(reply);
-    const err = String(await failure(api.importProjectTasks("p1", [{ title: "a", status: "x" }, { title: "b", status: "x" }])));
+    const err = String(
+      await failure(
+        api.importProjectTasks("p1", [
+          { title: "a", status: "x" },
+          { title: "b", status: "x" },
+        ]),
+      ),
+    );
     expect(err).toContain("/task/import/p1: sent 2 task(s)");
   });
 
@@ -1506,7 +1732,9 @@ describe("TestWritesSendEveryField", () => {
   });
 
   test("import failure as an object", async () => {
-    recorder(`{"results":{"total":1,"successful":0,"failed":1,"tasks":[{"success":false,"error":{"message":"no"},"task":null}]}}`);
+    recorder(
+      `{"results":{"total":1,"successful":0,"failed":1,"tasks":[{"success":false,"error":{"message":"no"},"task":null}]}}`,
+    );
     expect((await api.importProjectTasks("p1", [{ title: "a", status: "x" }])).tasks).toEqual([
       { success: false, id: "", number: 0, title: "", error: "no", warnings: [] },
     ]);
@@ -1528,23 +1756,45 @@ describe("TestWritesSendEveryField", () => {
         `{"success":true,"task":{"id":"t9","number":12,"title":"a"},"warnings":["Unknown status \\"x\\" mapped to \\"planned\\""]},` +
         `{"success":false,"error":"Assignee is not a member of this workspace","task":{"title":"b","status":"to-do"}}]}}`,
     );
-    const result = await api.importProjectTasks("p1", [{ title: "a", status: "x" }, { title: "b", status: "to-do", userId: "u9" }]);
+    const result = await api.importProjectTasks("p1", [
+      { title: "a", status: "x" },
+      { title: "b", status: "to-do", userId: "u9" },
+    ]);
     expect(seen.body).toBe('{"tasks":[{"title":"a","status":"x"},{"title":"b","status":"to-do","userId":"u9"}]}');
     expect(result).toEqual({
       total: 2,
       successful: 1,
       failed: 1,
       tasks: [
-        { success: true, id: "t9", number: 12, title: "a", error: "", warnings: ['Unknown status "x" mapped to "planned"'] },
-        { success: false, id: "", number: 0, title: "b", error: "Assignee is not a member of this workspace", warnings: [] },
+        {
+          success: true,
+          id: "t9",
+          number: 12,
+          title: "a",
+          error: "",
+          warnings: ['Unknown status "x" mapped to "planned"'],
+        },
+        {
+          success: false,
+          id: "",
+          number: 0,
+          title: "b",
+          error: "Assignee is not a member of this workspace",
+          warnings: [],
+        },
       ],
     });
   });
 
   test("create task", async () => {
     const seen = recorder(taskReply());
-    await api.createTask("p1", newTask({ title: "x", description: "d", priority: "high", status: "review", dueDate: "2026-10-01" }));
-    expect(seen.body).toBe('{"title":"x","description":"d","dueDate":"2026-10-01","priority":"high","status":"review"}');
+    await api.createTask(
+      "p1",
+      newTask({ title: "x", description: "d", priority: "high", status: "review", dueDate: "2026-10-01" }),
+    );
+    expect(seen.body).toBe(
+      '{"title":"x","description":"d","dueDate":"2026-10-01","priority":"high","status":"review"}',
+    );
   });
 
   test("create task defaults", async () => {
@@ -1594,7 +1844,9 @@ describe("TestWritesSendEveryField", () => {
   });
 
   test("link", async () => {
-    const seen = recorder(`{"id":"r1","sourceTaskId":"s","targetTaskId":"d","relationType":"subtask","createdAt":"${TIME}"}`);
+    const seen = recorder(
+      `{"id":"r1","sourceTaskId":"s","targetTaskId":"d","relationType":"subtask","createdAt":"${TIME}"}`,
+    );
     const got = await api.linkTasks("s", "d", "subtask");
     expect(seen.body).toBe('{"sourceTaskId":"s","targetTaskId":"d","relationType":"subtask"}');
     expect([got.sourceTaskId, got.targetTaskId]).toEqual(["s", "d"]);
@@ -1658,7 +1910,12 @@ test.each([
 });
 
 test("TestUpdateProjectRefusalNamesTheFlagsThatGetPast", async () => {
-  newServer(() => new Response(`{"id":"p1","name":"Board","icon":"Box","isPublic":true}`, { headers: { "content-type": "application/json" } }));
+  newServer(
+    () =>
+      new Response(`{"id":"p1","name":"Board","icon":"Box","isPublic":true}`, {
+        headers: { "content-type": "application/json" },
+      }),
+  );
   const err = String(await failure(api.updateProject("p1", { name: "New" })));
   expect(err).toContain("--slug TEXT --description TEXT");
   expect(err).not.toContain("--icon");
@@ -1688,7 +1945,10 @@ test("TestUpdateProjectEmptyReadOffersNoFlags", async () => {
 
 test("TestUpdateProjectMissingIconOffersTheIconFlag", async () => {
   newServer(
-    () => new Response(`{"id":"p1","name":"Board","slug":"x","description":"d","isPublic":true}`, { headers: { "content-type": "application/json" } }),
+    () =>
+      new Response(`{"id":"p1","name":"Board","slug":"x","description":"d","isPublic":true}`, {
+        headers: { "content-type": "application/json" },
+      }),
   );
   const err = String(await failure(api.updateProject("p1", { name: "New" })));
   expect(err).toContain("(pass --icon TEXT to write it yourself)");
@@ -1696,16 +1956,26 @@ test("TestUpdateProjectMissingIconOffersTheIconFlag", async () => {
 
 test("TestUpdateProjectMissingIsPublicOffersNoFlagAndSaysSo", async () => {
   newServer(
-    () => new Response(`{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d"}`, { headers: { "content-type": "application/json" } }),
+    () =>
+      new Response(`{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d"}`, {
+        headers: { "content-type": "application/json" },
+      }),
   );
   const err = String(await failure(api.updateProject("p1", { name: "New" })));
   expect(err).not.toContain("--isPublic");
   expect(err).not.toContain("to write it yourself");
-  expect(err).toContain("isPublic has no flag, so this project cannot be updated until the server returns it as a boolean");
+  expect(err).toContain(
+    "isPublic has no flag, so this project cannot be updated until the server returns it as a boolean",
+  );
 });
 
 test("TestUpdateProjectMissingIsPublicAndIconOffersNoFlag", async () => {
-  newServer(() => new Response(`{"id":"p1","name":"Board","slug":"x","description":"d"}`, { headers: { "content-type": "application/json" } }));
+  newServer(
+    () =>
+      new Response(`{"id":"p1","name":"Board","slug":"x","description":"d"}`, {
+        headers: { "content-type": "application/json" },
+      }),
+  );
   const err = String(await failure(api.updateProject("p1", { name: "New" })));
   expect(err).toContain("without icon, isPublic");
   expect(err).not.toContain("--icon");
@@ -1715,7 +1985,10 @@ test("TestUpdateProjectMissingIsPublicAndIconOffersNoFlag", async () => {
 
 test("TestUpdateProjectNullIsPublicSaysBooleanIsWhatIsMissing", async () => {
   newServer(
-    () => new Response(`{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d","isPublic":null}`, { headers: { "content-type": "application/json" } }),
+    () =>
+      new Response(`{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d","isPublic":null}`, {
+        headers: { "content-type": "application/json" },
+      }),
   );
   const err = String(await failure(api.updateProject("p1", { name: "New" })));
   expect(err).toContain("until the server returns it as a boolean");
@@ -1724,13 +1997,14 @@ test("TestUpdateProjectNullIsPublicSaysBooleanIsWhatIsMissing", async () => {
 });
 
 test("TestUpdateProjectReportsAFieldItDidNotRead", async () => {
-  newServer((req) =>
-    new Response(
-      req.method === "GET"
-        ? `{"id":"p1","name":"Board","icon":"Box","description":"d","isPublic":true}`
-        : `{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d","isPublic":true}`,
-      { headers: { "content-type": "application/json" } },
-    ),
+  newServer(
+    (req) =>
+      new Response(
+        req.method === "GET"
+          ? `{"id":"p1","name":"Board","icon":"Box","description":"d","isPublic":true}`
+          : `{"id":"p1","name":"Board","slug":"x","icon":"Box","description":"d","isPublic":true}`,
+        { headers: { "content-type": "application/json" } },
+      ),
   );
   const done = await api.updateProject("p1", { slug: "x" });
   expect(done.unread).toEqual(["slug"]);
@@ -1746,13 +2020,14 @@ test("TestUpdateProjectReadsNothingUnreadWhenTheReadHasTheFieldAndItIsPassed", a
 // Of the fields the read could not use, one sent as null was read — as no
 // value — and one left out was not read at all; the report keeps them apart.
 test("TestUpdateProjectReportsWhichUnreadFieldsCameBackNull", async () => {
-  newServer((req) =>
-    new Response(
-      req.method === "GET"
-        ? `{"id":"p1","name":"Board","icon":null,"description":"d","isPublic":true}`
-        : `{"id":"p1","name":"Board","slug":"x","icon":"Star","description":"d","isPublic":true}`,
-      { headers: { "content-type": "application/json" } },
-    ),
+  newServer(
+    (req) =>
+      new Response(
+        req.method === "GET"
+          ? `{"id":"p1","name":"Board","icon":null,"description":"d","isPublic":true}`
+          : `{"id":"p1","name":"Board","slug":"x","icon":"Star","description":"d","isPublic":true}`,
+        { headers: { "content-type": "application/json" } },
+      ),
   );
   const done = await api.updateProject("p1", { slug: "x", icon: "Star" });
   expect(done.unread).toEqual(["slug", "icon"]);
@@ -1919,7 +2194,17 @@ test("TestReorderProjectsSendsTheWorkspaceAndTheOrder", async () => {
     return Response.json([]);
   });
   await api.reorderProjects("w/1", ["p2", "p1"]);
-  expect(seen).toEqual([{ query: "?workspaceId=w%2F1", body: { projects: [{ id: "p2", position: 0 }, { id: "p1", position: 1 }] } }]);
+  expect(seen).toEqual([
+    {
+      query: "?workspaceId=w%2F1",
+      body: {
+        projects: [
+          { id: "p2", position: 0 },
+          { id: "p1", position: 1 },
+        ],
+      },
+    },
+  ]);
 });
 
 test("listMyTasks asks for the workspace and keeps the total the server counted", async () => {
@@ -1951,7 +2236,16 @@ test("listMyTasks asks for the workspace and keeps the total the server counted"
   expect(seen.query).toBe("workspaceId=w%2F1");
   expect(mine.total).toBe(130);
   expect(mine.tasks).toEqual([
-    { id: "t7", projectId: "p9", projectSlug: "GAM", number: 41, title: "Mine", status: "in-progress", priority: "urgent", dueDate: null },
+    {
+      id: "t7",
+      projectId: "p9",
+      projectSlug: "GAM",
+      number: 41,
+      title: "Mine",
+      status: "in-progress",
+      priority: "urgent",
+      dueDate: null,
+    },
   ]);
 });
 
@@ -1963,7 +2257,18 @@ describe("custom fields", () => {
   test("list maps every field", async () => {
     const seen = recorder(`[${fieldReply().replace('"options":null', () => '"options":["a","b"]')}]`);
     expect(await api.listCustomFields("p1")).toEqual([
-      { id: "f1", projectId: "p1", name: "Points", type: "number", required: true, defaultValue: "1", options: ["a", "b"], position: 2, createdAt: TIME, updatedAt: TIME },
+      {
+        id: "f1",
+        projectId: "p1",
+        name: "Points",
+        type: "number",
+        required: true,
+        defaultValue: "1",
+        options: ["a", "b"],
+        position: 2,
+        createdAt: TIME,
+        updatedAt: TIME,
+      },
     ]);
     expect([seen.method, seen.path]).toEqual(["GET", "/api/custom-field/project/p1"]);
   });
@@ -1971,7 +2276,16 @@ describe("custom fields", () => {
   test("project values carry the definition's fields", async () => {
     const seen = recorder(`[${fieldValueReply}]`);
     expect(await api.listProjectFieldValues("p1")).toEqual([
-      { id: "v1", taskId: "t1", fieldId: "f1", value: "3", fieldName: "Points", fieldPosition: 2, fieldType: "number", fieldOptions: null },
+      {
+        id: "v1",
+        taskId: "t1",
+        fieldId: "f1",
+        value: "3",
+        fieldName: "Points",
+        fieldPosition: 2,
+        fieldType: "number",
+        fieldOptions: null,
+      },
     ]);
     expect([seen.method, seen.path]).toEqual(["GET", "/api/custom-field/project/p1/values"]);
   });
@@ -1979,21 +2293,36 @@ describe("custom fields", () => {
   test("task values", async () => {
     const seen = recorder(`[${fieldValueReply}]`);
     expect(await api.listTaskFieldValues("t1")).toEqual([
-      { id: "v1", taskId: "t1", fieldId: "f1", value: "3", fieldName: "Points", fieldPosition: 2, fieldType: "number", fieldOptions: null },
+      {
+        id: "v1",
+        taskId: "t1",
+        fieldId: "f1",
+        value: "3",
+        fieldName: "Points",
+        fieldPosition: 2,
+        fieldType: "number",
+        fieldOptions: null,
+      },
     ]);
     expect([seen.method, seen.path]).toEqual(["GET", "/api/custom-field/task/t1"]);
   });
 
   test("filter values", async () => {
     const seen = recorder('[{"fieldId":"f1","fieldName":"Points","fieldType":"number","values":["1","3"]}]');
-    expect(await api.listFieldFilterValues("p1")).toEqual([{ fieldId: "f1", fieldName: "Points", fieldType: "number", values: ["1", "3"] }]);
+    expect(await api.listFieldFilterValues("p1")).toEqual([
+      { fieldId: "f1", fieldName: "Points", fieldType: "number", values: ["1", "3"] },
+    ]);
     expect([seen.method, seen.path]).toEqual(["GET", "/api/custom-field/project/p1/filter-values"]);
   });
 
   // defaultValue and options are sent only when given: the route stores what
   // it is sent, and an empty options list is not the same as none.
   test.each([
-    ["bare", { name: "Points", type: "number", required: true }, '{"projectId":"p1","name":"Points","type":"number","required":true}'],
+    [
+      "bare",
+      { name: "Points", type: "number", required: true },
+      '{"projectId":"p1","name":"Points","type":"number","required":true}',
+    ],
     [
       "full",
       { name: "Release", type: "dropdown", required: false, defaultValue: "Web", options: ["Web", "CLI"] },
@@ -2010,7 +2339,11 @@ describe("custom fields", () => {
   // The whole new order in one request, numbered from zero, answered with the
   // project's fields in their new order.
   test("reorder", async () => {
-    const seen = recorder(`[${fieldReply()},${fieldReply().replace('"id":"f1"', () => '"id":"f2"').replace('"position":2', () => '"position":0')}]`);
+    const seen = recorder(
+      `[${fieldReply()},${fieldReply()
+        .replace('"id":"f1"', () => '"id":"f2"')
+        .replace('"position":2', () => '"position":0')}]`,
+    );
     const fields = await api.reorderCustomFields("p1", ["f2", "f1"]);
     expect([seen.method, seen.path]).toEqual(["PUT", "/api/custom-field/reorder/p1"]);
     expect(seen.body).toBe('{"fields":[{"id":"f2","position":0},{"id":"f1","position":1}]}');
@@ -2135,10 +2468,9 @@ test("TestGitHubRepositoriesSendsThePageCursor", async () => {
   const queries: string[] = [];
   newServer((req) => {
     queries.push(new URL(req.url).search.replace(/^\?/, ""));
-    return new Response(
-      JSON.stringify({ repositories: [], installations: [], total: 0, nextPage: null }),
-      { headers: { "content-type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ repositories: [], installations: [], total: 0, nextPage: null }), {
+      headers: { "content-type": "application/json" },
+    });
   });
   await api.listGitHubRepositories("p1");
   await api.listGitHubRepositories("p1", { installationPage: "2", repositoryPage: "3" });
@@ -2251,8 +2583,14 @@ test("TestGitHubUpdateRefusesAnEmptyChange", async () => {
     seen.push(req.method);
     return new Response("{}");
   });
-  for (const changes of [{}, { isActive: undefined }, { isActive: undefined, commentTaskLinkOnGitHubIssue: undefined }]) {
-    expect(String(await failure(api.updateGitHubIntegration("p1", changes)))).toContain("no GitHub integration settings");
+  for (const changes of [
+    {},
+    { isActive: undefined },
+    { isActive: undefined, commentTaskLinkOnGitHubIssue: undefined },
+  ]) {
+    expect(String(await failure(api.updateGitHubIntegration("p1", changes)))).toContain(
+      "no GitHub integration settings",
+    );
   }
   expect(seen).toEqual([]);
 });
@@ -2327,15 +2665,14 @@ test("TestGitHubImportContinuesUntilDone", async () => {
   newServer(async (req) => {
     bodies.push(await req.json());
     const reply = replies[calls++]!;
-    return new Response(JSON.stringify(reply.body), { status: reply.status, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify(reply.body), {
+      status: reply.status,
+      headers: { "content-type": "application/json" },
+    });
   });
   const got = await api.importGitHubIssues("p1");
   expect(calls).toBe(3);
-  expect(bodies).toEqual([
-    { projectId: "p1" },
-    { projectId: "p1", runId: "run1" },
-    { projectId: "p1", runId: "run1" },
-  ]);
+  expect(bodies).toEqual([{ projectId: "p1" }, { projectId: "p1", runId: "run1" }, { projectId: "p1", runId: "run1" }]);
   expect(got).toEqual({ runId: "run1", pending: false, imported: 3, updated: 1, skipped: 2 });
 });
 
@@ -2379,7 +2716,11 @@ test("TestGitHubImportWaitsOutABusyLock", async () => {
   let calls = 0;
   newServer(() => {
     const at = calls++;
-    if (replies[at] === 429) return new Response("GitHub import is busy; retry this request", { status: 429, headers: { "Retry-After": "1" } });
+    if (replies[at] === 429)
+      return new Response("GitHub import is busy; retry this request", {
+        status: 429,
+        headers: { "Retry-After": "1" },
+      });
     const pending = replies[at] === 202;
     return new Response(JSON.stringify({ runId: "run1", pending, imported: 1, updated: 0, skipped: 0 }), {
       status: replies[at],
@@ -2399,7 +2740,11 @@ test("TestGitHubImportBusyCountStartsOverAfterAPage", async () => {
   let calls = 0;
   newServer(() => {
     const at = calls++;
-    if (replies[at] === 429) return new Response("GitHub import is busy; retry this request", { status: 429, headers: { "Retry-After": "1" } });
+    if (replies[at] === 429)
+      return new Response("GitHub import is busy; retry this request", {
+        status: 429,
+        headers: { "Retry-After": "1" },
+      });
     const pending = replies[at] === 202;
     return new Response(JSON.stringify({ runId: "run1", pending, imported: 1, updated: 0, skipped: 0 }), {
       status: replies[at],
@@ -2538,7 +2883,9 @@ test("TestGitHubImportSurvivesWhenOnlySkippedMoves", async () => {
 // The routes behind the server's user-session check refuse a key with their
 // own words; the message is kept for the caller.
 test("TestGitHubSessionRefusalKeepsTheServerMessage", async () => {
-  newServer(() => new Response("A user session is required", { status: 403, headers: { "content-type": "text/plain" } }));
+  newServer(
+    () => new Response("A user session is required", { status: 403, headers: { "content-type": "text/plain" } }),
+  );
   const err = await failure(api.verifyGitHubRepository("p1", "acme", "kaneo"));
   expect(err).toBeInstanceOf(KaneoApiError);
   expect((err as KaneoApiError).statusCode).toBe(403);
@@ -2592,7 +2939,11 @@ test("TestGetMattermostIntegrationMapsTheMaskedRow", async () => {
 
 test("TestCreateMattermostIntegrationPostsTheBody", async () => {
   const seen = recorder(mmRow);
-  const wanted: api.NewMattermostIntegration = { webhookUrl: "https://mm.example/in", channelName: "alerts", events: { taskCreated: false } };
+  const wanted: api.NewMattermostIntegration = {
+    webhookUrl: "https://mm.example/in",
+    channelName: "alerts",
+    events: { taskCreated: false },
+  };
   await api.createMattermostIntegration("p1", wanted);
   expect([seen.method, seen.path]).toEqual(["POST", "/api/mattermost-integration/project/p1"]);
   expect(seen.body).toBe(JSON.stringify(wanted));
@@ -2602,7 +2953,11 @@ test("TestCreateMattermostIntegrationPostsTheBody", async () => {
 // the event toggles it is sent.
 test("TestUpdateMattermostIntegrationPatchesSparseChanges", async () => {
   const seen = recorder(mmRow);
-  const changes: api.MattermostIntegrationChanges = { channelName: null, isActive: false, events: { taskStatusChanged: false } };
+  const changes: api.MattermostIntegrationChanges = {
+    channelName: null,
+    isActive: false,
+    events: { taskStatusChanged: false },
+  };
   await api.updateMattermostIntegration("p1", changes);
   expect([seen.method, seen.path]).toEqual(["PATCH", "/api/mattermost-integration/project/p1"]);
   expect(seen.body).toBe(JSON.stringify(changes));
@@ -2647,7 +3002,11 @@ test("TestGetGenericWebhookIntegrationDefaultsTheReminderLead", async () => {
 
 test("TestCreateGenericWebhookIntegrationPostsTheBody", async () => {
   const seen = recorder(gwRow);
-  const wanted: api.NewGenericWebhookIntegration = { webhookUrl: "https://wh.example/in", secret: "signing-material", dueDateReminderLeadTimeMinutes: 30 };
+  const wanted: api.NewGenericWebhookIntegration = {
+    webhookUrl: "https://wh.example/in",
+    secret: "signing-material",
+    dueDateReminderLeadTimeMinutes: 30,
+  };
   await api.createGenericWebhookIntegration("p1", wanted);
   expect([seen.method, seen.path]).toEqual(["POST", "/api/generic-webhook-integration/project/p1"]);
   expect(seen.body).toBe(JSON.stringify(wanted));
@@ -3032,14 +3391,30 @@ test("getGiteaIntegration maps null and missing optionals", async () => {
       `"maskedAccessToken":"masked-value","isActive":null,"createdAt":"${TIME}","updatedAt":"${TIME}"}`,
   );
   const got = await api.getGiteaIntegration("p1");
-  expect([got!.webhookUrl, got!.webhookSecret, got!.branchPattern, got!.commentTaskLinkOnGiteaIssue, got!.isActive]).toEqual([null, null, null, null, null]);
+  expect([
+    got!.webhookUrl,
+    got!.webhookSecret,
+    got!.branchPattern,
+    got!.commentTaskLinkOnGiteaIssue,
+    got!.isActive,
+  ]).toEqual([null, null, null, null, null]);
 });
 
 test("createGiteaIntegration posts the target and keeps the token only when given", async () => {
   const seen = recorder(giteaReply());
-  const got = await api.createGiteaIntegration("p1", { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", accessToken: "unit-token" });
+  const got = await api.createGiteaIntegration("p1", {
+    baseUrl: "https://gitea.example.com",
+    repositoryOwner: "acme",
+    repositoryName: "app",
+    accessToken: "unit-token",
+  });
   expect([seen.method, seen.path]).toEqual(["POST", "/api/gitea-integration/project/p1"]);
-  expect(JSON.parse(seen.body)).toEqual({ baseUrl: "https://gitea.example.com", accessToken: "unit-token", repositoryOwner: "acme", repositoryName: "app" });
+  expect(JSON.parse(seen.body)).toEqual({
+    baseUrl: "https://gitea.example.com",
+    accessToken: "unit-token",
+    repositoryOwner: "acme",
+    repositoryName: "app",
+  });
   expect(got.id).toBe("git1");
 });
 
@@ -3047,7 +3422,11 @@ test("createGiteaIntegration posts the target and keeps the token only when give
 // be sent as null or empty, which the server reads differently.
 test("createGiteaIntegration omits accessToken when none is given", async () => {
   const seen = recorder(giteaReply());
-  await api.createGiteaIntegration("p1", { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app" });
+  await api.createGiteaIntegration("p1", {
+    baseUrl: "https://gitea.example.com",
+    repositoryOwner: "acme",
+    repositoryName: "app",
+  });
   const sent = JSON.parse(seen.body);
   expect("accessToken" in sent).toBe(false);
 });
@@ -3056,13 +3435,23 @@ test("createGiteaIntegration omits accessToken when none is given", async () => 
 // a reply that cannot be reported as a link that was made.
 test("createGiteaIntegration refuses a null reply", async () => {
   recorder("null");
-  const e = await failure(api.createGiteaIntegration("p1", { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app" }));
+  const e = await failure(
+    api.createGiteaIntegration("p1", {
+      baseUrl: "https://gitea.example.com",
+      repositoryOwner: "acme",
+      repositoryName: "app",
+    }),
+  );
   expect(e).toBeInstanceOf(Error);
   expect((e as Error).message).toContain("server answered without the integration");
 });
 
 test("updateGiteaIntegration patches only the fields given", async () => {
-  const seen = recorder(giteaReply().replace('"isActive":true', '"isActive":false').replace('"commentTaskLinkOnGiteaIssue":true', '"commentTaskLinkOnGiteaIssue":false'));
+  const seen = recorder(
+    giteaReply()
+      .replace('"isActive":true', '"isActive":false')
+      .replace('"commentTaskLinkOnGiteaIssue":true', '"commentTaskLinkOnGiteaIssue":false'),
+  );
   const got = await api.updateGiteaIntegration("p1", { isActive: false, commentTaskLinkOnGiteaIssue: false });
   expect([seen.method, seen.path]).toEqual(["PATCH", "/api/gitea-integration/project/p1"]);
   expect(seen.body).toBe('{"isActive":false,"commentTaskLinkOnGiteaIssue":false}');
@@ -3093,12 +3482,34 @@ test("listGiteaRepositories posts the credentials and maps the repos", async () 
       '{"id":7,"name":"app","full_name":"acme/app","owner":{"login":"acme"},"private":true,"html_url":"https://gitea.example.com/acme/app"},' +
       '{"id":8,"name":"docs","full_name":"acme/docs","owner":{"login":"acme"},"private":false,"html_url":"https://gitea.example.com/acme/docs"}]}',
   );
-  const got = await api.listGiteaRepositories({ projectId: "p1", baseUrl: "https://gitea.example.com", accessToken: "unit-token" });
+  const got = await api.listGiteaRepositories({
+    projectId: "p1",
+    baseUrl: "https://gitea.example.com",
+    accessToken: "unit-token",
+  });
   expect([seen.method, seen.path]).toEqual(["POST", "/api/gitea-integration/repositories"]);
-  expect(JSON.parse(seen.body)).toEqual({ projectId: "p1", baseUrl: "https://gitea.example.com", accessToken: "unit-token" });
+  expect(JSON.parse(seen.body)).toEqual({
+    projectId: "p1",
+    baseUrl: "https://gitea.example.com",
+    accessToken: "unit-token",
+  });
   expect(got).toEqual([
-    { id: 7, name: "app", fullName: "acme/app", owner: "acme", private: true, htmlUrl: "https://gitea.example.com/acme/app" },
-    { id: 8, name: "docs", fullName: "acme/docs", owner: "acme", private: false, htmlUrl: "https://gitea.example.com/acme/docs" },
+    {
+      id: 7,
+      name: "app",
+      fullName: "acme/app",
+      owner: "acme",
+      private: true,
+      htmlUrl: "https://gitea.example.com/acme/app",
+    },
+    {
+      id: 8,
+      name: "docs",
+      fullName: "acme/docs",
+      owner: "acme",
+      private: false,
+      htmlUrl: "https://gitea.example.com/acme/docs",
+    },
   ]);
 });
 
@@ -3109,9 +3520,21 @@ test("verifyGiteaAccess posts the target and maps the checks", async () => {
     '{"isInstalled":true,"hasRequiredPermissions":false,"repositoryExists":true,"repositoryPrivate":true,' +
       '"missingPermissions":["issues (write)"],"message":"Token may not have sufficient permissions to manage issues.","failureReason":null}',
   );
-  const got = await api.verifyGiteaAccess({ projectId: "p1", baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", accessToken: "unit-token" });
+  const got = await api.verifyGiteaAccess({
+    projectId: "p1",
+    baseUrl: "https://gitea.example.com",
+    repositoryOwner: "acme",
+    repositoryName: "app",
+    accessToken: "unit-token",
+  });
   expect([seen.method, seen.path]).toEqual(["POST", "/api/gitea-integration/verify"]);
-  expect(JSON.parse(seen.body)).toEqual({ projectId: "p1", baseUrl: "https://gitea.example.com", accessToken: "unit-token", repositoryOwner: "acme", repositoryName: "app" });
+  expect(JSON.parse(seen.body)).toEqual({
+    projectId: "p1",
+    baseUrl: "https://gitea.example.com",
+    accessToken: "unit-token",
+    repositoryOwner: "acme",
+    repositoryName: "app",
+  });
   expect(got).toEqual({
     isInstalled: true,
     hasRequiredPermissions: false,
@@ -3130,7 +3553,12 @@ test("verifyGiteaAccess omits accessToken when none is given", async () => {
     '{"isInstalled":false,"hasRequiredPermissions":false,"repositoryExists":false,"repositoryPrivate":null,' +
       '"missingPermissions":[],"message":"The URL does not point to a Gitea instance.","failureReason":"not_a_gitea_instance"}',
   );
-  const got = await api.verifyGiteaAccess({ projectId: "p1", baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app" });
+  const got = await api.verifyGiteaAccess({
+    projectId: "p1",
+    baseUrl: "https://gitea.example.com",
+    repositoryOwner: "acme",
+    repositoryName: "app",
+  });
   const sent = JSON.parse(seen.body);
   expect("accessToken" in sent).toBe(false);
   expect(got.failureReason).toBe("not_a_gitea_instance");

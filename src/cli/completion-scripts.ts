@@ -26,7 +26,9 @@ export type Program = {
 export const activeHelpVar = (name: string): string =>
   `${name.toUpperCase()}_ACTIVE_HELP`.replaceAll("-", "_").replaceAll(":", "_");
 
-export const bashScript = (p: Program): string => `# bash completion V2 for ${p.name}                                -*- shell-script -*-
+export const bashScript = (
+  p: Program,
+): string => `# bash completion V2 for ${p.name}                                -*- shell-script -*-
 
 __${p.name}_debug()
 {
@@ -668,7 +670,9 @@ if [ "$funcstack[1]" = "_${p.name}" ]; then
 fi
 `;
 
-export const fishScript = (p: Program): string => `# fish completion for ${p.name}                                -*- shell-script -*-
+export const fishScript = (
+  p: Program,
+): string => `# fish completion for ${p.name}                                -*- shell-script -*-
 
 function __${p.name}_debug
     set -l file "$BASH_COMP_DEBUG_FILE"
@@ -905,7 +909,9 @@ complete -c ${p.name} -n 'not __${p.name}_requires_order_preservation && __${p.n
 complete -k -c ${p.name} -n '__${p.name}_requires_order_preservation && __${p.name}_prepare_completions' -f -a '$__${p.name}_comp_results'
 `;
 
-export const powershellScript = (p: Program): string => `# powershell completion for ${p.name}                                -*- shell-script -*-
+export const powershellScript = (
+  p: Program,
+): string => `# powershell completion for ${p.name}                                -*- shell-script -*-
 
 function __${p.name}_debug {
     if ($env:BASH_COMP_DEBUG_FILE) {
@@ -1176,4 +1182,3 @@ filter __${p.name}_escapeStringWithSpecialChars {
 
 Register-ArgumentCompleter -CommandName '${p.name}' -ScriptBlock \${__${p.name}CompleterBlock}
 `;
-

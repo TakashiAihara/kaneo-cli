@@ -1,5 +1,15 @@
 import { writeSync } from "node:fs";
-import { declaredFlags, find, inheritedFlags, localFlags, noArgs, type Command, type Flag, type FlagValues, type RunContext } from "./args";
+import {
+  declaredFlags,
+  find,
+  inheritedFlags,
+  localFlags,
+  noArgs,
+  type Command,
+  type Flag,
+  type FlagValues,
+  type RunContext,
+} from "./args";
 import type { App } from "./app";
 import { activeHelpVar, bashScript, fishScript, powershellScript, zshScript, type Program } from "./completion-scripts";
 
@@ -299,7 +309,9 @@ const flagNames = (flags: Flag[], given: ReadonlySet<string>, partial: string): 
 // found the command read it: a long spelling by name, a short one by its letter,
 // and anything after an "=" is the value rather than part of the flag.
 const alreadyGiven = (typed: string[], offered: Flag[]): Set<string> => {
-  const byShorthand = new Map(offered.flatMap((flag) => (flag.shorthand ? [[flag.shorthand, flag.name] as const] : [])));
+  const byShorthand = new Map(
+    offered.flatMap((flag) => (flag.shorthand ? [[flag.shorthand, flag.name] as const] : [])),
+  );
   const known = new Set(offered.map((flag) => flag.name));
   const given = new Set<string>();
   for (const word of typed) {
@@ -319,5 +331,4 @@ const alreadyGiven = (typed: string[], offered: Flag[]): Set<string> => {
 };
 
 // Sorted the way the help lists them, so a shell's menu and `kaneo --help` agree.
-const byName = (a: { name: string }, b: { name: string }): number =>
-  a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+const byName = (a: { name: string }, b: { name: string }): number => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);

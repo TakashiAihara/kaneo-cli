@@ -1,4 +1,12 @@
-import { loadGlobal, globalPath, activeProfile, workspaceForOwner, projectsForRepo, type GlobalConfig, type Profile } from "./global";
+import {
+  loadGlobal,
+  globalPath,
+  activeProfile,
+  workspaceForOwner,
+  projectsForRepo,
+  type GlobalConfig,
+  type Profile,
+} from "./global";
 import { findLocals, mergeLocals, type Local } from "./local";
 import { currentRepo } from "./repo";
 
@@ -51,8 +59,10 @@ const fetchKey = (command: string): string | Error => {
     return new Error(`api_key_command could not be started: ${(e as Error).message}`);
   }
   if (run.exitedDueToTimeout) return new Error(`api_key_command timed out after ${COMMAND_TIMEOUT_MS / 1000}s`);
-  if (run.stdout.length >= COMMAND_MAX_OUTPUT) return new Error(`api_key_command printed ${COMMAND_MAX_OUTPUT / 1024} KiB or more`);
-  if (!run.success) return new Error(`api_key_command failed (${run.exitCode === null ? run.signalCode : `exit ${run.exitCode}`})`);
+  if (run.stdout.length >= COMMAND_MAX_OUTPUT)
+    return new Error(`api_key_command printed ${COMMAND_MAX_OUTPUT / 1024} KiB or more`);
+  if (!run.success)
+    return new Error(`api_key_command failed (${run.exitCode === null ? run.signalCode : `exit ${run.exitCode}`})`);
 
   const key = run.stdout.toString().trim();
   if (key === "") return new Error("api_key_command printed nothing");
@@ -60,7 +70,8 @@ const fetchKey = (command: string): string | Error => {
   // lines of metadata), unlike a key typed into a flag or a file, and it goes
   // into an Authorization header, whose library quotes a value it refuses in
   // its error. So it is checked here, without being printed.
-  if (!/^[\x21-\x7e]+$/.test(key)) return new Error("api_key_command printed a value that is not a single-line API key");
+  if (!/^[\x21-\x7e]+$/.test(key))
+    return new Error("api_key_command printed a value that is not a single-line API key");
   return key;
 };
 

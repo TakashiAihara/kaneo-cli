@@ -83,7 +83,11 @@ const literalSecret = (flag: string): string =>
 // the rest of the text is kept as it came, whitespace included, and the read
 // keeps a leading BOM too — it can be part of the secret itself, which is
 // why the default reader is readCredential rather than readInput.
-const credentialText = async (source: string, named: string, read: (source: string) => Promise<string>): Promise<string> => {
+const credentialText = async (
+  source: string,
+  named: string,
+  read: (source: string) => Promise<string>,
+): Promise<string> => {
   const text = (await read(source)).replace(/\r?\n$/, "");
   if (text === "") throw new Error(`empty --${named} ${source === "-" ? "on stdin" : sourceName(source)}`);
   return text;
@@ -123,7 +127,9 @@ export const resolveCredentials = async (
     if (String(flags[fileFlag] ?? "") === "-") piped.push({ typed: fileFlag, name });
   }
   if (piped.length > 1) {
-    throw new Error(`only one of ${piped.map((p) => `--${p.typed}`).join(", ")} can read stdin; the others take a file or a second command`);
+    throw new Error(
+      `only one of ${piped.map((p) => `--${p.typed}`).join(", ")} can read stdin; the others take a file or a second command`,
+    );
   }
   for (const name of files) {
     const fileFlag = `${name}-file`;
@@ -167,18 +173,16 @@ export const requireCreateWebhookUrl = (flags: FlagValues, changed: ReadonlySet<
 // silent no-op.
 export function webhookUrlFlag(flags: FlagValues, changed: ReadonlySet<string>, creating: true): string;
 export function webhookUrlFlag(flags: FlagValues, changed: ReadonlySet<string>, creating: false): string | undefined;
-export function webhookUrlFlag(
-  flags: FlagValues,
-  changed: ReadonlySet<string>,
-  creating: boolean,
-): string | undefined {
+export function webhookUrlFlag(flags: FlagValues, changed: ReadonlySet<string>, creating: boolean): string | undefined {
   if (!changed.has(WEBHOOK_URL_FLAG)) {
     if (creating) throw new Error(webhookUrlRequired());
     return undefined;
   }
   const raw = String(flags[WEBHOOK_URL_FLAG] ?? "");
   if (raw === "") {
-    throw new Error(creating ? webhookUrlRequired() : `${WEBHOOK_URL_TYPED} cannot be cleared; the integration needs one`);
+    throw new Error(
+      creating ? webhookUrlRequired() : `${WEBHOOK_URL_TYPED} cannot be cleared; the integration needs one`,
+    );
   }
   return raw;
 }
@@ -239,7 +243,9 @@ export type IntegrationSpec<R extends Json, C extends object, U extends object> 
   createRefuses?: Record<string, string>;
 };
 
-export const providerCommand = <R extends Json, C extends object, U extends object>(spec: IntegrationSpec<R, C, U>): Command<App> => ({
+export const providerCommand = <R extends Json, C extends object, U extends object>(
+  spec: IntegrationSpec<R, C, U>,
+): Command<App> => ({
   name: spec.name,
   short: spec.short,
   long: spec.long,
@@ -291,7 +297,8 @@ export const providerCommand = <R extends Json, C extends object, U extends obje
           throw new Error(`nothing to change: pass at least one of ${spec.flags.map((f) => `--${f.name}`).join(", ")}`);
         }
         const updated = await spec.api.update(projectId, changes);
-        if (updated === null) throw new Error(`the server accepted the change but returned no ${spec.name} integration`);
+        if (updated === null)
+          throw new Error(`the server accepted the change but returned no ${spec.name} integration`);
         app.out.human(`updated ${spec.name} integration`);
         for (const line of spec.describe(updated)) app.out.human(line);
         app.out.data(updated);

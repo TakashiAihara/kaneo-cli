@@ -46,12 +46,16 @@ describe("project background get refusals", () => {
   // There is no JSON form of an image for the output flags to hand back.
   test("refuses --json", async () => {
     const message = await invoke({ terminal: false, json: true });
-    expect(message).toBe("--json and --jq do not apply to project background get; the image is written to stdout as it arrives");
+    expect(message).toBe(
+      "--json and --jq do not apply to project background get; the image is written to stdout as it arrives",
+    );
   });
 
   test("refuses --jq", async () => {
     const message = await invoke({ terminal: false, jq: true });
-    expect(message).toBe("--json and --jq do not apply to project background get; the image is written to stdout as it arrives");
+    expect(message).toBe(
+      "--json and --jq do not apply to project background get; the image is written to stdout as it arrives",
+    );
   });
 
   // Past the refusals the command reaches for the key — proof a pipe was let

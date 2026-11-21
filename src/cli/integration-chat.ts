@@ -22,9 +22,19 @@ import type { Json } from "../output/json";
 export const EVENT_FLAGS: Flag[] = [
   { name: "task-created", type: "bool", usage: "notify when a task is created", defaultValue: "false" },
   { name: "task-status-changed", type: "bool", usage: "notify when a task changes status", defaultValue: "false" },
-  { name: "task-priority-changed", type: "bool", usage: "notify when a task's priority changes", defaultValue: "false" },
+  {
+    name: "task-priority-changed",
+    type: "bool",
+    usage: "notify when a task's priority changes",
+    defaultValue: "false",
+  },
   { name: "task-title-changed", type: "bool", usage: "notify when a task is renamed", defaultValue: "false" },
-  { name: "task-description-changed", type: "bool", usage: "notify when a task's description changes", defaultValue: "false" },
+  {
+    name: "task-description-changed",
+    type: "bool",
+    usage: "notify when a task's description changes",
+    defaultValue: "false",
+  },
   { name: "task-comment-created", type: "bool", usage: "notify when a task gets a comment", defaultValue: "false" },
 ];
 
@@ -74,7 +84,8 @@ export const ACTIVE_FLAG: Flag = {
 
 // isActive is null on a row the server never set it on, which reads as unset
 // rather than as on or off.
-export const activeLabel = (isActive: boolean | null): string => (isActive === null ? "unset" : isActive ? "on" : "off");
+export const activeLabel = (isActive: boolean | null): string =>
+  isActive === null ? "unset" : isActive ? "on" : "off";
 
 // A webhook URL or bot token on the command line is visible in the process
 // list and the shell history, so the flag takes only `-`, which reads the
@@ -84,7 +95,9 @@ export const activeLabel = (isActive: boolean | null): string => (isActive === n
 // one secret flag, so two can never ask for the one stdin stream at once.
 const stdinSecret = async (flag: string, flags: FlagValues): Promise<string> => {
   if (String(flags[flag] ?? "") !== "-") {
-    throw new Error(`--${flag} is a secret and takes - only: pipe the value on stdin rather than passing it on the command line`);
+    throw new Error(
+      `--${flag} is a secret and takes - only: pipe the value on stdin rather than passing it on the command line`,
+    );
   }
   const text = (await readInput("-")).replace(/\r?\n$/, "");
   // Whitespace alone is no credential: a webhook URL of spaces trims to the
@@ -102,7 +115,9 @@ export type ChatSecret = { flag: string; what: string; value: string | undefined
 // The secret a create cannot do without.
 export const requiredSecret = (secret: ChatSecret): string => {
   if (secret.value === undefined) {
-    throw new Error(`creating an integration needs --${secret.flag} -: the ${secret.what} is read from stdin so it never appears on the command line`);
+    throw new Error(
+      `creating an integration needs --${secret.flag} -: the ${secret.what} is read from stdin so it never appears on the command line`,
+    );
   }
   return secret.value;
 };
@@ -155,7 +170,9 @@ export type ChatSpec<T extends Json, C extends object, U extends object> = {
   createRefuses?: Record<string, string>;
 };
 
-export const chatProvider = <T extends Json, C extends object, U extends object>(spec: ChatSpec<T, C, U>): Command<App> => ({
+export const chatProvider = <T extends Json, C extends object, U extends object>(
+  spec: ChatSpec<T, C, U>,
+): Command<App> => ({
   name: spec.name,
   short: `Show, set or remove the project's ${spec.name} integration`,
   children: [
@@ -210,10 +227,13 @@ export const chatProvider = <T extends Json, C extends object, U extends object>
           }
           const changes = await spec.updateBody(flags, changed, secret);
           if (Object.keys(changes).length === 0) {
-            throw new Error(`nothing to change: pass at least one of ${spec.flags.map((f) => `--${f.name}`).join(", ")}`);
+            throw new Error(
+              `nothing to change: pass at least one of ${spec.flags.map((f) => `--${f.name}`).join(", ")}`,
+            );
           }
           const updated = await spec.api.update(id, changes);
-          if (updated === null) throw new Error(`the server accepted the change but returned no ${spec.name} integration`);
+          if (updated === null)
+            throw new Error(`the server accepted the change but returned no ${spec.name} integration`);
           return { created: false, integration: updated };
         });
         app.out.human(`${done.created ? "created" : "updated"} ${spec.name} integration`);
@@ -248,7 +268,11 @@ export const chatProvider = <T extends Json, C extends object, U extends object>
   ],
 });
 
-const webhookCreateBody = (flags: FlagValues, changed: ReadonlySet<string>, secret: ChatSecret): NewWebhookIntegration => {
+const webhookCreateBody = (
+  flags: FlagValues,
+  changed: ReadonlySet<string>,
+  secret: ChatSecret,
+): NewWebhookIntegration => {
   const wanted: NewWebhookIntegration = { webhookUrl: requiredSecret(secret) };
   const channel = optionalText(flags, "channel-name");
   if (changed.has("channel-name") && channel !== undefined) wanted.channelName = channel;
@@ -257,7 +281,11 @@ const webhookCreateBody = (flags: FlagValues, changed: ReadonlySet<string>, secr
   return wanted;
 };
 
-const webhookUpdateBody = (flags: FlagValues, changed: ReadonlySet<string>, secret: ChatSecret): WebhookIntegrationChanges => {
+const webhookUpdateBody = (
+  flags: FlagValues,
+  changed: ReadonlySet<string>,
+  secret: ChatSecret,
+): WebhookIntegrationChanges => {
   const changes: WebhookIntegrationChanges = {};
   if (secret.value !== undefined) changes.webhookUrl = secret.value;
   if (changed.has("channel-name")) changes.channelName = nullableText(flags, "channel-name");

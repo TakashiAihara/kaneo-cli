@@ -14,12 +14,10 @@ export type Mode = { json: boolean; color: boolean };
 
 // --human wins over --json so a caller can force readable output through a
 // pipe. Both are passed in rather than probed so the decision stays testable.
-export const resolveMode = (
-  json: boolean,
-  human: boolean,
-  stdoutIsTTY: boolean,
-  noColor: boolean,
-): Mode => ({ json: !human && (json || !stdoutIsTTY), color: stdoutIsTTY && !noColor });
+export const resolveMode = (json: boolean, human: boolean, stdoutIsTTY: boolean, noColor: boolean): Mode => ({
+  json: !human && (json || !stdoutIsTTY),
+  color: stdoutIsTTY && !noColor,
+});
 
 const S_IFMT = 0o170000;
 const S_IFCHR = 0o020000;
@@ -63,7 +61,10 @@ export const sanitizeControl = (text: string): string => {
 // a line is neutralised as usual. A lone CR is not a line ending here and is
 // replaced like any other control character.
 export const sanitizeDocument = (text: string): string =>
-  text.split("\r\n").map((line) => sanitizeControl(line)).join("\r\n");
+  text
+    .split("\r\n")
+    .map((line) => sanitizeControl(line))
+    .join("\r\n");
 
 // Code-point ranges a terminal draws two cells wide: the East Asian Wide and
 // Fullwidth blocks a CJK name or slug is made of, and the emoji blocks. The
@@ -191,6 +192,7 @@ export class Writer {
   // it would be no better.
   error(message: string, fields: Record<string, Json> = {}): void {
     writeSync(2, `Error: ${sanitizeControl(message)}\n`);
-    if (this.mode.json && this.filter === undefined && !this.wroteData) writeSync(1, line({ error: message, ...fields }));
+    if (this.mode.json && this.filter === undefined && !this.wroteData)
+      writeSync(1, line({ error: message, ...fields }));
   }
 }

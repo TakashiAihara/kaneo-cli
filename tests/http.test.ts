@@ -419,7 +419,9 @@ describe("failures after a redirect", () => {
   });
 
   test("a hop that cannot be reached names the call, and the URL it dialled after it", async () => {
-    const origin = serve(() => new Response(null, { status: 303, headers: { location: "http://127.0.0.1:9/api/elsewhere" } }));
+    const origin = serve(
+      () => new Response(null, { status: 303, headers: { location: "http://127.0.0.1:9/api/elsewhere" } }),
+    );
     configureClient({ baseUrl: origin });
     const e = (await failure(kaneoFetch("/task-relation", { method: "POST", body: "{}" }))) as Error;
     expect(e.message).toBe(
@@ -525,14 +527,24 @@ describe("failures", () => {
   });
 
   test("an error status carrying {message, code, issues} reports the message", async () => {
-    const url = serve(() => Response.json({ message: "Invalid title", code: "VALIDATION_ERROR", issues: [{ path: "body.title", message: "Required" }] }, { status: 400 }));
+    const url = serve(() =>
+      Response.json(
+        { message: "Invalid title", code: "VALIDATION_ERROR", issues: [{ path: "body.title", message: "Required" }] },
+        { status: 400 },
+      ),
+    );
     configureClient({ baseUrl: url, apiKey: "test-key" });
     const e = (await failure(kaneoFetch("/task/x", { method: "POST" }))) as KaneoApiError;
     expect(e.messages).toEqual(["Invalid title"]);
   });
 
   test("an error status carrying {message, code, missingPermissions} reports the message", async () => {
-    const url = serve(() => Response.json({ message: "Missing permission", code: "MISSING_PERMISSION", missingPermissions: ["task:update"] }, { status: 403 }));
+    const url = serve(() =>
+      Response.json(
+        { message: "Missing permission", code: "MISSING_PERMISSION", missingPermissions: ["task:update"] },
+        { status: 403 },
+      ),
+    );
     configureClient({ baseUrl: url, apiKey: "test-key" });
     const e = (await failure(kaneoFetch("/task/x", { method: "PUT" }))) as KaneoApiError;
     expect(e.messages).toEqual(["Missing permission"]);
@@ -547,7 +559,10 @@ describe("failures", () => {
     ["a message that is not text", { message: ["Project not found"], code: "NOT_FOUND" }],
     ["an empty message", { message: "", code: "NOT_FOUND" }],
     ["no message", { code: "NOT_FOUND" }],
-    ["a key the error schema does not have", { message: "Rate limit exceeded.", code: "RATE_LIMITED", details: { tryAgainIn: 61000 } }],
+    [
+      "a key the error schema does not have",
+      { message: "Rate limit exceeded.", code: "RATE_LIMITED", details: { tryAgainIn: 61000 } },
+    ],
   ])("an error status carrying JSON with %s is a body only", async (_name, body) => {
     const url = serve(() => Response.json(body, { status: 404 }));
     configureClient({ baseUrl: url, apiKey: "test-key" });
@@ -614,7 +629,9 @@ describe("responses", () => {
   // NEL is the other side of the difference: Go's TrimSpace removes it and
   // JavaScript's trim() does not, so a document holding only NEL is the empty one.
   test("a document holding only NEL is the empty one", async () => {
-    const url = serve(() => new Response(`${String.fromCharCode(0x85)}\n`, { headers: { "content-type": "application/json" } }));
+    const url = serve(
+      () => new Response(`${String.fromCharCode(0x85)}\n`, { headers: { "content-type": "application/json" } }),
+    );
     configureClient({ baseUrl: url });
     expect(await kaneoFetch("/openapi", { method: "GET" })).toBeUndefined();
   });
@@ -639,7 +656,10 @@ describe("responses", () => {
   // and line breaks around a value, so a body led by NBSP is not an envelope.
   test("a body led by a character JSON does not count as space is not the envelope", async () => {
     const nbsp = String.fromCharCode(0xa0);
-    const url = serve(() => new Response(`${nbsp}{"success":false,"error":"nope"}`, { headers: { "content-type": "application/json" } }));
+    const url = serve(
+      () =>
+        new Response(`${nbsp}{"success":false,"error":"nope"}`, { headers: { "content-type": "application/json" } }),
+    );
     configureClient({ baseUrl: url });
     const e = (await failure(kaneoFetch("/project/p1", { method: "GET" }))) as Error;
     expect(e).not.toBeInstanceOf(KaneoApiError);
@@ -647,7 +667,9 @@ describe("responses", () => {
   });
 
   test("a body led by JSON whitespace is still the envelope", async () => {
-    const url = serve(() => new Response(`\r\n {"success":false,"error":"nope"}`, { headers: { "content-type": "application/json" } }));
+    const url = serve(
+      () => new Response(`\r\n {"success":false,"error":"nope"}`, { headers: { "content-type": "application/json" } }),
+    );
     configureClient({ baseUrl: url });
     const e = (await failure(kaneoFetch("/project/p1", { method: "GET" }))) as KaneoApiError;
     expect(e.message).toBe("GET /api/project/p1: 200: nope");
@@ -674,7 +696,9 @@ describe("responses", () => {
   test("a text reply still fails on an error status", async () => {
     const url = serve(() => new Response("Calendar feed not found", { status: 404 }));
     configureClient({ baseUrl: url });
-    const e = (await failure(kaneoFetch<string>("/calendar-feed/t/calendar.ics", { method: "GET", text: true }))) as KaneoApiError;
+    const e = (await failure(
+      kaneoFetch<string>("/calendar-feed/t/calendar.ics", { method: "GET", text: true }),
+    )) as KaneoApiError;
     expect(e).toBeInstanceOf(KaneoApiError);
     expect(e.messages).toEqual(["Calendar feed not found"]);
   });
@@ -727,7 +751,11 @@ describe("binary replies", () => {
   test("a blob reply is the body as it arrived, with the type it was served as", async () => {
     const url = serve(() => new Response(PNG, { headers: { "content-type": "image/png; charset=binary" } }));
     configureClient({ baseUrl: url, apiKey: "test-key" });
-    const blob = await kaneoFetch<Blob>("/project/p1/background", { method: "GET", blob: true, headers: { Accept: "image/*" } });
+    const blob = await kaneoFetch<Blob>("/project/p1/background", {
+      method: "GET",
+      blob: true,
+      headers: { Accept: "image/*" },
+    });
     expect(blob.type).toBe("image/png");
     expect(new Uint8Array(await blob.arrayBuffer())).toEqual(PNG);
   });
@@ -748,7 +776,9 @@ describe("binary replies", () => {
   });
 
   test("a failed blob call still reports the server's status and message", async () => {
-    const url = serve(() => new Response("Project background not found", { status: 404, headers: { "content-type": "text/plain" } }));
+    const url = serve(
+      () => new Response("Project background not found", { status: 404, headers: { "content-type": "text/plain" } }),
+    );
     configureClient({ baseUrl: url, apiKey: "test-key" });
     const e = (await failure(kaneoFetch("/project/p1/background", { method: "GET", blob: true }))) as KaneoApiError;
     expect(e.statusCode).toBe(404);
@@ -780,9 +810,7 @@ describe("binary replies", () => {
   // The envelope still speaks for a refused call: a blob route's non-2xx
   // keeps reporting the server's message.
   test("a refused blob call still reports the envelope's message", async () => {
-    const url = serve(() =>
-      Response.json({ success: false, error: "Asset not found" }, { status: 404 }),
-    );
+    const url = serve(() => Response.json({ success: false, error: "Asset not found" }, { status: 404 }));
     configureClient({ baseUrl: url });
     const e = (await failure(kaneoFetch("/asset/a1", { method: "GET", blob: true }))) as KaneoApiError;
     expect(e).toBeInstanceOf(KaneoApiError);
@@ -793,7 +821,14 @@ describe("binary replies", () => {
 
 describe("presignedPut", () => {
   test("PUTs the bytes to the URL with the signed headers and no key", async () => {
-    const seen: { method: string; path: string; query: string; auth: string | null; type: string | null; body: Uint8Array } = {
+    const seen: {
+      method: string;
+      path: string;
+      query: string;
+      auth: string | null;
+      type: string | null;
+      body: Uint8Array;
+    } = {
       method: "",
       path: "",
       query: "",
@@ -869,7 +904,9 @@ describe("presignedPut", () => {
     );
     configureClient({ baseUrl: url, apiKey: "test-key" });
     const e = await failure(presignedPut(`${url}/storage/k1?signature=secret`, {}, new Uint8Array([1])));
-    expect(String(e)).toContain("PUT " + url + "/storage/k1: 403: SignatureDoesNotMatch: Access \"denied\": check the key");
+    expect(String(e)).toContain(
+      "PUT " + url + '/storage/k1: 403: SignatureDoesNotMatch: Access "denied": check the key',
+    );
     expect(String(e)).not.toContain("StringToSign");
     expect(String(e)).not.toContain("SignatureProvided");
     expect(String(e)).not.toContain("deadbeef");
@@ -879,7 +916,9 @@ describe("presignedPut", () => {
   // Markup without the two fields is withheld rather than echoed: whatever
   // else it holds is the storage server's business, not the caller's.
   test("a markup refusal without code or message is not echoed", async () => {
-    const url = serve(() => new Response(`<Error><StringToSign>secret-material</StringToSign></Error>`, { status: 403 }));
+    const url = serve(
+      () => new Response(`<Error><StringToSign>secret-material</StringToSign></Error>`, { status: 403 }),
+    );
     configureClient({ baseUrl: url, apiKey: "test-key" });
     const e = await failure(presignedPut(`${url}/storage/k1`, {}, new Uint8Array([1])));
     expect(String(e)).toBe(`Error: PUT ${url}/storage/k1: 403`);

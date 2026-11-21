@@ -31,7 +31,13 @@ const entryLine = (entry: TimeEntry | ListedTimeEntry): string =>
 const TIME_FLAGS = [
   { name: "start", type: "string" as const, usage: "start time, ISO 8601 with an offset", defaultValue: "" },
   { name: "end", type: "string" as const, usage: "end time, ISO 8601 with an offset", defaultValue: "" },
-  { name: "description", shorthand: "d", type: "string" as const, usage: "what the time was spent on", defaultValue: "" },
+  {
+    name: "description",
+    shorthand: "d",
+    type: "string" as const,
+    usage: "what the time was spent on",
+    defaultValue: "",
+  },
 ];
 
 export const timeCommand = {

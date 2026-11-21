@@ -177,13 +177,7 @@ const rateLimitHint = (path: string, status: number): string =>
     ? "; Kaneo also answers 401 to a key that hit its rate limit (by default 100 requests with no 60-second pause), so if the key worked a moment ago, wait a minute and retry"
     : "";
 
-const describeFailure = (
-  method: string,
-  path: string,
-  status: number,
-  messages: string[],
-  body: string,
-): string => {
+const describeFailure = (method: string, path: string, status: number, messages: string[], body: string): string => {
   if (messages.length > 0) return `${method} ${path}: ${status}: ${messages.join("; ")}`;
   // The body comes trimmed as Go's TrimSpace trims it; trimming it again here
   // would drop a byte order mark Go kept in its Error.Body.
@@ -319,7 +313,13 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       throw new Error(`${called} ${served}: read body: ${reason(e)}`, { cause: e });
     }
     const wait = response.status === 429 ? tryAgainIn(bytes) : undefined;
-    if (!waitOutRateLimits || wait === undefined || waited + wait > RATE_LIMIT_BUDGET_MS || retries >= RATE_LIMIT_RETRIES) break;
+    if (
+      !waitOutRateLimits ||
+      wait === undefined ||
+      waited + wait > RATE_LIMIT_BUDGET_MS ||
+      retries >= RATE_LIMIT_RETRIES
+    )
+      break;
     waited += wait;
     retries++;
     console.error(`kaneo: ${called} ${served}: rate limited, sending it again in ${wait}ms`);
@@ -386,9 +386,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     // server reported does, since the two are read in the same place and the
     // reply alone says nothing about which call produced it.
     const what =
-      operation === undefined
-        ? `decode response: ${why}`
-        : decodeFailure(response, bytes.byteLength, operation, why);
+      operation === undefined ? `decode response: ${why}` : decodeFailure(response, bytes.byteLength, operation, why);
     throw new Error(`${called} ${served}: ${what}`, { cause: e });
   }
   if (schema) {
@@ -430,8 +428,7 @@ const reason = (e: unknown): string => (e instanceof Error ? e.message : String(
 // JavaScript's trim() removes except for two characters: it also counts the byte
 // order mark, which would turn a reply holding nothing else into the empty one
 // where Go read it as a body that failed to decode, and it leaves NEL (U+0085).
-const goTrimSpace = (text: string): string =>
-  text.replace(/^(?:[^\S\uFEFF]|\u0085)+|(?:[^\S\uFEFF]|\u0085)+$/g, "");
+const goTrimSpace = (text: string): string => text.replace(/^(?:[^\S\uFEFF]|\u0085)+|(?:[^\S\uFEFF]|\u0085)+$/g, "");
 
 // The operation a request was made for, as the registry of them sees it.
 //
@@ -479,8 +476,7 @@ const responseTypeOf = (operation: Operation): string =>
 // '<' looking for beginning of value"), which is a report of its own scanner to
 // reproduce, and saying a differently worded reason is better than saying a
 // wrong one.
-const goDecodeReason = (why: string): string =>
-  why.includes("Unexpected EOF") ? "unexpected end of JSON input" : why;
+const goDecodeReason = (why: string): string => (why.includes("Unexpected EOF") ? "unexpected end of JSON input" : why);
 
 // The path a request was made on, as the server saw it: /api included,
 // percent-escapes read back and the query left out. That is the Go build's
@@ -511,8 +507,7 @@ const urlError = (method: string, target: URL, e: unknown): string => {
 
 // A method as url.Error names it. Go's client takes it from the first request of
 // a redirect chain, so a write turned into a GET by a 303 is still a Post there.
-const goOp = (method: string): string =>
-  method === "" ? "Get" : method.slice(0, 1) + method.slice(1).toLowerCase();
+const goOp = (method: string): string => (method === "" ? "Get" : method.slice(0, 1) + method.slice(1).toLowerCase());
 
 // What went wrong below the request, in the words a Go user would recognise.
 // Anything unrecognised is passed on as it is, since inventing a reason would be
@@ -540,9 +535,7 @@ const dialReason = (target: URL, code: unknown, e: unknown): string => {
 // which schema was missed.
 const reportMismatch = <T>(method: string, path: string, error: ZodError<T>): void => {
   const fields = error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-  console.error(
-    `kaneo: ${method} ${path}: response does not match the schema, returned as sent: ${fields}`,
-  );
+  console.error(`kaneo: ${method} ${path}: response does not match the schema, returned as sent: ${fields}`);
 };
 
 const redirectTarget = (response: Response, from: URL): URL | undefined => {
@@ -635,7 +628,9 @@ const codedMessage = (text: string): string[] | undefined => {
   if (typeof parsed !== "object" || parsed === null) return undefined;
   if (Object.keys(parsed).some((k) => !CODED_KEYS.includes(k))) return undefined;
   const { message, code } = parsed as { message?: unknown; code?: unknown };
-  return typeof message === "string" && message !== "" && typeof code === "string" && code !== "" ? [message] : undefined;
+  return typeof message === "string" && message !== "" && typeof code === "string" && code !== ""
+    ? [message]
+    : undefined;
 };
 
 // The message of a failure sent as plain text. Kaneo up to v2.32 sends every
@@ -702,7 +697,8 @@ export const putUpload = async (url: string, headers: Record<string, string>, bo
   // process on a plain-HTTP hop.
   const parsed = parseUrl(url);
   const allowed =
-    parsed !== undefined && (parsed.protocol === "https:" || (parsed.protocol === "http:" && isLoopback(hostName(parsed))));
+    parsed !== undefined &&
+    (parsed.protocol === "https:" || (parsed.protocol === "http:" && isLoopback(hostName(parsed))));
   if (!allowed) {
     throw new Error(`upload to storage refused: ${presignedTarget(url)} is not https, or http to a loopback host`);
   }
@@ -749,9 +745,12 @@ export const presignedPut = async (url: string, headers: Record<string, string>,
   // the process on a plain-HTTP hop.
   const parsed = parseUrl(url);
   const allowed =
-    parsed !== undefined && (parsed.protocol === "https:" || (parsed.protocol === "http:" && isLoopback(hostName(parsed))));
+    parsed !== undefined &&
+    (parsed.protocol === "https:" || (parsed.protocol === "http:" && isLoopback(hostName(parsed))));
   if (!allowed) {
-    throw new Error(`PUT ${target}: refusing to send the upload over a URL that is not https, or http to a loopback host`);
+    throw new Error(
+      `PUT ${target}: refusing to send the upload over a URL that is not https, or http to a loopback host`,
+    );
   }
   const cap = settings.timeoutMs > 0 ? AbortSignal.timeout(settings.timeoutMs) : AbortSignal.abort();
   let response: Response;

@@ -1,5 +1,13 @@
 import { OPERATIONS, type Operation } from "./registry";
-import { clientShapes, requestDrift, requestShapes, serverOperations, type Drift, type RequestShape, type ServerOperation } from "./shape";
+import {
+  clientShapes,
+  requestDrift,
+  requestShapes,
+  serverOperations,
+  type Drift,
+  type RequestShape,
+  type ServerOperation,
+} from "./shape";
 import pinnedRequests from "./gen/requests.json";
 import pinnedOperations from "./gen/spec-operations.json";
 import { kaneoFetch, KaneoApiError, originOf, presignedPut } from "./http";
@@ -609,8 +617,13 @@ export const archived = (project: Project): boolean => project.archivedAt !== nu
 // issued, which the listing carries and Project leaves out: it says whether a
 // number can be on a project's board without reading the board. null where the
 // server does not send it (before Kaneo 2.23.0).
-export const lastTaskNumbers = async (workspaceId: string): Promise<{ project: Project; lastTaskNumber: number | null }[]> =>
-  zeroList(await listProjects({ workspaceId })).map((item) => ({ project: project(item), lastTaskNumber: item.lastTaskNumber ?? null }));
+export const lastTaskNumbers = async (
+  workspaceId: string,
+): Promise<{ project: Project; lastTaskNumber: number | null }[]> =>
+  zeroList(await listProjects({ workspaceId })).map((item) => ({
+    project: project(item),
+    lastTaskNumber: item.lastTaskNumber ?? null,
+  }));
 
 // The projects in a workspace. workspaceId is a required query parameter;
 // omitting it is a 400, not an unfiltered listing.
@@ -709,9 +722,9 @@ export const deleteProject = async (projectId: string): Promise<Project> =>
 // keeps whatever rank it holds there too: the server takes its id in the payload
 // like any other, so leaving one out is this client's rule and not the server's.
 export const reorderProjects = async (workspaceId: string, projectIds: string[]): Promise<Project[]> =>
-  zeroList(
-    await putProjects({ projects: projectIds.map((id, position) => ({ id, position })) }, { workspaceId }),
-  ).map(project);
+  zeroList(await putProjects({ projects: projectIds.map((id, position) => ({ id, position })) }, { workspaceId })).map(
+    project,
+  );
 
 // The fields to change. A field left out is written back as it was read, so
 // passing an empty string is what clears a description.
@@ -783,7 +796,10 @@ export const updateProject = async (
     const absent = missing.filter((field) => raw[field] === undefined);
     const nulled = missing.filter((field) => raw[field] === null);
     const mistyped = missing.filter((field) => raw[field] !== undefined && raw[field] !== null);
-    const typed = mistyped.map((field) => `${field} ${JSON.stringify(raw[field])} where the document has ${field === "isPublic" ? "a boolean" : "a string"}`);
+    const typed = mistyped.map(
+      (field) =>
+        `${field} ${JSON.stringify(raw[field])} where the document has ${field === "isPublic" ? "a boolean" : "a string"}`,
+    );
     const lacks = `${absent.length > 0 ? `, without ${absent.join(", ")}` : ""}${nulled.length > 0 ? `, with ${nulled.join(", ")} null` : ""}${typed.length > 0 ? `, with ${typed.join(", ")}` : ""}`;
     throw new Error(
       `reading project ${projectId} before the update got id ${JSON.stringify(before.id)}, name ${JSON.stringify(before.name)}${lacks}; not writing${flags.length > 0 ? ` (pass ${flags.join(" ")} to write it yourself)` : ""}${stuck ? "; isPublic has no flag, so this project cannot be updated until the server returns it as a boolean" : ""}`,
@@ -891,7 +907,12 @@ export const setProjectBackground = async (
   }
   await presignedPut(stage.uploadUrl, stage.headers, bytes);
   const done = zeroRecord(
-    await postProjectBackgroundFinalize(id, { key: stage.key, contentType, version: stage.version, size: bytes.byteLength }),
+    await postProjectBackgroundFinalize(id, {
+      key: stage.key,
+      contentType,
+      version: stage.version,
+      size: bytes.byteLength,
+    }),
   );
   // The URL is the only thing the finalize answers with: a reply without it
   // cannot say where the image landed.
@@ -1263,19 +1284,23 @@ const readBoard = async (
 ): Promise<Reading> => {
   const status = filters.status ?? "";
   const priority = filters.priority ?? "";
-  return readPages(async (page, related) => {
-    // In sorted order, as above listProjectsIn: the generated client writes
-    // the query in the order it is given, and the Go build sorted it.
-    const response = zeroRecord(
-      await listTasks(pathParam(projectId), {
-        ...(page > 1 ? { page } : {}),
-        ...(priority === "" ? {} : { priority }),
-        ...(related > 1 ? { relatedPage: related } : {}),
-        ...(status === "" ? {} : { status }),
-      }),
-    );
-    return { data: zeroRecord(response.data), pagination: response.pagination };
-  }, projectId, stopAt);
+  return readPages(
+    async (page, related) => {
+      // In sorted order, as above listProjectsIn: the generated client writes
+      // the query in the order it is given, and the Go build sorted it.
+      const response = zeroRecord(
+        await listTasks(pathParam(projectId), {
+          ...(page > 1 ? { page } : {}),
+          ...(priority === "" ? {} : { priority }),
+          ...(related > 1 ? { relatedPage: related } : {}),
+          ...(status === "" ? {} : { status }),
+        }),
+      );
+      return { data: zeroRecord(response.data), pagination: response.pagination };
+    },
+    projectId,
+    stopAt,
+  );
 };
 
 // Reads a paged board listing into a board. watchRevision asks the paging
@@ -1413,9 +1438,7 @@ export const boardTasks = (board: Board): Task[] => byPriority(board.columns.fil
 // done was the only final column, so it is named instead.
 export const closedStatuses = (board: Board): ReadonlySet<string> => {
   const predatesFinal = !board.columns.some((column) => column.isFinal !== undefined);
-  const closed = new Set(
-    board.columns.filter((column) => column.isFinal === true).map((column) => column.id),
-  );
+  const closed = new Set(board.columns.filter((column) => column.isFinal === true).map((column) => column.id));
   if (predatesFinal) closed.add("done");
   closed.add("archived");
   return closed;
@@ -1705,10 +1728,13 @@ export const setStartAndPosition = async (taskId: string, changes: StartAndPosit
     a === null || b === null ? a === b : Date.parse(a) === Date.parse(b);
   const off: string[] = [];
   if (after.id !== taskId) off.push(`id ${quoted(after.id)}, want ${quoted(taskId)}`);
-  if (!sameInstant(after.startDate, startDate)) off.push(`startDate ${quoted(String(after.startDate))}, want ${quoted(String(startDate))}`);
+  if (!sameInstant(after.startDate, startDate))
+    off.push(`startDate ${quoted(String(after.startDate))}, want ${quoted(String(startDate))}`);
   if (after.position !== position) off.push(`position ${after.position}, want ${position}`);
-  if (!sameInstant(after.dueDate, before.dueDate)) off.push(`dueDate ${quoted(String(after.dueDate))}, want ${quoted(String(before.dueDate))}`);
-  if (after.assigneeId !== before.assigneeId) off.push(`assignee ${quoted(String(after.assigneeId))}, want ${quoted(String(before.assigneeId))}`);
+  if (!sameInstant(after.dueDate, before.dueDate))
+    off.push(`dueDate ${quoted(String(after.dueDate))}, want ${quoted(String(before.dueDate))}`);
+  if (after.assigneeId !== before.assigneeId)
+    off.push(`assignee ${quoted(String(after.assigneeId))}, want ${quoted(String(before.assigneeId))}`);
   // What was sent back unchanged has to come back unchanged too. v2.29.2 echoes
   // the row it stored, so these hold there; they are here for a server that
   // answers with something else, which would otherwise change a field under a
@@ -1741,7 +1767,9 @@ export const setTaskDueDate = async (taskId: string, dueDate: string): Promise<T
   const t = zeroRecord(await updateTaskDueDate(pathParam(taskId), dueDate === "" ? {} : { dueDate }));
   const updated = task(t, { assigneeId: t.userId, assigneeName: null, labels: null });
   const landed =
-    dueDate === "" ? updated.dueDate === null : updated.dueDate !== null && Date.parse(updated.dueDate) === Date.parse(dueDate);
+    dueDate === ""
+      ? updated.dueDate === null
+      : updated.dueDate !== null && Date.parse(updated.dueDate) === Date.parse(dueDate);
   if (updated.id !== taskId || !landed) {
     throw new Error(
       `/task/due-date/${taskId}: server answered with task ${quoted(updated.id)} due ${quoted(String(updated.dueDate))}`,
@@ -1762,7 +1790,11 @@ export type BulkOperation = BulkUpdateTasksBody["operation"];
 // is found), which is reported rather than passed off as done. A reply with no
 // count is refused rather than read as zero; one with success false never gets
 // here, since the transport fails it.
-export const bulkUpdate = async (taskIds: string[], operation: BulkOperation, value: string | null): Promise<number> => {
+export const bulkUpdate = async (
+  taskIds: string[],
+  operation: BulkOperation,
+  value: string | null,
+): Promise<number> => {
   const reply = zeroRecord(await bulkUpdateTasks({ taskIds, operation, value }));
   const count = reply.updatedCount;
   const short = operation !== "addLabel" && operation !== "removeLabel" && count !== taskIds.length;
@@ -1982,7 +2014,9 @@ const activity = (a: GenActivity): Activity => ({
 // A task's history, oldest first like its comments. The server sends it newest
 // first.
 export const listActivities = async (taskId: string): Promise<Activity[]> =>
-  zeroList(await getActivities(pathParam(taskId))).map(activity).reverse();
+  zeroList(await getActivities(pathParam(taskId)))
+    .map(activity)
+    .reverse();
 
 // Records an event on a task, the way an importer writes one. An empty message
 // is sent as null, which is how the server stores an event that has none.
@@ -2049,7 +2083,11 @@ export const getTimeEntryById = async (entryId: string): Promise<TimeEntry> =>
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
 
 export const checkTimestamp = (field: string, value: string): string => {
-  const [year, month, day] = [value.slice(0, 4), value.slice(5, 7), value.slice(8, 10)].map(Number) as [number, number, number];
+  const [year, month, day] = [value.slice(0, 4), value.slice(5, 7), value.slice(8, 10)].map(Number) as [
+    number,
+    number,
+    number,
+  ];
   // Date.parse rolls an impossible date over (2026-02-30 reads as March 2), so
   // the date is rebuilt and compared. A roll-over changes both the month and
   // the day, so either comparison alone catches it and a test cannot tell them
@@ -2063,7 +2101,9 @@ export const checkTimestamp = (field: string, value: string): string => {
     probe.getUTCMonth() === month - 1 &&
     probe.getUTCDate() === day;
   if (!valid) {
-    throw new Error(`${field} ${JSON.stringify(value)} is not a real date and time in ISO 8601 with an offset, such as 2026-01-31T09:00:00Z`);
+    throw new Error(
+      `${field} ${JSON.stringify(value)} is not a real date and time in ISO 8601 with an offset, such as 2026-01-31T09:00:00Z`,
+    );
   }
   return value;
 };
@@ -2073,7 +2113,9 @@ export const checkTimestamp = (field: string, value: string): string => {
 // one just written would claim more than the reply said.
 const echoed = (entry: TimeEntry, route: string, wantId?: string): TimeEntry => {
   if (entry.id === "" || (wantId !== undefined && entry.id !== wantId)) {
-    throw new Error(`${route}: server answered with time entry ${JSON.stringify(entry.id)}; the write is not confirmed`);
+    throw new Error(
+      `${route}: server answered with time entry ${JSON.stringify(entry.id)}; the write is not confirmed`,
+    );
   }
   return entry;
 };
@@ -2104,7 +2146,9 @@ export const addTimeEntry = async (
 const readForWrite = async (entryId: string): Promise<TimeEntry> => {
   const read = await getTimeEntryById(entryId);
   if (read.id !== entryId || read.startTime === ZERO_TIME) {
-    throw new Error(`reading time entry ${entryId} before the update got id ${JSON.stringify(read.id)}, start ${read.startTime}; not writing`);
+    throw new Error(
+      `reading time entry ${entryId} before the update got id ${JSON.stringify(read.id)}, start ${read.startTime}; not writing`,
+    );
   }
   return read;
 };
@@ -2125,7 +2169,9 @@ export const updateTimeEntryById = async (
 ): Promise<TimeEntry> => {
   if (changes.endTime !== undefined) checkTimestamp("end", changes.endTime);
   const startTime =
-    changes.startTime === undefined ? (await readForWrite(entryId)).startTime : checkTimestamp("start", changes.startTime);
+    changes.startTime === undefined
+      ? (await readForWrite(entryId)).startTime
+      : checkTimestamp("start", changes.startTime);
   return putTimeEntry(entryId, { ...changes, startTime });
 };
 
@@ -2154,7 +2200,9 @@ const putTimeEntry = async (
 export const stopTimeEntry = async (entryId: string, endTime: string): Promise<TimeEntry> => {
   const read = await readForWrite(entryId);
   if (read.endTime !== null) {
-    throw new Error(`time entry ${entryId} already stopped at ${read.endTime}; change its end with \`kaneo time update ${shellWord(entryId)} --end <time>\``);
+    throw new Error(
+      `time entry ${entryId} already stopped at ${read.endTime}; change its end with \`kaneo time update ${shellWord(entryId)} --end <time>\``,
+    );
   }
   return putTimeEntry(entryId, { startTime: read.startTime, endTime });
 };
@@ -2181,11 +2229,7 @@ export type Relation = {
 //
 // The create reply carries neither summary of the two tasks, so both stay null
 // here; a caller holding the two tasks fills them in.
-export const linkTasks = async (
-  sourceTaskId: string,
-  targetTaskId: string,
-  relationType: string,
-): Promise<Relation> =>
+export const linkTasks = async (sourceTaskId: string, targetTaskId: string, relationType: string): Promise<Relation> =>
   relation(
     zeroRecord(
       await createTaskRelation({
@@ -2219,7 +2263,13 @@ const relation = (r: GenRelation | TaskRelationWithTasks): Relation => ({
 const relationTask = (t: RelatedTask | null | undefined): RelationTask | null =>
   t === null || t === undefined
     ? null
-    : { id: t.id ?? "", number: t.number ?? null, title: t.title ?? "", status: t.status ?? "", projectId: t.projectId ?? "" };
+    : {
+        id: t.id ?? "",
+        number: t.number ?? null,
+        title: t.title ?? "",
+        status: t.status ?? "",
+        projectId: t.projectId ?? "",
+      };
 
 // The summary a relation carries for a task already in hand.
 export const taskSummary = (t: Task): RelationTask => ({
@@ -2384,12 +2434,12 @@ export const updateLabel = async (
   const before = await getLabel(labelId);
   // A read that decoded to nothing would write a blank name back.
   if (before.id !== labelId || before.name === "") {
-    throw new Error(`reading label ${labelId} before the update got id ${quoted(before.id)}, name ${quoted(before.name)}; not writing`);
+    throw new Error(
+      `reading label ${labelId} before the update got id ${quoted(before.id)}, name ${quoted(before.name)}; not writing`,
+    );
   }
   const after = labelRecord(
-    zeroRecord(
-      await putLabel(pathParam(labelId), { name: name ?? before.name, color: changes.color ?? before.color }),
-    ),
+    zeroRecord(await putLabel(pathParam(labelId), { name: name ?? before.name, color: changes.color ?? before.color })),
   );
   return { before, after };
 };
@@ -2486,7 +2536,11 @@ export const listCalendarFeeds = async (projectId: string): Promise<CalendarFeed
 // Creates a feed matching tasks that carry any of the labels, by label id.
 // timeZone is the zone all-day dates are read in; "" leaves the server's
 // default (UTC) rather than sending a zone nobody asked for.
-export const createCalendarFeed = async (projectId: string, labelIds: string[], timeZone: string): Promise<CalendarFeed> =>
+export const createCalendarFeed = async (
+  projectId: string,
+  labelIds: string[],
+  timeZone: string,
+): Promise<CalendarFeed> =>
   calendarFeed(
     zeroRecord(
       await postCalendarFeed(pathParam(projectId), {
@@ -2510,7 +2564,12 @@ export const revokeCalendarFeed = async (projectId: string, id: string): Promise
 // transport refuses it over plain HTTP to a non-loopback host, on the first
 // hop and on every redirect, the way it refuses to send the key there.
 export const calendarFeedIcs = async (token: string): Promise<string> =>
-  readCalendarFeed(pathParam(token), { anonymous: true, text: true, credentialInUrl: true, headers: { Accept: "text/calendar" } });
+  readCalendarFeed(pathParam(token), {
+    anonymous: true,
+    text: true,
+    credentialInUrl: true,
+    headers: { Accept: "text/calendar" },
+  });
 
 // A link from a task to something outside the board.
 //
@@ -2690,8 +2749,11 @@ const fieldSetting = (v: GenFieldSettingReply): CustomFieldSetting => ({
 });
 
 // Creates or replaces the value one task holds for one field.
-export const setCustomFieldValue = async (taskId: string, fieldId: string, value: string): Promise<CustomFieldSetting> =>
-  fieldSetting(zeroRecord(await putFieldValue({ taskId, fieldId, value })));
+export const setCustomFieldValue = async (
+  taskId: string,
+  fieldId: string,
+  value: string,
+): Promise<CustomFieldSetting> => fieldSetting(zeroRecord(await putFieldValue({ taskId, fieldId, value })));
 
 // Deletes a field definition. The server removes the definition row; the
 // values tasks hold for it go with it.
@@ -2754,7 +2816,9 @@ export type GiteaTarget = {
   repositoryName: string;
 };
 
-const giteaTarget = (wanted: GiteaTarget): Pick<VerifyGiteaAccessBody, "baseUrl" | "accessToken" | "repositoryOwner" | "repositoryName"> => ({
+const giteaTarget = (
+  wanted: GiteaTarget,
+): Pick<VerifyGiteaAccessBody, "baseUrl" | "accessToken" | "repositoryOwner" | "repositoryName"> => ({
   baseUrl: wanted.baseUrl,
   ...(wanted.accessToken === undefined ? {} : { accessToken: wanted.accessToken }),
   repositoryOwner: wanted.repositoryOwner,
@@ -2836,9 +2900,15 @@ export const listGiteaRepositories = async (wanted: {
   baseUrl: string;
   accessToken: string;
 }): Promise<GiteaRepository[]> =>
-  zeroList(zeroRecord(await postGiteaRepositories({ projectId: wanted.projectId, baseUrl: wanted.baseUrl, accessToken: wanted.accessToken })).repositories).map(
-    giteaRepository,
-  );
+  zeroList(
+    zeroRecord(
+      await postGiteaRepositories({
+        projectId: wanted.projectId,
+        baseUrl: wanted.baseUrl,
+        accessToken: wanted.accessToken,
+      }),
+    ).repositories,
+  ).map(giteaRepository);
 
 // What a verification found. Every check is reported rather than failing the
 // request: a URL that is not a Gitea instance, a repository the token cannot
@@ -3018,8 +3088,14 @@ export const createGitlabIntegration = async (projectId: string, body: GitlabLin
 
 // Changes the stored link's settings; only what is passed changes, and the
 // server keeps the token and every other field.
-export const updateGitlabIntegration = async (projectId: string, changes: GitlabLinkChanges): Promise<GitlabIntegration> =>
-  writtenGitlab(await patchGitlabIntegration(pathParam(projectId), changes), `/gitlab-integration/project/${projectId}`);
+export const updateGitlabIntegration = async (
+  projectId: string,
+  changes: GitlabLinkChanges,
+): Promise<GitlabIntegration> =>
+  writtenGitlab(
+    await patchGitlabIntegration(pathParam(projectId), changes),
+    `/gitlab-integration/project/${projectId}`,
+  );
 
 export type GitlabDeleteResult = { success: boolean; message: string };
 
@@ -3124,9 +3200,7 @@ type GitHubInstallation = {
 const gitHubInstallation = (i: GenGitHubInstallation): GitHubInstallation => ({
   id: i.id ?? 0,
   account:
-    i.account === null || i.account === undefined
-      ? null
-      : { login: i.account.login ?? "", type: i.account.type ?? "" },
+    i.account === null || i.account === undefined ? null : { login: i.account.login ?? "", type: i.account.type ?? "" },
   repositories: zeroList(i.repositories),
 });
 
@@ -3389,19 +3463,28 @@ export const instanceConfig = async (): Promise<GenConfig> => zeroRecord(await r
 // of what is reported.
 export type AuthSession = {
   user: { id: string; name: string; email: string };
-  session: { id: string; userId: string; createdAt: string; expiresAt: string; ipAddress: string | null; userAgent: string | null };
+  session: {
+    id: string;
+    userId: string;
+    createdAt: string;
+    expiresAt: string;
+    ipAddress: string | null;
+    userAgent: string | null;
+  };
 };
 
 type SessionReply = {
   user?: { id?: string; name?: string; email?: string } | undefined;
-  session?: {
-    id?: string;
-    userId?: string;
-    createdAt?: string;
-    expiresAt?: string;
-    ipAddress?: string | null;
-    userAgent?: string | null;
-  } | undefined;
+  session?:
+    | {
+        id?: string;
+        userId?: string;
+        createdAt?: string;
+        expiresAt?: string;
+        ipAddress?: string | null;
+        userAgent?: string | null;
+      }
+    | undefined;
 } | null;
 
 export const authSession = async (): Promise<AuthSession | null> => {
@@ -3454,14 +3537,19 @@ const readPublicBoard = async (
   filters: PublicBoardFilters,
   stopAt?: (page: Task[]) => Task | undefined,
 ): Promise<Reading> =>
-  readPages(async (page, related) => {
-    const response = zeroRecord(
-      await readPublicProject(pathParam(projectId), publicParams(filters, page, related), { anonymous: true }),
-    );
-    // The page is the board fields beside its pagination block, so it stands
-    // in for the data the keyed listing nests them under.
-    return { data: response as GenBoard, pagination: response.pagination };
-  }, projectId, stopAt, true);
+  readPages(
+    async (page, related) => {
+      const response = zeroRecord(
+        await readPublicProject(pathParam(projectId), publicParams(filters, page, related), { anonymous: true }),
+      );
+      // The page is the board fields beside its pagination block, so it stands
+      // in for the data the keyed listing nests them under.
+      return { data: response as GenBoard, pagination: response.pagination };
+    },
+    projectId,
+    stopAt,
+    true,
+  );
 
 // A public project's columns and tasks, every page of them, read without a
 // key: the route is the one a shared board link is served by. The merge and
@@ -3698,8 +3786,10 @@ export type TelegramIntegrationChanges = {
 export const getSlackIntegration = async (projectId: string): Promise<WebhookIntegration | null> =>
   webhookIntegration(await readSlackIntegration(pathParam(projectId)));
 
-export const createSlackIntegration = async (projectId: string, wanted: NewWebhookIntegration): Promise<WebhookIntegration | null> =>
-  webhookIntegration(await postSlackIntegration(pathParam(projectId), wanted));
+export const createSlackIntegration = async (
+  projectId: string,
+  wanted: NewWebhookIntegration,
+): Promise<WebhookIntegration | null> => webhookIntegration(await postSlackIntegration(pathParam(projectId), wanted));
 
 export const updateSlackIntegration = async (
   projectId: string,
@@ -3712,13 +3802,16 @@ export const deleteSlackIntegration = async (projectId: string): Promise<{ succe
 export const getDiscordIntegration = async (projectId: string): Promise<WebhookIntegration | null> =>
   webhookIntegration(await readDiscordIntegration(pathParam(projectId)));
 
-export const createDiscordIntegration = async (projectId: string, wanted: NewWebhookIntegration): Promise<WebhookIntegration | null> =>
-  webhookIntegration(await postDiscordIntegration(pathParam(projectId), wanted));
+export const createDiscordIntegration = async (
+  projectId: string,
+  wanted: NewWebhookIntegration,
+): Promise<WebhookIntegration | null> => webhookIntegration(await postDiscordIntegration(pathParam(projectId), wanted));
 
 export const updateDiscordIntegration = async (
   projectId: string,
   changes: WebhookIntegrationChanges,
-): Promise<WebhookIntegration | null> => webhookIntegration(await patchDiscordIntegration(pathParam(projectId), changes));
+): Promise<WebhookIntegration | null> =>
+  webhookIntegration(await patchDiscordIntegration(pathParam(projectId), changes));
 
 export const deleteDiscordIntegration = async (projectId: string): Promise<{ success: boolean }> =>
   zeroRecord(await removeDiscordIntegration(pathParam(projectId)));
@@ -3726,13 +3819,17 @@ export const deleteDiscordIntegration = async (projectId: string): Promise<{ suc
 export const getTelegramIntegration = async (projectId: string): Promise<TelegramIntegration | null> =>
   telegramIntegration(await readTelegramIntegration(pathParam(projectId)));
 
-export const createTelegramIntegration = async (projectId: string, wanted: NewTelegramIntegration): Promise<TelegramIntegration | null> =>
+export const createTelegramIntegration = async (
+  projectId: string,
+  wanted: NewTelegramIntegration,
+): Promise<TelegramIntegration | null> =>
   telegramIntegration(await postTelegramIntegration(pathParam(projectId), wanted));
 
 export const updateTelegramIntegration = async (
   projectId: string,
   changes: TelegramIntegrationChanges,
-): Promise<TelegramIntegration | null> => telegramIntegration(await patchTelegramIntegration(pathParam(projectId), changes));
+): Promise<TelegramIntegration | null> =>
+  telegramIntegration(await patchTelegramIntegration(pathParam(projectId), changes));
 
 export const deleteTelegramIntegration = async (projectId: string): Promise<{ success: boolean }> =>
   zeroRecord(await removeTelegramIntegration(pathParam(projectId)));
@@ -3741,9 +3838,15 @@ export const deleteTelegramIntegration = async (projectId: string): Promise<{ su
 // title only a label for it. The reply is the stored link minus the
 // integration join the listing carries — a hand-added link has none, so its
 // type reads as null the same way.
-export const createExternalLink = async (taskId: string, wanted: { url: string; title?: string }): Promise<ExternalLink> => {
+export const createExternalLink = async (
+  taskId: string,
+  wanted: { url: string; title?: string },
+): Promise<ExternalLink> => {
   const created = zeroRecord(
-    await postExternalLink(pathParam(taskId), { url: wanted.url, ...(wanted.title === undefined ? {} : { title: wanted.title }) }),
+    await postExternalLink(pathParam(taskId), {
+      url: wanted.url,
+      ...(wanted.title === undefined ? {} : { title: wanted.title }),
+    }),
   );
   return {
     id: created.id ?? "",
@@ -3787,7 +3890,6 @@ export type CheckResult = {
 type Document = {
   paths?: Record<string, Record<string, { operationId?: string; tags?: unknown } | undefined> | undefined>;
 };
-
 
 // The comparison between this client and a server. The document is served
 // without authentication, so the call is anonymous and works before any key is

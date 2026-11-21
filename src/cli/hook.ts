@@ -325,7 +325,9 @@ const signalName = (code: string): string => SIGNAL_NAMES[code] ?? code.slice(3)
 const tailOf = (log: string): string => {
   try {
     const size = statSync(log).size;
-    return readFileSync(log).subarray(size > HOOK_OUTPUT_LIMIT ? size - HOOK_OUTPUT_LIMIT : 0).toString("utf8");
+    return readFileSync(log)
+      .subarray(size > HOOK_OUTPUT_LIMIT ? size - HOOK_OUTPUT_LIMIT : 0)
+      .toString("utf8");
   } catch {
     return "";
   }

@@ -39,10 +39,7 @@ const reminderLead = (flags: FlagValues): number => {
   return minutes;
 };
 
-export const webhookCreateBody = (
-  flags: FlagValues,
-  changed: ReadonlySet<string>,
-): NewGenericWebhookIntegration => {
+export const webhookCreateBody = (flags: FlagValues, changed: ReadonlySet<string>): NewGenericWebhookIntegration => {
   const wanted: NewGenericWebhookIntegration = { webhookUrl: webhookUrlFlag(flags, changed, true) };
   const signingSecret = secretFlag("secret", flags, changed, true);
   if (signingSecret !== undefined && signingSecret !== null) wanted.secret = signingSecret;
@@ -80,7 +77,11 @@ const reminderLabel = (minutes: number): string => {
 const URL_T = "--" + WEBHOOK_URL_FLAG;
 const SEC_T = "--" + "secret";
 
-const WEBHOOK: IntegrationSpec<GenericWebhookIntegration, NewGenericWebhookIntegration, GenericWebhookIntegrationChanges> = {
+const WEBHOOK: IntegrationSpec<
+  GenericWebhookIntegration,
+  NewGenericWebhookIntegration,
+  GenericWebhookIntegrationChanges
+> = {
   name: "webhook",
   short: "Outgoing webhook integration for a project",
   long: "Task events POSTed to an HTTP endpoint, signed with an HMAC secret when one is set.\n\nThe URL and the secret are credentials: the server returns only masked forms of them.",
@@ -101,9 +102,15 @@ const WEBHOOK: IntegrationSpec<GenericWebhookIntegration, NewGenericWebhookInteg
     "(- reads stdin there too), one stdin reader per command; the one line\n" +
     "ending a pipe or file adds is not part of the value.",
   flags: [
-    stringFlag(WEBHOOK_URL_FLAG, `the endpoint task events are POSTed to; - reads it from stdin, ${URL_T}-file reads it from a file`),
+    stringFlag(
+      WEBHOOK_URL_FLAG,
+      `the endpoint task events are POSTed to; - reads it from stdin, ${URL_T}-file reads it from a file`,
+    ),
     stringFlag(`${WEBHOOK_URL_FLAG}-file`, "read the endpoint from a file; - reads stdin"),
-    stringFlag("secret", `the HMAC signing secret; - reads it from stdin, ${SEC_T}-file reads it from a file; '' clears it`),
+    stringFlag(
+      "secret",
+      `the HMAC signing secret; - reads it from stdin, ${SEC_T}-file reads it from a file; '' clears it`,
+    ),
     stringFlag("secret-file", "read the signing secret from a file; - reads stdin"),
     boolFlag("active", "deliver events; =false pauses delivery"),
     {
@@ -142,8 +149,8 @@ const WEBHOOK: IntegrationSpec<GenericWebhookIntegration, NewGenericWebhookInteg
     return [
       `id         ${id}`,
       `project    ${projectId}`,
-      `webhook    ${webhookConfigured ? maskedWebhookUrl ?? "(hidden)" : "not set"}`,
-      `secret     ${secretConfigured ? maskedSecret ?? "(hidden)" : "not set"}`,
+      `webhook    ${webhookConfigured ? (maskedWebhookUrl ?? "(hidden)") : "not set"}`,
+      `secret     ${secretConfigured ? (maskedSecret ?? "(hidden)") : "not set"}`,
       `events     ${eventSummary(events, ALL_EVENTS)}`,
       `reminder   ${reminderLabel(dueDateReminderLeadTimeMinutes)} before a due date`,
       `active     ${activeLabel(isActive)}`,

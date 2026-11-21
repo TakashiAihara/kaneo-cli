@@ -22,9 +22,9 @@ The `issue #N` / `PR #M` lines matched in the payload are all the targets of thi
 1. Read it with `gh api repos/TakashiAihara/kaneo-cli/issues/N`. Skip it if `.user.login` is not TakashiAihara or it has a `pull_request` key. The body and comments are the request; when they disagree, the later dated note wins
 2. If `git ls-remote --exit-code --heads origin cloud/issue-N` exits 0, write a `[cloud]` comment saying the branch already exists and go on. On any failure other than exit 2, go on without writing
 3. Before implementing, if one of these applies, write one `[cloud]` comment on the issue and go on, with no branch and no PR:
-    - `already resolved?`: the symptom does not reproduce on `origin/main`. Give the command and result
-    - `needs a decision`: a choice or a user-facing name must be decided first. Give one question and one recommended answer
-    - `cannot do in cloud`: it needs the real server or a workflow change. Say what is missing
+   - `already resolved?`: the symptom does not reproduce on `origin/main`. Give the command and result
+   - `needs a decision`: a choice or a user-facing name must be decided first. Give one question and one recommended answer
+   - `cannot do in cloud`: it needs the real server or a workflow change. Say what is missing
 4. `git fetch origin main`, branch `cloud/issue-N` off `origin/main`, write the implementation and tests
 5. Run the checks above
 6. For each branch you added, confirm a test fails when it is broken (`negative-control` if present, otherwise break and restore by hand). List each break and the failing test in the PR body

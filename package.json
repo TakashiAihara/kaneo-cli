@@ -2,6 +2,17 @@
   "name": "kaneo-cli",
   "private": true,
   "description": "Command-line interface for Kaneo, the open source project management tool",
+  "keywords": [
+    "cli",
+    "kanban",
+    "kaneo",
+    "project-management",
+    "tasks"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TakashiAihara/kaneo-cli.git"
+  },
   "type": "module",
   "scripts": {
     "generate": "orval --config orval.config.ts && bun scripts/request-shapes.ts",
@@ -16,11 +27,6 @@
     "spec": "bun scripts/spec.ts",
     "rebase:main": "bun scripts/rebase-main.ts"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/TakashiAihara/kaneo-cli.git"
-  },
-  "keywords": ["kaneo", "cli", "project-management", "kanban", "tasks"],
   "dependencies": {
     "jq-wasm": "3.0.0-jq-1.8.2",
     "zod": "4.6.5"

@@ -81,12 +81,15 @@ const resolveAssignee = (task: Task, given: string): Promise<string> =>
 // that is, since a task create has no task yet to name it by.
 const resolveAssigneeIn = async (projectId: string, of: string, given: string): Promise<string> => {
   const value = given.trim();
-  if (value === "") throw new Error("the user is empty; give a member's id or name, `me`, or leave it out to clear the assignee");
+  if (value === "")
+    throw new Error("the user is empty; give a member's id or name, `me`, or leave it out to clear the assignee");
   if (value.toLowerCase() === "me") {
     const id = (
       await currentUser().catch((e: unknown) => {
         if (e instanceof KaneoApiError && e.statusCode === 404 && !e.messages.includes("User not found")) {
-          throw new Error(`${e.message}; \`me\` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead`);
+          throw new Error(
+            `${e.message}; \`me\` needs /user/me, which this server does not have (Kaneo before v2.28.0); give a member's id or name instead`,
+          );
         }
         if (e instanceof KaneoApiError && e.statusCode === 404) {
           throw new Error(`${e.message}; the server has no user for this API key; give a member's id or name instead`);
@@ -94,7 +97,8 @@ const resolveAssigneeIn = async (projectId: string, of: string, given: string): 
         throw e;
       })
     ).id;
-    if (id === "") throw new Error("the server did not say which user the API key is; give a member's id or name instead");
+    if (id === "")
+      throw new Error("the server did not say which user the API key is; give a member's id or name instead");
     return id;
   }
   const read = await getProject(projectId).catch((e: unknown) => {
@@ -102,7 +106,9 @@ const resolveAssigneeIn = async (projectId: string, of: string, given: string): 
   });
   const workspaceId = read.workspaceId;
   if (workspaceId === "") {
-    throw new Error(`reading project ${projectId}, ${of}, did not say which workspace it is in, so its members cannot be listed`);
+    throw new Error(
+      `reading project ${projectId}, ${of}, did not say which workspace it is in, so its members cannot be listed`,
+    );
   }
   const members = await listMembers(workspaceId);
   if (members.some((m) => m.id === value)) return value;
@@ -167,7 +173,8 @@ export const taskCommand = {
         // A value flag passed as "" is a mistake, not an absent flag, as bulk
         // reads them. Checked before --mine, whose refusal of the flag would
         // otherwise never see the empty value it was given.
-        if (changed.has("description") && String(flags.description ?? "").trim() === "") throw new Error("--description is empty");
+        if (changed.has("description") && String(flags.description ?? "").trim() === "")
+          throw new Error("--description is empty");
         if (flags.mine === true) {
           // The server lists open tasks only and takes no filter (as of v2.32.0), so a flag that
           // narrows or widens the listing would be accepted and do nothing.
@@ -195,10 +202,7 @@ export const taskCommand = {
         // A description the listing deferred is not on the task to match, so
         // the deferred ones are asked of the server by id and the rest are
         // matched here, both case-insensitively as the server matches.
-        const described =
-          query === ""
-            ? everything
-            : await describedTasks(board.projectId, everything, query);
+        const described = query === "" ? everything : await describedTasks(board.projectId, everything, query);
         const tasks = filterTasks(described, status, priority, flags.all === true);
         for (const task of tasks) app.out.human(taskLine(task));
         // The columns left out are not otherwise visible, so a count of the
@@ -206,7 +210,10 @@ export const taskCommand = {
         // warnSimilar does, so stdout stays the array it was; counted under the
         // same --status and --priority, so it is the tasks --all would add.
         const left = filterTasks(described, status, priority, true).length - tasks.length;
-        if (left > 0) console.error(`(${left} done / planned / archived ${left === 1 ? "task" : "tasks"} left out; --all to include them)`);
+        if (left > 0)
+          console.error(
+            `(${left} done / planned / archived ${left === 1 ? "task" : "tasks"} left out; --all to include them)`,
+          );
         // A description the listing deferred is marked as such, so JSON readers
         // can tell it from one that is genuinely empty.
         app.out.data(tasks.map((task) => ({ ...task, ...deferredMark(task) })));
@@ -289,7 +296,12 @@ export const taskCommand = {
       // not three. --title is the other way to give it, as task update takes it,
       // so the arguments are checked in run, where the flag can be seen.
       flags: [
-        { name: "title", type: "string" as const, usage: "task title, instead of the words after create", defaultValue: "" },
+        {
+          name: "title",
+          type: "string" as const,
+          usage: "task title, instead of the words after create",
+          defaultValue: "",
+        },
         {
           name: "description",
           shorthand: "d",
@@ -327,7 +339,12 @@ export const taskCommand = {
           usage: "due date: a date, or a date and time with an offset",
           defaultValue: "",
         },
-        { name: "assignee", type: "string" as const, usage: "member id, member name or `me`, as task assign takes them", defaultValue: "" },
+        {
+          name: "assignee",
+          type: "string" as const,
+          usage: "member id, member name or `me`, as task assign takes them",
+          defaultValue: "",
+        },
         {
           name: "attach",
           type: "bool" as const,
@@ -348,11 +365,14 @@ export const taskCommand = {
         },
       ],
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
-        if (changed.has("title") && args.length > 0) throw new Error("give the title once: as words after create or as --title, not both");
+        if (changed.has("title") && args.length > 0)
+          throw new Error("give the title once: as words after create or as --title, not both");
         if (!changed.has("title")) minimumArgs(1)(args);
         // As task update does, before the key is asked for: what is typed wrong
         // is said before what is missing from the environment.
-        const title = changed.has("title") ? wantedTitle(String(flags.title ?? "")) : wantedTitle(args.join(" "), "empty title");
+        const title = changed.has("title")
+          ? wantedTitle(String(flags.title ?? ""))
+          : wantedTitle(args.join(" "), "empty title");
         apiKey(app);
         const wanted: NewTask = {
           title,
@@ -394,7 +414,8 @@ export const taskCommand = {
         const task = await withProject(project(app), async (id) => {
           // Before anything is created, so a name that matches nobody leaves no
           // task behind. An empty one is no assignee, as it was before names.
-          if (wanted.assigneeId !== "") wanted.assigneeId = await resolveAssigneeIn(id, `the project the task is created in`, wanted.assigneeId);
+          if (wanted.assigneeId !== "")
+            wanted.assigneeId = await resolveAssigneeIn(id, `the project the task is created in`, wanted.assigneeId);
           // Inside the resolution because withProject needs its first request to
           // carry the project (see withProject in src/cli/lookup.ts), so the board
           // and the create are written as the one project a slug or a name
@@ -406,7 +427,11 @@ export const taskCommand = {
             closed = closedStatuses(board);
             refuseDuplicate(wanted.title, existing, closed);
           }
-          return afterWrite(`created ${JSON.stringify(wanted.title)}`, `\`kaneo task ls -p ${shellWord(id)}\` shows it`, createTask(id, wanted));
+          return afterWrite(
+            `created ${JSON.stringify(wanted.title)}`,
+            `\`kaneo task ls -p ${shellWord(id)}\` shows it`,
+            createTask(id, wanted),
+          );
         });
         // After the create, since the warning is about a task that now exists.
         if (!force) warnSimilar(wanted.title, existing, closed);
@@ -509,7 +534,11 @@ export const taskCommand = {
         // Resolved before the first write, since a name that matches no member
         // has to leave the task as it was.
         const wantedAssignee = String(flags.assignee ?? "");
-        const assignee = !pass("assignee") ? undefined : wantedAssignee.trim() === "" ? "" : await resolveAssignee(task, wantedAssignee);
+        const assignee = !pass("assignee")
+          ? undefined
+          : wantedAssignee.trim() === ""
+            ? ""
+            : await resolveAssignee(task, wantedAssignee);
         // The server refuses a start after the due date on the full update, and
         // that update comes last, so its refusal would arrive after the other
         // fields of this command had landed. The start it would check is the one
@@ -558,7 +587,10 @@ export const taskCommand = {
         // Last, so the full update it goes through reads the task with the writes
         // above already in it and sends them back rather than undoing them.
         if (startDate !== undefined || position !== undefined) {
-          const fields = [...(startDate === undefined ? [] : ["start date"]), ...(position === undefined ? [] : ["position"])];
+          const fields = [
+            ...(startDate === undefined ? [] : ["start date"]),
+            ...(position === undefined ? [] : ["position"]),
+          ];
           await write(names(fields), async () => {
             await setStartAndPosition(task.id, {
               ...(startDate === undefined ? {} : { startDate }),
@@ -580,9 +612,7 @@ export const taskCommand = {
         try {
           after = await getTask(task.id);
         } catch (e) {
-          throw new Error(
-            `${landed()}; reading the task back failed: ${e instanceof Error ? e.message : String(e)}`,
-          );
+          throw new Error(`${landed()}; reading the task back failed: ${e instanceof Error ? e.message : String(e)}`);
         }
         for (const [field, sent] of [
           ["title", title],
@@ -602,7 +632,9 @@ export const taskCommand = {
           );
         }
         if (assignee !== undefined && (after.assigneeId ?? "") !== assignee) {
-          throw new Error(`${landed()}, but task #${after.number} assignee reads back as ${JSON.stringify(after.assigneeId)}, not ${JSON.stringify(assignee)}`);
+          throw new Error(
+            `${landed()}, but task #${after.number} assignee reads back as ${JSON.stringify(after.assigneeId)}, not ${JSON.stringify(assignee)}`,
+          );
         }
         // The labels come from the task resolved above, since only the board
         // listing carries them and this report is shaped as `task get` shapes it.
@@ -714,17 +746,42 @@ export const taskCommand = {
       args: minimumArgs(1),
       flags: [
         { name: "status", type: "string" as const, usage: "move every task to this column", defaultValue: "" },
-        { name: "priority", type: "string" as const, usage: `set the priority: ${PRIORITIES.join(", ")}`, defaultValue: "" },
-        { name: "assign", type: "string" as const, usage: "assign every task to this member (id, name or `me`, as task assign takes them)", defaultValue: "" },
+        {
+          name: "priority",
+          type: "string" as const,
+          usage: `set the priority: ${PRIORITIES.join(", ")}`,
+          defaultValue: "",
+        },
+        {
+          name: "assign",
+          type: "string" as const,
+          usage: "assign every task to this member (id, name or `me`, as task assign takes them)",
+          defaultValue: "",
+        },
         { name: "unassign", type: "bool" as const, usage: "clear every task's assignee", defaultValue: "false" },
-        { name: "due", type: "string" as const, usage: "set the due date: 2026-10-31 or 2026-10-31T09:00+09:00", defaultValue: "" },
+        {
+          name: "due",
+          type: "string" as const,
+          usage: "set the due date: 2026-10-31 or 2026-10-31T09:00+09:00",
+          defaultValue: "",
+        },
         { name: "clear-due", type: "bool" as const, usage: "clear every task's due date", defaultValue: "false" },
         { name: "add-label", type: "string" as const, usage: "add the label with this id", defaultValue: "" },
         { name: "remove-label", type: "string" as const, usage: "remove the label with this id", defaultValue: "" },
         { name: "delete", type: "bool" as const, usage: "delete every task (needs --yes)", defaultValue: "false" },
         { name: "yes", type: "bool" as const, usage: "confirm --delete", defaultValue: "false" },
       ],
-      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+      run: async ({
+        args,
+        flags,
+        changed,
+        app,
+      }: {
+        args: string[];
+        flags: FlagValues;
+        changed: ReadonlySet<string>;
+        app: App;
+      }) => {
         const [flag, operation, value] = bulkChange(flags, changed);
         if (flags.yes === true && operation !== "delete") throw new Error("--yes only confirms --delete");
         apiKey(app);
@@ -788,7 +845,7 @@ export const taskCommand = {
       short: "Create tasks in a project from a JSON file (- reads stdin)",
       long:
         "Create tasks in a project from a JSON file (- reads stdin).\n\n" +
-        "The file is what task export writes, or {\"tasks\": [...]}, or a bare array\n" +
+        'The file is what task export writes, or {"tasks": [...]}, or a bare array\n' +
         "of tasks. Each task needs a title and a status; description, priority,\n" +
         "startDate, dueDate and userId are optional. Labels are not imported: an\n" +
         "export names them without the ids the server would need, and once the\n" +
@@ -855,7 +912,9 @@ export const taskCommand = {
         try {
           await refreshHolders(after);
         } catch (e) {
-          app.out.status(`task moved, but the session records naming it could not be updated: ${e instanceof Error ? e.message : String(e)}`);
+          app.out.status(
+            `task moved, but the session records naming it could not be updated: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
         // The destination as it was typed: the read-back above has already
         // confirmed the task sits on the project the value resolved to, so a
@@ -875,10 +934,30 @@ export const taskCommand = {
         "the copy to another project afterwards.",
       args: exactArgs(1),
       flags: [
-        { name: "title", type: "string" as const, usage: "title for the copy (default: the same title)", defaultValue: "" },
-        { name: "to", type: "string" as const, usage: "move the copy to this project (id, slug or name)", defaultValue: "" },
+        {
+          name: "title",
+          type: "string" as const,
+          usage: "title for the copy (default: the same title)",
+          defaultValue: "",
+        },
+        {
+          name: "to",
+          type: "string" as const,
+          usage: "move the copy to this project (id, slug or name)",
+          defaultValue: "",
+        },
       ],
-      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+      run: async ({
+        args,
+        flags,
+        changed,
+        app,
+      }: {
+        args: string[];
+        flags: FlagValues;
+        changed: ReadonlySet<string>;
+        app: App;
+      }) => {
         // An empty --title is refused before the copy is made: the server reads
         // a blank one as no title at all and would keep the source's, which is
         // not what was asked.
@@ -1030,14 +1109,19 @@ export const taskCommand = {
             namedReference(word) !== undefined ||
             isTicketId(word)
           ) {
-            throw new Error(`one argument is a relation id; to unlink two tasks give both: unlink ${word} <other-task>`);
+            throw new Error(
+              `one argument is a relation id; to unlink two tasks give both: unlink ${word} <other-task>`,
+            );
           }
-          if (relationType !== "") throw new Error("--type picks among the links of two tasks; a relation id already names one");
+          if (relationType !== "")
+            throw new Error("--type picks among the links of two tasks; a relation id already names one");
           apiKey(app);
           // The delete reply carries no task summaries, so this line names the
           // two tasks by id.
           const removed = await deleteRelation(word);
-          app.out.human(`unlinked ${removed.sourceTaskId} ${relationWord(removed.relationType, true)} ${removed.targetTaskId}`);
+          app.out.human(
+            `unlinked ${removed.sourceTaskId} ${relationWord(removed.relationType, true)} ${removed.targetTaskId}`,
+          );
           app.out.data(removed);
           return;
         }
@@ -1101,7 +1185,17 @@ export const taskCommand = {
         { name: "title", type: "string" as const, usage: "title for the link --add creates", defaultValue: "" },
         { name: "rm", type: "string" as const, usage: "remove the link with this id", defaultValue: "" },
       ],
-      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+      run: async ({
+        args,
+        flags,
+        changed,
+        app,
+      }: {
+        args: string[];
+        flags: FlagValues;
+        changed: ReadonlySet<string>;
+        app: App;
+      }) => {
         const add = String(flags.add ?? "");
         const rm = String(flags.rm ?? "");
         const title = String(flags.title ?? "");
@@ -1139,7 +1233,9 @@ export const taskCommand = {
         if (rm !== "") {
           const removed = await deleteExternalLink(task.id, rm.trim());
           if (removed !== rm.trim()) {
-            throw new Error(`the server answered a different link id (${JSON.stringify(removed)}); check \`kaneo task external-links\``);
+            throw new Error(
+              `the server answered a different link id (${JSON.stringify(removed)}); check \`kaneo task external-links\``,
+            );
           }
           wrote = "the link was removed";
         }
@@ -1169,7 +1265,9 @@ export const taskCommand = {
         "resolved in the task's own project.",
       args: (args: string[]) => {
         if (args.length !== 1 && args.length < 3) {
-          throw new Error("field takes a task, or a task, a field and a value: kaneo task field <task> [<name> <value...>]");
+          throw new Error(
+            "field takes a task, or a task, a field and a value: kaneo task field <task> [<name> <value...>]",
+          );
         }
       },
       run: async ({ args, app }: { args: string[]; app: App }) => {
@@ -1177,7 +1275,8 @@ export const taskCommand = {
         const task = await resolveTask(app, args[0]!);
         if (args.length === 1) {
           const values = (await listTaskFieldValues(task.id)).sort((a, b) => a.fieldPosition - b.fieldPosition);
-          for (const value of values) app.out.human(`${value.fieldName}  ${value.fieldType}  ${value.value ?? "(unset)"}`);
+          for (const value of values)
+            app.out.human(`${value.fieldName}  ${value.fieldType}  ${value.value ?? "(unset)"}`);
           app.out.data(values);
           return;
         }
@@ -1221,7 +1320,16 @@ export const taskCommand = {
         await putUpload(upload.uploadUrl, upload.headers, file.bytes);
         const asset = await finalizeTaskImage(task.id, { ...staged, key: upload.key });
         app.out.human(`uploaded ${file.name}: ${asset.url}`);
-        app.out.data({ id: asset.id, url: asset.url, taskId: task.id, taskNumber: task.number, filename: file.name, contentType: file.type, size: file.size, surface });
+        app.out.data({
+          id: asset.id,
+          url: asset.url,
+          taskId: task.id,
+          taskNumber: task.number,
+          filename: file.name,
+          contentType: file.type,
+          size: file.size,
+          surface,
+        });
       },
     },
   ],
@@ -1337,7 +1445,11 @@ const relationWords: Record<string, [string, string]> = {
 };
 
 // The widest of those words, which is where every line's next column starts.
-const RELATION_WORD_WIDTH = Math.max(...Object.values(relationWords).flat().map((word) => word.length));
+const RELATION_WORD_WIDTH = Math.max(
+  ...Object.values(relationWords)
+    .flat()
+    .map((word) => word.length),
+);
 
 // A type this CLI has no word for is shown as the server spelled it: the link is
 // still there, whatever it is called.
@@ -1471,18 +1583,17 @@ const isTicketId = (wanted: string): boolean => {
 //
 // slugs, when given, collects the slug of the board read, so a caller naming
 // several projects can name them the way a reference does.
-const numberOn = async (
-  value: string,
-  number: number,
-  origin: string,
-  slugs?: Map<string, string>,
-): Promise<Task> => {
-  const { board, task: found } = await withProject(value, (id) => findTaskByNumber(id, number), { explain: () => workspaceInReference(value, number) });
+const numberOn = async (value: string, number: number, origin: string, slugs?: Map<string, string>): Promise<Task> => {
+  const { board, task: found } = await withProject(value, (id) => findTaskByNumber(id, number), {
+    explain: () => workspaceInReference(value, number),
+  });
   slugs?.set(board.projectId, board.projectSlug);
   if (found === undefined) {
     // --project only steers a bare number; a reference names its board itself.
     const hint = origin === "the reference" ? "check the number" : "pass --project to look elsewhere";
-    throw new Error(`no task #${number} in project ${board.projectSlug === "" ? "" : `${board.projectSlug} `}(${board.projectId}, from ${origin}); ${hint}`);
+    throw new Error(
+      `no task #${number} in project ${board.projectSlug === "" ? "" : `${board.projectSlug} `}(${board.projectId}, from ${origin}); ${hint}`,
+    );
   }
   // The board listing does not always carry projectId on each task, but a task
   // found here is on this project by definition.
@@ -1755,7 +1866,10 @@ const checkStatus = async (tasks: Task[], status: string, projectName: (id: stri
   for (const projectId of projects) {
     const columns = await listColumns(projectId);
     if (!columns.some((c) => c.slug === status)) {
-      const numbers = tasks.filter((t) => t.projectId === projectId).map((t) => `#${t.number}`).join(" ");
+      const numbers = tasks
+        .filter((t) => t.projectId === projectId)
+        .map((t) => `#${t.number}`)
+        .join(" ");
       throw new Error(
         `project ${projectName(projectId)} (${numbers}) has no column ${JSON.stringify(status)}; its columns are ${columns.map((c) => c.slug).join(", ")}`,
       );
@@ -1790,7 +1904,9 @@ const importedTasks = (text: string, source: string): { tasks: ImportedTask[]; l
       const value = t[name];
       const nullable = name === "startDate" || name === "dueDate" || name === "userId";
       if (value !== undefined && typeof value !== "string" && !(nullable && value === null)) {
-        throw new Error(`${source}: task ${at + 1} has ${name} ${JSON.stringify(value)}, which is not ${nullable ? "a string or null" : "a string"}`);
+        throw new Error(
+          `${source}: task ${at + 1} has ${name} ${JSON.stringify(value)}, which is not ${nullable ? "a string or null" : "a string"}`,
+        );
       }
     }
     const field = (name: string): string | undefined => (typeof t[name] === "string" ? (t[name] as string) : undefined);
@@ -1833,7 +1949,9 @@ const checkImport = (tasks: ImportedTask[], columns: { slug: string }[], source:
       );
     }
     if (t.priority !== undefined && t.priority !== "" && priorityRank(t.priority) === PRIORITIES.length) {
-      throw new Error(`${source}: task ${at + 1} has priority ${JSON.stringify(t.priority)}; use one of: ${PRIORITIES.join(", ")}`);
+      throw new Error(
+        `${source}: task ${at + 1} has priority ${JSON.stringify(t.priority)}; use one of: ${PRIORITIES.join(", ")}`,
+      );
     }
   });
 };

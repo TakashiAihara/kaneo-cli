@@ -104,7 +104,17 @@ export const columnCommand = {
           defaultValue: "false",
         },
       ],
-      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+      run: async ({
+        args,
+        flags,
+        changed,
+        app,
+      }: {
+        args: string[];
+        flags: FlagValues;
+        changed: ReadonlySet<string>;
+        app: App;
+      }) => {
         // Only a flag that was passed is a change: `--icon ""` clears the icon,
         // and leaving the flag out has to keep it.
         const changes: ColumnChanges = {};

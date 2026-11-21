@@ -1,5 +1,17 @@
 import { randomBytes } from "node:crypto";
-import { appendFileSync, closeSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  closeSync,
+  fstatSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { devinSessionId } from "./devin";
@@ -48,8 +60,7 @@ const defaultStore = (home: string, env: (name: string) => string): Store => {
 
 // The store this process reads and writes. Go's os.UserHomeDir failing fell back
 // to the working directory, which lands on the same relative path.
-export const sessionStore = (): Store =>
-  defaultStore(process.env.HOME ?? ".", (name) => process.env[name] ?? "");
+export const sessionStore = (): Store => defaultStore(process.env.HOME ?? ".", (name) => process.env[name] ?? "");
 
 // The variables that name the session, most explicit first. KANEO_SESSION_ID
 // comes first so the CLI is usable outside any particular agent; the

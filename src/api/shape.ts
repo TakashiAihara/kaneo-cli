@@ -94,10 +94,7 @@ export const clientShapes = (
 // held to the pinned document's optional set in tests/unit/shape.test.ts.
 export type Drift = { id: string; field: string; problem: "gone" | "required" };
 
-export const requestDrift = (
-  client: Record<string, RequestShape>,
-  server: Record<string, RequestShape>,
-): Drift[] => {
+export const requestDrift = (client: Record<string, RequestShape>, server: Record<string, RequestShape>): Drift[] => {
   const drift: Drift[] = [];
   for (const [id, mine] of Object.entries(client)) {
     const theirs = server[id];

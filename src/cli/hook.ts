@@ -21,6 +21,13 @@ const HOOK_TIMEOUT_MS = 10_000;
 // Caps how much of a failed hook's output is reported.
 const HOOK_OUTPUT_LIMIT = 4096;
 
+// How long a caught signal waits before the hook's group is killed. A hook
+// that signals kaneo as its last act has not exited when the signal is
+// handled — its exit is a few instructions behind — and killing the group
+// then reports the hook's farewell as kaneo's own and takes what it left
+// running with it. The wait is short because the exit it waits for is.
+const HOOK_SIGNAL_GRACE_MS = 100;
+
 // The signals caught around a hook, so the hook can be killed before kaneo
 // dies of one. A signal kaneo was started with ignored (nohup) was meant to stay
 // ignored, and Bun offers no way to read an inherited disposition, so the
@@ -54,16 +61,44 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
   // close hook and undo it. A child that leaves the group is out of reach, and
   // so is everything if kaneo is killed with SIGKILL; both are accepted.
   let group: number | undefined;
-  // The group is only this process's to kill while the hook is in it: afterwards
-  // the number has been given back and may already name somebody else's, and a
-  // hook that ended cleanly is a hook that did its work whatever arrived while it
-  // was running.
-  let running = true;
+  // The hook process itself, once spawned. The group is only this process's to
+  // kill while the hook lives: afterwards the number has been given back and
+  // may already name somebody else's, and a hook that ended is a hook that did
+  // its work whatever arrived while it ran.
+  let hook: Bun.Subprocess | undefined;
+  // The kill a caught signal has armed. Held rather than fired at once so a
+  // hook that signalled on its way out can finish exiting first; see
+  // HOOK_SIGNAL_GRACE_MS.
+  let signalKill: ReturnType<typeof setTimeout> | undefined;
   let captured: string | undefined;
   let output: number | undefined;
 
+  // Whether the hook process still lives, asked of the kernel rather than of
+  // `hook.exited`: that promise resolves on a turn of the loop, and a signal
+  // handled on an earlier turn would otherwise read a hook that had already
+  // exited as still running. That is how a signal the hook sent on its way out
+  // came to be reported as kaneo's own and to take the hook's leftover group
+  // with it, about 1 run in 3.
+  const hookAlive = (): boolean => {
+    if (hook === undefined) return false;
+    // Once Bun has reaped it the status is known and the pid may already name
+    // another process, so /proc is not asked.
+    if (hook.exitCode !== null || hook.signalCode !== null) return false;
+    const state = procState(hook.pid);
+    if (state !== undefined) return state !== "Z" && state !== "X" && state !== "x";
+    // No /proc (macOS) or an unreadable one: kill(pid, 0) only answers
+    // existence, and a zombie still exists, so the race this guards is
+    // accepted there.
+    try {
+      process.kill(hook.pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const killGroup = (why: "timeout" | "signalled") => {
-    if (!running) return;
+    if (!hookAlive()) return;
     killed ??= why;
     // No hook was started: its capture or its spawn failed, and the handler can
     // only run at the await in the finally below, after that failure has been
@@ -79,7 +114,10 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
   const listeners = SIGNALS.map((signal) => {
     const handler = () => {
       caught ??= signal;
-      killGroup("signalled");
+      signalKill ??= setTimeout(() => {
+        signalKill = undefined;
+        killGroup("signalled");
+      }, HOOK_SIGNAL_GRACE_MS);
     };
     process.on(signal, handler);
     return { signal, handler };
@@ -132,7 +170,6 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
       return;
     }
 
-    let hook: Bun.Subprocess;
     try {
       hook = Bun.spawn(["sh", "-c", command], {
         env: { ...process.env, ...env },
@@ -148,20 +185,21 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
       reportHookFailure(event, env, `fork/exec sh: ${(e as Error).message}`, "");
       return;
     }
-    group = hook.pid;
+    const spawned = hook;
+    group = spawned.pid;
 
     const deadline = setTimeout(() => killGroup("timeout"), HOOK_TIMEOUT_MS);
 
-    await hook.exited;
-    running = false;
+    await spawned.exited;
     clearTimeout(deadline);
+    // The hook ended on its own, so a signal still inside its grace is the
+    // hook's farewell rather than a reason to kill what it left behind.
+    clearTimeout(signalKill);
 
-    // Decided on the turn that saw the hook exit, with nothing awaited since, so a
-    // signal is reported as the hook's killer only if its handler ran before that
-    // turn. A signal the hook sends just before it exits can land on either side
-    // (about 1 run in 3 reported as killed, 40 runs), which is accepted: either way
-    // it is re-sent below.
-    const failure = failureOf(hook, killed);
+    // A signal is the hook's killer only if its handler found the hook still
+    // alive once the grace had passed (hookAlive above), so one the hook sent
+    // on its way out is reported as the exit it was followed by.
+    const failure = failureOf(spawned, killed);
     if (failure !== undefined) reportHookFailure(event, env, failure, tailOf(log));
   } finally {
     // Given back here rather than left to the operating system, which only takes
@@ -194,6 +232,23 @@ export const runHook = async (app: App, event: string, env: Record<string, strin
     // Delivery is asynchronous, and without the wait kaneo could print its
     // success line before it dies.
     if (caught !== undefined) await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+};
+
+// The state character of /proc/<pid>/stat — the field after the last ")", the
+// comm field being the part that can hold spaces and parentheses — or
+// undefined where there is no /proc to read. "Z" and "X" are the dead states:
+// a zombie has exited but not been reaped, which is exactly the window the
+// hook's own exit status is decided in.
+const procState = (pid: number): string | undefined => {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const close = stat.lastIndexOf(")");
+    if (close < 0) return undefined;
+    const state = stat[close + 2];
+    return state === undefined || state === " " ? undefined : state;
+  } catch {
+    return undefined;
   }
 };
 

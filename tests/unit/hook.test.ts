@@ -19,8 +19,8 @@ const INDEX = join(import.meta.dir, "../../src/index.ts");
 // The whole pid: two runs share a pid namespace, so no two live at once share
 // it, where a slice of it (pid % 10000) could collide.
 const RUN = String(process.pid);
-const sleepArg = (base: "29.5" | "29.4" | "29.3" | "29.2"): string => `${base}${RUN}`;
-const SLEEPS = [sleepArg("29.5"), sleepArg("29.4"), sleepArg("29.3"), sleepArg("29.2")];
+const sleepArg = (base: "29.5" | "29.4" | "29.3" | "29.2" | "29.1"): string => `${base}${RUN}`;
+const SLEEPS = [sleepArg("29.5"), sleepArg("29.4"), sleepArg("29.3"), sleepArg("29.2"), sleepArg("29.1")];
 
 type Run = { exit: number | null; signal: string | null; stdout: string; stderr: string; ms: number };
 
@@ -40,16 +40,13 @@ const sleepersLeft = (): { pid: number; arg: string }[] => {
     .map((m) => ({ pid: Number(m[1]), arg: m[2]! }));
 };
 
-// The hook runs in its own session, so its group id is the shell's pid.
+// Only the sleeper's own pid is killed, never its group: the group id is the
+// dead shell's pid, which the OS may already have handed to an unrelated
+// process group, and signalling -pgid then kills that group's work — the
+// interference behind #281's flakes. Whatever waited on the sleeper finishes
+// as soon as it dies, so nothing is left running.
 const killSleepers = () => {
   for (const { pid } of sleepersLeft()) {
-    try {
-      const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-      const pgid = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[2]);
-      process.kill(-pgid, "SIGKILL");
-    } catch {
-      // gone already
-    }
     try {
       process.kill(pid, "SIGKILL");
     } catch {
@@ -330,6 +327,25 @@ describe("signals around the hook's lifetime", () => {
     expect(logged).toContain("attach hook failed: exit status 3");
     expect(sleepersLeft().filter((s) => s.arg === sleepArg("29.2")), "the group was killed after the hook exited").toHaveLength(1);
   }, 30_000);
+
+  // A signal the hook sends as it exits is the hook's own doing, not a signal
+  // meant for kaneo: it is reported as the exit it preceded, and the process
+  // the hook left behind is left running. Before the grace and liveness check
+  // this was a coin flip — about 1 run in 3 read "killed: kaneo received a
+  // signal" and the leftover was killed with it (#247). kaneo still dies of
+  // the signal, since a caught one is always re-sent.
+  test("a signal the hook sends as it exits is not kaneo's", async () => {
+    writeConfig({ attach: `(sleep ${sleepArg("29.1")}) & sleep 0.1; kill -TERM $PPID; exit 3` });
+    for (let run = 1; run <= 10; run++) {
+      const r = await kaneo("session", "attach", "1", "--strict");
+      expect(r.signal, `run ${run}: ended with exit ${r.exit}, want killed by SIGTERM`).toBe("SIGTERM");
+    }
+    const failures = hooksLog().split("\n").filter((l) => l.includes("hook failed"));
+    expect(failures.length).toBe(10);
+    for (const line of failures) expect(line).toContain("exit status 3");
+    expect(hooksLog()).not.toContain("killed: kaneo received a signal");
+    expect(sleepersLeft().filter((s) => s.arg === sleepArg("29.1")), "the leftovers were killed").toHaveLength(10);
+  }, 60_000);
 
   // hooks.log is where a failure goes when stderr is lost, so a stderr that
   // cannot be written to must neither fail the command nor keep the failure

@@ -1,6 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { configureClient } from "../../src/api/http";
-import { KaneoApiError } from "../../src/api/http";
+import { configureClient, kaneoFetch, KaneoApiError } from "../../src/api/http";
 import { allProjects, withProject } from "../../src/cli/lookup";
 
 const servers: { stop: (force?: boolean) => void }[] = [];
@@ -106,4 +105,32 @@ test("a destination resolved for one workspace is not kept for later lookups", a
 test("explain is added when the value names a project only in another workspace", async () => {
   serve((workspaceId) => json(workspaceId === "w2" ? [{ ...project("p-w2", "w2"), slug: "SAME2" }] : [project("p-w1", "w1")]));
   await expect(withProject("SAME2", byId, { sameWorkspaceAs: "p-w1", explain: async () => "; EXPLAINED" })).rejects.toThrow("only within its own workspace; EXPLAINED");
+});
+
+// Kaneo 2.50 sends every HTTPException as {"message","code"} JSON, where 2.32
+// sent the message as text/plain. The lookup decides on the message, so it has
+// to find it in that shape too: a slug or a name in the path is answered like
+// an id the server does not know.
+test.each([
+  [404, "Project not found", "NOT_FOUND"],
+  [400, "Workspace ID could not be determined", "BAD_REQUEST"],
+])("a slug the server refuses with %p %p (%p) in its JSON error shape is looked up", async (status, message, code) => {
+  const s = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: (req) => {
+      const url = new URL(req.url);
+      if (url.pathname === "/api/auth/organization/list") return json([{ id: "w1", name: "name-w1", slug: "w1", createdAt: "2026-01-01T00:00:00.000Z" }]);
+      if (url.pathname === "/api/project") return json([{ ...project("p-w1", "w1"), slug: `JSON${status}` }]);
+      if (url.pathname === "/api/task/tasks/p-w1") return json({ tasks: [] });
+      return json({ message, code }, status);
+    },
+  });
+  servers.push(s);
+  configureClient({ baseUrl: `http://127.0.0.1:${s.port}`, apiKey: "test-key" });
+  const op = async (id: string) => {
+    await kaneoFetch<unknown>(`/task/tasks/${id}`, { method: "GET" });
+    return id;
+  };
+  expect(await withProject(`JSON${status}`, op)).toBe("p-w1");
 });

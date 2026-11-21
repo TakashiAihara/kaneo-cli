@@ -1,0 +1,66 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"isInstalled\": true,\n  \"hasRequiredPermissions\": true,\n  \"projectExists\": true,\n  \"projectVisibility\": \"private\",\n  \"missingPermissions\": [],\n  \"message\": \"Token can access the project.\",\n  \"failureReason\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--token-type",
+        "bearer",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "Token can access the project.\ngitlab instance yes  project exists yes  required permissions yes\nvisibility private\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/verify",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitlab.example.com",
+        "accessToken": "verify-token-0123456789abcdef",
+        "projectPath": "acme/web-app"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/verify",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitlab.example.com",
+        "accessToken": "verify-token-0123456789abcdef",
+        "projectPath": "acme/web-app",
+        "tokenType": "bearer"
+      }
+    }
+  ],
+  "files": {}
+}

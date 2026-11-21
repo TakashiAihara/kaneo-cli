@@ -1,0 +1,40 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "update",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"nothing to change: pass at least one of --active, --comment-task-link\"\n}\n",
+      "stderr": "Error: nothing to change: pass at least one of --active, --comment-task-link\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "update",
+        "--active=false",
+        "--comment-task-link=false",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"gitl0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitlab.example.com\",\n  \"projectPath\": \"acme/web-app\",\n  \"tokenType\": \"private\",\n  \"maskedAccessToken\": \"seed••••••cdef\",\n  \"webhookUrl\": \"<URL>/api/gitlab-integration/webhook/gitl0001\",\n  \"webhookSecret\": \"whsec_seeded_cafebabe\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGitlabIssue\": false,\n  \"isActive\": false,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "PATCH",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "isActive": false,
+        "commentTaskLinkOnGitlabIssue": false
+      }
+    }
+  ],
+  "files": {}
+}

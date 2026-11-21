@@ -1,0 +1,125 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--token-type",
+        "bearer",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"gitl0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitlab.example.com\",\n  \"projectPath\": \"acme/web-app\",\n  \"tokenType\": \"bearer\",\n  \"maskedAccessToken\": \"cli-••••••cdef\",\n  \"webhookUrl\": \"<URL>/api/gitlab-integration/webhook/gitl0001\",\n  \"webhookSecret\": \"sec0002\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGitlabIssue\": true,\n  \"isActive\": true,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "project      proj-alpha\ngitlab       https://gitlab.example.com acme/web-app\ntoken        bearer cli-••••••cdef\nwebhook      <URL>/api/gitlab-integration/webhook/gitl0001\nwebhook secret sec0002\nbranch       {slug}-{number}\ncomment link yes\nactive       yes\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "update",
+        "--comment-task-link=false",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"gitl0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitlab.example.com\",\n  \"projectPath\": \"acme/web-app\",\n  \"tokenType\": \"bearer\",\n  \"maskedAccessToken\": \"cli-••••••cdef\",\n  \"webhookUrl\": \"<URL>/api/gitlab-integration/webhook/gitl0001\",\n  \"webhookSecret\": \"sec0002\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGitlabIssue\": false,\n  \"isActive\": true,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "import",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "imported 2, updated 1, skipped 1\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"success\": true,\n  \"message\": \"GitLab integration deleted\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitlab.example.com",
+        "projectPath": "acme/web-app",
+        "accessToken": "cli-token-0123456789abcdef",
+        "tokenType": "bearer"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "commentTaskLinkOnGitlabIssue": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

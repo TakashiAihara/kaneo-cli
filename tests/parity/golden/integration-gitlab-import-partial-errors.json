@@ -1,0 +1,45 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "import",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "imported 2, updated 1, skipped 1\n",
+      "stderr": "  Issue !12: the assignee is gone\n  Merge request !34: labels refused\nError: 2 issues failed to import\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "import",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"imported\": 2,\n  \"updated\": 1,\n  \"skipped\": 1,\n  \"errors\": [\n    \"Issue !12: the assignee is gone\",\n    \"Merge request !34: labels refused\"\n  ]\n}\n",
+      "stderr": "Error: 2 issues failed to import\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha"
+      }
+    }
+  ],
+  "files": {}
+}

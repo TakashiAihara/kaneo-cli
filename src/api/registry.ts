@@ -93,4 +93,11 @@ export const OPERATIONS: Operation[] = [
   { id: "reorderCustomFields", method: "PUT", path: "/custom-field/reorder/{projectId}", command: "kaneo field reorder" },
   { id: "setCustomFieldValue", method: "PUT", path: "/custom-field/value", command: "kaneo task field" },
   { id: "deleteCustomField", method: "DELETE", path: "/custom-field/{id}", command: "kaneo field rm" },
+  { id: "listGitlabProjects", method: "POST", path: "/gitlab-integration/projects", command: "kaneo integration gitlab projects" },
+  { id: "verifyGitlabAccess", method: "POST", path: "/gitlab-integration/verify", command: "kaneo integration gitlab verify" },
+  { id: "getGitlabIntegration", method: "GET", path: "/gitlab-integration/project/{projectId}", command: "kaneo integration gitlab get" },
+  { id: "createGitlabIntegration", method: "POST", path: "/gitlab-integration/project/{projectId}", command: "kaneo integration gitlab connect" },
+  { id: "updateGitlabIntegration", method: "PATCH", path: "/gitlab-integration/project/{projectId}", command: "kaneo integration gitlab update" },
+  { id: "deleteGitlabIntegration", method: "DELETE", path: "/gitlab-integration/project/{projectId}", command: "kaneo integration gitlab rm" },
+  { id: "importGitlabIssues", method: "POST", path: "/gitlab-integration/import-issues", command: "kaneo integration gitlab import" },
 ];

@@ -31,6 +31,12 @@
     "body.required": false,
     "body.type": true
   },
+  "createGitlabIntegration": {
+    "body.accessToken": false,
+    "body.baseUrl": true,
+    "body.projectPath": true,
+    "body.tokenType": false
+  },
   "createLabel": {
     "body.color": true,
     "body.name": true,
@@ -80,6 +86,7 @@
   },
   "deleteColumn": {},
   "deleteCustomField": {},
+  "deleteGitlabIntegration": {},
   "deleteLabel": {},
   "deleteNotificationPreferenceWorkspaceRule": {},
   "deleteProject": {},
@@ -99,6 +106,7 @@
   "getCustomFieldValuesByTask": {},
   "getCustomFieldsByProject": {},
   "getExternalLinksByTask": {},
+  "getGitlabIntegration": {},
   "getInvitationDetails": {},
   "getLabel": {},
   "getNotificationPreferences": {},
@@ -127,12 +135,21 @@
     "query.userEmail": false,
     "query.workspaceId": true
   },
+  "importGitlabIssues": {
+    "body.projectId": true
+  },
   "importTasks": {
     "body.tasks": true
   },
   "listAssignedTasks": {
     "query.countOnly": false,
     "query.workspaceId": true
+  },
+  "listGitlabProjects": {
+    "body.accessToken": true,
+    "body.baseUrl": true,
+    "body.projectId": true,
+    "body.tokenType": false
   },
   "listNotifications": {
     "query.workspaceId": false
@@ -183,6 +200,10 @@
     "body.icon": false,
     "body.isFinal": false,
     "body.name": false
+  },
+  "updateGitlabIntegration": {
+    "body.commentTaskLinkOnGitlabIssue": false,
+    "body.isActive": false
   },
   "updateLabel": {
     "body.color": true,
@@ -267,5 +288,12 @@
     "body.columnId": true,
     "body.eventType": true,
     "body.integrationType": true
+  },
+  "verifyGitlabAccess": {
+    "body.accessToken": true,
+    "body.baseUrl": true,
+    "body.projectId": true,
+    "body.projectPath": true,
+    "body.tokenType": false
   }
 }

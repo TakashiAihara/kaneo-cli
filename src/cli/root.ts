@@ -25,6 +25,7 @@ import { fieldCommand } from "./field";
 import { invitationCommand } from "./invitation";
 import { searchCommand } from "./search";
 import { workflowCommand } from "./workflow";
+import { integrationCommand } from "./integration";
 import { taskCommand } from "./task";
 import { boardCommand } from "./board";
 import { sessionCommand } from "./session";
@@ -104,6 +105,7 @@ export const rootCommand = (): { root: Command<App> } => {
     searchCommand,
     invitationCommand,
     workflowCommand,
+    integrationCommand,
     taskCommand,
     boardCommand,
     sessionCommand,

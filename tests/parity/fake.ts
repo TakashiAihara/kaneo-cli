@@ -420,7 +420,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   for (const v of seed.customFieldValues ?? []) {
     const task = tasks.find((t) => t.id === v.taskId)!;
     const field = fields.find((f) => f.projectId === task.projectId && f.name === v.field)!;
-    addFieldValue(v.taskId, field.id, v.value);
+    // A value the seed names for a task replaces the default the field's
+    // backfill wrote for the same pair: the row is keyed by task and field,
+    // so one row holds the explicit value, as upstream's unique constraint
+    // and its on-conflict upsert leave it.
+    const have = fieldValues.find((x) => x.taskId === v.taskId && x.fieldId === field.id);
+    if (have) have.value = v.value;
+    else addFieldValue(v.taskId, field.id, v.value);
   }
   // The joined row the value routes send: the definition's current name,
   // position, type and options beside the stored value.
@@ -439,6 +445,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   };
   const servedValues = (rows: typeof fieldValues) =>
     rows.filter((v) => fields.some((f) => f.id === v.fieldId)).map(servedValue);
+  // A task's value rows go with it, as the foreign key's cascade does.
+  const dropFieldValues = (taskId: string) => {
+    for (let j = fieldValues.length - 1; j >= 0; j--) if (fieldValues[j]!.taskId === taskId) fieldValues.splice(j, 1);
+  };
 
   // The value checks the custom-field routes borrow from validate-task-fields,
   // kept to the types those routes call them for.
@@ -818,6 +828,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           const r = relations[i]!;
           if (gone.has(r.sourceTaskId) || gone.has(r.targetTaskId)) relations.splice(i, 1);
         }
+        for (const taskId of gone) dropFieldValues(taskId);
         projects.splice(projects.indexOf(proj), 1);
         return reply;
       }
@@ -978,7 +989,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           break;
         }
         case "delete":
-          for (const t of found) tasks.splice(tasks.indexOf(t), 1);
+          for (const t of found) {
+            tasks.splice(tasks.indexOf(t), 1);
+            dropFieldValues(t.id);
+          }
           break;
         case "updateDueDate": {
           const at = value ? parsedDate(value, "date value") : null;
@@ -1166,6 +1180,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         tasks.splice(i, 1);
         // The document says a task takes its time entries with it.
         for (let j = timeEntries.length - 1; j >= 0; j--) if (timeEntries[j]!.taskId === t.id) timeEntries.splice(j, 1);
+        dropFieldValues(t.id);
         return ok(M.Task, t);
       }
     }

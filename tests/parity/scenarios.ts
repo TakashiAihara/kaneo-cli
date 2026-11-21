@@ -469,6 +469,26 @@ export const SCENARIOS: Scenario[] = [
       ["field", "ls", "--json"],
     ],
   },
+  {
+    // A value the seed names for a task replaces the default the field's
+    // backfill wrote for it — one row, not two — and a deleted task's values
+    // leave the filter candidates, singly and in bulk.
+    name: "field values leave with their task",
+    seed: {
+      customFields: [{ projectId: P1, name: "Env", type: "text", defaultValue: "prod" }],
+      customFieldValues: [
+        { taskId: "task-a1", field: "Env", value: "staging" },
+        { taskId: "task-a3", field: "Env", value: "dev" },
+      ],
+    },
+    steps: [
+      ["task", "field", "1", "--json"],
+      ["task", "rm", "1", "--yes", "--json"],
+      ["field", "values", "Env", "--json"],
+      ["task", "bulk", "2", "3", "--delete", "--yes", "--json"],
+      ["field", "values", "Env", "--json"],
+    ],
+  },
 
   ...both("search", ["search", "first"]),
   // A task other than #1, so a number that only happened to be 1 is caught.

@@ -1,0 +1,318 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "--bot-token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"creating an integration needs --chat-id: the chat id is required\"\n}\n",
+      "stderr": "Error: creating an integration needs --chat-id: the chat id is required\n"
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "--bot-token",
+        "-",
+        "--chat-id",
+        "123456789",
+        "--chat-label",
+        "ops alerts",
+        "--thread-id",
+        "42",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0001\",\n  \"projectId\": \"proj-alpha\",\n  \"chatId\": \"123456789\",\n  \"threadId\": 42,\n  \"chatLabel\": \"ops alerts\",\n  \"botTokenConfigured\": true,\n  \"maskedBotToken\": \"123456789:abcd…5678\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T12:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:00.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         int0001\nproject    proj-alpha\nchat       ops alerts (123456789)\nthread     42\nbot        123456789:abcd…5678\nevents     task created, task status changed, task comment created\nactive     on\ncreated    2026-01-01T12:00:00.000Z\nupdated    2026-01-01T12:00:00.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "--chat-id",
+        "-1001234567890",
+        "--thread-id",
+        "",
+        "--chat-label",
+        "",
+        "--task-comment-created=false",
+        "--active=false",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0001\",\n  \"projectId\": \"proj-alpha\",\n  \"chatId\": \"-1001234567890\",\n  \"threadId\": null,\n  \"chatLabel\": null,\n  \"botTokenConfigured\": true,\n  \"maskedBotToken\": \"123456789:abcd…5678\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": false\n  },\n  \"isActive\": false,\n  \"createdAt\": \"2026-01-01T12:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:01.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "--thread-id",
+        "abc",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--thread-id must be a positive integer, not \\\"abc\\\"\"\n}\n",
+      "stderr": "Error: --thread-id must be a positive integer, not \"abc\"\n"
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "--thread-id",
+        "0",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--thread-id must be a positive integer, not \\\"0\\\"\"\n}\n",
+      "stderr": "Error: --thread-id must be a positive integer, not \"0\"\n"
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "--thread-id",
+        "-1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--thread-id must be a positive integer, not \\\"-1\\\"\"\n}\n",
+      "stderr": "Error: --thread-id must be a positive integer, not \"-1\"\n"
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "--thread-id",
+        "0x10",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--thread-id must be a positive integer, not \\\"0x10\\\"\"\n}\n",
+      "stderr": "Error: --thread-id must be a positive integer, not \"0x10\"\n"
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "--thread-id",
+        "1e3",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--thread-id must be a positive integer, not \\\"1e3\\\"\"\n}\n",
+      "stderr": "Error: --thread-id must be a positive integer, not \"1e3\"\n"
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "--thread-id",
+        " ",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--thread-id must be a positive integer, not \\\" \\\"\"\n}\n",
+      "stderr": "Error: --thread-id must be a positive integer, not \" \"\n"
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "--bot-token",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0001\",\n  \"projectId\": \"proj-alpha\",\n  \"chatId\": \"-1001234567890\",\n  \"threadId\": null,\n  \"chatLabel\": null,\n  \"botTokenConfigured\": true,\n  \"maskedBotToken\": \"123456789:abcd…5678\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": false\n  },\n  \"isActive\": false,\n  \"createdAt\": \"2026-01-01T12:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:01.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"nothing to change: pass at least one of --bot-token, --chat-id, --thread-id, --chat-label, --active, --task-created, --task-status-changed, --task-priority-changed, --task-title-changed, --task-description-changed, --task-comment-created\"\n}\n",
+      "stderr": "Error: nothing to change: pass at least one of --bot-token, --chat-id, --thread-id, --chat-label, --active, --task-created, --task-status-changed, --task-priority-changed, --task-title-changed, --task-description-changed, --task-comment-created\n"
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"success\": true\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "no telegram integration on this project\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "botToken": "123456789:abcdefghijklmnopqrstuvwxyz012345678",
+        "chatId": "123456789",
+        "threadId": 42,
+        "chatLabel": "ops alerts"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "chatId": "-1001234567890",
+        "threadId": null,
+        "chatLabel": null,
+        "isActive": false,
+        "events": {
+          "taskCommentCreated": false
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "botToken": "123456789:abcdefghijklmnopqrstuvwxyz012345678"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

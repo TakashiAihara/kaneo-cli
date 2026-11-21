@@ -1,0 +1,129 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "slack",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         int0001\nproject    proj-alpha\nchannel    seeded\nwebhook    https://hooks.slack.com/services/T11111111/B22222222/seed…ed99\nevents     task created, task status changed, task comment created\nactive     unset\ncreated    2026-01-01T12:00:00.000Z\nupdated    2026-01-01T12:00:00.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "discord",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0002\",\n  \"projectId\": \"proj-alpha\",\n  \"channelName\": null,\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"https://discordapp.com/api/webhooks/555444333/seed…7890\",\n  \"events\": {\n    \"taskCreated\": false,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T12:00:01.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:01.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         int0003\nproject    proj-alpha\nchat       seeded ops (-100987654321)\nthread     7\nbot        987654321:qwer…6789\nevents     task created, task status changed, task comment created\nactive     off\ncreated    2026-01-01T12:00:02.000Z\nupdated    2026-01-01T12:00:02.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "get",
+        "-p",
+        "proj-beta",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0004\",\n  \"projectId\": \"proj-beta\",\n  \"channelName\": null,\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"https://hooks.slack.com/services/T33333333/B44444444/beta…e123\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T12:00:03.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:03.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "get",
+        "-p",
+        "proj-beta",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"success\": true\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -190,6 +190,10 @@ kaneo integration gitlab rm --yes   # also: delete; removes the link and its sto
 kaneo integration gitlab verify --base-url URL --project-path PATH --access-token -   # checks the token reaches the project, stores nothing; the check's findings are data, not an error
 kaneo integration gitlab projects --base-url URL --access-token -   # the GitLab projects the token can see, to pick one
 kaneo integration gitlab import   # the linked project's open issues as tasks; exits non-zero when any issue failed
+kaneo integration slack get                    # also discord and telegram: the chat integrations a project's events post out to
+kaneo integration slack set --webhook-url - [--channel-name NAME] < webhook-url.txt
+kaneo integration telegram set --bot-token - --chat-id <chat-id> [--thread-id N] [--chat-label NAME] < token.txt
+kaneo integration slack rm --yes
 kaneo task ls [--status ...] [--priority ...] [--all]
 kaneo task ls --mine       # open tasks assigned to you across the workspace, at most 100
 kaneo task get <task-id>                 # also lists the task's relations and the sessions holding it
@@ -311,6 +315,8 @@ Three of the routes — `repos`, `verify` and `connect` — need a user session 
 `kaneo feed` manages a project's calendar feeds: subscription links that serve the project's scheduled tasks — those with a start or due date and carrying any of the feed's labels — as an iCalendar document. `feed create` takes at least one label, by workspace label id or name, and `--time-zone` names the zone all-day dates are read in; left out, the server's UTC applies. A feed's subscribe link is the public half of `feed get <token>`: the route needs no key, which is what makes it pasteable into a calendar app, and `feed rm` revokes it for good — a feed created again gets a new token, so anything already subscribed has to be given the new link.
 
 `instance`, `public`, `avatar get` and the assets a public project's shared description publishes answer without a key — the routes a shared link is served by — so those commands run with `KANEO_API_KEY` unset; any other asset is the exception and is sent the configured key when there is one. `asset get` and `avatar get` write raw bytes: to stdout as they arrived — a terminal and `--json`/`--jq` are refused there, since the bytes are the server's to choose — or to the file `--out` names, where `--json` then reports the path, size and content type rather than the bytes. `whoami avatar set` reads the image type off the file's extension, refuses anything but png, jpeg and webp, and refuses an empty file or one over the server's ~512 KiB limit before sending it.
+
+`kaneo integration <provider>` manages where a project's events are posted: `slack` and `discord` through a webhook URL, `telegram` through a bot token and a chat id. `get` prints the configuration with the secret masked — the webhook URL keeps only its non-secret parts, the bot token keeps only the id before the colon — or `null` when the project has none. `set` creates the integration when the project has none and otherwise changes only the fields passed; the secret is never taken as a flag value, so --webhook\-url - and `--bot-token -` read it from stdin — one trailing line ending is dropped, and empty or all-whitespace stdin is refused rather than read as a secret. On update, `--channel-name ''`, `--thread-id ''` and `--chat-label ''` clear their fields, `--active=false` stops delivery without removing anything, and the `--task-*` event toggles merge into the stored set rather than replacing it. `rm --yes` deletes the integration.
 
 ### Shell completion
 

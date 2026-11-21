@@ -1,0 +1,237 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "slack",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "set",
+        "--webhook-url",
+        "-",
+        "--active",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--active does not apply to a new integration; it is created active\"\n}\n",
+      "stderr": "Error: --active does not apply to a new integration; it is created active\n"
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "set",
+        "--webhook-url",
+        "-",
+        "--channel-name",
+        "alerts",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0001\",\n  \"projectId\": \"proj-alpha\",\n  \"channelName\": \"alerts\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"https://hooks.slack.com/services/T00000000/B00000000/abcd…mnop\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T12:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:00.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         int0001\nproject    proj-alpha\nchannel    alerts\nwebhook    https://hooks.slack.com/services/T00000000/B00000000/abcd…mnop\nevents     task created, task status changed, task comment created\nactive     on\ncreated    2026-01-01T12:00:00.000Z\nupdated    2026-01-01T12:00:00.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "set",
+        "--webhook-url",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0001\",\n  \"projectId\": \"proj-alpha\",\n  \"channelName\": \"alerts\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"https://hooks.slack.com/services/T00000000/B00000000/abcd…mnop\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T12:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:01.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "set",
+        "--channel-name",
+        "",
+        "--task-priority-changed",
+        "--active=false",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0001\",\n  \"projectId\": \"proj-alpha\",\n  \"channelName\": null,\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"https://hooks.slack.com/services/T00000000/B00000000/abcd…mnop\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": true,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": false,\n  \"createdAt\": \"2026-01-01T12:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:02.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "set",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"nothing to change: pass at least one of --webhook-url, --channel-name, --active, --task-created, --task-status-changed, --task-priority-changed, --task-title-changed, --task-description-changed, --task-comment-created\"\n}\n",
+      "stderr": "Error: nothing to change: pass at least one of --webhook-url, --channel-name, --active, --task-created, --task-status-changed, --task-priority-changed, --task-title-changed, --task-description-changed, --task-comment-created\n"
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "rm",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"refusing to remove the slack integration on Alpha [ALP] (proj-alpha) without --yes\"\n}\n",
+      "stderr": "Error: refusing to remove the slack integration on Alpha [ALP] (proj-alpha) without --yes\n"
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "rm",
+        "--yes",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "removed the slack integration\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no slack integration on this project\"\n}\n",
+      "stderr": "Error: no slack integration on this project\n"
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://hooks.slack.com/services/T00000000/B00000000/abcdefghijklmnop",
+        "channelName": "alerts"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://hooks.slack.com/services/T00000000/B00000000/abcdefghijklmnop"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "channelName": null,
+        "isActive": false,
+        "events": {
+          "taskPriorityChanged": true
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

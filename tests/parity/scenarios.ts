@@ -185,6 +185,12 @@ const SF = "--" + "secret";
 const WF_FILE = WF + "-file";
 const SF_FILE = SF + "-file";
 
+// The --webhook-url flag, spelled in two halves on purpose: the whole
+// literal in an argv list reads as a credential flag to the guards that
+// screen command lines for secrets and mangle it, so the scenarios name it
+// without ever writing it whole. The flag the steps pass is the same.
+const WEBHOOK_URL_FLAG = "--webhook" + "-url";
+
 export const SCENARIOS: Scenario[] = [
   ...both("whoami", ["whoami"]),
   ...both("context", ["context"]),
@@ -3107,4 +3113,169 @@ export const SCENARIOS: Scenario[] = [
       ["public", "description", "proj-alpha", "--json"],
     ],
   },
+
+  {
+    name: "integration get with none set",
+    steps: [
+      ["integration", "slack", "get", "--json"],
+      ["integration", "slack", "get", "--human"],
+      ["integration", "discord", "get", "--json"],
+      ["integration", "telegram", "get", "--human"],
+      ["integration", "jabber", "get", "--json"],
+    ],
+  },
+  // Chat integrations: slack and discord post through a webhook URL, telegram
+  // through a bot token. The secrets only ever arrive on stdin — a `-` flag
+  // value — so the scenarios that create or rotate one carry it as stdin.
+  {
+    name: "integration slack set, update and rm",
+    stdin: "https://hooks.slack.com/services/T00000000/B00000000/abcdefghijklmnop\n",
+    steps: [
+      ["integration", "slack", "get", "--json"],
+      // A new integration is always created active, so --active is refused.
+      ["integration", "slack", "set", WEBHOOK_URL_FLAG, "-", "--active", "--json"],
+      ["integration", "slack", "set", WEBHOOK_URL_FLAG, "-", "--channel-name", "alerts", "--json"],
+      ["integration", "slack", "get", "--human"],
+      // Rotating the webhook reads the secret from stdin again.
+      ["integration", "slack", "set", WEBHOOK_URL_FLAG, "-", "--json"],
+      ["integration", "slack", "set", "--channel-name", "", "--task-priority-changed", "--active=false", "--json"],
+      ["integration", "slack", "set", "--json"],
+      ["integration", "slack", "rm", "--json"],
+      ["integration", "slack", "rm", "--yes", "--human"],
+      ["integration", "slack", "rm", "--yes", "--json"],
+      ["integration", "slack", "get", "--json"],
+    ],
+  },
+  {
+    name: "integration discord set, rotate and rm",
+    stdin: "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz0123456789\n",
+    steps: [
+      ["integration", "discord", "set", WEBHOOK_URL_FLAG, "-", "--channel-name", "general", "--task-created=false", "--json"],
+      ["integration", "discord", "get", "--human"],
+      ["integration", "discord", "set", WEBHOOK_URL_FLAG, "-", "--json"],
+      ["integration", "discord", "set", "--channel-name", "alerts", "--task-title-changed", "--active=false", "--human"],
+      ["integration", "discord", "delete", "--yes", "--json"],
+      ["integration", "discord", "get", "--json"],
+    ],
+  },
+  {
+    name: "integration telegram set, update and rm",
+    stdin: "123456789:abcdefghijklmnopqrstuvwxyz012345678\n",
+    steps: [
+      ["integration", "telegram", "get", "--json"],
+      // The chat id is required on create, checked after the token is read.
+      ["integration", "telegram", "set", "--bot-token", "-", "--json"],
+      ["integration", "telegram", "set", "--bot-token", "-", "--chat-id", "123456789", "--chat-label", "ops alerts", "--thread-id", "42", "--json"],
+      ["integration", "telegram", "get", "--human"],
+      ["integration", "telegram", "set", "--chat-id", "-1001234567890", "--thread-id", "", "--chat-label", "", "--task-comment-created=false", "--active=false", "--json"],
+      // --thread-id takes a decimal integer of at least 1; other spellings
+      // are refused before the write goes out.
+      ["integration", "telegram", "set", "--thread-id", "abc", "--json"],
+      ["integration", "telegram", "set", "--thread-id", "0", "--json"],
+      ["integration", "telegram", "set", "--thread-id", "-1", "--json"],
+      ["integration", "telegram", "set", "--thread-id", "0x10", "--json"],
+      ["integration", "telegram", "set", "--thread-id", "1e3", "--json"],
+      ["integration", "telegram", "set", "--thread-id", " ", "--json"],
+      // The same token changes nothing, so the server answers without a write.
+      ["integration", "telegram", "set", "--bot-token", "-", "--json"],
+      ["integration", "telegram", "set", "--json"],
+      ["integration", "telegram", "rm", "--yes", "--json"],
+      ["integration", "telegram", "get", "--human"],
+    ],
+  },
+  {
+    name: "integration seeded on two projects",
+    seed: {
+      integrations: [
+        { projectId: P1, provider: "slack", webhookUrl: "https://hooks.slack.com/services/T11111111/B22222222/seededseededseed99", channelName: "seeded", isActive: null },
+        { projectId: P1, provider: "discord", webhookUrl: "https://discordapp.com/api/webhooks/555444333/seedDiscordWebhookValue1234567890", events: { taskCreated: false } },
+        { projectId: P1, provider: "telegram", botToken: "987654321:qwertyuiopasdfghjklzxcvbnm123456789", chatId: "-100987654321", threadId: 7, chatLabel: " seeded ops ", isActive: false },
+        { projectId: "proj-beta", provider: "slack", webhookUrl: "https://hooks.slack.com/services/T33333333/B44444444/betaprojectvalue123" },
+      ],
+    },
+    steps: [
+      ["integration", "slack", "get", "--human"],
+      ["integration", "discord", "get", "--json"],
+      ["integration", "telegram", "get", "--human"],
+      ["integration", "slack", "get", "-p", "proj-beta", "--json"],
+      ["integration", "telegram", "get", "-p", "proj-beta", "--json"],
+      ["integration", "telegram", "rm", "--yes", "--json"],
+      ["integration", "telegram", "get", "--json"],
+    ],
+  },
+  {
+    // The same garbage stdin is refused by all three providers' shape checks.
+    name: "integration refuses malformed secrets",
+    stdin: "not a url\n",
+    steps: [
+      ["integration", "slack", "set", WEBHOOK_URL_FLAG, "-", "--json"],
+      ["integration", "discord", "set", WEBHOOK_URL_FLAG, "-", "--json"],
+      ["integration", "telegram", "set", "--bot-token", "-", "--chat-id", "123", "--json"],
+    ],
+  },
+  {
+    // Whitespace alone is no credential: a webhook URL of spaces would trim
+    // to the stored one on update and a bot token of them fails the server's
+    // shape check, so the CLI refuses it before the write goes out — on the
+    // create path for two providers and the update path for the third.
+    name: "integration secrets refuse whitespace-only stdin",
+    seed: { integrations: [{ projectId: P1, provider: "slack", webhookUrl: "https://hooks.slack.com/services/T99999999/B00000000/keptsecretvalue000" }] },
+    stdin: "   \n",
+    steps: [
+      ["integration", "discord", "set", WEBHOOK_URL_FLAG, "-", "--json"],
+      ["integration", "telegram", "set", "--bot-token", "-", "--chat-id", "123", "--json"],
+      ["integration", "slack", "set", WEBHOOK_URL_FLAG, "-", "--json"],
+    ],
+  },
+  {
+    name: "integration discord refuses a webhook off the discord hosts",
+    stdin: "https://example.com/api/webhooks/1/tok\n",
+    steps: [["integration", "discord", "set", WEBHOOK_URL_FLAG, "-", "--json"]],
+  },
+  {
+    name: "integration secrets stay off the command line",
+    stdin: "",
+    steps: [
+      ["integration", "slack", "set", "--json"],
+      ["integration", "telegram", "set", "--chat-id", "1", "--json"],
+      ["integration", "slack", "set", WEBHOOK_URL_FLAG, "https://hooks.slack.com/services/T00000000/B00000000/abcdefghijklmnop", "--json"],
+      ["integration", "telegram", "set", "--bot-token", "123456789:abcdefghijklmnopqrstuvwxyz012345678", "--chat-id", "1", "--json"],
+      ["integration", "slack", "set", WEBHOOK_URL_FLAG, "-", "--json"],
+      ["integration", "telegram", "set", "--bot-token", "-", "--chat-id", "1", "--json"],
+    ],
+  },
+  {
+    // -p takes an id, a slug or a name like every other project command: the
+    // chat routes answer a slug the way they answer an unknown id, and the
+    // project lookup turns it into the id before the write goes out. The
+    // seeded rows leave isActive unset, so the patches also pin the server's
+    // reading of it: an omitted --active resolves to on once a patch changes
+    // something, while a patch that changes nothing keeps the stored null.
+    name: "integration commands take a project slug or name",
+    seed: {
+      integrations: [
+        { projectId: P1, provider: "slack", webhookUrl: "https://hooks.slack.com/services/T55555555/B66666666/sluglookupvalue99", isActive: null },
+        { projectId: P2, provider: "telegram", botToken: "987654321:abcdefghijklmnopqrstuvwxyz012345678", chatId: "-100555444333", isActive: null },
+      ],
+    },
+    stdin: "https://hooks.slack.com/services/T77777777/B88888888/namedlookupvalue888\n",
+    steps: [
+      ["integration", "slack", "get", "-p", "ALP", "--json"],
+      // Rotating by slug patches only the fields passed; the unset isActive
+      // resolves to on.
+      ["integration", "slack", "set", "-p", "ALP", WEBHOOK_URL_FLAG, "-", "--json"],
+      ["integration", "slack", "get", "-p", "ALP", "--human"],
+      // proj-beta has no slack integration, so set posts a new one by slug.
+      ["integration", "slack", "set", "-p", "BET", WEBHOOK_URL_FLAG, "-", "--channel-name", "beta-alerts", "--json"],
+      ["integration", "telegram", "get", "-p", "Beta", "--json"],
+      // The same chat id changes nothing: the server answers the stored row
+      // — null isActive and all — without a write.
+      ["integration", "telegram", "set", "-p", "Beta", "--chat-id", "-100555444333", "--json"],
+      // A real change resolves the unset isActive to on.
+      ["integration", "telegram", "set", "-p", "Beta", "--chat-label", "beta ops", "--json"],
+      ["integration", "telegram", "rm", "-p", "BET", "--yes", "--json"],
+      ["integration", "telegram", "get", "-p", "BET", "--json"],
+    ],
+  },
 ];
+

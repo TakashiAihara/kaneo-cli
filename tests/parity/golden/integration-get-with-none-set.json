@@ -1,0 +1,82 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "slack",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "no slack integration on this project\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "discord",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "no telegram integration on this project\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "jabber",
+        "get",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown command \\\"jabber\\\" for \\\"kaneo integration\\\"\"\n}\n",
+      "stderr": "Error: unknown command \"jabber\" for \"kaneo integration\"\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,152 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "discord",
+        "set",
+        "--webhook-url",
+        "-",
+        "--channel-name",
+        "general",
+        "--task-created=false",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0001\",\n  \"projectId\": \"proj-alpha\",\n  \"channelName\": \"general\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"https://discord.com/api/webhooks/123456789012345678/abcd…6789\",\n  \"events\": {\n    \"taskCreated\": false,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T12:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:00.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "discord",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         int0001\nproject    proj-alpha\nchannel    general\nwebhook    https://discord.com/api/webhooks/123456789012345678/abcd…6789\nevents     task status changed, task comment created\nactive     on\ncreated    2026-01-01T12:00:00.000Z\nupdated    2026-01-01T12:00:00.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "discord",
+        "set",
+        "--webhook-url",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0001\",\n  \"projectId\": \"proj-alpha\",\n  \"channelName\": \"general\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"https://discord.com/api/webhooks/123456789012345678/abcd…6789\",\n  \"events\": {\n    \"taskCreated\": false,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T12:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:01.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "discord",
+        "set",
+        "--channel-name",
+        "alerts",
+        "--task-title-changed",
+        "--active=false",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "updated discord integration\nid         int0001\nproject    proj-alpha\nchannel    alerts\nwebhook    https://discord.com/api/webhooks/123456789012345678/abcd…6789\nevents     task status changed, task title changed, task comment created\nactive     off\ncreated    2026-01-01T12:00:00.000Z\nupdated    2026-01-01T12:00:02.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "discord",
+        "delete",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"success\": true\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "discord",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz0123456789",
+        "channelName": "general",
+        "events": {
+          "taskCreated": false
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz0123456789"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "channelName": "alerts",
+        "isActive": false,
+        "events": {
+          "taskTitleChanged": true
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

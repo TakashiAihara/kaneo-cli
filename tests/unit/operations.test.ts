@@ -475,6 +475,21 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["GitHubUpdate", "PATCH", "/api/github-integration/project/a%2Fb", () => api.updateGitHubIntegration(id, { isActive: true })],
     ["GitHubDelete", "DELETE", "/api/github-integration/project/a%2Fb", () => api.deleteGitHubIntegration(id)],
     ["GitHubImport", "POST", "/api/github-integration/import-issues", () => api.importGitHubIssues("p1")],
+    ["GetSlackIntegration", "GET", "/api/slack-integration/project/a%2Fb", () => api.getSlackIntegration(id)],
+    ["CreateSlackIntegration", "POST", "/api/slack-integration/project/a%2Fb", () =>
+      api.createSlackIntegration(id, { webhookUrl: "https://hooks.slack.com/services/T0/B0/x" })],
+    ["UpdateSlackIntegration", "PATCH", "/api/slack-integration/project/a%2Fb", () => api.updateSlackIntegration(id, { isActive: false })],
+    ["DeleteSlackIntegration", "DELETE", "/api/slack-integration/project/a%2Fb", () => api.deleteSlackIntegration(id)],
+    ["GetDiscordIntegration", "GET", "/api/discord-integration/project/a%2Fb", () => api.getDiscordIntegration(id)],
+    ["CreateDiscordIntegration", "POST", "/api/discord-integration/project/a%2Fb", () =>
+      api.createDiscordIntegration(id, { webhookUrl: "https://discord.com/api/webhooks/1/x" })],
+    ["UpdateDiscordIntegration", "PATCH", "/api/discord-integration/project/a%2Fb", () => api.updateDiscordIntegration(id, { channelName: null })],
+    ["DeleteDiscordIntegration", "DELETE", "/api/discord-integration/project/a%2Fb", () => api.deleteDiscordIntegration(id)],
+    ["GetTelegramIntegration", "GET", "/api/telegram-integration/project/a%2Fb", () => api.getTelegramIntegration(id)],
+    ["CreateTelegramIntegration", "POST", "/api/telegram-integration/project/a%2Fb", () =>
+      api.createTelegramIntegration(id, { botToken: "123456:fake", chatId: "-100" })],
+    ["UpdateTelegramIntegration", "PATCH", "/api/telegram-integration/project/a%2Fb", () => api.updateTelegramIntegration(id, { threadId: null })],
+    ["DeleteTelegramIntegration", "DELETE", "/api/telegram-integration/project/a%2Fb", () => api.deleteTelegramIntegration(id)],
   ];
   test.each(calls)("%s", async (name, method, path, call) => {
     const seen: { method: string; path: string }[] = [];
@@ -1050,6 +1065,125 @@ describe("TestReadsMapEveryField", () => {
         updatedAt: TIME,
       },
     ]);
+  });
+});
+
+describe("TestChatIntegrations", () => {
+  const EVENTS = {
+    taskCreated: true,
+    taskStatusChanged: true,
+    taskPriorityChanged: false,
+    taskTitleChanged: false,
+    taskDescriptionChanged: false,
+    taskCommentCreated: true,
+  };
+  const webhookReply = `{"id":"i1","projectId":"p1","channelName":"alerts","webhookConfigured":true,"maskedWebhookUrl":"https://hooks.slack.com/services/T0…wxyz","events":${JSON.stringify(EVENTS)},"isActive":true,"createdAt":"${TIME}","updatedAt":"${TIME}"}`;
+  const telegramReply = `{"id":"i1","projectId":"p1","chatId":"-100123","threadId":7,"chatLabel":"ops","botTokenConfigured":true,"maskedBotToken":"123456:AA…wxyz","events":${JSON.stringify(EVENTS)},"isActive":false,"createdAt":"${TIME}","updatedAt":"${TIME}"}`;
+
+  // Slack and Discord share the reply shape: the masked URL and the configured
+  // flag are the server's answer, and the stored secret never comes back.
+  test.each([
+    ["slack", api.getSlackIntegration, "/api/slack-integration/project/p1"],
+    ["discord", api.getDiscordIntegration, "/api/discord-integration/project/p1"],
+  ] as const)("%s integration row", async (_, get, path) => {
+    const seen = recorder(webhookReply);
+    expect(await get("p1")).toEqual({
+      id: "i1",
+      projectId: "p1",
+      channelName: "alerts",
+      webhookConfigured: true,
+      maskedWebhookUrl: "https://hooks.slack.com/services/T0…wxyz",
+      events: EVENTS,
+      isActive: true,
+      createdAt: TIME,
+      updatedAt: TIME,
+    });
+    expect([seen.method, seen.path]).toEqual(["GET", path]);
+  });
+
+  test("telegram integration row", async () => {
+    const seen = recorder(telegramReply);
+    expect(await api.getTelegramIntegration("p1")).toEqual({
+      id: "i1",
+      projectId: "p1",
+      chatId: "-100123",
+      threadId: 7,
+      chatLabel: "ops",
+      botTokenConfigured: true,
+      maskedBotToken: "123456:AA…wxyz",
+      events: EVENTS,
+      isActive: false,
+      createdAt: TIME,
+      updatedAt: TIME,
+    });
+    expect([seen.method, seen.path]).toEqual(["GET", "/api/telegram-integration/project/p1"]);
+  });
+
+  // A project with no integration answers JSON null, which reads as no row.
+  test.each([
+    ["slack", api.getSlackIntegration],
+    ["discord", api.getDiscordIntegration],
+    ["telegram", api.getTelegramIntegration],
+  ] as const)("%s with none configured", async (_, get) => {
+    recorder("null");
+    expect(await get("p1")).toBeNull();
+  });
+
+  // A create sends the whole wanted row; the event toggles go as the partial
+  // set they were given, and the reply comes back masked.
+  test("slack create sends the wanted row", async () => {
+    const seen = recorder(webhookReply);
+    const got = await api.createSlackIntegration("p1", {
+      webhookUrl: "https://hooks.slack.com/services/T0123/B0456/abcdef123456",
+      channelName: "alerts",
+      events: { taskCreated: false },
+    });
+    expect([seen.method, seen.path]).toEqual(["POST", "/api/slack-integration/project/p1"]);
+    expect(JSON.parse(seen.body)).toEqual({
+      webhookUrl: "https://hooks.slack.com/services/T0123/B0456/abcdef123456",
+      channelName: "alerts",
+      events: { taskCreated: false },
+    });
+    expect(got?.id).toBe("i1");
+  });
+
+  // A patch sends only the fields named: the event toggles merge into the
+  // stored set server-side, and null clears the nullable channel name.
+  test.each([
+    ["slack", api.updateSlackIntegration, "/api/slack-integration/project/p1"],
+    ["discord", api.updateDiscordIntegration, "/api/discord-integration/project/p1"],
+  ] as const)("%s update sends only what changed", async (_, update, path) => {
+    const seen = recorder(webhookReply);
+    await update("p1", { channelName: null, isActive: false, events: { taskPriorityChanged: true } });
+    expect([seen.method, seen.path]).toEqual(["PATCH", path]);
+    expect(seen.body).toBe('{"channelName":null,"isActive":false,"events":{"taskPriorityChanged":true}}');
+  });
+
+  test("telegram create sends the wanted row", async () => {
+    const seen = recorder(telegramReply);
+    const got = await api.createTelegramIntegration("p1", { botToken: "123456:fake-bot-token", chatId: "-100123", threadId: 7 });
+    expect([seen.method, seen.path]).toEqual(["POST", "/api/telegram-integration/project/p1"]);
+    expect(seen.body).toBe('{"botToken":"123456:fake-bot-token","chatId":"-100123","threadId":7}');
+    expect(got?.chatId).toBe("-100123");
+  });
+
+  // threadId and chatLabel are nullable on the wire: null is how a patch
+  // clears them, where an omitted key would keep the stored value.
+  test("telegram update clears the nullable fields", async () => {
+    const seen = recorder(telegramReply);
+    await api.updateTelegramIntegration("p1", { threadId: null, chatLabel: null, isActive: true });
+    expect([seen.method, seen.path]).toEqual(["PATCH", "/api/telegram-integration/project/p1"]);
+    expect(seen.body).toBe('{"threadId":null,"chatLabel":null,"isActive":true}');
+  });
+
+  test.each([
+    ["slack", "/api/slack-integration/project/p1", api.deleteSlackIntegration],
+    ["discord", "/api/discord-integration/project/p1", api.deleteDiscordIntegration],
+    ["telegram", "/api/telegram-integration/project/p1", api.deleteTelegramIntegration],
+  ] as const)("delete %s integration", async (_, path, del) => {
+    const seen = recorder('{"success":true}');
+    expect(await del("p1")).toEqual({ success: true });
+    expect([seen.method, seen.path]).toEqual(["DELETE", path]);
   });
 });
 

@@ -1,0 +1,33 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "discord",
+        "set",
+        "--webhook-url",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/discord-integration/project/proj-alpha: 400: Enter a valid Discord webhook URL\"\n}\n",
+      "stderr": "Error: POST /api/discord-integration/project/proj-alpha: 400: Enter a valid Discord webhook URL\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/discord-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://example.com/api/webhooks/1/tok"
+      }
+    }
+  ],
+  "files": {}
+}

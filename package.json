@@ -13,7 +13,8 @@
     "fmt:check": "oxfmt --check",
     "build": "bun scripts/build.ts",
     "parity:record": "bun scripts/record-golden.ts",
-    "spec": "bun scripts/spec.ts"
+    "spec": "bun scripts/spec.ts",
+    "rebase:main": "bun scripts/rebase-main.ts"
   },
   "repository": {
     "type": "git",

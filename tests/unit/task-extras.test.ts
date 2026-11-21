@@ -225,6 +225,28 @@ describe("task upload's local file check", () => {
 });
 
 describe("putUpload", () => {
+  // The presigned URL's query is the credential and the bytes the payload, so
+  // the scheme is held to the API key's rule before fetch: https anywhere,
+  // http only to a loopback host. fetch is stubbed so a refusal is proven by
+  // it never being called.
+  const stubFetch = (answer: () => Response) => {
+    const real = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = Object.assign(
+      async (input: Parameters<typeof fetch>[0]) => {
+        calls.push(String(input));
+        return answer();
+      },
+      { preconnect: real.preconnect },
+    );
+    return {
+      calls,
+      restore: () => {
+        globalThis.fetch = real;
+      },
+    };
+  };
+
   test("PUTs the bytes with the given headers and no API key", async () => {
     let seenReq: { bytes: number; type: string | null; auth: string | null } | undefined;
     const url = serve(async (req) => {
@@ -276,5 +298,65 @@ describe("putUpload", () => {
     expect(e).toBeInstanceOf(Error);
     expect((e as Error).message).toMatch(/^upload to storage failed: \w+$/);
     expect((e as Error).message).not.toContain("127.0.0.1");
+  });
+
+  test("an https URL passes the check and is sent the bytes", async () => {
+    const stub = stubFetch(() => new Response(null, { status: 200 }));
+    try {
+      await putUpload("https://storage.example.invalid/uploads/k?sig=secret", { "x-amz-meta": "1" }, new Uint8Array([1, 2, 3]));
+    } finally {
+      stub.restore();
+    }
+    expect(stub.calls).toEqual(["https://storage.example.invalid/uploads/k?sig=secret"]);
+  });
+
+  // http to loopback is the self-hosted case the rule exists for: the check
+  // passes and the call fails only at the connection, as it does for https.
+  test("http to a loopback host passes the check and fails only at the connection", async () => {
+    const e = await putUpload("http://127.0.0.1:9/uploads/k?sig=1", {}, new Uint8Array([1])).then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(e).toBeInstanceOf(Error);
+    expect((e as Error).message).toMatch(/^upload to storage failed: \w+$/);
+    expect((e as Error).message).not.toContain("refused");
+    expect((e as Error).message).not.toContain("sig=1");
+  });
+
+  test("http to a non-loopback host is refused before fetch", async () => {
+    const stub = stubFetch(() => new Response(null, { status: 200 }));
+    try {
+      const e = await putUpload("http://storage.example.invalid/uploads/k?sig=secret", {}, new Uint8Array([1])).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(e).toBeInstanceOf(Error);
+      expect((e as Error).message).toBe(
+        "upload to storage refused: http://storage.example.invalid/uploads/k is not https, or http to a loopback host",
+      );
+      expect((e as Error).message).not.toContain("sig=secret");
+      expect(stub.calls).toEqual([]);
+    } finally {
+      stub.restore();
+    }
+  });
+
+  // The allowance is https, or http to loopback — another scheme is refused
+  // even on loopback rather than left for fetch to reject.
+  test("a non-http scheme is refused even on loopback", async () => {
+    const stub = stubFetch(() => new Response(null, { status: 200 }));
+    try {
+      const e = await putUpload("ftp://127.0.0.1/uploads/k", {}, new Uint8Array([1])).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(e).toBeInstanceOf(Error);
+      expect((e as Error).message).toBe(
+        "upload to storage refused: ftp://127.0.0.1/uploads/k is not https, or http to a loopback host",
+      );
+      expect(stub.calls).toEqual([]);
+    } finally {
+      stub.restore();
+    }
   });
 });

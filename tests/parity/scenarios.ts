@@ -1349,6 +1349,26 @@ export const SCENARIOS: Scenario[] = [
       ["task", "ls", "--all", "--json"],
     ],
   },
+  // --to into another workspace is refused before the copy exists: the
+  // server moves a task only within its own workspace, and a copy the move
+  // then refused would be left behind. The listing after shows nothing was
+  // created.
+  {
+    name: "task duplicate to a project in another workspace",
+    seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
+    steps: [
+      ["task", "duplicate", "1", "--to", "GAM", "--json"],
+      ["task", "duplicate", "1", "--to", "proj-gamma", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  // The move after the copy is a write like any other: a 200 that did not
+  // take is caught by the read-back, as `task move` checks its own.
+  {
+    name: "task duplicate move the server did not keep",
+    writesNotKept: true,
+    steps: [["task", "duplicate", "1", "--to", P2, "--json"]],
+  },
   // A blank --title or --to and an unknown task are refused; a --to that
   // names no project fails before the copy is made.
   {

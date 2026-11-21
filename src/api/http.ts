@@ -693,9 +693,19 @@ const messageOf = (value: unknown): string => {
 // request is, since a storage endpoint that never answers would otherwise hold
 // the command open for ever. A redirect is refused rather than followed, as
 // kaneoFetch refuses its own: the signature is bound to this URL, and the
-// bytes and credential would otherwise go wherever it points. The URL itself
-// is never repeated in a failure: a presigned URL's query is its credential.
+// bytes and credential would otherwise go wherever it points. The query is
+// never repeated in a failure: a presigned URL's query is its credential.
 export const putUpload = async (url: string, headers: Record<string, string>, body: Uint8Array): Promise<void> => {
+  // The signed query and headers are the credential and the bytes the
+  // payload, so the URL is held to the rule the API key is: https, or http
+  // to a loopback host. Checked before the request, so nothing leaves the
+  // process on a plain-HTTP hop.
+  const parsed = parseUrl(url);
+  const allowed =
+    parsed !== undefined && (parsed.protocol === "https:" || (parsed.protocol === "http:" && isLoopback(hostName(parsed))));
+  if (!allowed) {
+    throw new Error(`upload to storage refused: ${presignedTarget(url)} is not https, or http to a loopback host`);
+  }
   const cap = settings.timeoutMs > 0 ? AbortSignal.timeout(settings.timeoutMs) : AbortSignal.abort();
   let response: Response;
   try {

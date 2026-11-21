@@ -865,8 +865,7 @@ export const taskCommand = {
         // An empty --title is refused before the copy is made: the server reads
         // a blank one as no title at all and would keep the source's, which is
         // not what was asked.
-        const title = changed.has("title") ? String(flags.title ?? "") : undefined;
-        if (title !== undefined && title.trim() === "") throw new Error("empty --title");
+        const title = changed.has("title") ? wantedTitle(String(flags.title ?? "")) : undefined;
         const to = String(flags.to ?? "");
         if (changed.has("to") && to.trim() === "") throw new Error("empty --to");
         apiKey(app);
@@ -874,19 +873,31 @@ export const taskCommand = {
         // The destination is resolved before the copy is made, so a --to that
         // names no project fails before anything is written. The source's own
         // project is refused for the same reason: the move would fail after
-        // the copy existed, leaving it behind.
+        // the copy existed, leaving it behind. A project in another workspace
+        // would strand the copy the same way — the server moves a task only
+        // within its own workspace — and the probe is a read that answers a
+        // project in any workspace the key reaches, so the two workspaces are
+        // compared here, while nothing is written yet.
         let destId = "";
         if (to !== "") {
+          let destWorkspace = "";
           destId = await withProject(
             to,
             async (id) => {
-              await getProject(id);
+              const project = await getProject(id);
+              destWorkspace = project.workspaceId;
               return id;
             },
             { sameWorkspaceAs: task.projectId },
           );
           if (destId === task.projectId) {
             throw new Error(`--to ${JSON.stringify(to)} is the project the task is already in`);
+          }
+          const sourceWorkspace = (await getProject(task.projectId)).workspaceId;
+          if (destWorkspace !== sourceWorkspace) {
+            throw new Error(
+              `--to ${JSON.stringify(to)} names a project in another workspace; the server moves a task only within its own workspace`,
+            );
           }
         }
         const copy = await duplicateTask(task.id, title);
@@ -900,6 +911,7 @@ export const taskCommand = {
             );
           }
           shown = await taskAfterWrite(copy, "the copy was moved");
+          readBack("project", shown.projectId, destId);
         }
         app.out.human(`duplicated #${task.number} as #${shown.number} ${shown.title}`);
         app.out.data(shown);

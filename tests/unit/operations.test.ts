@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import { configureClient, KaneoApiError } from "../../src/api/http";
+import { configureClient, InsecureCredentialError, KaneoApiError } from "../../src/api/http";
 import * as api from "../../src/api/kaneo";
 
 // Ported from the Go build's internal/api/operations_test.go. Each test serves
@@ -722,6 +722,15 @@ describe("calendar feeds", () => {
     const err = await failure(api.calendarFeedIcs("t"));
     expect(err).toBeInstanceOf(KaneoApiError);
     expect((err as KaneoApiError).messages).toEqual(["Calendar feed not found"]);
+  });
+
+  // The token is in the URL, so the call is credential-bearing even though it
+  // is anonymous: plain HTTP to a non-loopback host is refused before the
+  // token could be sent in clear.
+  test("the calendar read refuses plain HTTP off-loopback", async () => {
+    configureClient({ baseUrl: "http://kaneo.example.invalid", apiKey: "test-key" });
+    const err = await failure(api.calendarFeedIcs("t"));
+    expect(err).toBeInstanceOf(InsecureCredentialError);
   });
 });
 

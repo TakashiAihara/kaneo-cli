@@ -165,6 +165,46 @@ describe("the key over plain HTTP", () => {
   });
 });
 
+// The calendar feed's token is in the URL path, so its request is anonymous —
+// no key is fetched or sent — yet the URL still owes keepsCredential's
+// protection: plain HTTP to a non-loopback host is refused before anything is
+// sent, and so is a redirect that lands on one, since the path cannot be
+// stripped the way the key's header can.
+describe("a credential carried in the URL", () => {
+  const feedInit = { method: "GET", anonymous: true, text: true, credentialInUrl: true };
+
+  test("is refused over plain HTTP to a non-loopback host, without asking for the key", async () => {
+    let asked = 0;
+    configureClient({ baseUrl: "http://kaneo.example.invalid", apiKey: () => (asked++, "test-key") });
+    const e = await failure(kaneoFetch<string>("/calendar-feed/t/calendar.ics", feedInit));
+    expect(e).toBeInstanceOf(InsecureCredentialError);
+    expect(asked).toBe(0);
+  });
+
+  test("is sent to a loopback instance", async () => {
+    const ics = "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n";
+    const url = serve(() => new Response(ics, { headers: { "content-type": "text/calendar" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    expect(await kaneoFetch<string>("/calendar-feed/t/calendar.ics", feedInit)).toBe(ics);
+  });
+
+  test("a redirect to plain HTTP off-loopback is refused", async () => {
+    const origin = serve(() => Response.redirect("http://kaneo.example.invalid/calendar-feed/t/calendar.ics", 307));
+    configureClient({ baseUrl: origin, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch<string>("/calendar-feed/t/calendar.ics", feedInit))) as Error;
+    expect(e).toBeInstanceOf(InsecureCredentialError);
+    expect(e.message).toContain("http://kaneo.example.invalid");
+  });
+
+  test("a redirect that stays on protected targets is followed", async () => {
+    const ics = "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n";
+    const target = serve(() => new Response(ics));
+    const origin = serve(() => Response.redirect(`${target}/api/calendar-feed/t/calendar.ics`, 307));
+    configureClient({ baseUrl: origin, apiKey: "test-key" });
+    expect(await kaneoFetch<string>("/calendar-feed/t/calendar.ics", feedInit)).toBe(ics);
+  });
+});
+
 describe("redirects", () => {
   // fetch keeps Authorization across a same-host redirect even when the
   // scheme drops to http, which would put the key on the wire in the clear.

@@ -11,7 +11,7 @@ import {
 } from "../api/kaneo";
 import { normalizeBaseUrl } from "../api/http";
 import { exactArgs, minimumArgs, noArgs, type RunContext } from "./args";
-import { withProject } from "./lookup";
+import { resolveWorkspace, withProject } from "./lookup";
 import { sanitizeDocument } from "../output/output";
 
 // The subscribe link a feed's token stands for: the API serves it without a
@@ -30,8 +30,21 @@ const labelNames = (rows: LabelRecord[]): Map<string, string> => {
 
 // The workspace's label rows, or none when no workspace is configured: the
 // names are decoration on the listing, and a feed is still listed without them.
-const feedLabelNames = async (app: App): Promise<Map<string, string>> =>
-  app.cfg.workspaceId === "" ? new Map() : labelNames(await listWorkspaceLabels(workspace(app)));
+// A failed read degrades the same way — after `feed create` the feed and its
+// subscribe link are already on the server, so a names lookup that fails must
+// not turn the printed answer into an error; the reason goes to stderr and the
+// feed's label ids stand in for the names.
+const feedLabelNames = async (app: App): Promise<Map<string, string>> => {
+  if (app.cfg.workspaceId === "") return new Map();
+  try {
+    return labelNames(await listWorkspaceLabels(await resolveWorkspace(workspace(app))));
+  } catch (e) {
+    console.error(
+      `kaneo: label names unavailable, the feed's label ids are shown instead: ${e instanceof Error ? e.message : String(e)}`,
+    );
+    return new Map();
+  }
+};
 
 const feedLabels = (feed: CalendarFeed, names: Map<string, string>): string =>
   feed.labelIds.map((id) => names.get(id) ?? id).join(",");
@@ -118,7 +131,7 @@ export const feedCommand = {
         const wanted = project(app);
         // The labels resolve before the project does: they are the workspace's,
         // and a project that names none still gets the same refusal.
-        const rows = await listWorkspaceLabels(workspace(app));
+        const rows = await listWorkspaceLabels(await resolveWorkspace(workspace(app)));
         const options = calendarLabelOptions(rows);
         const labelIds = [...new Set(args.map((arg) => resolveFeedLabel(options, arg.trim())))];
         const timeZone = String(flags["time-zone"] ?? "");

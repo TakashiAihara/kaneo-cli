@@ -2123,8 +2123,11 @@ export const revokeCalendarFeed = async (projectId: string, id: string): Promise
 // The iCalendar document a feed's link serves. The route is public — the token
 // is the credential — so the call is anonymous, asks for the document's own
 // media type, and the body comes back as the text it is rather than as JSON.
+// The token rides in the URL, so the call is marked credentialInUrl: the
+// transport refuses it over plain HTTP to a non-loopback host, on the first
+// hop and on every redirect, the way it refuses to send the key there.
 export const calendarFeedIcs = async (token: string): Promise<string> =>
-  readCalendarFeed(pathParam(token), { anonymous: true, text: true, headers: { Accept: "text/calendar" } });
+  readCalendarFeed(pathParam(token), { anonymous: true, text: true, credentialInUrl: true, headers: { Accept: "text/calendar" } });
 
 // A link from a task to something outside the board.
 //

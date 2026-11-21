@@ -1,0 +1,88 @@
+{
+  "steps": [
+    {
+      "args": [
+        "feed",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "feed0001  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001/calendar.ics  bug  UTC  2026-01-01T01:00:00.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "create",
+        "bug",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"feed0002\",\n  \"projectId\": \"proj-alpha\",\n  \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0002\",\n  \"labelIds\": [\n    \"lbl0002\"\n  ],\n  \"timeZone\": \"UTC\",\n  \"createdAt\": \"2026-01-01T01:00:01.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "feed0001  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001/calendar.ics  bug  UTC  2026-01-01T01:00:00.000Z\nfeed0002  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0002/calendar.ics  bug  UTC  2026-01-01T01:00:01.000Z\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": "",
+      "body": {
+        "labelIds": [
+          "lbl0002"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -232,12 +232,22 @@
     },
     {
       "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/label/workspace/ws-main",
       "query": ""
     },
     {
       "method": "GET",
       "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
       "query": ""
     },
     {
@@ -258,6 +268,11 @@
     },
     {
       "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/label/workspace/ws-main",
       "query": ""
     },
@@ -273,7 +288,17 @@
     },
     {
       "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
       "query": ""
     },
     {
@@ -293,7 +318,7 @@
     },
     {
       "method": "GET",
-      "path": "/label/workspace/ws-main",
+      "path": "/auth/organization/list",
       "query": ""
     },
     {
@@ -303,7 +328,27 @@
     },
     {
       "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
       "query": ""
     },
     {
@@ -385,6 +430,11 @@
     {
       "method": "GET",
       "path": "/calendar-feed/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
       "query": ""
     },
     {

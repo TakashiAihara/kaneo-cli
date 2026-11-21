@@ -1295,6 +1295,32 @@ export const SCENARIOS: Scenario[] = [
     seed: { calendarFeeds: [{ projectId: P1, labels: ["bug"] }] },
     steps: [["feed", "ls", "--human"], ["feed", "ls", "--json"], ["feed", "create", "bug", "--json"]],
   },
+  {
+    // -w takes an id, a slug or a name, and the feed commands resolve it to the
+    // workspace's id the way every other workspace-scoped command does before
+    // asking for its labels. "main" is ws-main's slug: sent raw it would name
+    // no workspace's labels at all.
+    name: "feed commands resolve a workspace slug",
+    env: { KANEO_WORKSPACE: "main" },
+    seed: { calendarFeeds: [{ projectId: P1, labels: ["bug"] }] },
+    steps: [
+      ["feed", "ls", "--human"],
+      ["feed", "create", "bug", "--json"],
+      ["feed", "ls", "--human"],
+    ],
+  },
+  {
+    // The label names are decoration read after the write: when that read
+    // fails the created feed — and its subscribe link — is still printed, with
+    // the reason on stderr, rather than the command failing as if nothing was
+    // made. The first labels read, create's own options, still succeeds; every
+    // read after it fails, so `feed ls` degrades the same way.
+    name: "feed create prints the feed when label names cannot be read",
+    failOn: "^GET /label/workspace/",
+    failOnSkip: 1,
+    seed: { calendarFeeds: [{ projectId: P1, labels: ["bug"] }] },
+    steps: [["feed", "create", "bug", "--human"], ["feed", "ls", "--human"]],
+  },
   { name: "comment add from stdin", stdin: "multi\nline $comment\n", steps: [["comment", "add", "1", "-", "--json"], ["comment", "ls", "1", "--json"]] },
   { name: "comment add from a file", files: { "c.md": "from a file\n" }, steps: [["comment", "add", "1", "--file", "c.md", "--human"]] },
   { name: "comment add with text and a file", files: { "c.md": "x" }, steps: [["comment", "add", "1", "hi", "--file", "c.md", "--json"]] },

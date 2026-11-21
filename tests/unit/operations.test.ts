@@ -505,6 +505,7 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
         "SetStartAndPosition",
         "SetProjectBackground",
         "MoveProject",
+        "GitHubUpdate",
       ].includes(name),
     );
     expect(seen[0]).toEqual({ method, path });
@@ -1997,20 +1998,33 @@ test("TestGitHubUpdateSendsOnlyWhatChanged", async () => {
   });
   const got = await api.updateGitHubIntegration("p1", { isActive: false });
   expect(bodies).toEqual([{ isActive: false }]);
-  expect(got?.isActive).toBe(false);
-  expect(got?.commentTaskLinkOnGitHubIssue).toBeNull();
+  expect(got.isActive).toBe(false);
+  expect(got.commentTaskLinkOnGitHubIssue).toBeNull();
 });
 
-// An empty change set is refused before a request: the route would answer the
-// current integration either way, which reads as a change that was not.
+// A changes object that serializes to nothing is refused before a request:
+// the route would answer the current integration either way, which reads as
+// a change that was not. A field set to undefined serializes away the same
+// way an absent one does, so it does not count either.
 test("TestGitHubUpdateRefusesAnEmptyChange", async () => {
   const seen: string[] = [];
   newServer((req) => {
     seen.push(req.method);
     return new Response("{}");
   });
-  expect(String(await failure(api.updateGitHubIntegration("p1", {})))).toContain("no GitHub integration settings");
+  for (const changes of [{}, { isActive: undefined }, { isActive: undefined, commentTaskLinkOnGitHubIssue: undefined }]) {
+    expect(String(await failure(api.updateGitHubIntegration("p1", changes)))).toContain("no GitHub integration settings");
+  }
   expect(seen).toEqual([]);
+});
+
+// The route answers 404 for a project with no integration, so a 200 carrying
+// none is a reply that confirms nothing was changed — it is refused rather
+// than reported as updated.
+test("TestGitHubUpdateRefusesAReplyWithNoIntegration", async () => {
+  recorder("null");
+  const err = await failure(api.updateGitHubIntegration("p1", { isActive: true }));
+  expect(String(err)).toContain("server did not echo the update");
 });
 
 // No integration is null, not an error and not an empty record.
@@ -2137,6 +2151,76 @@ test("TestGitHubImportWaitsOutABusyLock", async () => {
   expect(calls).toBe(3);
   expect(got.pending).toBe(false);
 }, 10_000);
+
+// The busy count starts over after a page that went through: five busy
+// answers, a page, one more busy answer and the end is an import that
+// finishes, not one given up on.
+test("TestGitHubImportBusyCountStartsOverAfterAPage", async () => {
+  const replies = [429, 429, 429, 429, 429, 202, 429, 200];
+  let calls = 0;
+  newServer(() => {
+    const at = calls++;
+    if (replies[at] === 429) return new Response("GitHub import is busy; retry this request", { status: 429, headers: { "Retry-After": "1" } });
+    const pending = replies[at] === 202;
+    return new Response(JSON.stringify({ runId: "run1", pending, imported: 1, updated: 0, skipped: 0 }), {
+      status: replies[at],
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(8);
+  expect(got.pending).toBe(false);
+}, 15_000);
+
+// Five busy answers in a row are given up on, so a lock that stays held does
+// not keep the command polling.
+test("TestGitHubImportGivesUpOnALockThatStaysBusy", async () => {
+  let calls = 0;
+  newServer(() => {
+    calls++;
+    return new Response("busy", { status: 429 });
+  });
+  const err = await failure(api.importGitHubIssues("p1"));
+  expect(err).toBeInstanceOf(KaneoApiError);
+  expect(calls).toBe(6);
+}, 10_000);
+
+// A run whose counts never move is stuck: the pages that finish an issue's
+// labels and comments and every pull-request page report the same numbers,
+// but a run reporting them request after request is given up on rather than
+// polled for ever. The error names how to resume the saved run.
+test("TestGitHubImportGivesUpOnARunThatNeverProgresses", async () => {
+  let calls = 0;
+  newServer(() => {
+    calls++;
+    return new Response(JSON.stringify({ runId: "run1", pending: true, imported: 1, updated: 0, skipped: 0 }), {
+      status: 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const err = await failure(api.importGitHubIssues("p1"));
+  expect(String(err)).toContain("counts have not changed in 100 requests");
+  expect(String(err)).toContain("kaneo integration github import --run-id run1");
+  expect(calls).toBe(100);
+}, 10_000);
+
+// Counts that hold for a few requests and then move are a run still working,
+// not a stuck one: only an unbroken run of identical counts is given up on.
+test("TestGitHubImportSurvivesCountsThatHoldThenMove", async () => {
+  const counts = [1, 1, 1, 2, 2, 2, 3];
+  let calls = 0;
+  newServer(() => {
+    const imported = counts[Math.min(calls++, counts.length - 1)]!;
+    const done = calls > counts.length;
+    return new Response(JSON.stringify({ runId: "run1", pending: !done, imported, updated: 0, skipped: 0 }), {
+      status: done ? 200 : 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(8);
+  expect(got).toEqual({ runId: "run1", pending: false, imported: 3, updated: 0, skipped: 0 });
+});
 
 // The routes behind the server's user-session check refuse a key with their
 // own words; the message is kept for the caller.

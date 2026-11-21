@@ -2785,16 +2785,23 @@ export const connectGitHubRepository = async (
   return gitHubIntegration(zeroRecord(await postGitHubIntegration(pathParam(projectId), body)));
 };
 
-// Writes the settings a caller names and leaves the rest as stored. An empty
-// changes object is refused here rather than sent: the route answers the
-// current integration either way, which would look like a change that was not.
+// Writes the settings a caller names and leaves the rest as stored. A changes
+// object that serializes to nothing — empty, or every field undefined — is
+// refused here rather than sent: the route answers the current integration
+// either way, which would look like a change that was not. The route answers
+// 404 for a project with no integration, so a 200 carrying none is a reply
+// that confirms nothing was written and is refused the way a write the server
+// did not echo is.
 export const updateGitHubIntegration = async (
   projectId: string,
   changes: UpdateGitHubIntegrationBody,
-): Promise<GitHubIntegration | null> => {
-  if (Object.keys(changes).length === 0) throw new Error("no GitHub integration settings to change");
+): Promise<GitHubIntegration> => {
+  if (Object.values(changes).every((value) => value === undefined)) {
+    throw new Error("no GitHub integration settings to change");
+  }
   const reply = (await patchGitHubIntegration(pathParam(projectId), changes)) ?? null;
-  return reply === null ? null : gitHubIntegration(reply);
+  if (reply === null) throw new Error(`/github-integration/project/${projectId}: server did not echo the update`);
+  return gitHubIntegration(reply);
 };
 
 // What the delete route answers.
@@ -2819,9 +2826,19 @@ export const deleteGitHubIntegration = async (projectId: string): Promise<GitHub
 // client's request holding it is answered 429 with Retry-After: 1; that is
 // waited out the way a busy label delete is, five times in a row at most, the
 // count starting over after each page that went through.
+//
+// The counts a pending reply reports are the only progress the route shows,
+// and only an issue's own page moves them: the pages that finish an issue's
+// labels and comments and every pull-request page report the same numbers
+// however much they do, so a run can hold them for a stretch and still be
+// working. A run reporting the same counts IMPORT_STALL_LIMIT requests in a
+// row is given up on as stuck — its progress is saved after each page, so
+// the same command resumes it — rather than polled for ever.
 export const importGitHubIssues = async (projectId: string, runId?: string): Promise<GitHubImportResult> => {
   let run = runId;
   let busy = 0;
+  let lastCounts = "";
+  let held = 0;
   for (;;) {
     const body: ImportGitHubIssuesBody = { projectId };
     if (run !== undefined && run !== "") body.runId = run;
@@ -2840,12 +2857,29 @@ export const importGitHubIssues = async (projectId: string, runId?: string): Pro
     if (result.pending !== true) return result;
     busy = 0;
     if (result.runId !== "") run = result.runId;
+    const counts = `${result.imported}/${result.updated}/${result.skipped}`;
+    held = counts === lastCounts ? held + 1 : 1;
+    lastCounts = counts;
+    if (held >= IMPORT_STALL_LIMIT) {
+      const resume =
+        run === undefined || run === ""
+          ? "kaneo integration github import"
+          : `kaneo integration github import --run-id ${shellWord(run)}`;
+      throw new Error(
+        `the GitHub import's counts have not changed in ${IMPORT_STALL_LIMIT} requests; the run is saved, so \`${resume}\` resumes it`,
+      );
+    }
   }
 };
 
-// The server's own numbers: the lock's 429 carries Retry-After: 1.
+// The server's own numbers: the lock's 429 carries Retry-After: 1. The stall
+// limit is set far past the stretch one issue's own pages, or a pull-request
+// tail of ordinary size, can hold the same counts for; a run that still holds
+// them is stuck or too large to finish in one invocation, and resumes either
+// way.
 const IMPORT_BUSY_RETRIES = 5;
 const IMPORT_BUSY_WAIT_MS = 1000;
+const IMPORT_STALL_LIMIT = 100;
 
 export type CheckResult = {
   serverOperations: number;

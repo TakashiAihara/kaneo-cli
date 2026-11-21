@@ -143,7 +143,19 @@ export const githubCommand = {
         const [owner, name] = repoRef(args);
         apiKey(app);
         const result = await withProject(project(app), (id) => verifyGitHubRepository(id, owner, name));
-        app.out.human(result.message);
+        // The facts lead so an empty server message cannot hide them: the
+        // message is the server's own summary of the same answer.
+        app.out.human(`installed    ${result.isInstalled ? "yes" : "no"}`);
+        if (result.isInstalled) {
+          app.out.human(
+            result.hasRequiredPermissions
+              ? "permissions  complete"
+              : result.missingPermissions.length === 0
+                ? "permissions  incomplete"
+                : `permissions  missing: ${result.missingPermissions.join(", ")}`,
+          );
+        }
+        if (result.message !== "") app.out.human(result.message);
         if (result.installationUrl !== null) app.out.human(`install   ${result.installationUrl}`);
         if (result.settingsUrl !== null) app.out.human(`settings  ${result.settingsUrl}`);
         app.out.data(result);
@@ -212,11 +224,6 @@ export const githubCommand = {
           throw new Error("nothing to change: pass --active or --comment-task-link");
         }
         const integration = await withProject(project(app), (id) => updateGitHubIntegration(id, changes));
-        if (integration === null) {
-          app.out.human("no GitHub integration");
-          app.out.data(null);
-          return;
-        }
         app.out.human("updated GitHub integration");
         printIntegration(app, integration);
         app.out.data(integration);

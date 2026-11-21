@@ -67,7 +67,7 @@ const GLOBAL_FLAGS: Flag[] = [
   { name: "human", type: "bool", usage: "force human-readable output, even through a pipe", defaultValue: "false" },
   // jq runs inside the binary, so reading one field needs nothing installed.
   { name: "jq", type: "string", usage: "filter JSON output with a jq expression (implies --json)", defaultValue: "" },
-  { name: "timeout", type: "duration", usage: "per-request timeout", defaultValue: DEFAULT_TIMEOUT },
+  { name: "timeout", type: "duration", usage: "timeout for each request and each --jq evaluation", defaultValue: DEFAULT_TIMEOUT },
 ];
 
 // `help` is a command of its own, the way it is in every cobra-built CLI, and

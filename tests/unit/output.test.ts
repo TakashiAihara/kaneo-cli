@@ -205,6 +205,20 @@ describe("Writer with a --jq filter", () => {
     expect(err).toContain("--jq: boom");
   });
 
+  // halt_error on null prints no message of its own, so a pipeline that is
+  // only debug lines leaves the error nothing to say: the DEBUG array is fd 2
+  // output and must not be copied into the JqFailure message.
+  test("TestJQDoesNotLeakDebugIntoAnEmptyHaltMessage", () => {
+    const { out, err } = runJq(
+      "null | debug | halt_error(7)",
+      `try { w.data({}); } catch (e) { console.log("code=" + e.exitCode); console.log(JSON.stringify(e.message)); }`,
+    );
+    expect(out).toBe(
+      'code=7\n"--jq: \\nthe command had already run when --jq failed; anything it changes has been changed"\n',
+    );
+    expect(err).toBe('["DEBUG:",null]\n');
+  });
+
   // halt_error(n) is how a jq program chooses its exit status, and the
   // JqFailure carries it through rather than collapsing every failure to 1.
   test("TestJQFailureKeepsJqExitCode", () => {

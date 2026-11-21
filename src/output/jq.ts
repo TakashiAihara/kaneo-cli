@@ -174,7 +174,16 @@ export const loadFilter = async (expression: string, stderrIsTerminal: boolean, 
   port1.unref();
   worker.postMessage({ port: port2 }, [port2]);
 
-  const ready = await readyResult(worker, timeoutMs);
+  let ready: Ready;
+  try {
+    ready = await readyResult(worker, timeoutMs);
+  } catch (e) {
+    // A worker that never answered is no use to a retry: on the timeout path
+    // it is still alive, finished with init and idle, and would hold the
+    // jq-wasm instance for the life of the process.
+    void worker.terminate();
+    throw e;
+  }
   if (ready.exitCode !== 0) {
     void worker.terminate();
     throw failure(ready.stderr, ready.exitCode);
@@ -203,11 +212,12 @@ export const loadFilter = async (expression: string, stderrIsTerminal: boolean, 
       }
       // No "jq: " line: the whole stream is what the program printed. debug's
       // arrays still read as debug and go to fd 2; what remains is
-      // halt_error's message.
+      // halt_error's message — nothing, when the program printed only debug
+      // lines (a halt_error on null or "" has no message of its own).
       const debug = program.filter((line) => line.startsWith('["DEBUG:",'));
       const rest = program.filter((line) => !line.startsWith('["DEBUG:",'));
       emit(debug.join("\n"), stderrIsTerminal);
-      throw failure(rest.length > 0 ? rest.join("\n") : stderr, exitCode, RAN);
+      throw failure(rest.join("\n"), exitCode, RAN);
     }
     emit(stderr, stderrIsTerminal);
     return lines(stdout);

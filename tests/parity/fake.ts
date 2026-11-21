@@ -1436,6 +1436,22 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     return /^[A-Za-z0-9._-]+$/.test(suffix) && !suffix.startsWith(".");
   };
 
+  // external_link.integration_id references integration.id with
+  // onDelete: "cascade" upstream, so deleting an integration takes the links
+  // made through it; the tasks and the links added by hand stay.
+  const dropLinksFor = (integrationId: string) => {
+    for (let i = links.length - 1; i >= 0; i--) if (links[i]!.integrationId === integrationId) links.splice(i, 1);
+  };
+  // move-task.ts deletes a moved task's links whose integration the
+  // destination project does not own — the check is the integration row's
+  // projectId, whichever provider wrote it. A link whose integration id names
+  // no stored row is not the destination's either, so it goes as well.
+  const integrationProjectOf = (integrationId: string) =>
+    gitea.find((x) => x.id === integrationId)?.projectId ??
+    gitlabs.find((x) => x.id === integrationId)?.projectId ??
+    githubIntegrations.find((x) => x.id === integrationId)?.projectId ??
+    integrations.find((x) => x.id === integrationId)?.projectId;
+
   const route = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     // The presigned PUT a background upload is given lands outside /api and
@@ -2216,6 +2232,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         dest.lastTaskNumber += 1;
         Object.assign(t, { projectId: dest.id, number: dest.lastTaskNumber, status: b.destinationStatus ?? firstColumn });
         touch(t);
+        // move-task.ts drops the moved task's links through integrations the
+        // destination project does not own; links with no integration — the
+        // ones added by hand — stay.
+        for (let i = links.length - 1; i >= 0; i--) {
+          const link = links[i]!;
+          if (link.taskId === t.id && link.integrationId !== null && integrationProjectOf(link.integrationId) !== dest.id) links.splice(i, 1);
+        }
         return ok(M.MoveTaskResult, { task: t, sourceProjectId: from, destinationProjectId: dest.id });
       }
       touch(t);
@@ -3060,8 +3083,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (opts.plainMember) return failText(403, "Insufficient permissions");
         const i = gitea.findIndex((x) => x.projectId === projectId);
         if (i < 0) return failText(404, "Gitea integration not found");
-        // Imported tasks keep their external links; only the integration row goes.
+        // The integration row's cascade takes the external links made through
+        // it; the imported tasks and hand-added links stay.
+        const removed = gitea[i]!;
         gitea.splice(i, 1);
+        dropLinksFor(removed.id);
         return ok(M.GiteaDeleteResult, { success: true, message: "Gitea integration deleted" });
       }
     }
@@ -3268,6 +3294,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "DELETE") {
         if (row === undefined) return failText(404, "GitLab integration not found");
         gitlabs.splice(gitlabs.indexOf(row), 1);
+        dropLinksFor(row.id);
         return ok(M.GitlabDeleteResult, { success: true, message: "GitLab integration deleted" });
       }
     }
@@ -3397,6 +3424,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "DELETE") {
         if (integ === undefined) return failText(404, "GitHub integration not found");
         githubIntegrations.splice(githubIntegrations.indexOf(integ), 1);
+        dropLinksFor(integ.id);
         return ok(M.GitHubDeleteResult, { success: true, message: "GitHub integration deleted" });
       }
     }
@@ -3447,6 +3475,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "DELETE") {
         if (!existing) return new Response("Project or integration not found", { status: 404 });
         integrations.splice(integrations.indexOf(existing), 1);
+        dropLinksFor(existing.id);
         return ok(integrationDeleteSchema(kind), { success: true });
       }
       const b = (body ?? {}) as Record<string, any>;

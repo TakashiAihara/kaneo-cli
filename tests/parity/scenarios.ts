@@ -2690,12 +2690,23 @@ export const SCENARIOS: Scenario[] = [
     name: "integration gitea update without integration",
     steps: [["integration", "gitea", "update", "--active=false", "--json"]],
   },
+  // The delete cascades to the external links the integration made, as the
+  // integration table's onDelete does upstream; the imported task and the
+  // link added by hand stay.
   {
     name: "integration gitea rm needs --yes",
-    seed: { giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }] },
+    seed: {
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      externalLinks: [
+        { taskId: "task-a1", url: "https://gitea.example.com/acme/app/issues/7", title: "Write the parser", resourceType: "issue", externalId: "7", integration: { id: "git0001", type: "gitea" } },
+        { taskId: "task-a1", url: "https://example.com/notes", title: "Notes" },
+      ],
+    },
     steps: [
+      ["task", "external-links", "1", "--json"],
       ["integration", "gitea", "rm", "--human"],
       ["integration", "gitea", "rm", "--yes", "--json"],
+      ["task", "external-links", "1", "--json"],
       ["integration", "gitea", "rm", "--yes", "--json"],
     ],
   },
@@ -2847,6 +2858,51 @@ export const SCENARIOS: Scenario[] = [
       ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--json"],
       ["integration", "gitea", "import", "--json"],
       ["task", "ls", "--json"],
+    ],
+  },
+
+  // The import matches an issue to a task by the integration and the issue
+  // number, not the repository: connect keeps the integration row, so acme/other's
+  // issue 1 refreshes the task acme/app's issue 1 was linked to — title,
+  // priority and labels take the new repository's content — while the link
+  // itself keeps pointing at the old repository's issue.
+  {
+    name: "integration gitea reconnect refreshes matching issue numbers",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }, { owner: "acme", name: "other" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [
+        { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "App issue one" }] },
+        { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "other", issues: [{ number: 1, title: "Other issue one", labels: ["priority:urgent"] }] },
+      ],
+      externalLinks: [{ taskId: "task-a1", url: "https://gitea.example.com/acme/app/issues/1", title: "App issue one", resourceType: "issue", externalId: "1", integration: { id: "git0001", type: "gitea" } }],
+    },
+    steps: [
+      ["integration", "gitea", "connect", "acme/other", "--base-url", "https://gitea.example.com", "--json"],
+      ["integration", "gitea", "import", "--json"],
+      ["task", "get", "1", "--json"],
+      ["task", "external-links", "1", "--json"],
+    ],
+  },
+
+  // move-task.ts deletes a moved task's links through integrations the
+  // destination project does not own, so the source project's next import
+  // finds no link for the issue and creates a fresh task in the source
+  // project rather than refreshing the moved one.
+  {
+    name: "integration gitea import after the task moved projects",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [{ baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "Gitea issue one", labels: ["bug"] }] }],
+    },
+    steps: [
+      ["integration", "gitea", "import", "--json"],
+      ["task", "move", "4", "--to", P2, "--json"],
+      ["task", "external-links", "2", "-p", P2, "--json"],
+      ["integration", "gitea", "import", "--json"],
+      ["task", "ls", "--json"],
+      ["task", "ls", "-p", P2, "--json"],
     ],
   },
 

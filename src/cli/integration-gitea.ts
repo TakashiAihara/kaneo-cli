@@ -185,7 +185,8 @@ export const giteaCommand = {
       long:
         "Unlink the project from its Gitea repository.\n\n" +
         "The integration row and its webhook secret go with it; connecting again\n" +
-        "makes a new link. Tasks already imported keep their external links.",
+        "makes a new link. Tasks already imported stay on the board, but the\n" +
+        "external links they hold through this integration are deleted with it.",
       args: noArgs("kaneo integration gitea rm"),
       flags: [boolFlag("yes", "confirm the deletion")],
       run: async ({ flags, app }: RunContext<App>) => {

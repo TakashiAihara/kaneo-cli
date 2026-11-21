@@ -44,6 +44,20 @@ export type Seed = {
   workflowRules?: { projectId: string; integrationType: string; eventType: string; columnSlug: string }[];
   // A link without an integration is one a person added by hand.
   externalLinks?: { taskId: string; url: string; title?: string | null; resourceType?: string; externalId?: string; integration?: { id: string; type: string } }[];
+  // A project's link to a GitLab project, as the integration routes keep it.
+  // token is stored raw and only ever answered masked; hookSecret likewise
+  // only to a caller that may manage the workspace's settings.
+  gitlabIntegrations?: {
+    projectId: string;
+    baseUrl: string;
+    projectPath: string;
+    token: string;
+    tokenType?: "private" | "bearer";
+    hookSecret?: string;
+    isActive?: boolean;
+    commentLink?: boolean;
+    branchPattern?: string;
+  }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
@@ -139,6 +153,11 @@ export type FakeOptions = {
   driftedSpec?: boolean;
   // Serves the pinned document without createTask, an operation the client calls.
   specWithoutOperation?: boolean;
+  // The errors an import-issues answer carries, for a partial import.
+  gitlabImportErrors?: string[];
+  // Fields the verify answer carries instead of the canned success, merged
+  // over it, for the failure bodies a real GitLab instance produces.
+  gitlabVerify?: Record<string, unknown>;
 };
 
 export function startFake(seed: Seed, opts: FakeOptions = {}) {
@@ -434,6 +453,113 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const keyTakenMessage = (key: string, name: string) =>
     `This workspace already has a project using the key "${key}" (${name}). Choose a different key.`;
 
+  // GitLab integrations number and date apart from everything else, so
+  // connecting one in a scenario leaves the ids and times the other
+  // scenarios record alone.
+  let gseq = 0;
+  let gclock = 0;
+  const gid = (prefix: string) => `${prefix}${String(++gseq).padStart(4, "0")}`;
+  const gnow = () => new Date(T0 + 172_800_000 + 1000 * gclock++).toISOString();
+  type GitlabRow = {
+    id: string;
+    projectId: string;
+    baseUrl: string;
+    projectPath: string;
+    token: string;
+    kind: "private" | "bearer";
+    hookSecret: string;
+    isActive: boolean;
+    commentTaskLink: boolean;
+    branchPattern: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  const gitlabs: GitlabRow[] = [];
+  for (const g of seed.gitlabIntegrations ?? []) {
+    const at = gnow();
+    gitlabs.push({
+      id: gid("gitl"),
+      projectId: g.projectId,
+      baseUrl: g.baseUrl,
+      projectPath: g.projectPath,
+      token: g.token,
+      kind: g.tokenType ?? "private",
+      hookSecret: g.hookSecret ?? gid("sec"),
+      isActive: g.isActive ?? true,
+      commentTaskLink: g.commentLink ?? true,
+      branchPattern: g.branchPattern ?? "{slug}-{number}",
+      createdAt: at,
+      updatedAt: at,
+    });
+  }
+
+  // As upstream's plugins/gitlab/config.ts and utils/normalize-input.ts: the
+  // base URL keeps origin and path only and plain http is refused unless
+  // private destinations are allowed (no scenario enables them), and the
+  // project path is its segments joined, refusing relative ones. Both answer
+  // the way the server's HTTPException does: the message as text.
+  const gitlabBase = (raw: string): string | Response => {
+    try {
+      const trimmed = raw.trim().replace(/\/+$/, "");
+      const parsed = new URL(trimmed);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return failText(400, "GitLab base URL must use http or https");
+      }
+      if (parsed.search || parsed.hash || parsed.username || parsed.password) {
+        return failText(400, "GitLab base URL must not contain a query, fragment, or credentials");
+      }
+      if (parsed.protocol === "http:") {
+        return failText(400, "GitLab URL must use https unless KANEO_ALLOW_PRIVATE_WEBHOOK_DESTINATIONS is enabled");
+      }
+      return `${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}`;
+    } catch (e) {
+      return failText(400, e instanceof Error ? e.message : "Invalid GitLab input");
+    }
+  };
+  const gitlabPath = (raw: string): string | Response => {
+    const segments = raw
+      .trim()
+      .replace(/^\/+|\/+$/g, "")
+      .split("/")
+      .filter(Boolean);
+    if (segments.length < 2) {
+      return failText(400, "GitLab project path must include a namespace, for example group/project");
+    }
+    if (segments.some((s) => s === "." || s === "..")) {
+      return failText(400, "GitLab project path must not contain relative segments");
+    }
+    return segments.join("/");
+  };
+
+  // The token checks that would call GitLab are canned: the fake has no
+  // GitLab instance to ask, so a well-formed request succeeds and failOn /
+  // failMessage inject the failures a scenario needs.
+  const GITLAB_PROJECTS = [
+    { id: 101, name: "Web App", path_with_namespace: "acme/web-app", name_with_namespace: "Acme / Web App", visibility: "private", web_url: "https://gitlab.example.com/acme/web-app" },
+    { id: 102, name: "Docs", path_with_namespace: "acme/docs", name_with_namespace: "Acme / Docs", visibility: "internal", web_url: "https://gitlab.example.com/acme/docs" },
+  ];
+
+  // As upstream's get-gitlab-integration.ts: a token of eight characters or
+  // fewer is masked whole, and the secrets are answered only to a caller
+  // that may manage the workspace's settings.
+  const maskGitlabToken = (token: string): string =>
+    token.length <= 8 ? "••••••••" : `${token.slice(0, 4)}••••••${token.slice(-4)}`;
+  const gitlabJson = (row: GitlabRow, includeSecrets: boolean, origin: string) => ({
+    id: row.id,
+    projectId: row.projectId,
+    baseUrl: row.baseUrl,
+    projectPath: row.projectPath,
+    tokenType: row.kind,
+    maskedAccessToken: includeSecrets ? maskGitlabToken(row.token) : "",
+    webhookUrl: `${origin}/api/gitlab-integration/webhook/${row.id}`,
+    webhookSecret: includeSecrets ? row.hookSecret : "",
+    branchPattern: row.branchPattern,
+    commentTaskLinkOnGitlabIssue: row.commentTaskLink,
+    isActive: row.isActive,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
+
   const failing = opts.failOn ? new RegExp(opts.failOn) : undefined;
   const failingQuery = opts.failOnQuery ? new RegExp(opts.failOnQuery) : undefined;
   let skipped = 0;
@@ -485,6 +611,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["PUT", /^\/label\/[^/]+\/task$/, M.AttachLabelToTaskBody],
       ["POST", /^\/time-entry$/, M.CreateTimeEntryBody],
       ["PUT", /^\/time-entry\/[^/]+$/, M.UpdateTimeEntryBody],
+      ["POST", /^\/gitlab-integration\/projects$/, M.ListGitlabProjectsBody],
+      ["POST", /^\/gitlab-integration\/verify$/, M.VerifyGitlabAccessBody],
+      ["POST", /^\/gitlab-integration\/import-issues$/, M.ImportGitlabIssuesBody],
+      ["POST", /^\/gitlab-integration\/project\/[^/]+$/, M.CreateGitlabIntegrationBody],
+      ["PATCH", /^\/gitlab-integration\/project\/[^/]+$/, M.UpdateGitlabIntegrationBody],
     ];
     for (const [method, re, schema] of BODIES) {
       if (req.method !== method || !re.test(path)) continue;
@@ -1372,6 +1503,132 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "DELETE" && p[2]) {
         if (l.taskId === null) return fail(400, "Label is not assigned to a task");
         return ok(M.Label, labels.splice(labels.indexOf(l), 1)[0]!);
+      }
+    }
+
+    // GitLab integration, as usekaneo/kaneo v2.32.0's gitlab-integration
+    // routes answer. The checks that would call GitLab are canned: the fake
+    // has no GitLab instance to ask, so a well-formed request succeeds and
+    // failOn / failMessage inject the failures a scenario needs.
+    if (req.method === "POST" && path === "/gitlab-integration/projects") {
+      const b = body as any;
+      if (!projects.some((x) => x.id === b?.projectId)) return failText(400, "Workspace ID could not be determined");
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
+      const base = gitlabBase(String(b?.baseUrl ?? ""));
+      if (base instanceof Response) return base;
+      return ok(M.GitlabProjectList, { projects: GITLAB_PROJECTS });
+    }
+    if (req.method === "POST" && path === "/gitlab-integration/verify") {
+      const b = body as any;
+      if (!projects.some((x) => x.id === b?.projectId)) return failText(400, "Workspace ID could not be determined");
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
+      const base = gitlabBase(String(b?.baseUrl ?? ""));
+      if (base instanceof Response) return base;
+      const projectPath = gitlabPath(String(b?.projectPath ?? ""));
+      if (projectPath instanceof Response) return projectPath;
+      return ok(M.GitlabVerificationResult, {
+        isInstalled: true,
+        hasRequiredPermissions: true,
+        projectExists: true,
+        projectVisibility: "private",
+        missingPermissions: [],
+        message: "Token can access the project.",
+        failureReason: null,
+        ...(opts.gitlabVerify ?? {}),
+      });
+    }
+    if (req.method === "POST" && path === "/gitlab-integration/import-issues") {
+      const b = body as any;
+      const holder = projects.find((x) => x.id === b?.projectId);
+      if (!holder) return failText(404, "Project not found");
+      const row = gitlabs.find((g) => g.projectId === holder.id);
+      if (row === undefined) return failText(404, "GitLab integration not found");
+      if (!row.isActive) return failText(400, "GitLab integration is not active");
+      return ok(M.GitlabImportResult, {
+        imported: 2,
+        updated: 1,
+        skipped: 1,
+        ...(opts.gitlabImportErrors === undefined ? {} : { errors: opts.gitlabImportErrors }),
+      });
+    }
+    if ((p = m(/^\/gitlab-integration\/project\/([^/]+)$/))) {
+      const key = decodeURIComponent(p[1]);
+      const proj = projects.find((x) => x.id === key);
+      // The workspace middleware finds no project before the route runs.
+      if (!proj) return failText(400, "Workspace ID could not be determined");
+      const row = gitlabs.find((g) => g.projectId === key);
+      const origin = new URL(req.url).origin;
+      if (req.method === "GET") {
+        return ok(M.GitlabIntegration, row === undefined ? null : gitlabJson(row, !opts.plainMember, origin));
+      }
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
+      if (req.method === "POST") {
+        const b = body as any;
+        const base = gitlabBase(String(b?.baseUrl ?? ""));
+        if (base instanceof Response) return base;
+        const projectPath = gitlabPath(String(b?.projectPath ?? ""));
+        if (projectPath instanceof Response) return projectPath;
+        const given = b?.["accessToken"];
+        const supplied = typeof given === "string" ? given.trim() : "";
+        if (supplied === "" && row !== undefined && row.token !== "") {
+          // A saved credential is only reused while the GitLab URL is
+          // unchanged (upstream's create-gitlab-integration.ts).
+          const saved = gitlabBase(row.baseUrl);
+          if ((saved instanceof Response ? undefined : saved) !== base) {
+            return failText(400, "Enter a new access token when changing the GitLab URL");
+          }
+        }
+        const resolved = supplied !== "" ? supplied : (row?.token ?? "");
+        if (resolved === "") return failText(400, "Access token is required");
+        // A GitLab project already linked to another Kaneo project is refused.
+        const clash = gitlabs.find((g) => {
+          if (g.projectId === key || !g.isActive) return false;
+          const otherBase = gitlabBase(g.baseUrl);
+          const otherPath = gitlabPath(g.projectPath);
+          return !(otherBase instanceof Response) && !(otherPath instanceof Response) && otherBase === base && otherPath === projectPath;
+        });
+        if (clash !== undefined) {
+          return failText(409, `Project ${projectPath} on this GitLab instance is already linked to another project`);
+        }
+        const kind = b?.["tokenType"] === "bearer" ? "bearer" : "private";
+        const at = gnow();
+        let saved: GitlabRow;
+        if (row === undefined) {
+          saved = {
+            id: gid("gitl"),
+            projectId: key,
+            baseUrl: base,
+            projectPath,
+            token: resolved,
+            kind,
+            hookSecret: gid("sec"),
+            isActive: true,
+            commentTaskLink: true,
+            branchPattern: "{slug}-{number}",
+            createdAt: at,
+            updatedAt: at,
+          };
+          gitlabs.push(saved);
+        } else {
+          // Reconnecting keeps the webhook secret and the stored settings,
+          // and reactivates the link.
+          Object.assign(row, { baseUrl: base, projectPath, token: resolved, kind, isActive: true, updatedAt: at });
+          saved = row;
+        }
+        return ok(M.GitlabIntegration, gitlabJson(saved, true, origin));
+      }
+      if (req.method === "PATCH") {
+        if (row === undefined) return ok(M.GitlabIntegrationNotFound, { error: "Integration not found" }, 404);
+        const b = body as any;
+        if (typeof b?.isActive === "boolean") row.isActive = b.isActive;
+        if (typeof b?.commentTaskLinkOnGitlabIssue === "boolean") row.commentTaskLink = b.commentTaskLinkOnGitlabIssue;
+        row.updatedAt = gnow();
+        return ok(M.GitlabIntegration, gitlabJson(row, true, origin));
+      }
+      if (req.method === "DELETE") {
+        if (row === undefined) return failText(404, "GitLab integration not found");
+        gitlabs.splice(gitlabs.indexOf(row), 1);
+        return ok(M.GitlabDeleteResult, { success: true, message: "GitLab integration deleted" });
       }
     }
 

@@ -1,0 +1,52 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "rm",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to unlink the GitLab integration without --yes; the stored token and webhook secret are removed with it\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"success\": true,\n  \"message\": \"GitLab integration deleted\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "delete",
+        "--yes",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: DELETE /api/gitlab-integration/project/proj-alpha: 404: GitLab integration not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "DELETE",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

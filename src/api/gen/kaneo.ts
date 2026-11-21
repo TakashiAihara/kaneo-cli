@@ -19,6 +19,10 @@ import {
   CreateNotification200,
   CurrentUser,
   ExternalLink,
+  GitlabDeleteResult,
+  GitlabImportResult,
+  GitlabProjectList,
+  GitlabVerificationResult,
   InvitationDetails,
   Label,
   MoveTaskResult,
@@ -48,6 +52,7 @@ import type {
   ClearAllNotificationsParams,
   CreateActivityBody,
   CreateColumnBody,
+  CreateGitlabIntegrationBody,
   CreateLabelBody,
   CreateNotificationBody,
   CreateProjectBody,
@@ -58,9 +63,12 @@ import type {
   GetActivitiesParams,
   GetTaskByTicketIdParams,
   GetTaskParams,
+  GitlabIntegration,
   GlobalSearchParams,
+  ImportGitlabIssuesBody,
   ImportTasksBody,
   ListAssignedTasksParams,
+  ListGitlabProjectsBody,
   ListNotificationsParams,
   ListProjectsParams,
   ListTasksParams,
@@ -71,6 +79,7 @@ import type {
   ReorderProjectsBody,
   ReorderProjectsParams,
   UpdateColumnBody,
+  UpdateGitlabIntegrationBody,
   UpdateLabelBody,
   UpdateNotificationPreferencesBody,
   UpdateOrganizationBody,
@@ -85,7 +94,8 @@ import type {
   UpdateTaskTitleBody,
   UpdateTimeEntryBody,
   UpsertNotificationPreferenceWorkspaceRuleBody,
-  UpsertWorkflowRuleBody
+  UpsertWorkflowRuleBody,
+  VerifyGitlabAccessBody
 } from './model';
 
 import { kaneoFetch } from '../http';
@@ -2155,6 +2165,257 @@ export const globalSearch = async (params: GlobalSearchParams, options?: Paramet
 
     ,
     schema: SearchResponse
+  }
+);}
+
+
+
+export const getListGitlabProjectsUrl = () => {
+
+
+
+
+  return `/gitlab-integration/projects`
+}
+
+/**
+ * List the projects a GitLab token is a member of, for picking one to link. Sent as a POST because the token travels in the body rather than the URL.
+ * @summary List GitLab projects
+ */
+export const listGitlabProjects = async (listGitlabProjectsBody: ListGitlabProjectsBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitlabProjectList> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GitlabProjectList>(getListGitlabProjectsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(listGitlabProjectsBody),
+    schema: GitlabProjectList
+  }
+);}
+
+
+
+export const getVerifyGitlabAccessUrl = () => {
+
+
+
+
+  return `/gitlab-integration/verify`
+}
+
+/**
+ * Check that the base URL is a GitLab instance and that the token can reach the project with the permissions Kaneo needs. An unreachable instance, a missing project, or insufficient permissions are reported in a 200 body so the form can explain them; a token GitLab rejects outright is a 401.
+ * @summary Verify GitLab access
+ */
+export const verifyGitlabAccess = async (verifyGitlabAccessBody: VerifyGitlabAccessBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitlabVerificationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GitlabVerificationResult>(getVerifyGitlabAccessUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(verifyGitlabAccessBody),
+    schema: GitlabVerificationResult
+  }
+);}
+
+
+
+export const getGetGitlabIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/gitlab-integration/project/${projectId}`
+}
+
+/**
+ * Get the GitLab integration for a project, or null when none is configured. The masked access token and the webhook secret are included only for callers with workspace:manage_settings.
+ * @summary Get GitLab integration
+ */
+export const getGitlabIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitlabIntegration | null> => {
+
+  return kaneoFetch<GitlabIntegration | null>(getGetGitlabIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCreateGitlabIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/gitlab-integration/project/${projectId}`
+}
+
+/**
+ * Link a project to a GitLab project. Kaneo generates the secret GitLab must send with each webhook; add the webhook in GitLab afterwards. Use the verify route first to confirm the token really reaches the project.
+ * @summary Create GitLab integration
+ */
+export const createGitlabIntegration = async (projectId: string,
+    createGitlabIntegrationBody: CreateGitlabIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitlabIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GitlabIntegration | null>(getCreateGitlabIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createGitlabIntegrationBody)
+  }
+);}
+
+
+
+export const getUpdateGitlabIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/gitlab-integration/project/${projectId}`
+}
+
+/**
+ * Update the GitLab integration. Omitted fields keep their current value.
+ * @summary Update GitLab integration
+ */
+export const updateGitlabIntegration = async (projectId: string,
+    updateGitlabIntegrationBody: UpdateGitlabIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitlabIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GitlabIntegration | null>(getUpdateGitlabIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateGitlabIntegrationBody)
+  }
+);}
+
+
+
+export const getDeleteGitlabIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/gitlab-integration/project/${projectId}`
+}
+
+/**
+ * Unlink a project from its GitLab project.
+ * @summary Delete GitLab integration
+ */
+export const deleteGitlabIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitlabDeleteResult> => {
+
+  return kaneoFetch<GitlabDeleteResult>(getDeleteGitlabIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: GitlabDeleteResult
+  }
+);}
+
+
+
+export const getImportGitlabIssuesUrl = () => {
+
+
+
+
+  return `/gitlab-integration/import-issues`
+}
+
+/**
+ * Import the linked project's open issues as tasks. Issues that already have a task are refreshed rather than duplicated. Requires task:create and task:update permissions.
+ * @summary Import GitLab issues
+ */
+export const importGitlabIssues = async (importGitlabIssuesBody: ImportGitlabIssuesBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitlabImportResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GitlabImportResult>(getImportGitlabIssuesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(importGitlabIssuesBody),
+    schema: GitlabImportResult
   }
 );}
 

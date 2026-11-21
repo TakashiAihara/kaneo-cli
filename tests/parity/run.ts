@@ -44,6 +44,8 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     dropCommentsMatching: s.dropCommentsMatching,
     writesNotKept: s.writesNotKept,
     commentReplyWithoutId: s.commentReplyWithoutId,
+    gitlabImportErrors: s.gitlabImportErrors,
+    gitlabVerify: s.gitlabVerify,
     driftedSpec: s.driftedSpec,
     specWithoutOperation: s.specWithoutOperation,
   });

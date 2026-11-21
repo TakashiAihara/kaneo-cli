@@ -1,0 +1,35 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"isInstalled\": true,\n  \"hasRequiredPermissions\": false,\n  \"projectExists\": true,\n  \"projectVisibility\": \"private\",\n  \"missingPermissions\": [\n    \"Developer\"\n  ],\n  \"message\": \"Token may not have sufficient permissions to manage issues and labels.\",\n  \"failureReason\": null\n}\n",
+      "stderr": "Error: Token may not have sufficient permissions to manage issues and labels.\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/verify",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitlab.example.com",
+        "accessToken": "verify-token-0123456789abcdef",
+        "projectPath": "acme/web-app"
+      }
+    }
+  ],
+  "files": {}
+}

@@ -56,6 +56,21 @@ const INVITATIONS: Seed["invitations"] = [
   { id: "inv-boundary", workspaceId: WS, inviterName: "Grace", expiresAt: "2026-01-01T12:00:00.000Z" },
 ];
 
+// A project's stored link to a GitLab project. The token is stored raw and
+// only ever answered masked; the values are fixtures, never real credentials.
+const GITLAB: NonNullable<Seed["gitlabIntegrations"]> = [
+  {
+    projectId: P1,
+    baseUrl: "https://gitlab.example.com",
+    projectPath: "acme/web-app",
+    token: "seeded-token-0123456789abcdef",
+    hookSecret: "whsec_seeded_cafebabe",
+    isActive: true,
+    commentLink: true,
+    branchPattern: "{slug}-{number}",
+  },
+];
+
 export type Scenario = {
   name: string;
   // Each step is one CLI invocation. Global context (-w / -p) is passed in
@@ -106,6 +121,10 @@ export type Scenario = {
   writesNotKept?: boolean;
   // The fake answers a comment post without the comment's id.
   commentReplyWithoutId?: boolean;
+  // The fake's import-issues answers carry these per-issue errors.
+  gitlabImportErrors?: string[];
+  // The fake's verify answer carries these fields instead of the canned success.
+  gitlabVerify?: Record<string, unknown>;
   // The fake's OpenAPI document drifts from the pinned one in two request fields.
   driftedSpec?: boolean;
   // The fake's OpenAPI document lacks createTask, an operation the client calls.
@@ -1872,5 +1891,198 @@ export const SCENARIOS: Scenario[] = [
     name: "project find",
     seed: { projects: [...SEED.projects, { id: "proj-beacon", workspaceId: "ws-other", name: "Beacon", slug: "BCN" }] },
     steps: [["project", "find", "be", "--json"], ["project", "find", "OLD", "--human"], ["project", "find", "zzz", "--json"]],
+  },
+
+  // GitLab integration. The token only ever arrives on stdin, the stored link
+  // answers it masked, and each refusal is the server's own words.
+  {
+    name: "integration gitlab get without a link",
+    steps: [["integration", "gitlab", "get", "--human"], ["integration", "gitlab", "get", "--json"]],
+  },
+  ...both("integration gitlab get", ["integration", "gitlab", "get"]).map(
+    (s): Scenario => ({ ...s, seed: { gitlabIntegrations: GITLAB } }),
+  ),
+  {
+    // A plain member still reads the link, but the secrets come back empty and
+    // the human line for the webhook secret is left out.
+    name: "integration gitlab get as a plain member",
+    plainMember: true,
+    seed: { gitlabIntegrations: GITLAB },
+    steps: [["integration", "gitlab", "get", "--human"], ["integration", "gitlab", "get", "--json"]],
+  },
+  {
+    // connect reads the token from stdin, the link answers masked, update
+    // changes only what is passed, import counts what it did, and rm removes
+    // the link for good.
+    name: "integration gitlab connect update import rm",
+    stdin: "cli-token-0123456789abcdef\n",
+    steps: [
+      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--token-type", "bearer", "--json"],
+      ["integration", "gitlab", "get", "--human"],
+      ["integration", "gitlab", "update", "--comment-task-link=false", "--json"],
+      ["integration", "gitlab", "import", "--human"],
+      ["integration", "gitlab", "rm", "--yes", "--json"],
+      ["integration", "gitlab", "get", "--json"],
+    ],
+  },
+  {
+    // The stored token is reused only while the GitLab URL is unchanged; a
+    // different instance needs a new one, and the server says so. The masked
+    // token after the first connect is the seeded one, which is the proof the
+    // stored credential was kept.
+    name: "integration gitlab connect reuses or refuses the stored token",
+    seed: { gitlabIntegrations: GITLAB },
+    steps: [
+      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "acme/other-project", "--human"],
+      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.other.example.com", "--project-path", "acme/web-app", "--human"],
+      ["integration", "gitlab", "get", "--json"],
+    ],
+  },
+  {
+    name: "integration gitlab connect to a project linked elsewhere",
+    seed: { gitlabIntegrations: GITLAB },
+    stdin: "cli-token-0123456789abcdef\n",
+    steps: [
+      ["integration", "gitlab", "connect", "-p", P2, "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
+      ["integration", "gitlab", "connect", "-p", P2, "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"],
+    ],
+  },
+  {
+    // The token is stdin-only: absent, a literal value and empty stdin are
+    // each refused before a request is made, for every command that takes one.
+    name: "integration gitlab token rules",
+    stdin: "",
+    steps: [
+      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--human"],
+      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "literal-value", "--json"],
+      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"],
+      ["integration", "gitlab", "projects", "--base-url", "https://gitlab.example.com", "--human"],
+      ["integration", "gitlab", "projects", "--base-url", "https://gitlab.example.com", "--access-token", "literal-value", "--json"],
+      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "literal-value", "--json"],
+      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"],
+    ],
+  },
+  {
+    // The instance address is checked before the token is even looked at: a
+    // value that is not a URL, plain http and a project path without a
+    // namespace are each the server's own refusal.
+    name: "integration gitlab refuses bad instance addresses",
+    stdin: "addr-token-0123456789abcdef\n",
+    steps: [
+      ["integration", "gitlab", "connect", "--base-url", "gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
+      ["integration", "gitlab", "connect", "--base-url", "http://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
+      ["integration", "gitlab", "verify", "--base-url", "http://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
+      ["integration", "gitlab", "projects", "--base-url", "http://gitlab.example.com", "--access-token", "-", "--human"],
+      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "web-app", "--access-token", "-", "--human"],
+    ],
+  },
+  {
+    name: "integration gitlab verify",
+    stdin: "verify-token-0123456789abcdef\n",
+    steps: [
+      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"],
+      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--token-type", "bearer", "--human"],
+    ],
+  },
+  {
+    // A project the token cannot see is a 200 body, not an error status; the
+    // command still exits non-zero because the check did not pass.
+    name: "integration gitlab verify a project the token cannot see",
+    stdin: "verify-token-0123456789abcdef\n",
+    gitlabVerify: {
+      isInstalled: false,
+      hasRequiredPermissions: false,
+      projectExists: false,
+      projectVisibility: null,
+      missingPermissions: [],
+      message: "Project not found or not accessible with this token.",
+      failureReason: "project_not_found",
+    },
+    steps: [
+      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
+      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"],
+    ],
+  },
+  {
+    name: "integration gitlab verify a token short of permissions",
+    stdin: "verify-token-0123456789abcdef\n",
+    gitlabVerify: {
+      hasRequiredPermissions: false,
+      missingPermissions: ["Developer"],
+      message: "Token may not have sufficient permissions to manage issues and labels.",
+    },
+    steps: [["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--json"]],
+  },
+  {
+    name: "integration gitlab projects",
+    stdin: "list-token-0123456789abcdef\n",
+    steps: [
+      ["integration", "gitlab", "projects", "--base-url", "https://gitlab.example.com", "--access-token", "-", "--json"],
+      ["integration", "gitlab", "projects", "--base-url", "https://gitlab.example.com", "--access-token", "-", "--human"],
+    ],
+  },
+  {
+    name: "integration gitlab update",
+    seed: { gitlabIntegrations: GITLAB },
+    steps: [
+      ["integration", "gitlab", "update", "--active=false", "--comment-task-link=false", "--json"],
+      ["integration", "gitlab", "get", "--human"],
+      ["integration", "gitlab", "update", "--active", "--json"],
+      ["integration", "gitlab", "import", "--human"],
+    ],
+  },
+  {
+    name: "integration gitlab update needs a change",
+    seed: { gitlabIntegrations: GITLAB },
+    steps: [
+      ["integration", "gitlab", "update", "--json"],
+      ["integration", "gitlab", "update", "--active=false", "--comment-task-link=false", "--json"],
+    ],
+  },
+  {
+    name: "integration gitlab update without a link",
+    steps: [["integration", "gitlab", "update", "--active=false", "--json"]],
+  },
+  {
+    name: "integration gitlab rm needs --yes and a link",
+    seed: { gitlabIntegrations: GITLAB },
+    steps: [
+      ["integration", "gitlab", "rm", "--human"],
+      ["integration", "gitlab", "rm", "--yes", "--json"],
+      ["integration", "gitlab", "delete", "--yes", "--human"],
+    ],
+  },
+  {
+    name: "integration gitlab import without a link",
+    steps: [["integration", "gitlab", "import", "--human"]],
+  },
+  {
+    name: "integration gitlab import partial errors",
+    seed: { gitlabIntegrations: GITLAB },
+    gitlabImportErrors: ["Issue !12: the assignee is gone", "Merge request !34: labels refused"],
+    steps: [["integration", "gitlab", "import", "--human"], ["integration", "gitlab", "import", "--json"]],
+  },
+  {
+    name: "integration gitlab import an inactive link",
+    seed: { gitlabIntegrations: [{ ...GITLAB[0]!, isActive: false }] },
+    steps: [["integration", "gitlab", "import", "--human"]],
+  },
+  {
+    // A plain member reads the link with its secrets withheld, is refused
+    // every manage_settings route, and can still import: that route asks for
+    // task permissions instead.
+    name: "integration gitlab as a plain member",
+    plainMember: true,
+    seed: { gitlabIntegrations: GITLAB },
+    stdin: "member-token-0123456789abcdef\n",
+    steps: [
+      ["integration", "gitlab", "get", "--human"],
+      ["integration", "gitlab", "connect", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
+      ["integration", "gitlab", "update", "--active=false", "--human"],
+      ["integration", "gitlab", "rm", "--yes", "--human"],
+      ["integration", "gitlab", "verify", "--base-url", "https://gitlab.example.com", "--project-path", "acme/web-app", "--access-token", "-", "--human"],
+      ["integration", "gitlab", "projects", "--base-url", "https://gitlab.example.com", "--access-token", "-", "--human"],
+      ["integration", "gitlab", "import", "--human"],
+    ],
   },
 ];

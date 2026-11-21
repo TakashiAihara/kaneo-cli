@@ -1,0 +1,159 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "project      proj-alpha\ngitlab       https://gitlab.example.com acme/web-app\ntoken        private\nwebhook      <URL>/api/gitlab-integration/webhook/gitl0001\nbranch       {slug}-{number}\ncomment link yes\nactive       yes\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/gitlab-integration/project/proj-alpha: 403: Insufficient permissions\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "update",
+        "--active=false",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: PATCH /api/gitlab-integration/project/proj-alpha: 403: Insufficient permissions\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "rm",
+        "--yes",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: DELETE /api/gitlab-integration/project/proj-alpha: 403: Insufficient permissions\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/gitlab-integration/verify: 403: Insufficient permissions\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "projects",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--access-token",
+        "-",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: POST /api/gitlab-integration/projects: 403: Insufficient permissions\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "import",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "imported 2, updated 1, skipped 1\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitlab.example.com",
+        "projectPath": "acme/web-app",
+        "accessToken": "member-token-0123456789abcdef"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "isActive": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/verify",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitlab.example.com",
+        "accessToken": "member-token-0123456789abcdef",
+        "projectPath": "acme/web-app"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/projects",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitlab.example.com",
+        "accessToken": "member-token-0123456789abcdef"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitlab-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha"
+      }
+    }
+  ],
+  "files": {}
+}

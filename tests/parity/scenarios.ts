@@ -2038,6 +2038,10 @@ export const SCENARIOS: Scenario[] = [
     ["integration", "--help"],
     ["integration", "mattermost", "set", "--help"],
     ["integration", "webhook", "set", "--help"],
+    ["integration"],
+    ["integration", "gitea"],
+    ["integration", "gitea", "connect", "--help"],
+    ["integration", "gitea", "import", "--help"],
   ].map((args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] })),
   { name: "unknown flag", steps: [["task", "ls", "--bogus"], ["task", "ls", "-x"], ["--bogus"]] },
   { name: "control characters in an unknown command", steps: [["\u0001"], ["a\u007fb"], ["tab\there"]] },
@@ -2519,6 +2523,423 @@ export const SCENARIOS: Scenario[] = [
     name: "project find",
     seed: { projects: [...SEED.projects, { id: "proj-beacon", workspaceId: "ws-other", name: "Beacon", slug: "BCN" }] },
     steps: [["project", "find", "be", "--json"], ["project", "find", "OLD", "--human"], ["project", "find", "zzz", "--json"]],
+  },
+
+  // Gitea integration: the whole lifecycle against the fake's one instance.
+  // Every step is handed the same stdin; only the ones passing --token - read it.
+  {
+    name: "integration gitea lifecycle",
+    seed: {
+      giteaRepositories: [
+        { owner: "acme", name: "app", private: true },
+        { owner: "acme", name: "docs" },
+      ],
+    },
+    stdin: "fake-gitea-token\n",
+    steps: [
+      ["integration", "gitea", "get", "--json"],
+      ["integration", "gitea", "verify", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      ["integration", "gitea", "repos", "--base-url", "https://gitea.example.com", "--token", "-", "--human"],
+      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      ["integration", "gitea", "get", "--human"],
+      ["integration", "gitea", "update", "--active=false", "--comment-task-link=false", "--json"],
+      // No --token: the stored one answers because the base URL is unchanged.
+      ["integration", "gitea", "verify", "acme/app", "--base-url", "https://gitea.example.com", "--json"],
+      ["integration", "gitea", "rm", "--yes", "--json"],
+      ["integration", "gitea", "get", "--json"],
+    ],
+  },
+  // The key may read the integration but not manage the workspace's settings,
+  // so the webhook secret comes back empty rather than stored, and every
+  // manageAccess route refuses the write. import is no manageAccess route — it
+  // asks for task permissions a member has — so it still runs.
+  {
+    name: "integration gitea get as a plain member",
+    plainMember: true,
+    stdin: "fake-gitea-token\n",
+    seed: {
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [{ baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "Member may import this" }] }],
+    },
+    steps: [
+      ["integration", "gitea", "get", "--human"],
+      ["integration", "gitea", "get", "--json"],
+      ["integration", "gitea", "update", "--active=false", "--json"],
+      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--json"],
+      ["integration", "gitea", "rm", "--yes", "--json"],
+      ["integration", "gitea", "verify", "acme/app", "--base-url", "https://gitea.example.com", "--json"],
+      ["integration", "gitea", "repos", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      ["integration", "gitea", "import", "--json"],
+    ],
+  },
+  // The stored token answers verify and connect only while the normalized base
+  // URL is the saved integration's; a moved instance needs a new token.
+  {
+    name: "integration gitea stored token rules",
+    seed: {
+      giteaRepositories: [
+        { owner: "acme", name: "app" },
+        { owner: "acme", name: "other" },
+      ],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "scenario-stored-token", repositoryOwner: "acme", repositoryName: "app" }],
+    },
+    steps: [
+      ["integration", "gitea", "verify", "acme/app", "--base-url", "https://gitea.example.com/", "--json"],
+      ["integration", "gitea", "verify", "acme/app", "--base-url", "https://gitea.example.com/gitea", "--json"],
+      // Reconnecting on the same instance keeps the stored token and moves the
+      // link to the other repository.
+      ["integration", "gitea", "connect", "acme/other", "--base-url", "https://gitea.example.com", "--json"],
+      ["integration", "gitea", "get", "--json"],
+    ],
+  },
+  // verify reports each check in the body rather than failing the request.
+  {
+    name: "integration gitea verify reports",
+    seed: {
+      giteaRepositories: [
+        { owner: "acme", name: "app" },
+        { owner: "acme", name: "readonly", canWriteIssues: false, private: true },
+      ],
+    },
+    stdin: "fake-gitea-token\n",
+    steps: [
+      ["integration", "gitea", "verify", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "--human"],
+      ["integration", "gitea", "verify", "acme/readonly", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      ["integration", "gitea", "verify", "acme/missing", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      // With no integration stored and no token sent, the server refuses.
+      ["integration", "gitea", "verify", "acme/app", "--base-url", "https://gitea.example.com", "--json"],
+    ],
+  },
+  {
+    name: "integration gitea verify not a gitea instance",
+    seed: { giteaInstance: { mode: "not-gitea" } },
+    stdin: "fake-gitea-token\n",
+    steps: [["integration", "gitea", "verify", "acme/app", "--base-url", "https://example.com", "--token", "-", "--json"]],
+  },
+  {
+    name: "integration gitea verify redirected",
+    seed: { giteaInstance: { mode: "redirected" } },
+    stdin: "fake-gitea-token\n",
+    steps: [["integration", "gitea", "verify", "acme/app", "--base-url", "http://gitea.example.com", "--token", "-", "--json"]],
+  },
+  // Every route that trusts a token fails the same way when the instance
+  // rejects it.
+  {
+    name: "integration gitea bad token",
+    seed: { giteaInstance: { mode: "bad-token" }, giteaRepositories: [{ owner: "acme", name: "app" }] },
+    stdin: "fake-gitea-token\n",
+    steps: [
+      ["integration", "gitea", "repos", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+    ],
+  },
+  {
+    name: "integration gitea connect needs a reachable repository",
+    seed: { giteaRepositories: [{ owner: "acme", name: "app" }] },
+    stdin: "fake-gitea-token\n",
+    steps: [
+      ["integration", "gitea", "connect", "acme/missing", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      // No stored integration and no token sent: the server asks for one.
+      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--json"],
+      // A token is a credential, so a literal flag value is refused client-side.
+      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--token", "literal", "--json"],
+      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://other.example.com", "--token", "-", "--json"],
+      // The stored token belongs to the instance it was saved for.
+      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--json"],
+      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+    ],
+  },
+  // A repository already linked to another project cannot be linked again.
+  {
+    name: "integration gitea connect repository already linked",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+    },
+    stdin: "fake-gitea-token\n",
+    steps: [
+      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--token", "-", "-p", "proj-beta", "--json"],
+      ["integration", "gitea", "rm", "--yes", "-p", "proj-beta", "--json"],
+    ],
+  },
+  // The argument and --base-url are judged before stdin is read: with empty
+  // stdin, a --token - read first would fail on the token instead, so these
+  // steps also pin that order. The last one reaches the token read itself.
+  {
+    name: "integration gitea refuses bad input before reading the token",
+    stdin: "",
+    steps: [
+      ["integration", "gitea", "verify", "acme/app", "--token", "-", "--json"],
+      ["integration", "gitea", "connect", "acme", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      ["integration", "gitea", "connect", "acme/app/extra", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      ["integration", "gitea", "repos", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+    ],
+  },
+  {
+    name: "integration gitea update needs a change",
+    seed: { giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }] },
+    steps: [
+      ["integration", "gitea", "update", "--json"],
+      ["integration", "gitea", "update", "--active=false", "--json"],
+      ["integration", "gitea", "update", "--comment-task-link=false", "--json"],
+    ],
+  },
+  // The update route's 404 is the document's {"error": ...} JSON, which the
+  // error line shows as the raw body.
+  {
+    name: "integration gitea update without integration",
+    steps: [["integration", "gitea", "update", "--active=false", "--json"]],
+  },
+  // The delete cascades to the external links the integration made, as the
+  // integration table's onDelete does upstream; the imported task and the
+  // link added by hand stay.
+  {
+    name: "integration gitea rm needs --yes",
+    seed: {
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      externalLinks: [
+        { taskId: "task-a1", url: "https://gitea.example.com/acme/app/issues/7", title: "Write the parser", resourceType: "issue", externalId: "7", integration: { id: "git0001", type: "gitea" } },
+        { taskId: "task-a1", url: "https://example.com/notes", title: "Notes" },
+      ],
+    },
+    steps: [
+      ["task", "external-links", "1", "--json"],
+      ["integration", "gitea", "rm", "--human"],
+      ["integration", "gitea", "rm", "--yes", "--json"],
+      ["task", "external-links", "1", "--json"],
+      ["integration", "gitea", "rm", "--yes", "--json"],
+    ],
+  },
+  // The import brings in open issues only: issue 3 is closed and never seen,
+  // issue 6 is a pull request the issue listing also carries and upstream
+  // drops before importing, issue 4 imports like any other open issue — the
+  // pinned release has no incoming-rule gate — issue 5 fails outright, and
+  // issue 7 is already linked to task-a1 (external id "7", integration
+  // git0001 — the first gitea row the fake numbers) so it refreshes instead
+  // of duplicating.
+  {
+    name: "integration gitea import",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [
+        {
+          projectId: P1,
+          baseUrl: "https://gitea.example.com",
+          accessToken: "seeded-token",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+        },
+      ],
+      giteaRepoIssues: [
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [
+            { number: 1, title: "Fix login bug", body: "Steps to reproduce", labels: ["bug", "priority:high", "status:in-progress"] },
+            { number: 2, title: "Write the docs", labels: ["docs"] },
+            { number: 3, title: "Already closed", state: "closed", labels: ["bug"] },
+            { number: 4, title: "A chore with a wontfix label", labels: ["wontfix"] },
+            { number: 5, title: "Cannot be fetched", labels: ["bug"], fail: "Gitea API error 502" },
+            { number: 6, title: "A pull request, not an issue", labels: ["bug"], pullRequest: true },
+            { number: 7, title: "Parser, refreshed", body: "refreshed body", labels: ["status:done", "priority:urgent"] },
+          ],
+        },
+      ],
+      externalLinks: [{ taskId: "task-a1", url: "https://gitea.example.com/acme/app/issues/7", title: "Write the parser", resourceType: "issue", externalId: "7", integration: { id: "git0001", type: "gitea" } }],
+    },
+    steps: [
+      ["integration", "gitea", "import", "--json"],
+      ["task", "ls", "--json"],
+      ["task", "get", "4", "--json"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  { name: "integration gitea import without integration", steps: [["integration", "gitea", "import", "--json"]] },
+  {
+    name: "integration gitea import inactive",
+    seed: { giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app", isActive: false }] },
+    steps: [["integration", "gitea", "import", "--json"]],
+  },
+
+  // The issue listing runs before any per-issue work and outside its error
+  // handling, so an instance that rejects the stored token fails the whole
+  // import with the server's plain 500 — nothing is imported.
+  {
+    name: "integration gitea import with a failing instance",
+    seed: {
+      giteaInstance: { mode: "bad-token" },
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [{ baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "Never imported" }] }],
+    },
+    steps: [["integration", "gitea", "import", "--json"]],
+  },
+  // A link whose task is gone — or belongs to another project — fails
+  // findExternalLink's scope upstream, so the issue never reaches the
+  // refresh path: it takes the create path, counts imported, and a fresh
+  // task lands in the importing project. The stale link rows stay but
+  // never match again, so the second import refreshes the new tasks, and
+  // the foreign task keeps its title and labels.
+  {
+    name: "integration gitea import reimports links to missing or foreign tasks",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [
+            { number: 8, title: "Linked to a deleted task", labels: ["bug"] },
+            { number: 9, title: "Linked to another project's task", labels: ["bug"] },
+          ],
+        },
+      ],
+      externalLinks: [
+        { taskId: "task-gone", url: "https://gitea.example.com/acme/app/issues/8", title: "Old link", resourceType: "issue", externalId: "8", integration: { id: "git0001", type: "gitea" } },
+        { taskId: "task-b1", url: "https://gitea.example.com/acme/app/issues/9", title: "Foreign link", resourceType: "issue", externalId: "9", integration: { id: "git0001", type: "gitea" } },
+      ],
+    },
+    steps: [
+      ["integration", "gitea", "import", "--json"],
+      ["integration", "gitea", "import", "--json"],
+      ["task", "ls", "--json"],
+      ["task", "ls", "-p", "proj-beta", "--json"],
+    ],
+  },
+  // The human import prints each failure and the summary, then exits 1 — the
+  // --json steps elsewhere never show that path.
+  {
+    name: "integration gitea import human with errors",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [
+            { number: 1, title: "Imports fine", labels: ["bug"] },
+            { number: 2, title: "Fails to import", fail: "Gitea API error 502" },
+          ],
+        },
+      ],
+    },
+    steps: [["integration", "gitea", "import", "--human"]],
+  },
+  // The integration row's isActive column is nullable; a null reads as
+  // "unknown" rather than active or inactive.
+  {
+    name: "integration gitea get with a null active flag",
+    seed: { giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app", isActive: null }] },
+    steps: [
+      ["integration", "gitea", "get", "--human"],
+      ["integration", "gitea", "get", "--json"],
+    ],
+  },
+
+  // Reconnecting moves the link, and the issue list moves with the repository:
+  // acme/other's own issues import, acme/third has none seeded so its import
+  // is empty rather than acme/app's leftovers, and back on acme/app its own
+  // list is what imports again.
+  {
+    name: "integration gitea reconnect lists the new repository's issues",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }, { owner: "acme", name: "other" }, { owner: "acme", name: "third" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [
+        { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "App issue" }] },
+        { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "other", issues: [{ number: 2, title: "Other issue" }] },
+      ],
+    },
+    steps: [
+      ["integration", "gitea", "connect", "acme/other", "--base-url", "https://gitea.example.com", "--json"],
+      ["integration", "gitea", "import", "--json"],
+      ["integration", "gitea", "connect", "acme/third", "--base-url", "https://gitea.example.com", "--json"],
+      ["integration", "gitea", "import", "--json"],
+      ["integration", "gitea", "connect", "acme/app", "--base-url", "https://gitea.example.com", "--json"],
+      ["integration", "gitea", "import", "--json"],
+      ["task", "ls", "--json"],
+    ],
+  },
+
+  // The import matches an issue to a task by the integration and the issue
+  // number, not the repository: connect keeps the integration row, so acme/other's
+  // issue 1 refreshes the task acme/app's issue 1 was linked to — title,
+  // priority and labels take the new repository's content — while the link
+  // itself keeps pointing at the old repository's issue.
+  {
+    name: "integration gitea reconnect refreshes matching issue numbers",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }, { owner: "acme", name: "other" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [
+        { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "App issue one" }] },
+        { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "other", issues: [{ number: 1, title: "Other issue one", labels: ["priority:urgent"] }] },
+      ],
+      externalLinks: [{ taskId: "task-a1", url: "https://gitea.example.com/acme/app/issues/1", title: "App issue one", resourceType: "issue", externalId: "1", integration: { id: "git0001", type: "gitea" } }],
+    },
+    steps: [
+      ["integration", "gitea", "connect", "acme/other", "--base-url", "https://gitea.example.com", "--json"],
+      ["integration", "gitea", "import", "--json"],
+      ["task", "get", "1", "--json"],
+      ["task", "external-links", "1", "--json"],
+    ],
+  },
+
+  // move-task.ts deletes a moved task's links through integrations the
+  // destination project does not own, so the source project's next import
+  // finds no link for the issue and creates a fresh task in the source
+  // project rather than refreshing the moved one.
+  {
+    name: "integration gitea import after the task moved projects",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [{ baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "Gitea issue one", labels: ["bug"] }] }],
+    },
+    steps: [
+      ["integration", "gitea", "import", "--json"],
+      ["task", "move", "4", "--to", P2, "--json"],
+      ["task", "external-links", "2", "-p", P2, "--json"],
+      ["integration", "gitea", "import", "--json"],
+      ["task", "ls", "--json"],
+      ["task", "ls", "-p", P2, "--json"],
+    ],
+  },
+
+  // external_link.task_id cascades on task delete upstream, on the single
+  // and bulk routes alike, so removing an imported task takes its link
+  // with it: the next import creates fresh tasks rather than counting the
+  // issues skipped against links whose tasks are gone.
+  {
+    name: "integration gitea import after imported tasks are deleted",
+    seed: {
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [
+        {
+          baseUrl: "https://gitea.example.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          issues: [
+            { number: 1, title: "Gitea issue one", labels: ["bug"] },
+            { number: 2, title: "Gitea issue two", labels: ["docs"] },
+          ],
+        },
+      ],
+    },
+    steps: [
+      ["integration", "gitea", "import", "--json"],
+      ["task", "external-links", "4", "--json"],
+      ["task", "rm", "4", "--yes", "--json"],
+      ["task", "bulk", "5", "--delete", "--yes", "--json"],
+      ["integration", "gitea", "import", "--json"],
+      ["task", "ls", "--json"],
+    ],
   },
 
   // GitLab integration. The token only ever arrives on stdin, the stored link

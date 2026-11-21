@@ -1,0 +1,151 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/other",
+        "--base-url",
+        "https://gitea.example.com",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"git0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitea.example.com\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"other\",\n  \"maskedAccessToken\": \"seed••••••oken\",\n  \"webhookUrl\": \"<URL>/api/gitea-integration/webhook/git0001\",\n  \"webhookSecret\": \"fake-hook-secret-1\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGiteaIssue\": true,\n  \"isActive\": true,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "import",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"imported\": 1,\n  \"updated\": 0,\n  \"skipped\": 0,\n  \"errors\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/third",
+        "--base-url",
+        "https://gitea.example.com",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"git0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitea.example.com\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"third\",\n  \"maskedAccessToken\": \"seed••••••oken\",\n  \"webhookUrl\": \"<URL>/api/gitea-integration/webhook/git0001\",\n  \"webhookSecret\": \"fake-hook-secret-1\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGiteaIssue\": true,\n  \"isActive\": true,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "import",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"imported\": 0,\n  \"updated\": 0,\n  \"skipped\": 0,\n  \"errors\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"git0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitea.example.com\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"app\",\n  \"maskedAccessToken\": \"seed••••••oken\",\n  \"webhookUrl\": \"<URL>/api/gitea-integration/webhook/git0001\",\n  \"webhookSecret\": \"fake-hook-secret-1\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGiteaIssue\": true,\n  \"isActive\": true,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "import",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"imported\": 1,\n  \"updated\": 0,\n  \"skipped\": 0,\n  \"errors\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"description\": \"multi\\nline\",\n    \"status\": \"to-do\",\n    \"priority\": \"high\",\n    \"position\": 0,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task0002\",\n    \"number\": 4,\n    \"title\": \"Other issue\",\n    \"description\": \"\",\n    \"status\": \"to-do\",\n    \"priority\": \"low\",\n    \"position\": 3,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task0004\",\n    \"number\": 5,\n    \"title\": \"App issue\",\n    \"description\": \"\",\n    \"status\": \"to-do\",\n    \"priority\": \"low\",\n    \"position\": 4,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:12.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task-a2\",\n    \"number\": 2,\n    \"title\": \"Ship it\",\n    \"description\": \"\",\n    \"status\": \"in-progress\",\n    \"priority\": \"no-priority\",\n    \"position\": 1,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": \"user-1\",\n    \"assigneeName\": \"Ada\",\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n    \"labels\": []\n  }\n]\n",
+      "stderr": "(1 done / planned / archived task left out; --all to include them)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitea.example.com",
+        "repositoryOwner": "acme",
+        "repositoryName": "other"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitea.example.com",
+        "repositoryOwner": "acme",
+        "repositoryName": "third"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitea.example.com",
+        "repositoryOwner": "acme",
+        "repositoryName": "app"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

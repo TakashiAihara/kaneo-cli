@@ -1,0 +1,104 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "external-links",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"link0002\",\n    \"taskId\": \"task-a1\",\n    \"resourceType\": \"issue\",\n    \"externalId\": \"7\",\n    \"url\": \"https://gitea.example.com/acme/app/issues/7\",\n    \"title\": \"Write the parser\",\n    \"integrationType\": \"gitea\",\n    \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n    \"updatedAt\": \"2026-01-01T00:00:10.000Z\"\n  },\n  {\n    \"id\": \"link0003\",\n    \"taskId\": \"task-a1\",\n    \"resourceType\": \"url\",\n    \"externalId\": \"https://example.com/notes\",\n    \"url\": \"https://example.com/notes\",\n    \"title\": \"Notes\",\n    \"integrationType\": null,\n    \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n    \"updatedAt\": \"2026-01-01T00:00:11.000Z\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "rm",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to delete the gitea integration of acme/app on https://gitea.example.com without --yes\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"success\": true,\n  \"message\": \"Gitea integration deleted\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "external-links",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"link0003\",\n    \"taskId\": \"task-a1\",\n    \"resourceType\": \"url\",\n    \"externalId\": \"https://example.com/notes\",\n    \"url\": \"https://example.com/notes\",\n    \"title\": \"Notes\",\n    \"integrationType\": null,\n    \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n    \"updatedAt\": \"2026-01-01T00:00:11.000Z\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"this project has no gitea integration to delete\"\n}\n",
+      "stderr": "Error: this project has no gitea integration to delete\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/external-link/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/external-link/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

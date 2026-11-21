@@ -36,6 +36,10 @@ import {
   GitHubDeleteResult,
   GitHubRepositoryList,
   GitHubVerificationResult,
+  GiteaDeleteResult,
+  GiteaImportResult,
+  GiteaRepositoryList,
+  GiteaVerificationResult,
   GitlabDeleteResult,
   GitlabImportResult,
   GitlabProjectList,
@@ -90,6 +94,7 @@ import type {
   CreateExternalLinkBody,
   CreateGenericWebhookIntegrationBody,
   CreateGitHubIntegrationBody,
+  CreateGiteaIntegrationBody,
   CreateGitlabIntegrationBody,
   CreateLabelBody,
   CreateMattermostIntegrationBody,
@@ -116,13 +121,16 @@ import type {
   GetTaskDescriptionPageParams,
   GetTaskParams,
   GitHubIntegration,
+  GiteaIntegration,
   GitlabIntegration,
   GlobalSearchParams,
   ImportGitHubIssuesBody,
+  ImportGiteaIssuesBody,
   ImportGitlabIssuesBody,
   ImportTasksBody,
   ListAssignedTasksParams,
   ListGitHubRepositoriesParams,
+  ListGiteaRepositoriesBody,
   ListGitlabProjectsBody,
   ListNotificationsParams,
   ListProjectsParams,
@@ -143,6 +151,7 @@ import type {
   UpdateDiscordIntegrationBody,
   UpdateGenericWebhookIntegrationBody,
   UpdateGitHubIntegrationBody,
+  UpdateGiteaIntegrationBody,
   UpdateGitlabIntegrationBody,
   UpdateLabelBody,
   UpdateMattermostIntegrationBody,
@@ -165,6 +174,7 @@ import type {
   UpsertNotificationPreferenceWorkspaceRuleBody,
   UpsertWorkflowRuleBody,
   VerifyGitHubInstallationBody,
+  VerifyGiteaAccessBody,
   VerifyGitlabAccessBody
 } from './model';
 
@@ -3224,6 +3234,257 @@ return kaneoFetch<IssueImportResult>(getImportGitHubIssuesUrl(),
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(importGitHubIssuesBody),
     schema: IssueImportResult
+  }
+);}
+
+
+
+export const getListGiteaRepositoriesUrl = () => {
+
+
+
+
+  return `/gitea-integration/repositories`
+}
+
+/**
+ * List the repositories a Gitea token can reach, for picking one to link. Sent as a POST because the token travels in the body rather than the URL.
+ * @summary List Gitea repositories
+ */
+export const listGiteaRepositories = async (listGiteaRepositoriesBody: ListGiteaRepositoriesBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GiteaRepositoryList> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GiteaRepositoryList>(getListGiteaRepositoriesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(listGiteaRepositoriesBody),
+    schema: GiteaRepositoryList
+  }
+);}
+
+
+
+export const getVerifyGiteaAccessUrl = () => {
+
+
+
+
+  return `/gitea-integration/verify`
+}
+
+/**
+ * Check that the base URL is a Gitea instance and that the token can reach the repository with the permissions Kaneo needs. Repository permission failures are reported in the body; invalid credentials and upstream errors return an error status. Omit accessToken to use the saved token for the unchanged base URL.
+ * @summary Verify Gitea access
+ */
+export const verifyGiteaAccess = async (verifyGiteaAccessBody: VerifyGiteaAccessBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GiteaVerificationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GiteaVerificationResult>(getVerifyGiteaAccessUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(verifyGiteaAccessBody),
+    schema: GiteaVerificationResult
+  }
+);}
+
+
+
+export const getGetGiteaIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/gitea-integration/project/${projectId}`
+}
+
+/**
+ * Get the Gitea integration for a project, or null when none is configured. The webhook secret is included only for callers with workspace:manage_settings.
+ * @summary Get Gitea integration
+ */
+export const getGiteaIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<GiteaIntegration | null> => {
+
+  return kaneoFetch<GiteaIntegration | null>(getGetGiteaIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCreateGiteaIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/gitea-integration/project/${projectId}`
+}
+
+/**
+ * Link a project to a Gitea repository, creating the webhook Gitea will post events to. Use the verify route first to confirm the token really reaches the repository.
+ * @summary Create Gitea integration
+ */
+export const createGiteaIntegration = async (projectId: string,
+    createGiteaIntegrationBody: CreateGiteaIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GiteaIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GiteaIntegration | null>(getCreateGiteaIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createGiteaIntegrationBody)
+  }
+);}
+
+
+
+export const getUpdateGiteaIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/gitea-integration/project/${projectId}`
+}
+
+/**
+ * Update the Gitea integration. Omitted fields keep their current value.
+ * @summary Update Gitea integration
+ */
+export const updateGiteaIntegration = async (projectId: string,
+    updateGiteaIntegrationBody: UpdateGiteaIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GiteaIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GiteaIntegration | null>(getUpdateGiteaIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateGiteaIntegrationBody)
+  }
+);}
+
+
+
+export const getDeleteGiteaIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/gitea-integration/project/${projectId}`
+}
+
+/**
+ * Unlink a project from its Gitea repository.
+ * @summary Delete Gitea integration
+ */
+export const deleteGiteaIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<GiteaDeleteResult> => {
+
+  return kaneoFetch<GiteaDeleteResult>(getDeleteGiteaIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: GiteaDeleteResult
+  }
+);}
+
+
+
+export const getImportGiteaIssuesUrl = () => {
+
+
+
+
+  return `/gitea-integration/import-issues`
+}
+
+/**
+ * Import the linked repository's issues as tasks. Issues that already have a task are refreshed rather than duplicated.
+ * @summary Import Gitea issues
+ */
+export const importGiteaIssues = async (importGiteaIssuesBody: ImportGiteaIssuesBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GiteaImportResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GiteaImportResult>(getImportGiteaIssuesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(importGiteaIssuesBody),
+    schema: GiteaImportResult
   }
 );}
 

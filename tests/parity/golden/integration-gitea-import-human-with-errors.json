@@ -1,0 +1,26 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "import",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "Issue #2: Gitea API error 502\nimported 1 issue(s), updated 0, skipped 0\n",
+      "stderr": "Error: 1 issue(s) could not be imported\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitea-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha"
+      }
+    }
+  ],
+  "files": {}
+}

@@ -1,0 +1,58 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "update",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"nothing to change: pass --active or --comment-task-link\"\n}\n",
+      "stderr": "Error: nothing to change: pass --active or --comment-task-link\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "update",
+        "--active=false",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"git0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitea.example.com\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"app\",\n  \"maskedAccessToken\": \"seed••••••oken\",\n  \"webhookUrl\": \"<URL>/api/gitea-integration/webhook/git0001\",\n  \"webhookSecret\": \"fake-hook-secret-1\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGiteaIssue\": true,\n  \"isActive\": false,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "update",
+        "--comment-task-link=false",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"git0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitea.example.com\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"app\",\n  \"maskedAccessToken\": \"seed••••••oken\",\n  \"webhookUrl\": \"<URL>/api/gitea-integration/webhook/git0001\",\n  \"webhookSecret\": \"fake-hook-secret-1\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGiteaIssue\": false,\n  \"isActive\": false,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "PATCH",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "isActive": false
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "commentTaskLinkOnGiteaIssue": false
+      }
+    }
+  ],
+  "files": {}
+}

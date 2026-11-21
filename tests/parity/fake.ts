@@ -56,6 +56,44 @@ export type Seed = {
   // Values tasks hold for fields, named by the field's name in the task's
   // project: only fields somebody set a value on have a row.
   customFieldValues?: { taskId: string; field: string; value: string | null }[];
+  // A project's link to a Gitea repository, as the integration row keeps it.
+  // accessToken defaults to a fake one; replies carry only its mask. isActive
+  // may be null, as the nullable column allows.
+  giteaIntegrations?: {
+    projectId: string;
+    baseUrl: string;
+    accessToken?: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    isActive?: boolean | null;
+    webhookSecret?: string;
+    branchPattern?: string;
+    commentTaskLinkOnGiteaIssue?: boolean;
+  }[];
+  // The issues a repository on the instance holds, keyed by the repo's
+  // normalized base URL, owner and name — upstream fetches them live, so a
+  // link to the repository lists this repo's issues and a reconnect to
+  // another one sees that repository's list instead. state other than "open"
+  // is never listed, pullRequest marks the pull requests the issue listing
+  // also carries (upstream drops them before importing), labels feed the
+  // priority, status and task-label sync, and fail makes that one issue an
+  // errors entry.
+  giteaRepoIssues?: {
+    baseUrl: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    issues?: { number: number; title: string; body?: string; labels?: string[]; state?: string; pullRequest?: boolean; fail?: string }[];
+  }[];
+  // The repositories the fake's Gitea instance knows a token can reach: what
+  // repos lists and what verify and connect check owner/name against. Every
+  // base URL is answered as this one instance, and canWriteIssues false is a
+  // token that reads but cannot write issues.
+  giteaRepositories?: { owner: string; name: string; private?: boolean; canWriteIssues?: boolean }[];
+  // How the one instance answers the user check every route makes before it
+  // trusts a token: "ok" (the default) is a healthy instance, "not-gitea" is a
+  // URL that is not one, "redirected" is a host that bounces the API call, and
+  // "bad-token" rejects every token.
+  giteaInstance?: { mode?: "ok" | "not-gitea" | "redirected" | "bad-token" };
   // A project's link to a GitLab project, as the integration routes keep it.
   // token is stored raw and only ever answered masked; hookSecret likewise
   // only to a caller that may manage the workspace's settings.
@@ -578,6 +616,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const dropFieldValues = (taskId: string) => {
     for (let j = fieldValues.length - 1; j >= 0; j--) if (fieldValues[j]!.taskId === taskId) fieldValues.splice(j, 1);
   };
+  // A task's external links go with it the same way: external_link.task_id
+  // references task.id with onDelete: "cascade" upstream, so every route that
+  // removes a task row — the single and bulk deletes, and the project delete
+  // whose tasks cascade — takes the links made through it.
+  const dropLinksForTask = (taskId: string) => {
+    for (let j = links.length - 1; j >= 0; j--) if (links[j]!.taskId === taskId) links.splice(j, 1);
+  };
 
   // The value checks the custom-field routes borrow from validate-task-fields,
   // kept to the types those routes call them for.
@@ -830,6 +875,135 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     createdAt: string;
   }[] = [];
 
+  // Gitea and GitLab integrations number and date themselves apart, as
+  // notifications do, so a scenario that links a repository leaves every
+  // other id and time alone. The day offset keeps their times off the day
+  // the shared clock writes.
+  let gseq = 0;
+  let gclock = 0;
+  const gid = (prefix: string) => `${prefix}${String(++gseq).padStart(4, "0")}`;
+  const gnow = () => new Date(T0 + 2 * 86_400_000 + 1000 * gclock++).toISOString();
+  type GiteaRow = {
+    id: string;
+    projectId: string;
+    baseUrl: string;
+    token: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    hookSecret: string;
+    branchPattern: string | null;
+    commentOnIssue: boolean;
+    isActive: boolean | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  // One seeded issue with the seed's defaults applied, as the instance's
+  // issue listing holds it.
+  type GiteaIssueRow = { number: number; title: string; body: string | null; labels: string[]; state: string; pullRequest: boolean; fail: string | null };
+  // plugins/gitea/config.ts's normalizeGiteaBaseUrl: origin plus path, trailing
+  // slashes off, and only http(s) URLs without credentials, query or fragment.
+  const normalizeGiteaUrl = (raw: string): string => {
+    const trimmed = raw.trim().replace(/\/+$/, "");
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("Gitea base URL must use http or https");
+    if (parsed.search || parsed.hash || parsed.username || parsed.password) {
+      throw new Error("Gitea base URL must not contain a query, fragment, or credentials");
+    }
+    return `${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}`;
+  };
+  const gitea: GiteaRow[] = [];
+  for (const entry of seed.giteaIntegrations ?? []) {
+    const at = gnow();
+    gitea.push({
+      id: gid("git"),
+      projectId: entry.projectId,
+      baseUrl: normalizeGiteaUrl(entry.baseUrl),
+      token: entry.accessToken ?? "fake-gitea-token",
+      repositoryOwner: entry.repositoryOwner,
+      repositoryName: entry.repositoryName,
+      hookSecret: entry.webhookSecret ?? `fake-hook-secret-${gseq}`,
+      branchPattern: entry.branchPattern ?? null,
+      commentOnIssue: entry.commentTaskLinkOnGiteaIssue ?? true,
+      isActive: entry.isActive === undefined ? true : entry.isActive,
+      createdAt: at,
+      updatedAt: at,
+    });
+  }
+  // The instance's issue lists, one per repository the seed names. The key is
+  // the normalized base URL, owner and name together, as upstream's client is
+  // bound to one instance: the same owner/name on another base URL is another
+  // repository with its own list.
+  const giteaRepoKey = (baseUrl: string, owner: string, name: string) => JSON.stringify([baseUrl, owner, name]);
+  const giteaIssues = new Map<string, GiteaIssueRow[]>();
+  for (const repo of seed.giteaRepoIssues ?? []) {
+    giteaIssues.set(
+      giteaRepoKey(normalizeGiteaUrl(repo.baseUrl), repo.repositoryOwner, repo.repositoryName),
+      (repo.issues ?? []).map((i) => ({ number: i.number, title: i.title, body: i.body ?? null, labels: i.labels ?? [], state: i.state ?? "open", pullRequest: i.pullRequest ?? false, fail: i.fail ?? null })),
+    );
+  }
+  // What import-issues would list for the row's current repository: its own
+  // list, or none when the seed names no issues for it.
+  const giteaIssuesFor = (row: GiteaRow) => giteaIssues.get(giteaRepoKey(row.baseUrl, row.repositoryOwner, row.repositoryName)) ?? [];
+  // The one Gitea instance every base URL is answered as.
+  const giteaRepos = seed.giteaRepositories ?? [];
+  const giteaRepo = (owner: string, name: string) => giteaRepos.find((r) => r.owner === owner && r.name === name);
+  const giteaRow = (projectId: string) => gitea.find((g) => g.projectId === projectId);
+  const giteaMode = seed.giteaInstance?.mode ?? "ok";
+  // get-gitea-integration.ts's maskToken: short tokens mask whole, longer ones
+  // keep their ends.
+  const maskGiteaToken = (token: string) => (token.length <= 8 ? "••••••••" : `${token.slice(0, 4)}••••••${token.slice(-4)}`);
+  // get-gitea-integration.ts always answers webhookSecret: the stored secret
+  // when the caller may manage the workspace's settings, "" for anyone else.
+  const giteaIntegrationReply = (row: GiteaRow, origin: string, includeSecrets = true) => ({
+    id: row.id,
+    projectId: row.projectId,
+    baseUrl: row.baseUrl,
+    repositoryOwner: row.repositoryOwner,
+    repositoryName: row.repositoryName,
+    maskedAccessToken: maskGiteaToken(row.token),
+    webhookUrl: `${origin}/api/gitea-integration/webhook/${row.id}`,
+    webhookSecret: includeSecrets ? row.hookSecret : "",
+    // get-gitea-integration.ts falls back on any falsy stored pattern, so an
+    // empty string answers the default too.
+    branchPattern: row.branchPattern || "{slug}-{number}",
+    commentTaskLinkOnGiteaIssue: row.commentOnIssue,
+    isActive: row.isActive,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
+  // resolve-verification-token.ts: a sent token wins; without one the stored
+  // token answers only while the normalized base URL is the saved one.
+  const giteaTokenFor = (projectId: string, rawBaseUrl: string, sent: unknown): { baseUrl: string; token: string } | Response => {
+    let baseUrl: string;
+    try {
+      baseUrl = normalizeGiteaUrl(rawBaseUrl);
+    } catch {
+      return failText(400, "Enter a valid HTTP or HTTPS Gitea URL without credentials, a query, or a fragment.");
+    }
+    if (typeof sent === "string" && sent.trim() !== "") return { baseUrl, token: sent.trim() };
+    const saved = giteaRow(projectId);
+    if (saved === undefined || saved.token.trim() === "" || normalizeGiteaUrl(saved.baseUrl) !== baseUrl) {
+      return failText(400, "Enter a personal access token to verify this Gitea instance.");
+    }
+    return { baseUrl, token: saved.token };
+  };
+  // import-gitea-issues.ts's importLabelsForTask: the task's labels become
+  // exactly the issue's non-system ones — task labels the issue does not name
+  // are removed, and a missing one takes the workspace label's color when a
+  // label of that name exists there.
+  const syncGiteaTaskLabels = (issueLabels: string[], taskId: string, workspaceId: string) => {
+    const expected = issueLabels.filter((n) => !n.startsWith("priority:") && !n.startsWith("status:"));
+    for (let i = labels.length - 1; i >= 0; i--) {
+      const l = labels[i]!;
+      if (l.taskId === taskId && !expected.includes(l.name)) labels.splice(i, 1);
+    }
+    for (const name of expected) {
+      if (labels.some((l) => l.taskId === taskId && l.name === name)) continue;
+      const workspaceLabel = labels.find((l) => l.taskId === null && l.workspaceId === workspaceId && l.name === name);
+      addLabel(name, workspaceLabel?.color ?? "#6B7280", workspaceId, taskId);
+    }
+  };
+
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
@@ -894,13 +1068,6 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const keyTakenMessage = (key: string, name: string) =>
     `This workspace already has a project using the key "${key}" (${name}). Choose a different key.`;
 
-  // GitLab integrations number and date apart from everything else, so
-  // connecting one in a scenario leaves the ids and times the other
-  // scenarios record alone.
-  let gseq = 0;
-  let gclock = 0;
-  const gid = (prefix: string) => `${prefix}${String(++gseq).padStart(4, "0")}`;
-  const gnow = () => new Date(T0 + 172_800_000 + 1000 * gclock++).toISOString();
   type GitlabRow = {
     id: string;
     projectId: string;
@@ -1278,6 +1445,22 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     return /^[A-Za-z0-9._-]+$/.test(suffix) && !suffix.startsWith(".");
   };
 
+  // external_link.integration_id references integration.id with
+  // onDelete: "cascade" upstream, so deleting an integration takes the links
+  // made through it; the tasks and the links added by hand stay.
+  const dropLinksFor = (integrationId: string) => {
+    for (let i = links.length - 1; i >= 0; i--) if (links[i]!.integrationId === integrationId) links.splice(i, 1);
+  };
+  // move-task.ts deletes a moved task's links whose integration the
+  // destination project does not own — the check is the integration row's
+  // projectId, whichever provider wrote it. A link whose integration id names
+  // no stored row is not the destination's either, so it goes as well.
+  const integrationProjectOf = (integrationId: string) =>
+    gitea.find((x) => x.id === integrationId)?.projectId ??
+    gitlabs.find((x) => x.id === integrationId)?.projectId ??
+    githubIntegrations.find((x) => x.id === integrationId)?.projectId ??
+    integrations.find((x) => x.id === integrationId)?.projectId;
+
   const route = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     // The presigned PUT a background upload is given lands outside /api and
@@ -1388,6 +1571,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/custom-field$/, M.CreateCustomFieldBody],
       ["PUT", /^\/custom-field\/value$/, M.SetCustomFieldValueBody],
       ["PUT", /^\/custom-field\/reorder\/[^/]+$/, M.ReorderCustomFieldsBody],
+      ["POST", /^\/gitea-integration\/repositories$/, M.ListGiteaRepositoriesBody],
+      ["POST", /^\/gitea-integration\/verify$/, M.VerifyGiteaAccessBody],
+      ["POST", /^\/gitea-integration\/project\/[^/]+$/, M.CreateGiteaIntegrationBody],
+      ["PATCH", /^\/gitea-integration\/project\/[^/]+$/, M.UpdateGiteaIntegrationBody],
+      ["POST", /^\/gitea-integration\/import-issues$/, M.ImportGiteaIssuesBody],
       ["POST", /^\/gitlab-integration\/projects$/, M.ListGitlabProjectsBody],
       ["POST", /^\/gitlab-integration\/verify$/, M.VerifyGitlabAccessBody],
       ["POST", /^\/gitlab-integration\/import-issues$/, M.ImportGitlabIssuesBody],
@@ -1619,7 +1807,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         for (const list of [tasks, columns, workflowRules] as { projectId?: string }[][]) {
           for (let i = list.length - 1; i >= 0; i--) if (list[i]!.projectId === proj.id) list.splice(i, 1);
         }
-        for (let i = links.length - 1; i >= 0; i--) if (gone.has(links[i]!.taskId)) links.splice(i, 1);
+        for (const taskId of gone) {
+          dropLinksForTask(taskId);
+          dropFieldValues(taskId);
+        }
         for (let i = comments.length - 1; i >= 0; i--) if (gone.has(comments[i]!.taskId)) comments.splice(i, 1);
         // A link between two tasks is two rows of one thing, so one end going
         // takes it with it, as the cascade on task_relation does.
@@ -1627,7 +1818,6 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           const r = relations[i]!;
           if (gone.has(r.sourceTaskId) || gone.has(r.targetTaskId)) relations.splice(i, 1);
         }
-        for (const taskId of gone) dropFieldValues(taskId);
         projects.splice(projects.indexOf(proj), 1);
         return reply;
       }
@@ -1914,6 +2104,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         case "delete":
           for (const t of found) {
             tasks.splice(tasks.indexOf(t), 1);
+            dropLinksForTask(t.id);
             dropFieldValues(t.id);
           }
           break;
@@ -2053,6 +2244,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         dest.lastTaskNumber += 1;
         Object.assign(t, { projectId: dest.id, number: dest.lastTaskNumber, status: b.destinationStatus ?? firstColumn });
         touch(t);
+        // move-task.ts drops the moved task's links through integrations the
+        // destination project does not own; links with no integration — the
+        // ones added by hand — stay.
+        for (let i = links.length - 1; i >= 0; i--) {
+          const link = links[i]!;
+          if (link.taskId === t.id && link.integrationId !== null && integrationProjectOf(link.integrationId) !== dest.id) links.splice(i, 1);
+        }
         return ok(M.MoveTaskResult, { task: t, sourceProjectId: from, destinationProjectId: dest.id });
       }
       touch(t);
@@ -2255,6 +2453,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         tasks.splice(i, 1);
         // The document says a task takes its time entries with it.
         for (let j = timeEntries.length - 1; j >= 0; j--) if (timeEntries[j]!.taskId === t.id) timeEntries.splice(j, 1);
+        dropLinksForTask(t.id);
         dropFieldValues(t.id);
         return ok(M.Task, t);
       }
@@ -2747,6 +2946,248 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       return ok(M.CustomFieldDefinition, deleted);
     }
 
+    // The Gitea integration routes. Every base URL is answered as the one
+    // seeded instance, and giteaMode is how its user check fails when a
+    // scenario needs that. A project the workspace middleware cannot place is
+    // the same plain-text 400 the column routes give; import-issues' own scope
+    // check answers 404 "Project not found" instead. index.ts's manageAccess
+    // puts every route but get and import-issues behind workspace
+    // manage_settings, which a plain member fails with the same 403 the
+    // project writes give; get only hides the webhook secret from them, and
+    // import-issues asks for task permissions a member has.
+    if (req.method === "POST" && path === "/gitea-integration/repositories") {
+      const b = body as any;
+      if (!projects.some((x) => x.id === b.projectId)) return failText(400, "Workspace ID could not be determined");
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
+      let normalized: string;
+      try {
+        normalized = normalizeGiteaUrl(b.baseUrl);
+      } catch {
+        // A plain Error reaches the app's onError as a JSON 500, not text.
+        return Response.json({ message: "Internal Server Error" }, { status: 500 });
+      }
+      // list-gitea-repositories.ts verifies the token first and turns any
+      // failure of that check into the same 400.
+      if (giteaMode !== "ok" || b.accessToken.trim() === "") return failText(400, "Invalid Gitea token or could not reach instance.");
+      return ok(M.GiteaRepositoryList, {
+        repositories: giteaRepos.map((r, i) => ({
+          id: i + 1,
+          name: r.name,
+          full_name: `${r.owner}/${r.name}`,
+          owner: { login: r.owner },
+          private: r.private ?? false,
+          html_url: `${normalized}/${r.owner}/${r.name}`,
+        })),
+      });
+    }
+    if (req.method === "POST" && path === "/gitea-integration/verify") {
+      const b = body as any;
+      if (!projects.some((x) => x.id === b.projectId)) return failText(400, "Workspace ID could not be determined");
+      if (opts.plainMember) return failText(403, "Insufficient permissions");
+      const resolved = giteaTokenFor(b.projectId, b.baseUrl, b.accessToken);
+      if (resolved instanceof Response) return resolved;
+      // verify-gitea-access.ts reports what the checks found rather than
+      // failing the request, except an unauthorized token, which is a 400.
+      if (giteaMode === "not-gitea") {
+        return ok(M.GiteaVerificationResult, { isInstalled: false, hasRequiredPermissions: false, repositoryExists: false, repositoryPrivate: null, missingPermissions: [], message: "The URL does not point to a Gitea instance.", failureReason: "not_a_gitea_instance" });
+      }
+      if (giteaMode === "redirected") {
+        return ok(M.GiteaVerificationResult, { isInstalled: false, hasRequiredPermissions: false, repositoryExists: false, repositoryPrivate: null, missingPermissions: [], message: "The Gitea URL redirected (HTTP 301). This usually means the server forces HTTPS. Please use the final URL directly.", failureReason: "redirected" });
+      }
+      if (giteaMode === "bad-token") return failText(400, "Invalid Gitea token or unauthorized.");
+      const repo = giteaRepo(b.repositoryOwner, b.repositoryName);
+      if (repo === undefined) {
+        return ok(M.GiteaVerificationResult, { isInstalled: false, hasRequiredPermissions: false, repositoryExists: false, repositoryPrivate: null, missingPermissions: [], message: "Repository not found or not accessible with this token.", failureReason: "repository_not_found" });
+      }
+      const canWrite = repo.canWriteIssues !== false;
+      return ok(M.GiteaVerificationResult, {
+        isInstalled: true,
+        hasRequiredPermissions: canWrite,
+        repositoryExists: true,
+        repositoryPrivate: repo.private ?? false,
+        missingPermissions: canWrite ? [] : ["issues (write)"],
+        message: canWrite ? "Token can access the repository." : "Token may not have sufficient permissions to manage issues.",
+        failureReason: null,
+      });
+    }
+    if ((p = m(/^\/gitea-integration\/project\/([^/]+)$/))) {
+      const projectId = decodeURIComponent(p![1]);
+      if (req.method === "GET") {
+        if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+        const row = giteaRow(projectId);
+        return ok(M.GiteaIntegration, row === undefined ? null : giteaIntegrationReply(row, url.origin, !opts.plainMember));
+      }
+      if (req.method === "POST") {
+        if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+        if (opts.plainMember) return failText(403, "Insufficient permissions");
+        const b = body as any;
+        // create-gitea-integration.ts normalizes the URL before the token is
+        // resolved, so a URL it refuses is the app's plain JSON 500 here.
+        let normalized: string;
+        try {
+          normalized = normalizeGiteaUrl(b.baseUrl);
+        } catch {
+          return Response.json({ message: "Internal Server Error" }, { status: 500 });
+        }
+        const resolved = giteaTokenFor(projectId, normalized, b.accessToken);
+        if (resolved instanceof Response) return resolved;
+        // verifyGiteaToken and getRepo run against the instance; a GiteaApiError
+        // becomes an HTTPException carrying its status and message.
+        if (giteaMode !== "ok") {
+          const status = giteaMode === "redirected" ? 301 : giteaMode === "bad-token" ? 401 : 404;
+          const message = giteaMode === "redirected" ? `Gitea request was redirected (HTTP ${status})` : `Gitea API error ${status}`;
+          return failText(status, message);
+        }
+        if (giteaRepo(b.repositoryOwner, b.repositoryName) === undefined) return failText(404, "Gitea API error 404");
+        const clash = gitea.find(
+          (x) => x.projectId !== projectId && x.isActive && x.baseUrl === normalized && x.repositoryOwner === b.repositoryOwner && x.repositoryName === b.repositoryName,
+        );
+        if (clash !== undefined) return failText(409, `Repository ${b.repositoryOwner}/${b.repositoryName} on this Gitea instance is already linked to another project`);
+        const existing = giteaRow(projectId);
+        let row: GiteaRow;
+        if (existing === undefined) {
+          const at = gnow();
+          const rowId = gid("git");
+          row = {
+            id: rowId,
+            projectId,
+            baseUrl: normalized,
+            token: resolved.token,
+            repositoryOwner: b.repositoryOwner,
+            repositoryName: b.repositoryName,
+            hookSecret: `fake-hook-secret-${rowId}`,
+            branchPattern: null,
+            commentOnIssue: true,
+            isActive: true,
+            createdAt: at,
+            updatedAt: at,
+          };
+          gitea.push(row);
+        } else {
+          // Reconnecting keeps the webhook secret and resets everything else
+          // to the defaults, as getDefaultGiteaConfig does; the token is the
+          // resolved one, which is the stored token when none was sent.
+          existing.baseUrl = normalized;
+          existing.token = resolved.token;
+          existing.repositoryOwner = b.repositoryOwner;
+          existing.repositoryName = b.repositoryName;
+          existing.branchPattern = null;
+          existing.commentOnIssue = true;
+          existing.isActive = true;
+          existing.updatedAt = gnow();
+          row = existing;
+        }
+        return ok(M.GiteaIntegration, giteaIntegrationReply(row, url.origin));
+      }
+      if (req.method === "PATCH") {
+        if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+        if (opts.plainMember) return failText(403, "Insufficient permissions");
+        const row = giteaRow(projectId);
+        // The document declares this 404 as {"error": ...} JSON, not text.
+        if (row === undefined) return ok(M.GiteaIntegrationNotFound, { error: "Integration not found" }, 404);
+        const b = body as any;
+        // index.ts's update route resolves the flag on every PATCH: an omitted
+        // isActive keeps the stored value read as on, so a null flips active.
+        row.isActive = b.isActive !== undefined ? b.isActive : (row.isActive ?? true);
+        if (b.commentTaskLinkOnGiteaIssue !== undefined) row.commentOnIssue = b.commentTaskLinkOnGiteaIssue;
+        row.updatedAt = gnow();
+        return ok(M.GiteaIntegration, giteaIntegrationReply(row, url.origin));
+      }
+      if (req.method === "DELETE") {
+        if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+        if (opts.plainMember) return failText(403, "Insufficient permissions");
+        const i = gitea.findIndex((x) => x.projectId === projectId);
+        if (i < 0) return failText(404, "Gitea integration not found");
+        // The integration row's cascade takes the external links made through
+        // it; the imported tasks and hand-added links stay.
+        const removed = gitea[i]!;
+        gitea.splice(i, 1);
+        dropLinksFor(removed.id);
+        return ok(M.GiteaDeleteResult, { success: true, message: "Gitea integration deleted" });
+      }
+    }
+    if (req.method === "POST" && path === "/gitea-integration/import-issues") {
+      const b = body as any;
+      const project = projects.find((x) => x.id === b.projectId);
+      if (project === undefined) return failText(404, "Project not found");
+      const row = giteaRow(b.projectId);
+      if (row === undefined) return failText(404, "Gitea integration not found");
+      if (!row.isActive) return failText(400, "Gitea integration is not active");
+      if (row.token.trim() === "" || row.baseUrl.trim() === "") return failText(400, "Gitea access token or base URL not configured");
+      // import-gitea-issues.ts's listIssues runs before the per-issue try/catch
+      // and nothing translates its GiteaApiError, so a failing instance ends
+      // the call in the app's plain 500 rather than an errors entry.
+      if (giteaMode !== "ok") return Response.json({ message: "Internal Server Error" }, { status: 500 });
+      let imported = 0;
+      let updated = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+      for (const issue of giteaIssuesFor(row)) {
+        // The API lists state=open issues only, so anything else never reaches
+        // the import at all; the pull_request rows that listing also carries
+        // are filtered out upstream before a single one is imported.
+        if (issue.state !== "open" || issue.pullRequest) continue;
+        // findExternalLink applies externalLinkScope(): the link counts only
+        // while its task exists in the link integration's project. One that
+        // fails it — the task is gone or sits in another project — is
+        // invisible here, so the issue takes the create path below and counts
+        // imported; upstream's skipped is reachable only through a race the
+        // sequential fake never has.
+        const link = links.find((l) => {
+          if (l.integrationId !== row.id || l.resourceType !== "issue" || l.externalId !== String(issue.number)) return false;
+          return tasks.some((t) => t.id === l.taskId && t.projectId === project.id);
+        });
+        try {
+          if (issue.fail !== null) throw new Error(issue.fail);
+          // extract-priority.ts: the first priority:/status: label decides, and
+          // only values in the known sets count.
+          const priorityName = issue.labels.map((n) => (n.startsWith("priority:") ? n.slice("priority:".length) : null)).find((v): v is string => v !== null);
+          const priority = priorityName !== undefined && ["low", "medium", "high", "urgent"].includes(priorityName) ? priorityName : null;
+          const statusName = issue.labels.map((n) => (n.startsWith("status:") ? n.slice("status:".length).trim().toLowerCase() : null)).find((v): v is string => v !== null);
+          const status = statusName !== undefined && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(statusName) ? statusName : null;
+          if (link !== undefined) {
+            // The scope check above already proved the task exists in this
+            // project, so withIntegrationTask's re-checks upstream — which can
+            // only fail on a race — never skip here.
+            const task = tasks.find((t) => t.id === link.taskId)!;
+            task.title = issue.title;
+            task.description = issue.body ?? "";
+            if (priority !== null) task.priority = priority;
+            if (status !== null) task.status = status;
+            syncGiteaTaskLabels(issue.labels, link.taskId, project.workspaceId);
+            updated++;
+            continue;
+          }
+          const task = addTask(project.id, {
+            title: issue.title,
+            description: issue.body ?? "",
+            status: status ?? "to-do",
+            priority: priority ?? "low",
+            userId: null,
+          });
+          const at = now();
+          links.push({
+            id: id("link"),
+            taskId: task.id,
+            integrationId: row.id,
+            resourceType: "issue",
+            externalId: String(issue.number),
+            url: `${row.baseUrl}/${row.repositoryOwner}/${row.repositoryName}/issues/${issue.number}`,
+            title: issue.title,
+            metadata: { state: issue.state, createdFrom: "gitea-import" },
+            createdAt: at,
+            updatedAt: at,
+            integration: { id: row.id, type: "gitea" },
+          });
+          syncGiteaTaskLabels(issue.labels, task.id, project.workspaceId);
+          imported++;
+        } catch (e) {
+          errors.push(`Issue #${issue.number}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      return ok(M.GiteaImportResult, { imported, updated, skipped, ...(errors.length > 0 ? { errors } : {}) });
+    }
+
     // GitLab integration, as usekaneo/kaneo v2.32.0's gitlab-integration
     // routes answer. The checks that would call GitLab are canned: the fake
     // has no GitLab instance to ask, so a well-formed request succeeds and
@@ -2873,6 +3314,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "DELETE") {
         if (row === undefined) return failText(404, "GitLab integration not found");
         gitlabs.splice(gitlabs.indexOf(row), 1);
+        dropLinksFor(row.id);
         return ok(M.GitlabDeleteResult, { success: true, message: "GitLab integration deleted" });
       }
     }
@@ -3002,6 +3444,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "DELETE") {
         if (integ === undefined) return failText(404, "GitHub integration not found");
         githubIntegrations.splice(githubIntegrations.indexOf(integ), 1);
+        dropLinksFor(integ.id);
         return ok(M.GitHubDeleteResult, { success: true, message: "GitHub integration deleted" });
       }
     }
@@ -3052,6 +3495,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "DELETE") {
         if (!existing) return new Response("Project or integration not found", { status: 404 });
         integrations.splice(integrations.indexOf(existing), 1);
+        dropLinksFor(existing.id);
         return ok(integrationDeleteSchema(kind), { success: true });
       }
       const b = (body ?? {}) as Record<string, any>;

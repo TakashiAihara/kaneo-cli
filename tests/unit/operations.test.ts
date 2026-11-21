@@ -2901,3 +2901,162 @@ test("getPublicBoard sends every filter under its query name", async () => {
     "?status=done&priority=high&assigneeId=u1&page=1&relatedPage=1&limit=5&sortBy=title&sortOrder=desc&dueBefore=2026-02-01&dueAfter=2026-01-01",
   ]);
 });
+
+// The Gitea routes keep the token out of every reply: the integration answers
+// with its mask, and a request carries accessToken only when one was given.
+const giteaReply = (extra = "") =>
+  `{"id":"git1","projectId":"p1","baseUrl":"https://gitea.example.com","repositoryOwner":"acme","repositoryName":"app",` +
+  `"maskedAccessToken":"masked-value","webhookUrl":"https://api.example.com/api/gitea-integration/webhook/git1",` +
+  `"webhookSecret":"secret-value","branchPattern":"{slug}-{number}","commentTaskLinkOnGiteaIssue":true,"isActive":true,` +
+  `"createdAt":"${TIME}","updatedAt":"${TIME}"${extra}}`;
+
+test("getGiteaIntegration reads the route and maps every field", async () => {
+  const seen = recorder(giteaReply());
+  const got = await api.getGiteaIntegration("p/1");
+  expect([seen.method, seen.path]).toEqual(["GET", "/api/gitea-integration/project/p%2F1"]);
+  expect(got).toEqual({
+    id: "git1",
+    projectId: "p1",
+    baseUrl: "https://gitea.example.com",
+    repositoryOwner: "acme",
+    repositoryName: "app",
+    maskedAccessToken: "masked-value",
+    webhookUrl: "https://api.example.com/api/gitea-integration/webhook/git1",
+    webhookSecret: "secret-value",
+    branchPattern: "{slug}-{number}",
+    commentTaskLinkOnGiteaIssue: true,
+    isActive: true,
+    createdAt: TIME,
+    updatedAt: TIME,
+  });
+});
+
+// The server answers null for a project with no integration, which is an
+// answer rather than a failure; the optional fields read as null when absent.
+test("getGiteaIntegration maps null and missing optionals", async () => {
+  recorder("null");
+  expect(await api.getGiteaIntegration("p1")).toBeNull();
+
+  recorder(
+    `{"id":"git1","projectId":"p1","baseUrl":"https://gitea.example.com","repositoryOwner":"acme","repositoryName":"app",` +
+      `"maskedAccessToken":"masked-value","isActive":null,"createdAt":"${TIME}","updatedAt":"${TIME}"}`,
+  );
+  const got = await api.getGiteaIntegration("p1");
+  expect([got!.webhookUrl, got!.webhookSecret, got!.branchPattern, got!.commentTaskLinkOnGiteaIssue, got!.isActive]).toEqual([null, null, null, null, null]);
+});
+
+test("createGiteaIntegration posts the target and keeps the token only when given", async () => {
+  const seen = recorder(giteaReply());
+  const got = await api.createGiteaIntegration("p1", { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", accessToken: "unit-token" });
+  expect([seen.method, seen.path]).toEqual(["POST", "/api/gitea-integration/project/p1"]);
+  expect(JSON.parse(seen.body)).toEqual({ baseUrl: "https://gitea.example.com", accessToken: "unit-token", repositoryOwner: "acme", repositoryName: "app" });
+  expect(got.id).toBe("git1");
+});
+
+// Leaving accessToken out is how the stored token is kept; the key must not
+// be sent as null or empty, which the server reads differently.
+test("createGiteaIntegration omits accessToken when none is given", async () => {
+  const seen = recorder(giteaReply());
+  await api.createGiteaIntegration("p1", { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app" });
+  const sent = JSON.parse(seen.body);
+  expect("accessToken" in sent).toBe(false);
+});
+
+// The route answers with the stored integration, never null; a null reply is
+// a reply that cannot be reported as a link that was made.
+test("createGiteaIntegration refuses a null reply", async () => {
+  recorder("null");
+  const e = await failure(api.createGiteaIntegration("p1", { baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app" }));
+  expect(e).toBeInstanceOf(Error);
+  expect((e as Error).message).toContain("server answered without the integration");
+});
+
+test("updateGiteaIntegration patches only the fields given", async () => {
+  const seen = recorder(giteaReply().replace('"isActive":true', '"isActive":false').replace('"commentTaskLinkOnGiteaIssue":true', '"commentTaskLinkOnGiteaIssue":false'));
+  const got = await api.updateGiteaIntegration("p1", { isActive: false, commentTaskLinkOnGiteaIssue: false });
+  expect([seen.method, seen.path]).toEqual(["PATCH", "/api/gitea-integration/project/p1"]);
+  expect(seen.body).toBe('{"isActive":false,"commentTaskLinkOnGiteaIssue":false}');
+  expect([got.isActive, got.commentTaskLinkOnGiteaIssue]).toEqual([false, false]);
+});
+
+// The update route's 200 schema is nullable, so a null reply is reachable;
+// it is still a reply that cannot be reported as a change that was made.
+test("updateGiteaIntegration refuses a null reply", async () => {
+  recorder("null");
+  const e = await failure(api.updateGiteaIntegration("p1", { isActive: false }));
+  expect(e).toBeInstanceOf(Error);
+  expect((e as Error).message).toContain("server answered without the integration");
+});
+
+test("deleteGiteaIntegration deletes the route and reads the two fields", async () => {
+  const seen = recorder('{"success":true,"message":"Gitea integration deleted"}');
+  const got = await api.deleteGiteaIntegration("p1");
+  expect([seen.method, seen.path]).toEqual(["DELETE", "/api/gitea-integration/project/p1"]);
+  expect(got).toEqual({ success: true, message: "Gitea integration deleted" });
+});
+
+// Gitea's own field names come across as the camelCase the rest of the client
+// uses.
+test("listGiteaRepositories posts the credentials and maps the repos", async () => {
+  const seen = recorder(
+    '{"repositories":[' +
+      '{"id":7,"name":"app","full_name":"acme/app","owner":{"login":"acme"},"private":true,"html_url":"https://gitea.example.com/acme/app"},' +
+      '{"id":8,"name":"docs","full_name":"acme/docs","owner":{"login":"acme"},"private":false,"html_url":"https://gitea.example.com/acme/docs"}]}',
+  );
+  const got = await api.listGiteaRepositories({ projectId: "p1", baseUrl: "https://gitea.example.com", accessToken: "unit-token" });
+  expect([seen.method, seen.path]).toEqual(["POST", "/api/gitea-integration/repositories"]);
+  expect(JSON.parse(seen.body)).toEqual({ projectId: "p1", baseUrl: "https://gitea.example.com", accessToken: "unit-token" });
+  expect(got).toEqual([
+    { id: 7, name: "app", fullName: "acme/app", owner: "acme", private: true, htmlUrl: "https://gitea.example.com/acme/app" },
+    { id: 8, name: "docs", fullName: "acme/docs", owner: "acme", private: false, htmlUrl: "https://gitea.example.com/acme/docs" },
+  ]);
+});
+
+// Verification failures are reported in the body, so every field is read,
+// including the reason a failure carries.
+test("verifyGiteaAccess posts the target and maps the checks", async () => {
+  const seen = recorder(
+    '{"isInstalled":true,"hasRequiredPermissions":false,"repositoryExists":true,"repositoryPrivate":true,' +
+      '"missingPermissions":["issues (write)"],"message":"Token may not have sufficient permissions to manage issues.","failureReason":null}',
+  );
+  const got = await api.verifyGiteaAccess({ projectId: "p1", baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", accessToken: "unit-token" });
+  expect([seen.method, seen.path]).toEqual(["POST", "/api/gitea-integration/verify"]);
+  expect(JSON.parse(seen.body)).toEqual({ projectId: "p1", baseUrl: "https://gitea.example.com", accessToken: "unit-token", repositoryOwner: "acme", repositoryName: "app" });
+  expect(got).toEqual({
+    isInstalled: true,
+    hasRequiredPermissions: false,
+    repositoryExists: true,
+    repositoryPrivate: true,
+    missingPermissions: ["issues (write)"],
+    message: "Token may not have sufficient permissions to manage issues.",
+    failureReason: null,
+  });
+});
+
+// Omitting accessToken asks the server to verify with the stored token; the
+// key is left out entirely rather than sent empty.
+test("verifyGiteaAccess omits accessToken when none is given", async () => {
+  const seen = recorder(
+    '{"isInstalled":false,"hasRequiredPermissions":false,"repositoryExists":false,"repositoryPrivate":null,' +
+      '"missingPermissions":[],"message":"The URL does not point to a Gitea instance.","failureReason":"not_a_gitea_instance"}',
+  );
+  const got = await api.verifyGiteaAccess({ projectId: "p1", baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app" });
+  const sent = JSON.parse(seen.body);
+  expect("accessToken" in sent).toBe(false);
+  expect(got.failureReason).toBe("not_a_gitea_instance");
+});
+
+// errors is optional on the wire; a reply without it reads as an empty list.
+test("importGiteaIssues posts the project and maps the counts", async () => {
+  const seen = recorder('{"imported":2,"updated":1,"skipped":3}');
+  const got = await api.importGiteaIssues("p1");
+  expect([seen.method, seen.path]).toEqual(["POST", "/api/gitea-integration/import-issues"]);
+  expect(JSON.parse(seen.body)).toEqual({ projectId: "p1" });
+  expect(got).toEqual({ imported: 2, updated: 1, skipped: 3, errors: [] });
+});
+
+test("importGiteaIssues keeps the per-issue errors", async () => {
+  recorder('{"imported":0,"updated":0,"skipped":1,"errors":["Issue #4: Gitea API error 502"]}');
+  const got = await api.importGiteaIssues("p1");
+  expect(got.errors).toEqual(["Issue #4: Gitea API error 502"]);
+});

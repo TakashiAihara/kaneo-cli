@@ -13,9 +13,9 @@
         "-",
         "--json"
       ],
-      "exit": 1,
+      "exit": 0,
       "stdout": "{\n  \"isInstalled\": true,\n  \"hasRequiredPermissions\": false,\n  \"projectExists\": true,\n  \"projectVisibility\": \"private\",\n  \"missingPermissions\": [\n    \"Developer\"\n  ],\n  \"message\": \"Token may not have sufficient permissions to manage issues and labels.\",\n  \"failureReason\": null\n}\n",
-      "stderr": "Error: Token may not have sufficient permissions to manage issues and labels.\n"
+      "stderr": ""
     }
   ],
   "requests": [

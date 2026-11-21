@@ -2127,8 +2127,8 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
-    // A project the token cannot see is a 200 body, not an error status; the
-    // command still exits non-zero because the check did not pass.
+    // A project the token cannot see is a 200 body, not an error status, and
+    // the command exits 0: the check's findings are the answer, not a failure.
     name: "integration gitlab verify a project the token cannot see",
     stdin: "verify-token-0123456789abcdef\n",
     gitlabVerify: {

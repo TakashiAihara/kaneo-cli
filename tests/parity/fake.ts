@@ -1811,7 +1811,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "POST" && path === "/gitlab-integration/import-issues") {
       const b = body as any;
-      const holder = projects.find((x) => x.id === b?.projectId);
+      // scopeToProjectFromBody runs before the route: a missing projectId is
+      // its own 400, while an unknown one is the route's 404.
+      const pid = b?.projectId;
+      if (typeof pid !== "string" || pid === "") return failText(400, "projectId is required");
+      const holder = projects.find((x) => x.id === pid);
       if (!holder) return failText(404, "Project not found");
       const row = gitlabs.find((g) => g.projectId === holder.id);
       if (row === undefined) return failText(404, "GitLab integration not found");

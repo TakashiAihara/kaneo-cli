@@ -27,7 +27,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "project      proj-alpha\ngitlab       https://gitlab.example.com acme/web-app\ntoken        bearer cli-••••••cdef\nwebhook      <URL>/api/gitlab-integration/webhook/gitl0001\nwebhook secret sec0002\nbranch       {slug}-{number}\ncomment link yes\nactive       yes\n",
+      "stdout": "project        proj-alpha\ngitlab         https://gitlab.example.com acme/web-app\ntoken          bearer cli-••••••cdef\nwebhook        <URL>/api/gitlab-integration/webhook/gitl0001\nwebhook secret sec0002\nbranch         {slug}-{number}\ncomment link   yes\nactive         yes\n",
       "stderr": ""
     },
     {

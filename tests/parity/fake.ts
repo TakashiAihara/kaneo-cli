@@ -778,6 +778,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     skipped: r.skipped,
   });
 
+<<<<<<< HEAD
   // Integrations as the server keeps them: one row per project and type, the
   // config holding the credentials, isActive, and the timestamps a write bumps.
   // The replies mask the URL and the signing secret the way the plugins do.
@@ -868,12 +869,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     createdAt: string;
   }[] = [];
 
-  // Gitea integrations number and date themselves apart, as notifications do,
-  // so a scenario that links a repository leaves every other id and time alone.
-  // The day offset keeps their times off the day the shared clock writes.
+  // Gitea and GitLab integrations number and date themselves apart, as
+  // notifications do, so a scenario that links a repository leaves every
+  // other id and time alone. The day offset keeps their times off the day
+  // the shared clock writes.
   let gseq = 0;
   let gclock = 0;
-  const gid = () => `git${String(++gseq).padStart(4, "0")}`;
+  const gid = (prefix: string) => `${prefix}${String(++gseq).padStart(4, "0")}`;
   const gnow = () => new Date(T0 + 2 * 86_400_000 + 1000 * gclock++).toISOString();
   type GiteaRow = {
     id: string;
@@ -908,7 +910,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   for (const entry of seed.giteaIntegrations ?? []) {
     const at = gnow();
     gitea.push({
-      id: gid(),
+      id: gid("git"),
       projectId: entry.projectId,
       baseUrl: normalizeGiteaUrl(entry.baseUrl),
       token: entry.accessToken ?? "fake-gitea-token",
@@ -1071,13 +1073,6 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const keyTakenMessage = (key: string, name: string) =>
     `This workspace already has a project using the key "${key}" (${name}). Choose a different key.`;
 
-  // GitLab integrations number and date apart from everything else, so
-  // connecting one in a scenario leaves the ids and times the other
-  // scenarios record alone.
-  let gseq = 0;
-  let gclock = 0;
-  const gid = (prefix: string) => `${prefix}${String(++gseq).padStart(4, "0")}`;
-  const gnow = () => new Date(T0 + 172_800_000 + 1000 * gclock++).toISOString();
   type GitlabRow = {
     id: string;
     projectId: string;
@@ -3029,7 +3024,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         let row: GiteaRow;
         if (existing === undefined) {
           const at = gnow();
-          const rowId = gid();
+          const rowId = gid("git");
           row = {
             id: rowId,
             projectId,

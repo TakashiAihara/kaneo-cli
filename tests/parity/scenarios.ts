@@ -2549,6 +2549,17 @@ export const SCENARIOS: Scenario[] = [
       ["integration", "gitea", "get", "--json"],
     ],
   },
+  // The key may read the integration but not manage the workspace's settings,
+  // so the webhook secret is absent from the reply rather than sent.
+  {
+    name: "integration gitea get as a plain member",
+    plainMember: true,
+    seed: { giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }] },
+    steps: [
+      ["integration", "gitea", "get", "--human"],
+      ["integration", "gitea", "get", "--json"],
+    ],
+  },
   // The stored token answers verify and connect only while the normalized base
   // URL is the saved integration's; a moved instance needs a new token.
   {
@@ -2639,6 +2650,19 @@ export const SCENARIOS: Scenario[] = [
       ["integration", "gitea", "rm", "--yes", "-p", "proj-beta", "--json"],
     ],
   },
+  // The argument and --base-url are judged before stdin is read: with empty
+  // stdin, a --token - read first would fail on the token instead, so these
+  // steps also pin that order. The last one reaches the token read itself.
+  {
+    name: "integration gitea refuses bad input before reading the token",
+    stdin: "",
+    steps: [
+      ["integration", "gitea", "verify", "acme/app", "--token", "-", "--json"],
+      ["integration", "gitea", "connect", "acme", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      ["integration", "gitea", "connect", "acme/app/extra", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+      ["integration", "gitea", "repos", "--base-url", "https://gitea.example.com", "--token", "-", "--json"],
+    ],
+  },
   {
     name: "integration gitea update needs a change",
     seed: { giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }] },
@@ -2647,6 +2671,12 @@ export const SCENARIOS: Scenario[] = [
       ["integration", "gitea", "update", "--active=false", "--json"],
       ["integration", "gitea", "update", "--comment-task-link=false", "--json"],
     ],
+  },
+  // The update route's 404 is the document's {"error": ...} JSON, which the
+  // error line shows as the raw body.
+  {
+    name: "integration gitea update without integration",
+    steps: [["integration", "gitea", "update", "--active=false", "--json"]],
   },
   {
     name: "integration gitea rm needs --yes",

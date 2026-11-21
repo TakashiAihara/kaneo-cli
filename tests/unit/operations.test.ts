@@ -2979,6 +2979,15 @@ test("updateGiteaIntegration patches only the fields given", async () => {
   expect([got.isActive, got.commentTaskLinkOnGiteaIssue]).toEqual([false, false]);
 });
 
+// The update route's 200 schema is nullable, so a null reply is reachable;
+// it is still a reply that cannot be reported as a change that was made.
+test("updateGiteaIntegration refuses a null reply", async () => {
+  recorder("null");
+  const e = await failure(api.updateGiteaIntegration("p1", { isActive: false }));
+  expect(e).toBeInstanceOf(Error);
+  expect((e as Error).message).toContain("server answered without the integration");
+});
+
 test("deleteGiteaIntegration deletes the route and reads the two fields", async () => {
   const seen = recorder('{"success":true,"message":"Gitea integration deleted"}');
   const got = await api.deleteGiteaIntegration("p1");

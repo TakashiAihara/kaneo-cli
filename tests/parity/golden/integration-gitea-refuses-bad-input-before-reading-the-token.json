@@ -1,0 +1,67 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/app",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no Gitea instance: pass --base-url \\u003curl\\u003e\"\n}\n",
+      "stderr": "Error: no Gitea instance: pass --base-url <url>\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"give the repository as \\u003cowner\\u003e/\\u003cname\\u003e, not \\\"acme\\\"\"\n}\n",
+      "stderr": "Error: give the repository as <owner>/<name>, not \"acme\"\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app/extra",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"give the repository as \\u003cowner\\u003e/\\u003cname\\u003e, not \\\"acme/app/extra\\\"\"\n}\n",
+      "stderr": "Error: give the repository as <owner>/<name>, not \"acme/app/extra\"\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "repos",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty access token on stdin\"\n}\n",
+      "stderr": "Error: empty access token on stdin\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

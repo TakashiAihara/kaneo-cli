@@ -66,7 +66,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "acme/app on https://gitea.example.com\n  instance       https://gitea.example.com\n  repository     acme/app\n  token          fake••••••oken\n  webhook        <URL>/api/gitea-integration/webhook/git0001\n  webhook secret fake-hook-secret-git0001\n  state          active\n  issue links    on\n",
+      "stdout": "acme/app on https://gitea.example.com\n  instance       https://gitea.example.com\n  repository     acme/app\n  token          fake••••••oken\n  webhook        <URL>/api/gitea-integration/webhook/git0001\n  webhook secret fake-hook-secret-git0001\n  branches       {slug}-{number}\n  state          active\n  issue links    on\n",
       "stderr": ""
     },
     {

@@ -63,6 +63,7 @@ const integrationLines = (i: GiteaIntegration): string[] => [
   detail("token", i.maskedAccessToken),
   ...(i.webhookUrl === null ? [] : [detail("webhook", i.webhookUrl)]),
   ...(i.webhookSecret === null || i.webhookSecret === "" ? [] : [detail("webhook secret", i.webhookSecret)]),
+  ...(i.branchPattern === null || i.branchPattern === "" ? [] : [detail("branches", i.branchPattern)]),
   detail("state", i.isActive === null ? "unknown" : i.isActive ? "active" : "inactive"),
   detail("issue links", i.commentTaskLinkOnGiteaIssue === null ? "unknown" : i.commentTaskLinkOnGiteaIssue ? "on" : "off"),
 ];
@@ -81,12 +82,16 @@ const TARGET_FLAGS = [
 
 // What connect and verify send: the repository split out of its owner/name
 // form, the instance, and the token only when one was piped in — omitting it
-// is how the server is asked to use the stored one.
+// is how the server is asked to use the stored one. The argument and
+// --base-url are refused before stdin is read, so a command that cannot run
+// does not consume the pipe first.
 const target = async (arg: string, flags: FlagValues, changed: ReadonlySet<string>): Promise<GiteaTarget> => {
+  const repo = repository(arg);
+  const url = baseUrl(flags);
   const token = await accessToken(flags, changed);
   return {
-    ...repository(arg),
-    baseUrl: baseUrl(flags),
+    ...repo,
+    baseUrl: url,
     ...(token === undefined ? {} : { accessToken: token }),
   };
 };
@@ -122,7 +127,7 @@ export const giteaCommand = {
     },
     {
       name: "connect",
-      use: "connect <owner>/<repository>",
+      use: "connect <owner>/<name>",
       short: "Link the project to a Gitea repository",
       long:
         "Link the project to a Gitea repository, or link it again to move it.\n\n" +
@@ -201,7 +206,7 @@ export const giteaCommand = {
     },
     {
       name: "verify",
-      use: "verify <owner>/<repository>",
+      use: "verify <owner>/<name>",
       short: "Check a Gitea instance, token and repository without linking",
       long:
         "Check a Gitea instance, token and repository without linking the project.\n\n" +
@@ -236,10 +241,11 @@ export const giteaCommand = {
       flags: TARGET_FLAGS,
       run: async ({ flags, changed, app }: RunContext<App>) => {
         apiKey(app);
+        const url = baseUrl(flags);
         const token = await accessToken(flags, changed);
         if (token === undefined) throw new Error("repos needs the token: pass --token - and pipe it");
         const repos = await withProject(project(app), (id) =>
-          listGiteaRepositories({ projectId: id, baseUrl: baseUrl(flags), accessToken: token }),
+          listGiteaRepositories({ projectId: id, baseUrl: url, accessToken: token }),
         );
         // fullName is the owner/name connect takes, so a line can be picked and
         // passed on as it is.

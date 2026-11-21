@@ -184,10 +184,10 @@ kaneo workflow ls                 # the resolved project's rules, and where each
 kaneo workflow set <integration> <event> <column>   # one of the pairs listed below; setting a pair again moves the column
 kaneo workflow rm <rule-id>       # or <integration> <event>, instead of the id; by id the rule is deleted wherever it is
 kaneo integration gitea get                 # the resolved project's Gitea link, or that there is none
-kaneo integration gitea connect <owner>/<repo> --base-url <url> [--token -]
+kaneo integration gitea connect <owner>/<name> --base-url <url> [--token -]
 kaneo integration gitea update [--active=false] [--comment-task-link=false]
 kaneo integration gitea rm --yes
-kaneo integration gitea verify <owner>/<repo> --base-url <url> [--token -]   # checks without linking
+kaneo integration gitea verify <owner>/<name> --base-url <url> [--token -]   # checks without linking
 kaneo integration gitea repos --base-url <url> --token -                     # the repositories the token can reach
 kaneo integration gitea import               # the linked repository's open issues as tasks
 kaneo integration gitlab get      # the project's stored link, or that there is none

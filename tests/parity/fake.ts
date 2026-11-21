@@ -921,7 +921,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   // get-gitea-integration.ts's maskToken: short tokens mask whole, longer ones
   // keep their ends.
   const maskGiteaToken = (token: string) => (token.length <= 8 ? "••••••••" : `${token.slice(0, 4)}••••••${token.slice(-4)}`);
-  const giteaIntegrationReply = (row: GiteaRow, origin: string) => ({
+  // The document answers webhookSecret only to a caller that may manage the
+  // workspace's settings; for anyone else the optional field is absent.
+  const giteaIntegrationReply = (row: GiteaRow, origin: string, includeSecrets = true) => ({
     id: row.id,
     projectId: row.projectId,
     baseUrl: row.baseUrl,
@@ -929,7 +931,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     repositoryName: row.repositoryName,
     maskedAccessToken: maskGiteaToken(row.token),
     webhookUrl: `${origin}/api/gitea-integration/webhook/${row.id}`,
-    webhookSecret: row.hookSecret,
+    ...(includeSecrets ? { webhookSecret: row.hookSecret } : {}),
     branchPattern: row.branchPattern ?? "{slug}-{number}",
     commentTaskLinkOnGiteaIssue: row.commentOnIssue,
     isActive: row.isActive,
@@ -2964,7 +2966,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "GET") {
         if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
         const row = giteaRow(projectId);
-        return ok(M.GiteaIntegration, row === undefined ? null : giteaIntegrationReply(row, url.origin));
+        return ok(M.GiteaIntegration, row === undefined ? null : giteaIntegrationReply(row, url.origin, !opts.plainMember));
       }
       if (req.method === "POST") {
         if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
@@ -3033,7 +3035,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "PATCH") {
         if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
         const row = giteaRow(projectId);
-        if (row === undefined) return failText(404, "Integration not found");
+        // The document declares this 404 as {"error": ...} JSON, not text.
+        if (row === undefined) return ok(M.GiteaIntegrationNotFound, { error: "Integration not found" }, 404);
         const b = body as any;
         if (b.isActive !== undefined) row.isActive = b.isActive;
         if (b.commentTaskLinkOnGiteaIssue !== undefined) row.commentOnIssue = b.commentTaskLinkOnGiteaIssue;

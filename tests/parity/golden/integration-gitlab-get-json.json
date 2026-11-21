@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"gitl0001\",\n  \"projectId\": \"proj-alpha\",\n  \"baseUrl\": \"https://gitlab.example.com\",\n  \"projectPath\": \"acme/web-app\",\n  \"tokenType\": \"private\",\n  \"maskedAccessToken\": \"seed••••••cdef\",\n  \"webhookUrl\": \"<URL>/api/gitlab-integration/webhook/gitl0001\",\n  \"webhookSecret\": \"whsec_seeded_cafebabe\",\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGitlabIssue\": true,\n  \"isActive\": true,\n  \"createdAt\": \"<TIME>Z\",\n  \"updatedAt\": \"<TIME>Z\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

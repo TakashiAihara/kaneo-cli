@@ -1,0 +1,39 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "no GitLab integration is configured for this project\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/gitlab-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

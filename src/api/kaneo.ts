@@ -58,6 +58,13 @@ import {
   reorderCustomFields as putFieldOrder,
   setCustomFieldValue as putFieldValue,
   deleteCustomField as removeCustomField,
+  listGitlabProjects as postGitlabProjects,
+  verifyGitlabAccess as postGitlabVerify,
+  getGitlabIntegration as readGitlabIntegration,
+  createGitlabIntegration as postGitlabIntegration,
+  updateGitlabIntegration as patchGitlabIntegration,
+  deleteGitlabIntegration as removeGitlabIntegration,
+  importGitlabIssues as postGitlabImport,
   importTasks as postImport,
   listOrganization,
   listProjects,
@@ -95,8 +102,15 @@ import type {
   NotificationPreferences as GenNotificationPreferences,
   CreateTaskRelationBody,
   Activity as GenActivity,
+  CreateGitlabIntegrationBody,
+  GitlabIntegration as GenGitlabIntegration,
+  GitlabProject as GenGitlabProject,
+  GitlabVerificationResult as GenGitlabVerificationResult,
   GlobalSearchParams,
   Label as GenLabel,
+  ListGitlabProjectsBody,
+  UpdateGitlabIntegrationBody,
+  VerifyGitlabAccessBody,
   ExternalLink as GenExternalLink,
   ImportTasksBody,
   Organization,
@@ -2241,6 +2255,164 @@ export const setCustomFieldValue = async (taskId: string, fieldId: string, value
 // values tasks hold for it go with it.
 export const deleteCustomField = async (fieldId: string): Promise<CustomField> =>
   customField(zeroRecord(await removeCustomField(pathParam(fieldId))));
+
+// A project's link to a GitLab project. The token itself is never returned:
+// maskedAccessToken is the part of it a caller with manage_settings sees, and
+// "" for anyone else — webhookSecret and webhookUrl are answered the same
+// way, since the secret is what a caller pastes into GitLab's webhook form.
+// A field the server leaves out reads as null, the way the rest of this file
+// reads an absent optional.
+export type GitlabIntegration = {
+  id: string;
+  projectId: string;
+  baseUrl: string;
+  projectPath: string;
+  tokenType: "private" | "bearer";
+  maskedAccessToken: string;
+  webhookUrl: string;
+  webhookSecret: string;
+  branchPattern: string | null;
+  commentTaskLinkOnGitlabIssue: boolean | null;
+  isActive: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const gitlabIntegration = (raw: NonNullable<GenGitlabIntegration>): GitlabIntegration => ({
+  id: raw.id ?? "",
+  projectId: raw.projectId ?? "",
+  baseUrl: raw.baseUrl ?? "",
+  projectPath: raw.projectPath ?? "",
+  // The server defaults to the PRIVATE-TOKEN header form; anything but
+  // "bearer" is read the way it writes a token it does not know.
+  tokenType: raw.tokenType === "bearer" ? "bearer" : "private",
+  maskedAccessToken: raw.maskedAccessToken ?? "",
+  webhookUrl: raw.webhookUrl ?? "",
+  webhookSecret: raw.webhookSecret ?? "",
+  branchPattern: raw.branchPattern ?? null,
+  commentTaskLinkOnGitlabIssue: raw.commentTaskLinkOnGitlabIssue ?? null,
+  isActive: raw.isActive ?? null,
+  createdAt: isoTime(raw, "createdAt"),
+  updatedAt: isoTime(raw, "updatedAt"),
+});
+
+// A write's reply is the stored link; a null is a reply the server should
+// never send, since the write either happened or failed, and reading it as
+// "no integration" would report the opposite of what occurred.
+const writtenGitlab = (reply: GenGitlabIntegration | null | undefined, path: string): GitlabIntegration => {
+  if (reply === null || reply === undefined) {
+    throw new Error(`${path}: the server answered without the integration`);
+  }
+  return gitlabIntegration(reply);
+};
+
+// The stored link, or null when the project has none. The masked token and
+// webhook secret come back empty for a caller that may not manage the
+// workspace's settings; that is the server's answer, passed through.
+export const getGitlabIntegration = async (projectId: string): Promise<GitlabIntegration | null> => {
+  const reply = await readGitlabIntegration(pathParam(projectId));
+  return reply === null || reply === undefined ? null : gitlabIntegration(reply);
+};
+
+// The request bodies the check-before-connect calls take. The access token is
+// a secret, so the CLI reads it from stdin and the body is built here rather
+// than exposed as a flag.
+export type GitlabProjectQuery = ListGitlabProjectsBody;
+export type GitlabAccessCheck = VerifyGitlabAccessBody;
+export type GitlabLink = CreateGitlabIntegrationBody;
+export type GitlabLinkChanges = UpdateGitlabIntegrationBody;
+
+// A project on the GitLab instance the token is a member of. The fields keep
+// GitLab's own names: path_with_namespace is what --project-path takes.
+export type GitlabProject = {
+  id: number;
+  name: string;
+  path_with_namespace: string;
+  name_with_namespace: string;
+  visibility: string;
+  web_url: string;
+};
+
+const gitlabProject = (p: GenGitlabProject): GitlabProject => ({
+  id: p.id ?? 0,
+  name: p.name ?? "",
+  path_with_namespace: p.path_with_namespace ?? "",
+  name_with_namespace: p.name_with_namespace ?? "",
+  visibility: p.visibility ?? "",
+  web_url: p.web_url ?? "",
+});
+
+// The projects the token can see, for picking one to link. The token travels
+// in the body, never in the URL.
+export const listGitlabProjects = async (query: GitlabProjectQuery): Promise<GitlabProject[]> =>
+  zeroList(zeroRecord(await postGitlabProjects(query)).projects).map(gitlabProject);
+
+// What the server found when it checked the token against the instance and
+// the project. A check that fails for a reason it can name — not a GitLab
+// instance, a redirect, a project the token cannot see — is answered in this
+// body rather than as an error; only a token GitLab rejects outright comes
+// back as a failure.
+export type GitlabVerification = {
+  isInstalled: boolean;
+  hasRequiredPermissions: boolean;
+  projectExists: boolean;
+  projectVisibility: string | null;
+  missingPermissions: string[];
+  message: string;
+  failureReason: "not_a_gitlab_instance" | "redirected" | "project_not_found" | null;
+};
+
+const gitlabVerification = (v: GenGitlabVerificationResult): GitlabVerification => ({
+  isInstalled: v.isInstalled ?? false,
+  hasRequiredPermissions: v.hasRequiredPermissions ?? false,
+  projectExists: v.projectExists ?? false,
+  projectVisibility: v.projectVisibility ?? null,
+  missingPermissions: zeroList(v.missingPermissions),
+  message: v.message ?? "",
+  failureReason: v.failureReason ?? null,
+});
+
+export const verifyGitlabAccess = async (query: GitlabAccessCheck): Promise<GitlabVerification> =>
+  gitlabVerification(zeroRecord(await postGitlabVerify(query)));
+
+// Links the project to a GitLab project. The server reuses the stored token
+// only while the GitLab URL is unchanged, so omitting accessToken here means
+// "keep it" — a changed URL without a new token is the server's error to give.
+export const createGitlabIntegration = async (projectId: string, body: GitlabLink): Promise<GitlabIntegration> =>
+  writtenGitlab(await postGitlabIntegration(pathParam(projectId), body), `/gitlab-integration/project/${projectId}`);
+
+// Changes the stored link's settings; only what is passed changes, and the
+// server keeps the token and every other field.
+export const updateGitlabIntegration = async (projectId: string, changes: GitlabLinkChanges): Promise<GitlabIntegration> =>
+  writtenGitlab(await patchGitlabIntegration(pathParam(projectId), changes), `/gitlab-integration/project/${projectId}`);
+
+export type GitlabDeleteResult = { success: boolean; message: string };
+
+// Unlinks the project. The server answers 404 when there is no link, which
+// the transport reports like any other failure.
+export const deleteGitlabIntegration = async (projectId: string): Promise<GitlabDeleteResult> => {
+  const r = zeroRecord(await removeGitlabIntegration(pathParam(projectId)));
+  return { success: r.success ?? false, message: r.message ?? "" };
+};
+
+// What one import run did. errors lists the issues that failed; the counts
+// are still the server's, and a partial import is not an error here.
+export type GitlabImportResult = {
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors?: string[];
+};
+
+export const importGitlabIssues = async (projectId: string): Promise<GitlabImportResult> => {
+  const r = zeroRecord(await postGitlabImport({ projectId }));
+  return {
+    imported: r.imported ?? 0,
+    updated: r.updated ?? 0,
+    skipped: r.skipped ?? 0,
+    ...(r.errors === undefined ? {} : { errors: zeroList(r.errors) }),
+  };
+};
 
 export type CheckResult = {
   serverOperations: number;

@@ -238,7 +238,9 @@ describe("redirects", () => {
   });
 
   // As Go's client does: 301, 302 and 303 turn any method but GET and HEAD
-  // into a GET without a body; 307 and 308 keep both.
+  // into a GET without a body; 307 and 308 keep both. The redirect stays on
+  // the origin the request was sent to: a body may not be replayed anywhere
+  // else, which the refusal tests below pin.
   test.each([
     [301, "PUT", "GET", ""],
     [302, "PUT", "GET", ""],
@@ -249,18 +251,95 @@ describe("redirects", () => {
     [308, "POST", "POST", '{"status":"done"}'],
   ])("a %p answered to %p is followed as %p", async (status, method, want, wantBody) => {
     let got = { method: "", body: "" };
-    const target = serve(async (req) => {
+    const url = serve(async (req) => {
+      if (new URL(req.url).pathname === "/api/task/status/t1") {
+        return new Response(null, { status, headers: { location: "/api/elsewhere" } });
+      }
       got = { method: req.method, body: await req.text() };
       return Response.json({});
     });
-    const origin = serve(() => new Response(null, { status, headers: { location: `${target}/api/task/status/t1` } }));
-    configureClient({ baseUrl: origin, apiKey: "test-key" });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
     await kaneoFetch("/task/status/t1", {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "done" }),
     });
     expect(got).toEqual({ method: want, body: wantBody });
+  });
+
+  // The body is the credential the headers cannot show: the GitLab token an
+  // integration call sends travels inside it. A hop that would replay it
+  // against another origin is refused before the request is made, and the
+  // target never sees it.
+  test.each([307, 308])("refuse a %p to another origin when the request has a body", async (status) => {
+    let reached = 0;
+    const target = serve(() => {
+      reached++;
+      return Response.json({});
+    });
+    const origin = serve(() => new Response(null, { status, headers: { location: `${target}/api/elsewhere` } }));
+    configureClient({ baseUrl: origin, apiKey: "test-key" });
+    const e = (await failure(
+      kaneoFetch("/gitlab-integration/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: "gitlab-token" }),
+      }),
+    )) as KaneoApiError;
+    expect(e).toBeInstanceOf(KaneoApiError);
+    expect(e.statusCode).toBe(status);
+    expect(e.message).toBe(
+      `POST /api/gitlab-integration/verify: ${status}: refusing to follow the redirect to ${target}/api/elsewhere: the request body may carry a credential`,
+    );
+    expect(reached).toBe(0);
+  });
+
+  // The same hop on the origin the request was sent to is followed with the
+  // body intact: the credential stays with the server it was meant for.
+  test("follow a 307 on the same origin with the body", async () => {
+    let got = { method: "", body: "", auth: "" };
+    const url = serve(async (req) => {
+      if (new URL(req.url).pathname === "/api/gitlab-integration/verify") {
+        return new Response(null, { status: 307, headers: { location: "/api/elsewhere" } });
+      }
+      got = { method: req.method, body: await req.text(), auth: req.headers.get("authorization") ?? "" };
+      return Response.json({});
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    await kaneoFetch("/gitlab-integration/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken: "gitlab-token" }),
+    });
+    expect(got).toEqual({ method: "POST", body: '{"accessToken":"gitlab-token"}', auth: "Bearer test-key" });
+  });
+
+  // The origin a body may be replayed to is the scheme, host and port together:
+  // a hop that keeps the host and port but changes the scheme is another
+  // recipient, so an https-to-http downgrade — or the upgrade shown here, the
+  // comparison being symmetric — is refused before the request is attempted.
+  test("refuse a redirect that changes only the scheme when the request has a body", async () => {
+    let hits = 0;
+    const url = serve((req) => {
+      hits++;
+      const secure = new URL(req.url);
+      secure.protocol = "https:";
+      return new Response(null, { status: 307, headers: { location: secure.href } });
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(
+      kaneoFetch("/gitlab-integration/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: "gitlab-token" }),
+      }),
+    )) as KaneoApiError;
+    expect(e).toBeInstanceOf(KaneoApiError);
+    expect(e.statusCode).toBe(307);
+    expect(e.message).toBe(
+      `POST /api/gitlab-integration/verify: 307: refusing to follow the redirect to ${url.replace("http:", "https:")}/api/gitlab-integration/verify: the request body may carry a credential`,
+    );
+    expect(hits).toBe(1);
   });
 
   // The rewrite changes what is sent, not what was asked for: the reply is still

@@ -1,0 +1,117 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --access-token is required: pass --access-token - to read the GitLab token from stdin\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "literal-value",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--access-token takes only -: the GitLab token is read from stdin so it never appears on the command line\"\n}\n",
+      "stderr": "Error: --access-token takes only -: the GitLab token is read from stdin so it never appears on the command line\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "verify",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty access token on stdin\"\n}\n",
+      "stderr": "Error: empty access token on stdin\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "projects",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --access-token is required: pass --access-token - to read the GitLab token from stdin\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "projects",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--access-token",
+        "literal-value",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--access-token takes only -: the GitLab token is read from stdin so it never appears on the command line\"\n}\n",
+      "stderr": "Error: --access-token takes only -: the GitLab token is read from stdin so it never appears on the command line\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "literal-value",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--access-token takes only -: the GitLab token is read from stdin so it never appears on the command line\"\n}\n",
+      "stderr": "Error: --access-token takes only -: the GitLab token is read from stdin so it never appears on the command line\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitlab",
+        "connect",
+        "--base-url",
+        "https://gitlab.example.com",
+        "--project-path",
+        "acme/web-app",
+        "--access-token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty access token on stdin\"\n}\n",
+      "stderr": "Error: empty access token on stdin\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

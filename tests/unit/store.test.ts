@@ -333,6 +333,45 @@ describe("currentId", () => {
     expect(out.trim()).toBe("");
   }, 30_000);
 
+  // The lock being held is not enough either: it has to be an ancestor of
+  // this process holding it. A lock held by an unrelated process — here a
+  // flock sibling of the resolver, not a parent — resolves to nothing.
+  test("a Devin lock held by a non-ancestor resolves to empty", async () => {
+    const dataHome = join(tmp(), "data");
+    const lock = join(devinLocks(dataHome), "flint-otter.lock");
+    writeFileSync(lock, "");
+
+    // flock takes the lock before it runs the command, so the pid file
+    // existing means the lock is held. The holder is a child of this test
+    // process, a sibling rather than an ancestor of the resolver below.
+    const pidFile = join(tmp(), "holder.pid");
+    sleepers.push(pidFile);
+    const holder = Bun.spawn(["flock", lock, "sh", "-c", `echo $$ > "${pidFile}"; exec sleep 29.4`], {
+      stdout: "ignore",
+      stderr: "pipe",
+    });
+    const deadline = Date.now() + 10_000;
+    while (!existsSync(pidFile) && Date.now() < deadline) await Bun.sleep(20);
+    expect(existsSync(pidFile), "the lock holder never ran").toBe(true);
+
+    const free = Bun.spawn([process.execPath, "-e", devinChild], {
+      env: devinEnv(dataHome),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [out, err, code] = await Promise.all([
+      new Response(free.stdout).text(),
+      new Response(free.stderr).text(),
+      free.exited,
+    ]);
+    expect(err).toBe("");
+    expect(code).toBe(0);
+    expect(out.trim()).toBe("");
+
+    killRecorded(pidFile);
+    await holder.exited;
+  }, 30_000);
+
   // An explicit variable still wins over the lock: KANEO_SESSION_ID is how the
   // CLI is pinned to a session by hand.
   test("a session variable wins over the Devin lock", async () => {

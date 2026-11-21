@@ -66,14 +66,18 @@ const lockFiles = (dir: string): Map<string, string> => {
   return files;
 };
 
-// The "major:minor:inode" triple /proc/locks prints for a file, in the kernel's
-// own encoding: dev_t splits into a 12-bit major and a 20-bit minor, printed
-// %02x each, and the inode decimal. BigInt because dev_t is 64 bits and the
-// high word carries major bits a 32-bit shift would lose.
-const inoKey = (st: { dev: number; ino: number }): string => {
+// The "major:minor:inode" triple /proc/locks prints for a file: major and
+// minor in hex, wider than two digits when the value needs it, and the inode
+// decimal. st_dev is a dev_t in the encoding glibc's sysmacros.h shares with
+// the kernel's stat, so major() and minor() are decoded with those masks
+// verbatim: dev bits 8-19 hold major's low 12 bits and bits 44-63 its high
+// 20; bits 0-7 hold minor's low 8 and bits 20-43 its high 24. BigInt because
+// dev_t is 64 bits and the high word carries major bits a 32-bit shift
+// would lose.
+export const inoKey = (st: { dev: number; ino: number }): string => {
   const dev = BigInt(st.dev);
-  const major = Number(((dev >> 8n) & 0xfffn) | ((dev >> 32n) & ~0xfffn));
-  const minor = Number((dev & 0xffn) | ((dev >> 12n) & ~0xffn));
+  const major = Number(((dev & 0xfff00n) >> 8n) | ((dev & 0xfffff00000000000n) >> 32n));
+  const minor = Number((dev & 0xffn) | ((dev & 0xffffff00000n) >> 12n));
   const hex = (n: number): string => n.toString(16).padStart(2, "0");
   return `${hex(major)}:${hex(minor)}:${st.ino}`;
 };

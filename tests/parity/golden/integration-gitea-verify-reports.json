@@ -1,0 +1,116 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "Token can access the repository.\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/readonly",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"isInstalled\": true,\n  \"hasRequiredPermissions\": false,\n  \"repositoryExists\": true,\n  \"repositoryPrivate\": true,\n  \"missingPermissions\": [\n    \"issues (write)\"\n  ],\n  \"message\": \"Token may not have sufficient permissions to manage issues.\",\n  \"failureReason\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/missing",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"isInstalled\": false,\n  \"hasRequiredPermissions\": false,\n  \"repositoryExists\": false,\n  \"repositoryPrivate\": null,\n  \"missingPermissions\": [],\n  \"message\": \"Repository not found or not accessible with this token.\",\n  \"failureReason\": \"repository_not_found\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "verify",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/gitea-integration/verify: 400: Enter a personal access token to verify this Gitea instance.\"\n}\n",
+      "stderr": "Error: POST /api/gitea-integration/verify: 400: Enter a personal access token to verify this Gitea instance.\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitea-integration/verify",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitea.example.com",
+        "accessToken": "fake-gitea-token",
+        "repositoryOwner": "acme",
+        "repositoryName": "app"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/verify",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitea.example.com",
+        "accessToken": "fake-gitea-token",
+        "repositoryOwner": "acme",
+        "repositoryName": "readonly"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/verify",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitea.example.com",
+        "accessToken": "fake-gitea-token",
+        "repositoryOwner": "acme",
+        "repositoryName": "missing"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/verify",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitea.example.com",
+        "repositoryOwner": "acme",
+        "repositoryName": "app"
+      }
+    }
+  ],
+  "files": {}
+}

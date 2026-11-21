@@ -1,0 +1,59 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "repos",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/gitea-integration/repositories: 400: Invalid Gitea token or could not reach instance.\"\n}\n",
+      "stderr": "Error: POST /api/gitea-integration/repositories: 400: Invalid Gitea token or could not reach instance.\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/gitea-integration/project/proj-alpha: 401: Gitea API error 401; Kaneo also answers 401 to a key that hit its rate limit (by default 100 requests with no 60-second pause), so if the key worked a moment ago, wait a minute and retry\"\n}\n",
+      "stderr": "Error: POST /api/gitea-integration/project/proj-alpha: 401: Gitea API error 401; Kaneo also answers 401 to a key that hit its rate limit (by default 100 requests with no 60-second pause), so if the key worked a moment ago, wait a minute and retry\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitea-integration/repositories",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "baseUrl": "https://gitea.example.com",
+        "accessToken": "fake-gitea-token"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitea.example.com",
+        "repositoryOwner": "acme",
+        "repositoryName": "app",
+        "accessToken": "fake-gitea-token"
+      }
+    }
+  ],
+  "files": {}
+}

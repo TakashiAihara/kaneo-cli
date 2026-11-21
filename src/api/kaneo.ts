@@ -2861,10 +2861,11 @@ export const importGitHubIssues = async (projectId: string, runId?: string): Pro
     held = counts === lastCounts ? held + 1 : 1;
     lastCounts = counts;
     if (held >= IMPORT_STALL_LIMIT) {
-      const resume =
-        run === undefined || run === ""
-          ? "kaneo integration github import"
-          : `kaneo integration github import --run-id ${shellWord(run)}`;
+      // The project is always named: the run is saved under the project this
+      // call resolved, which need not be the one the reader's settings pick.
+      const resume = `kaneo integration github import -p ${shellWord(projectId)}${
+        run === undefined || run === "" ? "" : ` --run-id ${shellWord(run)}`
+      }`;
       throw new Error(
         `the GitHub import's counts have not changed in ${IMPORT_STALL_LIMIT} requests; the run is saved, so \`${resume}\` resumes it`,
       );

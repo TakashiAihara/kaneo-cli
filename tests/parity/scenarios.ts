@@ -2565,6 +2565,20 @@ export const SCENARIOS: Scenario[] = [
     seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", verified: false }] },
     steps: [["integration", "github", "import", "--json"]],
   },
+  {
+    // A null installationId is the row with no installation bound: the verified
+    // flag alone does not bind it, so get reports requiresVerification and
+    // import refuses the way verified:false does. The seed must keep the null
+    // rather than default it, or this state cannot be reproduced.
+    name: "integration github no installation",
+    seed: {
+      githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", installationId: null, verified: true }],
+    },
+    steps: [
+      ["integration", "github", "get", "--json"],
+      ["integration", "github", "import", "--json"],
+    ],
+  },
   { name: "integration github import without one", steps: [["integration", "github", "import", "--json"]] },
   {
     // A runId the server never issued is the 409 the route reserves for a

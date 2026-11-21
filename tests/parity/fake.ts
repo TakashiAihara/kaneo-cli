@@ -612,7 +612,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     projectId: g.projectId,
     repositoryOwner: g.repositoryOwner,
     repositoryName: g.repositoryName,
-    installationId: g.installationId ?? 42,
+    // An explicit null is kept: the row then has no installation bound,
+    // which githubBound reads as requiring verification.
+    installationId: g.installationId === undefined ? 42 : g.installationId,
     isActive: g.isActive ?? true,
     verified: g.verified ?? true,
     ...(g.branchPattern === undefined ? {} : { branchPattern: g.branchPattern }),

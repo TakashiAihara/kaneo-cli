@@ -2200,7 +2200,23 @@ test("TestGitHubImportGivesUpOnARunThatNeverProgresses", async () => {
   });
   const err = await failure(api.importGitHubIssues("p1"));
   expect(String(err)).toContain("counts have not changed in 100 requests");
-  expect(String(err)).toContain("kaneo integration github import --run-id run1");
+  expect(String(err)).toContain("kaneo integration github import -p p1 --run-id run1");
+  expect(calls).toBe(100);
+}, 10_000);
+
+// A pending reply that never names its run leaves the resume to the bare
+// command, which still has to name the project the run belongs to.
+test("TestGitHubImportStallHintWithoutARunIdStillNamesTheProject", async () => {
+  let calls = 0;
+  newServer(() => {
+    calls++;
+    return new Response(JSON.stringify({ pending: true, imported: 1, updated: 0, skipped: 0 }), {
+      status: 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const err = await failure(api.importGitHubIssues("p1"));
+  expect(String(err)).toContain("`kaneo integration github import -p p1` resumes it");
   expect(calls).toBe(100);
 }, 10_000);
 

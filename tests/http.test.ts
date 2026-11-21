@@ -765,6 +765,30 @@ describe("binary replies", () => {
     await kaneoFetch<Blob>("/project/p1/background", { method: "GET", blob: true, headers: { Accept: "image/*" } });
     expect(accept).toBe("image/*");
   });
+
+  // A blob route's 2xx body is bytes by definition, so a file whose contents
+  // happen to be a {"success": false} document is the download, not a failure
+  // report — the envelope heuristic is meaningless on success here.
+  test("a blob reply that looks like an error envelope still downloads", async () => {
+    const body = '{"success":false,"error":{"message":"just a JSON file"}}';
+    const url = serve(() => new Response(body, { headers: { "content-type": "application/json" } }));
+    configureClient({ baseUrl: url });
+    const blob = await kaneoFetch<Blob>("/asset/a1", { method: "GET", blob: true });
+    expect(await blob.text()).toBe(body);
+  });
+
+  // The envelope still speaks for a refused call: a blob route's non-2xx
+  // keeps reporting the server's message.
+  test("a refused blob call still reports the envelope's message", async () => {
+    const url = serve(() =>
+      Response.json({ success: false, error: "Asset not found" }, { status: 404 }),
+    );
+    configureClient({ baseUrl: url });
+    const e = (await failure(kaneoFetch("/asset/a1", { method: "GET", blob: true }))) as KaneoApiError;
+    expect(e).toBeInstanceOf(KaneoApiError);
+    expect(e.statusCode).toBe(404);
+    expect(e.message).toContain("Asset not found");
+  });
 });
 
 describe("presignedPut", () => {

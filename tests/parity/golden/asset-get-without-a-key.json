@@ -16,6 +16,8 @@
         "asset",
         "get",
         "asset-priv",
+        "--out",
+        "priv.bin",
         "--json"
       ],
       "exit": 1,

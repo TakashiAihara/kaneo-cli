@@ -2948,7 +2948,10 @@ export const SCENARIOS: Scenario[] = [
       ["avatar", "get", "avatar-self", "--human"],
       ["whoami", "avatar", "rm", "--human"],
       ["whoami", "avatar", "rm", "--json"],
-      ["avatar", "get", "avatar-self", "--json"],
+      // The avatar is gone, so both reads fail — --out still reports the 404
+      // as JSON, while the raw stdout path keeps it off stdout entirely.
+      ["avatar", "get", "avatar-self", "--out", "gone.webp", "--json"],
+      ["avatar", "get", "avatar-self", "--human"],
     ],
   },
   {
@@ -2966,8 +2969,15 @@ export const SCENARIOS: Scenario[] = [
     seed: { avatars: [{ id: "av-1", body: "avatar-one-bytes", contentType: "image/webp" }] },
     steps: [
       ["avatar", "get", "av-1", "--human"],
+      // The bytes have no JSON form, so the output flags are refused on the
+      // stdout path — before any request is made.
+      ["avatar", "get", "av-1", "--json"],
+      ["avatar", "get", "av-1", "--jq", "."],
       ["avatar", "get", "av-1", "--out", "face.webp", "--json"],
-      ["avatar", "get", "nope", "--json"],
+      // A missing avatar still fails the read — --out reports the 404 as
+      // JSON, while the raw stdout path keeps it off stdout entirely.
+      ["avatar", "get", "nope", "--out", "none.webp", "--json"],
+      ["avatar", "get", "nope", "--human"],
     ],
   },
   {
@@ -2976,12 +2986,25 @@ export const SCENARIOS: Scenario[] = [
       assets: [
         { id: "asset-pic", body: "fake-asset-bytes", contentType: "image/png" },
         { id: "asset-priv", body: "private-asset-bytes", contentType: "text/plain", public: false },
+        // Not UTF-8: the PNG signature followed by bytes no text decode
+        // survives, so the goldens pin that the download's bytes — to stdout
+        // or to --out — arrive as they were served, not as text would.
+        { id: "asset-bin", body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00]), contentType: "image/png" },
       ],
     },
     steps: [
       ["asset", "get", "asset-pic", "--human"],
+      // The bytes have no JSON form, so the output flags are refused on the
+      // stdout path — before any request is made.
+      ["asset", "get", "asset-pic", "--json"],
+      ["asset", "get", "asset-pic", "--jq", "."],
+      ["asset", "get", "asset-bin", "--human"],
+      ["asset", "get", "asset-bin", "--out", "bin.png", "--json"],
       ["asset", "get", "asset-priv", "--human"],
-      ["asset", "get", "missing", "--json"],
+      // A missing asset still fails the read — --out reports the 404 as
+      // JSON, while the raw stdout path keeps it off stdout entirely.
+      ["asset", "get", "missing", "--out", "missing.bin", "--json"],
+      ["asset", "get", "missing", "--human"],
     ],
   },
   {
@@ -2994,7 +3017,12 @@ export const SCENARIOS: Scenario[] = [
         { id: "asset-priv", body: "private-asset-bytes", contentType: "text/plain", public: false },
       ],
     },
-    steps: [["asset", "get", "asset-pic", "--human"], ["asset", "get", "asset-priv", "--json"]],
+    steps: [
+      ["asset", "get", "asset-pic", "--human"],
+      // --out keeps --json meaningful on a refused read: the 401 is reported
+      // as the usual error document.
+      ["asset", "get", "asset-priv", "--out", "priv.bin", "--json"],
+    ],
   },
   {
     name: "public project",

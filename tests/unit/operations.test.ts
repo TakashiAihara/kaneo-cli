@@ -2533,8 +2533,9 @@ test("getPublicProjectDescription concatenates the pages and keeps the first ver
     return Response.json({ content, version: "7", nextOffset: offset === 0 ? 6 : null });
   });
   const description = await api.getPublicProjectDescription("proj-pub");
-  // The first page names no version to pin; every later offset carries the
-  // one it answered, so an edit mid-read is a 409 rather than a splice.
+  // The first request has no version to send — none is known until the
+  // first page answers; every later offset carries the one it named, so an
+  // edit mid-read is a 409 rather than a splice.
   expect(pages).toEqual([
     ["0", null],
     ["6", "7"],
@@ -2561,6 +2562,32 @@ test("a public description that changed mid-read fails with the server's 409", a
   expect(err).toBeInstanceOf(KaneoApiError);
   expect(err.statusCode).toBe(409);
   expect(err.message).toContain("Description changed or is unavailable; refresh before loading it again");
+});
+
+// A nextOffset that does not move forward would reread the same page for
+// ever; handing back the text read so far would pass a prefix off as the
+// whole description, so the read fails instead.
+test("a description page whose nextOffset does not advance fails the read", async () => {
+  newServer(async (req) => {
+    const offset = Number(new URL(req.url).searchParams.get("offset") ?? "0");
+    return Response.json({ content: "chunk", version: "7", nextOffset: offset === 0 ? 0 : null });
+  });
+  const err = await failure(api.getPublicProjectDescription("proj-pub"));
+  expect(String(err)).toContain("nextOffset 0, which does not advance");
+});
+
+// A nextOffset that always advances still ends: the read is bounded, so a
+// server that never sets it null fails rather than looping forever.
+test("a description whose nextOffset never ends fails after the page cap", async () => {
+  let reads = 0;
+  newServer(async (req) => {
+    reads++;
+    const offset = Number(new URL(req.url).searchParams.get("offset") ?? "0");
+    return Response.json({ content: "x", version: "7", nextOffset: offset + 1 });
+  });
+  const err = await failure(api.getPublicProjectDescription("proj-pub"));
+  expect(String(err)).toContain("8192 pages");
+  expect(reads).toBe(8192);
 });
 
 test("downloadAsset and downloadAvatar hand back the bytes and their type", async () => {
@@ -2614,6 +2641,49 @@ test("getPublicBoard does not reread when relatedRevision differs between task p
   const board = await api.getPublicBoard("proj-pub");
   expect(reads).toEqual(["page=1", "page=2"]);
   expect(board.columns[0]!.tasks.map((t) => t.title)).toEqual(["task 1", "task 2"]);
+});
+
+// revision is the board's own, watched across every page the read makes, so
+// a change between task pages is a board that moved and the read is taken
+// again.
+test("getPublicBoard rereads when revision moves between task pages", async () => {
+  const reads: string[] = [];
+  let settled = false;
+  newServer(async (req) => {
+    const url = new URL(req.url);
+    const page = Number(url.searchParams.get("page") ?? "1");
+    reads.push(`page=${page}`);
+    const body = JSON.parse(publicPage([pubTask(`t${page}`, page, `task ${page}`)], page, 2));
+    // The first read sees the board's revision move between its pages; the
+    // reread finds it still, which is what ends the loop.
+    body.pagination.revision = settled ? "r2" : `rev-${page}`;
+    if (page === 2) settled = true;
+    return Response.json(body);
+  });
+  const board = await api.getPublicBoard("proj-pub");
+  expect(reads).toEqual(["page=1", "page=2", "page=1", "page=2"]);
+  expect(board.columns[0]!.tasks.map((t) => t.title)).toEqual(["task 1", "task 2"]);
+});
+
+// The same watch covers a page's related continuations: revision is the
+// board's, not the related rows', so it is compared there too — the scoping
+// that keeps relatedRevision to its own page does not apply to it.
+test("getPublicBoard rereads when revision moves between related pages", async () => {
+  const reads: string[] = [];
+  let settled = false;
+  newServer(async (req) => {
+    const url = new URL(req.url);
+    const related = Number(url.searchParams.get("relatedPage") ?? "1");
+    reads.push(`related=${related}`);
+    const body = JSON.parse(publicPage([pubTask("t1", 1, "first")], 1, 1));
+    body.pagination.relatedTotalPages = 2;
+    body.pagination.revision = settled ? "r2" : related === 1 ? "r1" : "r2";
+    if (related === 2) settled = true;
+    return Response.json(body);
+  });
+  const board = await api.getPublicBoard("proj-pub");
+  expect(reads).toEqual(["related=1", "related=2", "related=1", "related=2"]);
+  expect(board.columns[0]!.tasks.map((t) => t.title)).toEqual(["first"]);
 });
 
 // Every route the new reads hit is anonymous: none of them may run the

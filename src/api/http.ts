@@ -337,7 +337,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // A non-2xx status and a 2xx carrying success:false are both failures: the
   // server reports validation problems the second way, so the status alone is
   // not enough to judge the call.
-  const reported = failure(called, served, response.status, text, trimmed);
+  const reported = failure(called, served, response.status, text, trimmed, wantBlob === true);
   if (reported) {
     const wait = response.status === 429 ? tryAgainIn(bytes) : undefined;
     if (wait !== undefined && waitOutRateLimits) {
@@ -602,8 +602,13 @@ const failure = (
   status: number,
   raw: string,
   trimmed: string,
+  blob: boolean,
 ): KaneoApiError | undefined => {
-  const envelope = decodeEnvelope(raw);
+  // A blob route's 2xx body is bytes by definition, so a document shaped
+  // like the failure envelope is the file being served — an asset can be a
+  // JSON file whose contents say success:false — not a report. The envelope
+  // still speaks for a refused call.
+  const envelope = blob && status >= 200 && status < 300 ? undefined : decodeEnvelope(raw);
   if (envelope) return new KaneoApiError(method, path, status, messagesOf(envelope), trimmed);
   if (status >= 200 && status < 300) return undefined;
   return new KaneoApiError(method, path, status, codedMessage(trimmed) ?? plainMessage(trimmed), trimmed);

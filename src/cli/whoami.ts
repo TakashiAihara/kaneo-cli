@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { apiKey, type App } from "./app";
 import { authSession, currentUser, deleteAvatar, listWorkspaces, uploadAvatar, type User, type Workspace } from "../api/kaneo";
 import { KaneoApiError, normalizeBaseUrl } from "../api/http";
@@ -79,6 +79,12 @@ export const whoamiCommand: Command<App> = {
             const file = args[0]!;
             const contentType = avatarType(file);
             if (!existsSync(file)) throw new Error(`no such file: ${file}`);
+            // The size is checked before the read so a file far over the
+            // limit is refused without being held in memory whole; the check
+            // after the read stays for a file that grew while it was read.
+            if (statSync(file).size > uploadUserAvatarBodyDataMax) {
+              throw new Error(`${file} is too large: the server takes at most ${uploadUserAvatarBodyDataMax} base64 characters (~512 KiB of image)`);
+            }
             const bytes = await Bun.file(file).bytes();
             if (bytes.byteLength === 0) throw new Error(`${file} is empty`);
             const data = Buffer.from(bytes).toString("base64");
@@ -137,7 +143,10 @@ export const whoamiCommand: Command<App> = {
 const avatarType = (file: string): string => {
   const dot = file.lastIndexOf(".");
   const ext = dot === -1 ? "" : file.slice(dot + 1).toLowerCase();
-  const type = AVATAR_TYPES[ext];
+  // hasOwn, not a plain lookup: ext is whatever followed the dot, and
+  // "constructor" or "__proto__" would otherwise read an inherited member
+  // and pass the undefined check with a function for a content type.
+  const type = Object.hasOwn(AVATAR_TYPES, ext) ? AVATAR_TYPES[ext] : undefined;
   if (type === undefined) {
     throw new Error(`cannot tell the image type of ${file}: use a .png, .jpg, .jpeg or .webp file`);
   }

@@ -107,11 +107,12 @@ export type Seed = {
   }[];
   // What /instance/status answers; hasUsers is otherwise read off the seed.
   instance?: { hasUsers?: boolean; hasAdmin?: boolean };
-  // Binary documents the asset and avatar routes serve, body as UTF-8 text.
-  // An asset is public unless it says otherwise, which is what decides whether
-  // the key is needed for it.
-  assets?: { id: string; body: string; contentType?: string; public?: boolean }[];
-  avatars?: { id: string; body: string; contentType?: string }[];
+  // Binary documents the asset and avatar routes serve. A string body is
+  // UTF-8 text; bytes are given as a Uint8Array so a download can carry what
+  // text cannot, like a real image's. An asset is public unless it says
+  // otherwise, which is what decides whether the key is needed for it.
+  assets?: { id: string; body: string | Uint8Array; contentType?: string; public?: boolean }[];
+  avatars?: { id: string; body: string | Uint8Array; contentType?: string }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
@@ -357,7 +358,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   let grew = 0;
 
   // The binary documents, seeded and then kept as the avatar route writes
-  // them. Bodies are UTF-8 text so a recorded golden stays readable.
+  // them. Response takes a string or bytes as they are.
   const assets = new Map(
     (seed.assets ?? []).map((a) => [a.id, { body: a.body, contentType: a.contentType ?? "application/octet-stream", public: a.public ?? true }]),
   );
@@ -2651,14 +2652,18 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const filterAssignee = url.searchParams.get("assigneeId");
       const dueBefore = url.searchParams.get("dueBefore");
       const dueAfter = url.searchParams.get("dueAfter");
+      // The bounds are instants, not strings: an offset spelling of the same
+      // moment must compare equal, so they are judged as times.
+      const before = dueBefore === null ? null : Date.parse(dueBefore);
+      const after = dueAfter === null ? null : Date.parse(dueAfter);
       let mine = tasks.filter(
         (t) =>
           t.projectId === proj.id &&
           (filterStatus === null || t.status === filterStatus) &&
           (filterPriority === null || t.priority === filterPriority) &&
           (filterAssignee === null || t.userId === filterAssignee) &&
-          (dueBefore === null || (t.dueDate !== null && t.dueDate < dueBefore)) &&
-          (dueAfter === null || (t.dueDate !== null && t.dueDate > dueAfter)),
+          (before === null || (t.dueDate != null && Date.parse(t.dueDate) < before)) &&
+          (after === null || (t.dueDate != null && Date.parse(t.dueDate) > after)),
       );
       const sortBy = url.searchParams.get("sortBy");
       if (sortBy !== null) {

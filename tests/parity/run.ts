@@ -105,7 +105,9 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
 
     // What the cwd holds before the first step, so a file a command writes
     // there (an --out download) is told apart from the scenario's own inputs
-    // and a repository's .git, neither of which the CLI produced.
+    // and a repository's .git, neither of which the CLI produced. A file that
+    // is not UTF-8 — a binary download — is kept as base64 behind a marker, so
+    // the golden can tell the bytes apart rather than recording U+FFFD loss.
     const cwdTree = (): Map<string, string> => {
       const out = new Map<string, string>();
       const walk = (dir: string) => {
@@ -113,13 +115,33 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
           if (name === ".git") continue;
           const full = join(dir, name);
           if (statSync(full).isDirectory()) walk(full);
-          else out.set(relative(cwd, full), readFileSync(full, "utf8"));
+          else {
+            const bytes = readFileSync(full);
+            try {
+              out.set(relative(cwd, full), new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+            } catch {
+              out.set(relative(cwd, full), `base64:${bytes.toString("base64")}`);
+            }
+          }
         }
       };
       walk(cwd);
       return out;
     };
     const cwdBefore = cwdTree();
+
+    // A step's stdout can be a download's raw bytes rather than text, so it
+    // is kept the way cwdTree keeps --out files: UTF-8 when it decodes, and
+    // base64 behind a marker when it does not — U+FFFD would hide a corrupt
+    // download inside a readable golden.
+    const streamText = async (stream: ReadableStream<Uint8Array>): Promise<string> => {
+      const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+      try {
+        return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      } catch {
+        return `base64:${Buffer.from(bytes).toString("base64")}`;
+      }
+    };
 
     const steps: StepResult[] = [];
     for (const args of s.steps) {
@@ -142,7 +164,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
         p.stdin!.write(s.stdin);
         p.stdin!.end();
       }
-      const [stdout, stderr, exit] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+      const [stdout, stderr, exit] = await Promise.all([streamText(p.stdout), new Response(p.stderr).text(), p.exited]);
       steps.push({ args, exit, stdout: normalize(stdout), stderr: normalize(stderr) });
     }
 

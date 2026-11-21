@@ -3083,21 +3083,34 @@ export const findPublicTaskByNumber = async (
 // an edit mid-read is answered 409 rather than spliced into the text.
 export type Description = { content: string; version: string };
 
+// The server serves a description in 32K-character pages, so this many pages
+// is a text of hundreds of megabytes — far past any real description. The cap
+// exists for a nextOffset that keeps advancing without end: without it the
+// read would hold the process in a request loop.
+const DESCRIPTION_PAGES = 8192;
+
 const readDescription = async (
   fetchPage: (offset: number, version: string | undefined) => Promise<GenDescriptionPage>,
 ): Promise<Description> => {
   let content = "";
   let version: string | undefined;
-  for (let offset = 0; ; ) {
+  for (let offset = 0, pages = 0; ; pages++) {
+    if (pages === DESCRIPTION_PAGES) {
+      throw new Error(`description read passed ${DESCRIPTION_PAGES} pages and nextOffset still had not ended the text`);
+    }
     const page = zeroRecord(await fetchPage(offset, version));
     content += page.content ?? "";
     // The first page that names a version pins every later offset to it; one
     // that names none leaves the read unpinned, as it was.
     version ??= page.version || undefined;
     const next = page.nextOffset;
-    // A next offset that does not advance is a page that would be read for
-    // ever; the text read so far is the answer the server gave.
-    if (next === null || next === undefined || next <= offset) break;
+    if (next === null || next === undefined) break;
+    // A next offset that does not advance would reread the same page for
+    // ever, and answering the text read so far would pass a prefix off as the
+    // whole description; the read fails instead.
+    if (next <= offset) {
+      throw new Error(`description page at offset ${offset} answered nextOffset ${next}, which does not advance`);
+    }
     offset = next;
   }
   return { content, version: version ?? "" };

@@ -16,6 +16,29 @@
         "avatar",
         "get",
         "av-1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--json and --jq do not apply to avatar get without --out; the bytes are written to stdout as they arrive\"\n}\n",
+      "stderr": "Error: --json and --jq do not apply to avatar get without --out; the bytes are written to stdout as they arrive\n"
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-1",
+        "--jq",
+        "."
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --json and --jq do not apply to avatar get without --out; the bytes are written to stdout as they arrive\n"
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "av-1",
         "--out",
         "face.webp",
         "--json"
@@ -29,10 +52,23 @@
         "avatar",
         "get",
         "nope",
+        "--out",
+        "none.webp",
         "--json"
       ],
       "exit": 1,
       "stdout": "{\n  \"error\": \"GET /api/user/avatar/nope: 404: Avatar not found\"\n}\n",
+      "stderr": "Error: GET /api/user/avatar/nope: 404: Avatar not found\n"
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "nope",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
       "stderr": "Error: GET /api/user/avatar/nope: 404: Avatar not found\n"
     }
   ],
@@ -45,6 +81,11 @@
     {
       "method": "GET",
       "path": "/user/avatar/av-1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/nope",
       "query": ""
     },
     {

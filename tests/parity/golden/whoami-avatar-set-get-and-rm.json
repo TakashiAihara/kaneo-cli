@@ -50,10 +50,23 @@
         "avatar",
         "get",
         "avatar-self",
+        "--out",
+        "gone.webp",
         "--json"
       ],
       "exit": 1,
       "stdout": "{\n  \"error\": \"GET /api/user/avatar/avatar-self: 404: Avatar not found\"\n}\n",
+      "stderr": "Error: GET /api/user/avatar/avatar-self: 404: Avatar not found\n"
+    },
+    {
+      "args": [
+        "avatar",
+        "get",
+        "avatar-self",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
       "stderr": "Error: GET /api/user/avatar/avatar-self: 404: Avatar not found\n"
     }
   ],
@@ -80,6 +93,11 @@
     {
       "method": "DELETE",
       "path": "/user/avatar",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/avatar/avatar-self",
       "query": ""
     },
     {

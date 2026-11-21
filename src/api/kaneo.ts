@@ -33,8 +33,14 @@ import {
   createCalendarFeed as postCalendarFeed,
   createTaskComment,
   bulkUpdateTasks,
+  createDiscordIntegration as postDiscordIntegration,
+  createSlackIntegration as postSlackIntegration,
+  createTelegramIntegration as postTelegramIntegration,
   createTaskRelation,
+  deleteDiscordIntegration as removeDiscordIntegration,
   deleteNotificationPreferenceWorkspaceRule,
+  deleteSlackIntegration as removeSlackIntegration,
+  deleteTelegramIntegration as removeTelegramIntegration,
   deleteColumn as removeColumn,
   createTimeEntry,
   deleteProject as removeProject,
@@ -60,6 +66,9 @@ import {
   getTaskRelations,
   listNotifications as getNotifications,
   listCalendarFeeds as readCalendarFeeds,
+  getDiscordIntegration as readDiscordIntegration,
+  getSlackIntegration as readSlackIntegration,
+  getTelegramIntegration as readTelegramIntegration,
   getTaskTimeEntries,
   getTimeEntry,
   getWorkflowRules as readRules,
@@ -93,7 +102,10 @@ import {
   revokeCalendarFeed as removeCalendarFeed,
   unarchiveProject,
   uploadProjectBackground as putProjectBackgroundUpload,
+  updateDiscordIntegration as patchDiscordIntegration,
   updateNotificationPreferences as putNotificationPreferences,
+  updateSlackIntegration as patchSlackIntegration,
+  updateTelegramIntegration as patchTelegramIntegration,
   updateColumn as putColumn,
   updateOrganization,
   updateProject as putProject,
@@ -137,6 +149,7 @@ import type {
   BulkUpdateTasksBody,
   Column as GenColumn,
   CreateTaskBody,
+  DiscordIntegration as GenDiscordIntegration,
   GenericWebhookEvents as GenGenericWebhookEvents,
   GenericWebhookIntegration as GenGenericWebhookIntegration,
   IntegrationEvents as GenIntegrationEvents,
@@ -160,6 +173,7 @@ import type {
   InstanceStatus as GenInstanceStatus,
   Organization,
   TaskDescriptionPage as GenDescriptionPage,
+  SlackIntegration as GenSlackIntegration,
   TaskExport,
   ProjectListItem,
   RelatedTask,
@@ -171,6 +185,7 @@ import type {
   CustomFieldValue as GenFieldValue,
   SetCustomFieldValueResponse as GenFieldSettingReply,
   CreateCustomFieldBody,
+  TelegramIntegration as GenTelegramIntegration,
   UpdateGenericWebhookIntegrationBody,
   UpdateMattermostIntegrationBody,
   UpdateNotificationPreferencesBody,
@@ -3155,6 +3170,175 @@ export const uploadAvatar = async (contentType: string, data: string): Promise<G
 
 // Removes the credential's own avatar.
 export const deleteAvatar = async (): Promise<GenUserAvatarDeleted> => zeroRecord(await removeAvatar());
+
+// ---- Chat integrations: slack, discord, telegram ----
+
+// The six events a chat integration can be told about. A reply carries all
+// six; a write carries only the toggles it means to change, which the server
+// merges into the stored set rather than replacing it.
+export type IntegrationEvents = {
+  taskCreated: boolean;
+  taskStatusChanged: boolean;
+  taskPriorityChanged: boolean;
+  taskTitleChanged: boolean;
+  taskDescriptionChanged: boolean;
+  taskCommentCreated: boolean;
+};
+
+export type IntegrationEventChanges = Partial<IntegrationEvents>;
+
+const integrationEvents = (e: IntegrationEventChanges | undefined): IntegrationEvents => ({
+  taskCreated: e?.taskCreated === true,
+  taskStatusChanged: e?.taskStatusChanged === true,
+  taskPriorityChanged: e?.taskPriorityChanged === true,
+  taskTitleChanged: e?.taskTitleChanged === true,
+  taskDescriptionChanged: e?.taskDescriptionChanged === true,
+  taskCommentCreated: e?.taskCommentCreated === true,
+});
+
+// Slack and Discord answer the same shape: the channel the messages go to, the
+// webhook URL masked down to its non-secret parts, and the event toggles. The
+// stored secret itself never comes back — webhookConfigured says there is one.
+export type WebhookIntegration = {
+  id: string;
+  projectId: string;
+  channelName: string | null;
+  webhookConfigured: boolean;
+  maskedWebhookUrl: string;
+  events: IntegrationEvents;
+  isActive: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// Telegram's row names the chat rather than a channel, and the bot token
+// masked the way the server masks it (the part before the colon, then the
+// secret half shortened).
+export type TelegramIntegration = {
+  id: string;
+  projectId: string;
+  chatId: string;
+  threadId: number | null;
+  chatLabel: string | null;
+  botTokenConfigured: boolean;
+  maskedBotToken: string;
+  events: IntegrationEvents;
+  isActive: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const webhookIntegration = (i: GenSlackIntegration | GenDiscordIntegration | undefined): WebhookIntegration | null => {
+  if (i === null || i === undefined) return null;
+  return {
+    id: i.id ?? "",
+    projectId: i.projectId ?? "",
+    channelName: i.channelName ?? null,
+    webhookConfigured: i.webhookConfigured === true,
+    maskedWebhookUrl: i.maskedWebhookUrl ?? "",
+    events: integrationEvents(i.events),
+    isActive: i.isActive ?? null,
+    createdAt: isoTime(i, "createdAt"),
+    updatedAt: isoTime(i, "updatedAt"),
+  };
+};
+
+const telegramIntegration = (i: GenTelegramIntegration | undefined): TelegramIntegration | null => {
+  if (i === null || i === undefined) return null;
+  return {
+    id: i.id ?? "",
+    projectId: i.projectId ?? "",
+    chatId: i.chatId ?? "",
+    threadId: i.threadId ?? null,
+    chatLabel: i.chatLabel ?? null,
+    botTokenConfigured: i.botTokenConfigured === true,
+    maskedBotToken: i.maskedBotToken ?? "",
+    events: integrationEvents(i.events),
+    isActive: i.isActive ?? null,
+    createdAt: isoTime(i, "createdAt"),
+    updatedAt: isoTime(i, "updatedAt"),
+  };
+};
+
+// What connecting a webhook chat integration takes. The webhook URL is the
+// secret the events are delivered through; the server checks its shape only.
+export type NewWebhookIntegration = {
+  webhookUrl: string;
+  channelName?: string;
+  events?: IntegrationEventChanges;
+};
+
+// Only the fields passed are sent; the server keeps the rest and merges the
+// event toggles into the stored set. channelName accepts null to clear it.
+export type WebhookIntegrationChanges = {
+  webhookUrl?: string;
+  channelName?: string | null;
+  isActive?: boolean;
+  events?: IntegrationEventChanges;
+};
+
+// What connecting a Telegram integration takes. The bot token is the secret;
+// the chat is checked for shape only, not against Telegram.
+export type NewTelegramIntegration = {
+  botToken: string;
+  chatId: string;
+  threadId?: number;
+  chatLabel?: string;
+  events?: IntegrationEventChanges;
+};
+
+// Only the fields passed are sent; threadId and chatLabel accept null to
+// clear them.
+export type TelegramIntegrationChanges = {
+  botToken?: string;
+  chatId?: string;
+  threadId?: number | null;
+  chatLabel?: string | null;
+  isActive?: boolean;
+  events?: IntegrationEventChanges;
+};
+
+export const getSlackIntegration = async (projectId: string): Promise<WebhookIntegration | null> =>
+  webhookIntegration(await readSlackIntegration(pathParam(projectId)));
+
+export const createSlackIntegration = async (projectId: string, wanted: NewWebhookIntegration): Promise<WebhookIntegration | null> =>
+  webhookIntegration(await postSlackIntegration(pathParam(projectId), wanted));
+
+export const updateSlackIntegration = async (
+  projectId: string,
+  changes: WebhookIntegrationChanges,
+): Promise<WebhookIntegration | null> => webhookIntegration(await patchSlackIntegration(pathParam(projectId), changes));
+
+export const deleteSlackIntegration = async (projectId: string): Promise<{ success: boolean }> =>
+  zeroRecord(await removeSlackIntegration(pathParam(projectId)));
+
+export const getDiscordIntegration = async (projectId: string): Promise<WebhookIntegration | null> =>
+  webhookIntegration(await readDiscordIntegration(pathParam(projectId)));
+
+export const createDiscordIntegration = async (projectId: string, wanted: NewWebhookIntegration): Promise<WebhookIntegration | null> =>
+  webhookIntegration(await postDiscordIntegration(pathParam(projectId), wanted));
+
+export const updateDiscordIntegration = async (
+  projectId: string,
+  changes: WebhookIntegrationChanges,
+): Promise<WebhookIntegration | null> => webhookIntegration(await patchDiscordIntegration(pathParam(projectId), changes));
+
+export const deleteDiscordIntegration = async (projectId: string): Promise<{ success: boolean }> =>
+  zeroRecord(await removeDiscordIntegration(pathParam(projectId)));
+
+export const getTelegramIntegration = async (projectId: string): Promise<TelegramIntegration | null> =>
+  telegramIntegration(await readTelegramIntegration(pathParam(projectId)));
+
+export const createTelegramIntegration = async (projectId: string, wanted: NewTelegramIntegration): Promise<TelegramIntegration | null> =>
+  telegramIntegration(await postTelegramIntegration(pathParam(projectId), wanted));
+
+export const updateTelegramIntegration = async (
+  projectId: string,
+  changes: TelegramIntegrationChanges,
+): Promise<TelegramIntegration | null> => telegramIntegration(await patchTelegramIntegration(pathParam(projectId), changes));
+
+export const deleteTelegramIntegration = async (projectId: string): Promise<{ success: boolean }> =>
+  zeroRecord(await removeTelegramIntegration(pathParam(projectId)));
 
 export type CheckResult = {
   serverOperations: number;

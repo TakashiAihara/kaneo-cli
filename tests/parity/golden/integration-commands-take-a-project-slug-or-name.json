@@ -1,0 +1,398 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "slack",
+        "get",
+        "-p",
+        "ALP",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0001\",\n  \"projectId\": \"proj-alpha\",\n  \"channelName\": null,\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"https://hooks.slack.com/services/T55555555/B66666666/slug…ue99\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": null,\n  \"createdAt\": \"2026-01-01T12:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:00.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "set",
+        "-p",
+        "ALP",
+        "--webhook-url",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0001\",\n  \"projectId\": \"proj-alpha\",\n  \"channelName\": null,\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"https://hooks.slack.com/services/T77777777/B88888888/name…e888\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T12:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:02.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "get",
+        "-p",
+        "ALP",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         int0001\nproject    proj-alpha\nchannel    -\nwebhook    https://hooks.slack.com/services/T77777777/B88888888/name…e888\nevents     task created, task status changed, task comment created\nactive     on\ncreated    2026-01-01T12:00:00.000Z\nupdated    2026-01-01T12:00:02.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "slack",
+        "set",
+        "-p",
+        "BET",
+        "--webhook-url",
+        "-",
+        "--channel-name",
+        "beta-alerts",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0003\",\n  \"projectId\": \"proj-beta\",\n  \"channelName\": \"beta-alerts\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"https://hooks.slack.com/services/T77777777/B88888888/name…e888\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T12:00:03.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:03.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "get",
+        "-p",
+        "Beta",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0002\",\n  \"projectId\": \"proj-beta\",\n  \"chatId\": \"-100555444333\",\n  \"threadId\": null,\n  \"chatLabel\": null,\n  \"botTokenConfigured\": true,\n  \"maskedBotToken\": \"987654321:abcd…5678\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": null,\n  \"createdAt\": \"2026-01-01T12:00:01.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:01.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "-p",
+        "Beta",
+        "--chat-id",
+        "-100555444333",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0002\",\n  \"projectId\": \"proj-beta\",\n  \"chatId\": \"-100555444333\",\n  \"threadId\": null,\n  \"chatLabel\": null,\n  \"botTokenConfigured\": true,\n  \"maskedBotToken\": \"987654321:abcd…5678\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": null,\n  \"createdAt\": \"2026-01-01T12:00:01.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:01.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "set",
+        "-p",
+        "Beta",
+        "--chat-label",
+        "beta ops",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"int0002\",\n  \"projectId\": \"proj-beta\",\n  \"chatId\": \"-100555444333\",\n  \"threadId\": null,\n  \"chatLabel\": \"beta ops\",\n  \"botTokenConfigured\": true,\n  \"maskedBotToken\": \"987654321:abcd…5678\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T12:00:01.000Z\",\n  \"updatedAt\": \"2026-01-01T12:00:04.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "rm",
+        "-p",
+        "BET",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"success\": true\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "telegram",
+        "get",
+        "-p",
+        "BET",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://hooks.slack.com/services/T77777777/B88888888/namedlookupvalue888"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/slack-integration/project/proj-beta",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://hooks.slack.com/services/T77777777/B88888888/namedlookupvalue888",
+        "channelName": "beta-alerts"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/Beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/Beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/telegram-integration/project/proj-beta",
+      "query": "",
+      "body": {
+        "chatId": "-100555444333"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/Beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/telegram-integration/project/proj-beta",
+      "query": "",
+      "body": {
+        "chatLabel": "beta ops"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/telegram-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-beta",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

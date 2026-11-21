@@ -24,8 +24,11 @@ import {
   CustomFieldDefinition,
   CustomFieldFilterValues,
   CustomFieldValue,
+  DeleteDiscordIntegration200,
   DeleteGenericWebhookIntegration200,
   DeleteMattermostIntegration200,
+  DeleteSlackIntegration200,
+  DeleteTelegramIntegration200,
   ExternalLink,
   GitHubAppInfo,
   GitHubDeleteResult,
@@ -78,6 +81,7 @@ import type {
   CreateCalendarFeedBody,
   CreateColumnBody,
   CreateCustomFieldBody,
+  CreateDiscordIntegrationBody,
   CreateGenericWebhookIntegrationBody,
   CreateGitHubIntegrationBody,
   CreateGitlabIntegrationBody,
@@ -85,10 +89,13 @@ import type {
   CreateMattermostIntegrationBody,
   CreateNotificationBody,
   CreateProjectBody,
+  CreateSlackIntegrationBody,
   CreateTaskBody,
   CreateTaskCommentBody,
   CreateTaskRelationBody,
+  CreateTelegramIntegrationBody,
   CreateTimeEntryBody,
+  DiscordIntegration,
   FinalizeProjectBackgroundUploadBody,
   GenericWebhookIntegration,
   GetActivitiesParams,
@@ -119,7 +126,10 @@ import type {
   ReorderProjectsBody,
   ReorderProjectsParams,
   SetCustomFieldValueBody,
+  SlackIntegration,
+  TelegramIntegration,
   UpdateColumnBody,
+  UpdateDiscordIntegrationBody,
   UpdateGenericWebhookIntegrationBody,
   UpdateGitHubIntegrationBody,
   UpdateGitlabIntegrationBody,
@@ -128,6 +138,7 @@ import type {
   UpdateNotificationPreferencesBody,
   UpdateOrganizationBody,
   UpdateProjectBody,
+  UpdateSlackIntegrationBody,
   UpdateTaskAssigneeBody,
   UpdateTaskBody,
   UpdateTaskCommentBody,
@@ -136,6 +147,7 @@ import type {
   UpdateTaskPriorityBody,
   UpdateTaskStatusBody,
   UpdateTaskTitleBody,
+  UpdateTelegramIntegrationBody,
   UpdateTimeEntryBody,
   UploadProjectBackgroundBody,
   UploadUserAvatarBody,
@@ -3397,6 +3409,137 @@ export const deleteGenericWebhookIntegration = async (projectId: string, options
 
 
 
+export const getGetDiscordIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/discord-integration/project/${projectId}`
+}
+
+/**
+ * Get the Discord integration for a project, or null when none is configured.
+ * @summary Get Discord integration
+ */
+export const getDiscordIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<DiscordIntegration | null> => {
+
+  return kaneoFetch<DiscordIntegration | null>(getGetDiscordIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCreateDiscordIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/discord-integration/project/${projectId}`
+}
+
+/**
+ * Create or replace the Discord integration for a project. The webhook URL is checked for shape only; delivery failures surface later.
+ * @summary Create Discord integration
+ */
+export const createDiscordIntegration = async (projectId: string,
+    createDiscordIntegrationBody: CreateDiscordIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<DiscordIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<DiscordIntegration | null>(getCreateDiscordIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createDiscordIntegrationBody)
+  }
+);}
+
+
+
+export const getUpdateDiscordIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/discord-integration/project/${projectId}`
+}
+
+/**
+ * Update the Discord integration. Omitted fields keep their current value, and event toggles are merged into the existing set.
+ * @summary Update Discord integration
+ */
+export const updateDiscordIntegration = async (projectId: string,
+    updateDiscordIntegrationBody: UpdateDiscordIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<DiscordIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<DiscordIntegration | null>(getUpdateDiscordIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateDiscordIntegrationBody)
+  }
+);}
+
+
+
+export const getDeleteDiscordIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/discord-integration/project/${projectId}`
+}
+
+/**
+ * Remove the Discord integration from a project.
+ * @summary Delete Discord integration
+ */
+export const deleteDiscordIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<DeleteDiscordIntegration200> => {
+
+  return kaneoFetch<DeleteDiscordIntegration200>(getDeleteDiscordIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: DeleteDiscordIntegration200
+  }
+);}
+
+
+
 export const getGetMattermostIntegrationUrl = (projectId: string,) => {
 
 
@@ -3523,6 +3666,268 @@ export const deleteMattermostIntegration = async (projectId: string, options?: P
 
     ,
     schema: DeleteMattermostIntegration200
+  }
+);}
+
+
+
+export const getGetSlackIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/slack-integration/project/${projectId}`
+}
+
+/**
+ * Get the Slack integration for a project, or null when none is configured.
+ * @summary Get Slack integration
+ */
+export const getSlackIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<SlackIntegration | null> => {
+
+  return kaneoFetch<SlackIntegration | null>(getGetSlackIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCreateSlackIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/slack-integration/project/${projectId}`
+}
+
+/**
+ * Create or replace the Slack integration for a project. The webhook URL is checked for shape only; delivery failures surface later.
+ * @summary Create Slack integration
+ */
+export const createSlackIntegration = async (projectId: string,
+    createSlackIntegrationBody: CreateSlackIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<SlackIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<SlackIntegration | null>(getCreateSlackIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createSlackIntegrationBody)
+  }
+);}
+
+
+
+export const getUpdateSlackIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/slack-integration/project/${projectId}`
+}
+
+/**
+ * Update the Slack integration. Omitted fields keep their current value, and event toggles are merged into the existing set.
+ * @summary Update Slack integration
+ */
+export const updateSlackIntegration = async (projectId: string,
+    updateSlackIntegrationBody: UpdateSlackIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<SlackIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<SlackIntegration | null>(getUpdateSlackIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateSlackIntegrationBody)
+  }
+);}
+
+
+
+export const getDeleteSlackIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/slack-integration/project/${projectId}`
+}
+
+/**
+ * Remove the Slack integration from a project.
+ * @summary Delete Slack integration
+ */
+export const deleteSlackIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<DeleteSlackIntegration200> => {
+
+  return kaneoFetch<DeleteSlackIntegration200>(getDeleteSlackIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: DeleteSlackIntegration200
+  }
+);}
+
+
+
+export const getGetTelegramIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/telegram-integration/project/${projectId}`
+}
+
+/**
+ * Get the Telegram integration for a project, or null when none is configured.
+ * @summary Get Telegram integration
+ */
+export const getTelegramIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<TelegramIntegration | null> => {
+
+  return kaneoFetch<TelegramIntegration | null>(getGetTelegramIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCreateTelegramIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/telegram-integration/project/${projectId}`
+}
+
+/**
+ * Create or replace the Telegram integration for a project. The bot token and chat are checked for shape only, not against Telegram.
+ * @summary Create Telegram integration
+ */
+export const createTelegramIntegration = async (projectId: string,
+    createTelegramIntegrationBody: CreateTelegramIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<TelegramIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<TelegramIntegration | null>(getCreateTelegramIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createTelegramIntegrationBody)
+  }
+);}
+
+
+
+export const getUpdateTelegramIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/telegram-integration/project/${projectId}`
+}
+
+/**
+ * Update the Telegram integration. Omitted fields keep their current value; threadId and chatLabel accept null to clear them.
+ * @summary Update Telegram integration
+ */
+export const updateTelegramIntegration = async (projectId: string,
+    updateTelegramIntegrationBody: UpdateTelegramIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<TelegramIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<TelegramIntegration | null>(getUpdateTelegramIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateTelegramIntegrationBody)
+  }
+);}
+
+
+
+export const getDeleteTelegramIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/telegram-integration/project/${projectId}`
+}
+
+/**
+ * Remove the Telegram integration from a project.
+ * @summary Delete Telegram integration
+ */
+export const deleteTelegramIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<DeleteTelegramIntegration200> => {
+
+  return kaneoFetch<DeleteTelegramIntegration200>(getDeleteTelegramIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: DeleteTelegramIntegration200
   }
 );}
 

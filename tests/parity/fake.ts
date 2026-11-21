@@ -92,19 +92,34 @@ export type Seed = {
     importPages?: number;
   }[];
   // A project's integrations already stored, so get/set/rm run without a
-  // create first. provider is the command name: mattermost or webhook. events
+  // create first. provider picks the family: mattermost and webhook seed the
+  // plugin integrations, slack, discord and telegram the chat ones. events
   // holds the stored toggles by their API field names; the rest default the
   // way a created row does.
-  integrations?: {
-    projectId: string;
-    provider: "mattermost" | "webhook";
-    webhookUrl?: string;
-    channelName?: string | null;
-    secret?: string;
-    events?: Record<string, boolean>;
-    dueDateReminderLeadTimeMinutes?: number;
-    isActive?: boolean | null;
-  }[];
+  integrations?: (
+    | {
+        projectId: string;
+        provider: "mattermost" | "webhook";
+        webhookUrl?: string;
+        channelName?: string | null;
+        secret?: string;
+        events?: Record<string, boolean>;
+        dueDateReminderLeadTimeMinutes?: number;
+        isActive?: boolean | null;
+      }
+    | {
+        projectId: string;
+        provider: "slack" | "discord" | "telegram";
+        channelName?: string | null;
+        webhookUrl?: string;
+        botToken?: string;
+        chatId?: string;
+        threadId?: number | null;
+        chatLabel?: string | null;
+        events?: Partial<Record<ChatEventKey, boolean>>;
+        isActive?: boolean | null;
+      }
+  )[];
   // What /instance/status answers; hasUsers is otherwise read off the seed.
   instance?: { hasUsers?: boolean; hasAdmin?: boolean };
   // Binary documents the asset and avatar routes serve. A string body is
@@ -128,6 +143,34 @@ const DEFAULT_COLUMNS = [
   { slug: "in-progress", name: "In Progress" },
   { slug: "done", name: "Done", isFinal: true },
 ];
+
+const CHAT_EVENT_KEYS = [
+  "taskCreated",
+  "taskStatusChanged",
+  "taskPriorityChanged",
+  "taskTitleChanged",
+  "taskDescriptionChanged",
+  "taskCommentCreated",
+] as const;
+type ChatEventKey = (typeof CHAT_EVENT_KEYS)[number];
+
+// The toggles a new integration starts with — the same defaults the three
+// providers' plugin configs carry (plugins/*/config.ts default*Events in
+// usekaneo/kaneo).
+const DEFAULT_CHAT_EVENTS: Record<ChatEventKey, boolean> = {
+  taskCreated: true,
+  taskStatusChanged: true,
+  taskPriorityChanged: false,
+  taskTitleChanged: false,
+  taskDescriptionChanged: false,
+  taskCommentCreated: true,
+};
+
+// The shape checks the plugins run before a config is stored, with the
+// messages their valibot schemas produce.
+const SLACK_WEBHOOK_URL = /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9]+\/[A-Za-z0-9]+\/[A-Za-z0-9]+$/;
+const DISCORD_WEBHOOK_URL = /^https:\/\/(?:discord\.com|discordapp\.com)\/api\/webhooks\/[^/]+\/[^/\s]+$/i;
+const TELEGRAM_BOT_TOKEN = /^\d{8,10}:[A-Za-z0-9_-]{35}$/;
 
 // The columns a project starts with, as the server's own shape so the routes
 // below can hand them straight to their schemas.
@@ -721,6 +764,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const MM_EVENTS = { taskCreated: true, taskStatusChanged: true, taskPriorityChanged: false, taskTitleChanged: false, taskDescriptionChanged: false, taskCommentCreated: true };
   const GW_EVENTS = { ...MM_EVENTS, taskDeleted: false, taskMoved: false, taskDueDateChanged: false, taskAssigneeChanged: false, taskUnassigned: false, dueDateReminder: false };
   for (const i of seed.integrations ?? []) {
+    if (i["provider"] !== "mattermost" && i["provider"] !== "webhook") continue;
     const at = now();
     integrations.push({
       id: id("integ"),
@@ -932,6 +976,237 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     updatedAt: row.updatedAt,
   });
 
+  // Chat integrations keep one row per project and provider, the stored
+  // config holding the secrets the responses mask, the way the server's
+  // integration table does (apps/api/src/{slack,discord,telegram}-integration
+  // in usekaneo/kaneo). They number and date on their own counters so
+  // seeding them leaves the other scenarios' ids and times alone.
+  let iseq = 0;
+  let iclock = 0;
+  const iid = (prefix: string) => `${prefix}${String(++iseq).padStart(4, "0")}`;
+  // Kept on the seed's own day so the golden normaliser does not mask them:
+  // an update that bumps updatedAt and telegram's no-op that does not are
+  // only visible while the times themselves are.
+  const inow = () => new Date(T0 + 12 * 3600 * 1000 + 1000 * iclock++).toISOString();
+
+  type ChatKind = "slack" | "discord" | "telegram";
+  type ChatConfig = {
+    webhookUrl?: string;
+    channelName?: string;
+    token?: string;
+    chatId?: string;
+    threadId?: number;
+    chatLabel?: string;
+    events: Record<ChatEventKey, boolean>;
+  };
+  type ChatRow = {
+    kind: ChatKind;
+    projectId: string;
+    id: string;
+    config: ChatConfig;
+    isActive: boolean | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  const chatIntegrations: ChatRow[] = [];
+
+  // '' clears a nullable field on a patch; undefined already means keep, so
+  // the caller tells the two apart before calling this.
+  const trimField = (value: unknown): string | undefined => {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  };
+  const chatEvents = (partial: Partial<Record<ChatEventKey, boolean>> | undefined): Record<ChatEventKey, boolean> => ({
+    ...DEFAULT_CHAT_EVENTS,
+    ...partial,
+  });
+
+  for (const i of seed.integrations ?? []) {
+    if (i["provider"] !== "slack" && i["provider"] !== "discord" && i["provider"] !== "telegram") continue;
+    const at = inow();
+    const events = chatEvents(i.events);
+    // The stored config keeps the provider's own key order, which the
+    // telegram no-op check stringifies.
+    const config: ChatConfig =
+      i.provider === "telegram"
+        ? { token: i.botToken?.trim() ?? "", chatId: i.chatId?.trim() ?? "", threadId: i.threadId ?? undefined, chatLabel: trimField(i.chatLabel), events }
+        : { webhookUrl: i.webhookUrl ?? "", channelName: trimField(i.channelName), events };
+    chatIntegrations.push({ kind: i.provider, projectId: i.projectId, id: iid("int"), config, isActive: i.isActive === undefined ? true : i.isActive, createdAt: at, updatedAt: at });
+  }
+
+  const telegramConfigErrors = (config: { token?: string; chatId?: string; threadId?: number }): string[] => {
+    const errors: string[] = [];
+    if (!TELEGRAM_BOT_TOKEN.test(config.token ?? "")) errors.push("Enter a valid Telegram bot token");
+    if ((config.chatId ?? "").trim() === "") errors.push("Chat ID is required");
+    if (config.threadId !== undefined) {
+      // Valibot's pipe reports every failed action, not just the first, with
+      // these messages (plugins/telegram/config.ts).
+      if (!Number.isInteger(config.threadId)) errors.push(`Invalid integer: Received ${config.threadId}`);
+      if (config.threadId < 1) errors.push(`Invalid value: Expected >=1 but received ${config.threadId}`);
+    }
+    return errors;
+  };
+  const webhookUrlError = (kind: ChatKind, url: string): string | null => {
+    if (kind === "slack") return SLACK_WEBHOOK_URL.test(url) ? null : "Invalid Slack webhook URL";
+    try {
+      new URL(url);
+    } catch {
+      return "Invalid URL";
+    }
+    return DISCORD_WEBHOOK_URL.test(url) ? null : "Enter a valid Discord webhook URL";
+  };
+
+  // The config a POST stores, or the 400 the server's validation answers.
+  const postedConfig = (kind: ChatKind, b: Record<string, any>): ChatConfig | Response => {
+    const events = chatEvents(b.events);
+    if (kind === "telegram") {
+      // The token is stored as sent: upstream trims it on PATCH but not on
+      // POST, so a token with whitespace fails the shape check here too.
+      const token = typeof b.botToken === "string" ? b.botToken : "";
+      const chatId = typeof b.chatId === "string" ? b.chatId.trim() : "";
+      const errors = telegramConfigErrors({ token, chatId, threadId: b.threadId ?? undefined });
+      if (errors.length > 0) return failText(400, errors.join(", "));
+      return { token, chatId, threadId: b.threadId ?? undefined, chatLabel: trimField(b.chatLabel), events };
+    }
+    const webhookUrl = typeof b.webhookUrl === "string" ? b.webhookUrl : "";
+    const error = webhookUrlError(kind, webhookUrl);
+    if (error !== null) return failText(400, error);
+    return { webhookUrl, channelName: trimField(b.channelName), events };
+  };
+
+  // The config a PATCH stores and the active flag it resolves to, or the 400
+  // the server's validation answers. noop marks telegram's unchanged-answer,
+  // which skips the write so updatedAt stays where it was.
+  const patchedConfig = (kind: ChatKind, b: Record<string, any>, row: ChatRow): { config: ChatConfig; isActive: boolean | null; noop: boolean } | Response => {
+    const current = row.config;
+    if (kind === "telegram") {
+      const next: ChatConfig = {
+        token: "botToken" in b ? (typeof b.botToken === "string" ? b.botToken.trim() : "") : (current.token ?? ""),
+        chatId: "chatId" in b ? (typeof b.chatId === "string" ? b.chatId.trim() : "") : (current.chatId ?? ""),
+        threadId: b.threadId === undefined ? current.threadId : (b.threadId ?? undefined),
+        chatLabel: b.chatLabel === undefined ? current.chatLabel : trimField(b.chatLabel),
+        events: chatEvents({ ...current.events, ...b.events }),
+      };
+      // An omitted isActive resolves against the stored value read as on:
+      // upstream writes `existing.isActive ?? true`, so a row whose flag was
+      // never set flips to on with the first real change — while a patch
+      // that changes nothing still answers the stored null.
+      const resolvedIsActive = b.isActive !== undefined ? b.isActive : (row.isActive ?? true);
+      if (JSON.stringify(next) === JSON.stringify(current) && resolvedIsActive === (row.isActive ?? true)) {
+        return { config: current, isActive: row.isActive, noop: true };
+      }
+      const errors = telegramConfigErrors(next);
+      if (errors.length > 0) return failText(400, errors.join(", "));
+      return { config: next, isActive: resolvedIsActive, noop: false };
+    }
+    const url = typeof b.webhookUrl === "string" ? b.webhookUrl.trim() : "";
+    const next: ChatConfig = {
+      webhookUrl: url === "" ? current.webhookUrl : url,
+      channelName: b.channelName === undefined ? current.channelName : trimField(b.channelName),
+      events: chatEvents({ ...current.events, ...b.events }),
+    };
+    const error = webhookUrlError(kind, next.webhookUrl ?? "");
+    if (error !== null) return failText(400, error);
+    return { config: next, isActive: b.isActive !== undefined ? b.isActive : (row.isActive ?? true), noop: false };
+  };
+
+  // The masked forms the responses carry, copied from maskWebhookUrl and
+  // maskBotToken upstream: the URL's last path segment (or the bot token's
+  // half after the colon) keeps its ends and loses its middle, and a value
+  // that cannot be read at all is just "Configured".
+  const maskTail = (value: string): string => (value.length > 8 ? `${value.slice(0, 4)}…${value.slice(-4)}` : "••••");
+  const maskWebhookUrl = (value: string): string => {
+    try {
+      const url = new URL(value);
+      const parts = url.pathname.split("/").filter(Boolean);
+      const last = parts[parts.length - 1] ?? "";
+      return `${url.origin}/${parts.slice(0, -1).join("/")}/${maskTail(last)}`;
+    } catch {
+      return "Configured";
+    }
+  };
+  const maskBotToken = (value: string): string => {
+    const [prefix, suffix = ""] = value.split(":", 2);
+    if (!suffix) return "Configured";
+    return `${prefix}:${maskTail(suffix)}`;
+  };
+
+  const chatResponse = (row: ChatRow): Record<string, unknown> => {
+    const c = row.config;
+    const base = { id: row.id, projectId: row.projectId, events: chatEvents(c.events), isActive: row.isActive, createdAt: row.createdAt, updatedAt: row.updatedAt };
+    if (row.kind === "telegram") {
+      return {
+        ...base,
+        chatId: c.chatId ?? "",
+        threadId: c.threadId ?? null,
+        chatLabel: c.chatLabel ?? null,
+        botTokenConfigured: Boolean(c.token),
+        maskedBotToken: c.token ? maskBotToken(c.token) : "",
+      };
+    }
+    return {
+      ...base,
+      channelName: c.channelName ?? null,
+      webhookConfigured: Boolean(c.webhookUrl),
+      // Slack masks unconditionally and Discord only when one is set; a
+      // stored config always has one, so the two answer the same.
+      maskedWebhookUrl: row.kind === "slack" ? maskWebhookUrl(c.webhookUrl ?? "") : c.webhookUrl ? maskWebhookUrl(c.webhookUrl) : "",
+    };
+  };
+  const chatRespond = (kind: ChatKind, body: unknown): Response => {
+    if (kind === "slack") return ok(M.SlackIntegration, body as z.input<typeof M.SlackIntegration>);
+    if (kind === "discord") return ok(M.DiscordIntegration, body as z.input<typeof M.DiscordIntegration>);
+    return ok(M.TelegramIntegration, body as z.input<typeof M.TelegramIntegration>);
+  };
+  const chatDeleted = (kind: ChatKind): Response => {
+    if (kind === "slack") return ok(M.DeleteSlackIntegration200, { success: true });
+    if (kind === "discord") return ok(M.DeleteDiscordIntegration200, { success: true });
+    return ok(M.DeleteTelegramIntegration200, { success: true });
+  };
+
+  const chatIntegration = (kind: ChatKind, projectId: string, method: string, body: any): Response => {
+    const title = kind === "slack" ? "Slack" : kind === "discord" ? "Discord" : "Telegram";
+    // The workspace middleware runs before the route and cannot place an
+    // unknown project: the same 400 the column routes give.
+    if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+    const row = chatIntegrations.find((r) => r.kind === kind && r.projectId === projectId);
+    if (method === "GET") return chatRespond(kind, row === undefined ? null : chatResponse(row));
+    if (method === "DELETE") {
+      if (row === undefined) return failText(404, `${title} integration not found`);
+      chatIntegrations.splice(chatIntegrations.indexOf(row), 1);
+      return chatDeleted(kind);
+    }
+    if (method === "POST") {
+      const built = postedConfig(kind, body ?? {});
+      if (built instanceof Response) return built;
+      const at = inow();
+      if (row === undefined) {
+        const created: ChatRow = { kind, projectId, id: iid("int"), config: built, isActive: true, createdAt: at, updatedAt: at };
+        chatIntegrations.push(created);
+        return chatRespond(kind, chatResponse(created));
+      }
+      row.config = built;
+      // Slack and Discord reset the switch on replace; Telegram keeps it.
+      if (kind !== "telegram") row.isActive = true;
+      row.updatedAt = at;
+      return chatRespond(kind, chatResponse(row));
+    }
+    if (method === "PATCH") {
+      if (row === undefined) return failText(404, `${title} integration not found`);
+      const b = (body ?? {}) as Record<string, any>;
+      const patched = patchedConfig(kind, b, row);
+      if (patched instanceof Response) return patched;
+      if (!patched.noop) {
+        row.config = patched.config;
+        row.isActive = patched.isActive;
+        row.updatedAt = inow();
+      }
+      return chatRespond(kind, chatResponse(row));
+    }
+    return fail(404, `no route: ${method} ${kind}-integration/project/${projectId}`);
+  };
+
   const failing = opts.failOn ? new RegExp(opts.failOn) : undefined;
   const failingQuery = opts.failOnQuery ? new RegExp(opts.failOnQuery) : undefined;
   let skipped = 0;
@@ -1032,6 +1307,12 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["PATCH", /^\/github-integration\/project\/[^/]+$/, M.UpdateGitHubIntegrationBody],
       ["POST", /^\/github-integration\/import-issues$/, M.ImportGitHubIssuesBody],
       ["PUT", /^\/user\/avatar$/, M.UploadUserAvatarBody],
+      ["POST", /^\/slack-integration\/project\/[^/]+$/, M.CreateSlackIntegrationBody],
+      ["PATCH", /^\/slack-integration\/project\/[^/]+$/, M.UpdateSlackIntegrationBody],
+      ["POST", /^\/discord-integration\/project\/[^/]+$/, M.CreateDiscordIntegrationBody],
+      ["PATCH", /^\/discord-integration\/project\/[^/]+$/, M.UpdateDiscordIntegrationBody],
+      ["POST", /^\/telegram-integration\/project\/[^/]+$/, M.CreateTelegramIntegrationBody],
+      ["PATCH", /^\/telegram-integration\/project\/[^/]+$/, M.UpdateTelegramIntegrationBody],
     ];
     for (const [method, re, schema] of BODIES) {
       if (req.method !== method || !re.test(path)) continue;
@@ -2749,6 +3030,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ownAvatar = undefined;
       avatars.delete("avatar-self");
       return ok(M.UserAvatarDeleted, { deleted });
+    }
+
+    if ((p = m(/^\/(slack|discord|telegram)-integration\/project\/([^/]+)$/))) {
+      return chatIntegration(p[1] as ChatKind, decodeURIComponent(p[2]), req.method, body);
     }
 
     return fail(404, `no route: ${req.method} ${path}`);

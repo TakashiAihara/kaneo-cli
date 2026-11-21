@@ -33,6 +33,28 @@
       "exit": 1,
       "stdout": "{\n  \"error\": \"GET /api/task/BET-x: 404: Task not found\"\n}\n",
       "stderr": "Error: GET /api/task/BET-x: 404: Task not found\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "a?b-1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/task/by-ticket-id/a?b-1: 404: Task not found\"\n}\n",
+      "stderr": "Error: GET /api/task/by-ticket-id/a?b-1: 404: Task not found\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "BET-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/task/BET-: 404: Task not found\"\n}\n",
+      "stderr": "Error: GET /api/task/BET-: 404: Task not found\n"
     }
   ],
   "requests": [
@@ -49,6 +71,16 @@
     {
       "method": "GET",
       "path": "/task/BET-x",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/by-ticket-id/a%3Fb-1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/BET-",
       "query": ""
     }
   ],

@@ -19,34 +19,36 @@ export const SIMILAR_TITLE = 0.6;
 // few enough that the message stays one readable line.
 const SIMILAR_REPORTED = 5;
 
-// Statuses holding finished or filed-away work, so a title repeating one of them
-// is the next round of it rather than a duplicate. planned is not among them:
-// work nobody has picked up is open backlog, and a task created beside it joins
-// that backlog rather than repeating it.
-const CLOSED_STATUSES = ["done", "archived"];
-
 // An issue or task reference inside a title: `name#N` written with no space,
-// anywhere in the title, and `name #N` written with one space only where the name
-// comes right after an opening parenthesis — "(ccx #165)", "（ccx #165 の後続）".
-// The name is a run of [A-Za-z0-9_./-], so an owner and a repository are one run
-// and `TakashiAihara/ccx#165` is read as the owner and the repository.
+// anywhere in the title, and `name #N` written with one space only inside
+// parentheses — "(ccx #165)", "（ccx #165 の後続）", "(ccx #165 and alp #3)".
+// Every reference inside one pair of parentheses counts, not only the first.
 //
-// Measured over 889 real titles: 28 write `name#N`, 50 write `(name #N` right
-// after a parenthesis, and 16 write `name #N` elsewhere. Those 16 are a mixture
-// of repositories ("ccx #188") with plain words ("PR #314"), so the space is
-// only the way a bracketed reference is written and a bare `#N` never names one:
+// Measured over 889 real titles: 28 write `name#N`, 50 write `name #N` inside
+// parentheses, and 16 write `name #N` elsewhere. Those 16 are a mixture of
+// repositories ("ccx #188") with plain words ("PR #314"), so the space is only
+// the way a bracketed reference is written and a bare `#N` never names one:
 // "Phase #1 design" and "Phase #1 implement" count a phase, not an issue.
+//
+// The name is then checked rather than only shaped, because the character run
+// also covers words and paths: `PR#12`, `Fix#7`, `docs/a.md#12` and
+// `…/issues/7#3` are not references (see parseName).
 //
 // Whatever follows the number is not part of it, so a colon reads the same as
 // the space in "ccx#165: crash"; a character of [A-Za-z0-9_] says the number
-// runs on into something else and is not a reference at all.
-const REFERENCE = /(?<![A-Za-z0-9_./-])([A-Za-z0-9_./-]+)#(\d+)(?![A-Za-z0-9_])/g;
-const BRACKETED_REFERENCE = /(?<=[(（])([A-Za-z0-9_./-]+) #(\d+)(?![A-Za-z0-9_])/g;
+// runs on into something else and is not a reference at all. A `#` before the
+// name means the number already ran into another hash ("ccx#1a#2"), which is
+// not a name either.
+const REFERENCE = /(?<![A-Za-z0-9_./#-])([A-Za-z0-9_./-]+)#(\d+)(?![A-Za-z0-9_])/g;
+const SPACED_REFERENCE = /([A-Za-z0-9_./-]+) #(\d+)(?![A-Za-z0-9_])/g;
+const PARENTHESISED = /[（(][^()（）]*/g;
 
 // One reference a title names. The owner is kept beside the repository rather
 // than folded into it, since two titles naming different owners are two
-// references rather than one seen two ways.
-type Reference = { owner: string; repo: string; number: string };
+// references rather than one seen two ways. owner and repo are lowercased for
+// matching; written is the reference as the title wrote it, for the message
+// that names it back.
+type Reference = { owner: string; repo: string; number: string; written: string };
 
 // Whether both titles name the same reference. Case is ignored, since a slug or
 // an owner is written in whatever case the author had, and the numbers are
@@ -65,44 +67,80 @@ const isSameReference = (mine: Reference, theirs: Reference): boolean =>
   mine.number === theirs.number &&
   (mine.owner === "" || theirs.owner === "" || mine.owner === theirs.owner);
 
-// The references a title names, in the order it writes them. The two forms are
-// matched separately and merged back by where each was found, so the first
-// reference of a title is the first one it writes.
-const references = (title: string): Reference[] =>
-  [...title.matchAll(REFERENCE), ...title.matchAll(BRACKETED_REFERENCE)]
-    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
-    .map((match) => {
-      const name = match[1]!.toLowerCase();
-      const at = name.lastIndexOf("/");
-      return { owner: at < 0 ? "" : name.slice(0, at), repo: name.slice(at + 1), number: match[2]! };
-    });
+// The references a title names, in the order it writes them. The unspaced form
+// is matched over the whole title and the spaced one inside each pair of
+// parentheses, then merged back by where each was found.
+const references = (title: string): Reference[] => {
+  const found: { at: number; name: string; number: string; written: string }[] = [];
+  for (const match of title.matchAll(REFERENCE)) {
+    found.push({ at: match.index ?? 0, name: match[1]!, number: match[2]!, written: match[0]! });
+  }
+  for (const span of title.matchAll(PARENTHESISED)) {
+    for (const match of span[0].matchAll(SPACED_REFERENCE)) {
+      found.push({ at: (span.index ?? 0) + (match.index ?? 0), name: match[1]!, number: match[2]!, written: match[0]! });
+    }
+  }
+  return found
+    .sort((a, b) => a.at - b.at)
+    .map((match) => reference(match))
+    .filter((reference): reference is Reference => reference !== undefined);
+};
 
-// A reference as the title being created wrote it, since an owner it left out is
-// not one the message should invent: `ccx#165`, or `takashiaihara/ccx#165` where
-// that title wrote the owner out.
-const asWritten = (reference: Reference): string =>
-  reference.owner === ""
-    ? `${reference.repo}#${reference.number}`
-    : `${reference.owner}/${reference.repo}#${reference.number}`;
+const reference = (match: { name: string; number: string; written: string }): Reference | undefined => {
+  const name = parseName(match.name);
+  if (name === undefined) return undefined;
+  return { ...name, number: match.number, written: match.written };
+};
+
+// The name a reference is written with: `repo` or `owner/repo`. A leading
+// segment holding a dot is a host name (`github.com/owner/repo`), which is
+// dropped since the owner already says whose repository it is. Only the one
+// in front is dropped: a second dotted segment is the owner, not another
+// host, so `a.b/c.d/repo#7` keeps `c.d/repo` rather than collapsing to a bare
+// `repo`. What is left deeper than owner/repo is a path (`docs/a.md#12`,
+// `…/issues/7#3`), and a dot in the repository is a file or a domain, not a
+// slug.
+const parseName = (name: string): { owner: string; repo: string } | undefined => {
+  const parts = name.split("/");
+  if (parts.length > 1 && parts[0]!.includes(".")) parts.shift();
+  if (parts.length > 2 || parts.some((part) => part === "")) return undefined;
+  const repo = parts[parts.length - 1]!;
+  const owner = parts.length === 2 ? parts[0]! : "";
+  if (repo.includes(".")) return undefined;
+  if (!repoSlug(repo)) return undefined;
+  return { owner: owner.toLowerCase(), repo: repo.toLowerCase() };
+};
+
+// Whether the last segment reads as a repository slug rather than an English
+// word: a CapitalizedWord is a word ("Fix#7", "Phase #1"), and a short all-caps
+// token is an acronym or word ("PR#12") too small to name a repository. Longer
+// all-caps names ("ALP#3") and anything with a lowercase letter still can be.
+const repoSlug = (repo: string): boolean => {
+  if (/^[A-Z][a-z]+$/.test(repo)) return false;
+  return /[a-z]/.test(repo) || repo.length >= 3;
+};
 
 // The open tasks whose titles name a reference this title also names, with that
 // reference as the title wrote it: the pair `task create` refuses on, and at most
 // SIMILAR_REPORTED of them, lowest number first, so the same board refuses the
-// same way every time.
+// same way every time. closed is the set of statuses the project's own columns
+// mark finished (see closedStatuses), so a task in a final column is the next
+// round of work rather than a duplicate.
 //
 // A title naming several references is refused on the first one it writes, so the
 // message names one issue rather than a set of them.
 export const sharedReference = (
   title: string,
   tasks: Task[],
+  closed: ReadonlySet<string>,
 ): { reference: string; tasks: Task[] } | undefined => {
-  const open = tasks.filter((task) => !CLOSED_STATUSES.includes(task.status));
+  const open = tasks.filter((task) => !closed.has(task.status));
   for (const reference of references(title)) {
     const found = open
       .filter((task) => references(task.title).some((theirs) => isSameReference(reference, theirs)))
       .sort((a, b) => a.number - b.number)
       .slice(0, SIMILAR_REPORTED);
-    if (found.length > 0) return { reference: asWritten(reference), tasks: found };
+    if (found.length > 0) return { reference: reference.written, tasks: found };
   }
   return undefined;
 };
@@ -116,13 +154,14 @@ export const titleSimilarity = (a: string, b: string): number => {
 };
 
 // The open tasks a warning names: the titles alike enough to this one, most
-// similar first and at most SIMILAR_REPORTED of them.
+// similar first and at most SIMILAR_REPORTED of them. closed is the same set
+// sharedReference reads, so a task in a final column is not warned about either.
 //
 // A number breaks a tie, so the same board always names the same task first and
 // the warning does not move between runs.
-export const similarOpenTasks = (title: string, tasks: Task[]): Task[] =>
+export const similarOpenTasks = (title: string, tasks: Task[], closed: ReadonlySet<string>): Task[] =>
   tasks
-    .filter((task) => !CLOSED_STATUSES.includes(task.status))
+    .filter((task) => !closed.has(task.status))
     .map((task) => ({ task, score: titleSimilarity(task.title, title) }))
     .filter((found) => found.score >= SIMILAR_TITLE)
     .sort((a, b) => b.score - a.score || a.task.number - b.task.number)

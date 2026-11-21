@@ -65,7 +65,7 @@ export const attachTask = async (
     "nothing is recorded here for it",
     `\`kaneo session attach ${shellWord(taskRef(attachment.projectSlug, task.number, attachment.projectId))}\` records it here, and posts a second marker; \`kaneo session status\` shows what is held here`,
   );
-  await confirmMarker(task.id, task.number, posted, "hard");
+  await confirmMarker(task.id, task.number, posted, format(marker), "hard");
   try {
     store.save(store.sessionStore(), sessionId, attachment);
   } catch (e) {
@@ -138,18 +138,22 @@ export const postMarker = async (
 export type ListingFailure = "hard" | "fail-open";
 
 // Confirms the server kept a marker just posted, by looking for it among the
-// task's comments.
+// task's comments and checking the text it stored is the text that was sent.
 //
 // The post answers with the comment's id, and a listing without it says the
-// server does not hold what was just written. Acting on a marker nobody can read
-// leaves `session next` posting onto a board this session is not on. Both that
-// and a reply carrying no id are hard failures whatever the caller asked for,
-// since the marker is on the server either way and a fail-open command would
-// swallow the only report of it.
+// server does not hold what was just written. The id alone does not say the
+// marker survived: a server that dropped or rewrote the body would leave a
+// comment that parses as nothing, so the stored text is compared with what was
+// submitted — the server keeps comment text verbatim (measured against
+// v2.32.0), so a difference is a marker this board cannot read. Both that and
+// a reply carrying no id are hard failures whatever the caller asked for, since
+// the marker is on the server either way and a fail-open command would swallow
+// the only report of it.
 export const confirmMarker = async (
   taskId: string,
   number: number,
   posted: Comment,
+  body: string,
   listingFailure: ListingFailure,
 ): Promise<void> => {
   // A reply carrying no id cannot be looked for, which is a different failure
@@ -168,9 +172,15 @@ export const confirmMarker = async (
     if (listingFailure === "hard") throw hard(message);
     throw new Error(message);
   }
-  if (!listed.some((comment) => comment.id === posted.id)) {
+  const held = listed.find((comment) => comment.id === posted.id);
+  if (held === undefined) {
     throw hard(
       `posted the marker on #${number} but it is not among its comments; check kaneo comment ls ${shellWord(taskId)} before retrying`,
+    );
+  }
+  if (held.content !== body) {
+    throw hard(
+      `posted the marker on #${number} but the server stored different text; check kaneo comment ls ${shellWord(taskId)} before retrying`,
     );
   }
 };

@@ -2171,23 +2171,45 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         results: { total: results.length, successful: results.filter((r) => r.success).length, failed: results.filter((r) => !r.success).length, tasks: results },
       });
     }
-    // v2.32.0's get-task-by-ticket-id.ts: the key is whatever precedes the last
-    // dash, matched to a slug ignoring case; a match in an active project wins
-    // over an archived one, and a tie is a 409. Its HTTPException is plain text.
+    // v2.32.0's get-task-by-ticket-id.ts, as far as the CLI can reach it: the
+    // key is whatever precedes the last dash, matched to a slug ignoring case
+    // the way isSameProjectKey folds it; candidates rank active projects first,
+    // then the most recently archived, and only a rank tie is a 409. The query
+    // narrowing (workspaceId/workspaceSlug/projectId) and the instance-admin
+    // bypass are not modeled: the CLI sends neither, and the fake's key is a
+    // plain member. Its HTTPException is plain text.
     if (req.method === "GET" && (p = m(/^\/task\/by-ticket-id\/([^/]+)$/))) {
-      const match = decodeURIComponent(p[1]).normalize("NFKC").match(/^(.+)-(\d+)$/u);
+      const ticketId = decodeURIComponent(p[1]);
+      // Upstream validates the raw parameter — its length and TICKET_ID_PATTERN
+      // — before the controller NFKC-normalizes it, and \d is ASCII-only, so a
+      // fullwidth digit fails there rather than folding into an ASCII one here.
+      if (ticketId.length > 128 || !/^(.+)-(\d+)$/u.test(ticketId)) return failText(400, "Invalid task ticket ID");
+      const match = ticketId.normalize("NFKC").match(/^(.+)-(\d+)$/u);
       const number = Number(match?.[2]);
       if (!match || !Number.isSafeInteger(number) || number < 1 || number > 2_147_483_647) return failText(400, "Invalid task ticket ID");
       const key = match[1]!.toLowerCase();
+      // The key's user sees only the workspaces it is a member of. The members
+      // seed says where user-self belongs: an entry with a workspaceId limits
+      // it there, one without is in all of them, and no entry at all keeps the
+      // fake's standing assumption that the key reaches what it seeded.
+      const selfEntries = (seed.members ?? []).filter((mm) => mm.id === "user-self");
+      const reachesAll = selfEntries.length === 0 || selfEntries.some((mm) => mm.workspaceId === undefined);
+      const reached = new Set(selfEntries.map((mm) => mm.workspaceId).filter((w): w is string => w !== undefined));
       const found = tasks
         .filter((t) => t.number === number)
         .map((t) => ({ t, project: projects.find((x) => x.id === t.projectId)! }))
+        .filter(({ project }) => reachesAll || reached.has(project.workspaceId))
         .filter(({ project }) => project.slug.normalize("NFKC").toLowerCase() === key);
       if (found.length === 0) return failText(404, "Task not found");
-      const active = found.filter(({ project }) => project.archivedAt === null);
-      const pool = active.length > 0 ? active : found;
-      if (pool.length > 1) return failText(409, "Task ticket ID matches multiple accessible tasks");
-      const { t, project } = pool[0]!;
+      // Active projects rank above every archived one (an infinite rank), and
+      // among archived ones the newest archivedAt ranks highest.
+      const rank = (project: (typeof projects)[number]) =>
+        project.archivedAt === null ? Number.POSITIVE_INFINITY : Date.parse(project.archivedAt);
+      const sorted = [...found].sort((a, b) => rank(b.project) - rank(a.project));
+      if (sorted.length > 1 && rank(sorted[1]!.project) === rank(sorted[0]!.project)) {
+        return failText(409, "Task ticket ID matches multiple accessible tasks");
+      }
+      const { t, project } = sorted[0]!;
       return ok(M.TaskByTicketId, {
         ...t,
         columnId: columnsOf(t.projectId).find((c) => c.slug === t.status)?.id ?? null,
@@ -3898,7 +3920,10 @@ const fileExtension = (filename: string): string => {
 };
 
 // What a server older than the document leaves out, applied to any response.
-const LEGACY_DROPPED = new Set(["backgroundVersion", "pagination", "labels", "externalLinks", "subtaskCounts", "assigneeImage", "lastTaskNumber"]);
+// isFinal among them: final columns are a v2.2.0 feature, and a server this
+// old has none, so the listing answers without the field the way its columns
+// route would not exist either.
+const LEGACY_DROPPED = new Set(["backgroundVersion", "pagination", "labels", "externalLinks", "subtaskCounts", "assigneeImage", "lastTaskNumber", "isFinal"]);
 // What it sends as null. The relation summaries are nullable in the document,
 // so the id fallback is exercised here.
 const LEGACY_NULLED = new Set(["user", "sourceTask", "targetTask"]);

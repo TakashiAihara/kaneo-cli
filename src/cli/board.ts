@@ -1,5 +1,5 @@
 import { apiKey, projects, type App } from "./app";
-import { archived, boardTasks, getBoard, getProject, listComments, type Task } from "../api/kaneo";
+import { archived, boardTasks, closedStatuses, deferredMark, getBoard, getProject, listComments, type Task } from "../api/kaneo";
 import { noArgs, type RunContext } from "./args";
 import { withProject } from "./lookup";
 import { holding } from "../session/marker";
@@ -95,14 +95,17 @@ export const boardCommand = {
 // which sessions hold a task.
 const buildBoard = async (id: string): Promise<Report> => {
   const board = await getBoard(id);
+  const closed = closedStatuses(board);
   const open: Task[] = [];
   let done = 0;
   for (const task of boardTasks(board)) {
-    if (task.status === "done") {
+    if (closed.has(task.status)) {
       done++;
       continue;
     }
-    open.push(task);
+    // A description the listing deferred is marked as such in the JSON, so it
+    // reads differently from one that is genuinely empty.
+    open.push({ ...task, ...deferredMark(task) });
   }
 
   // An empty board still owes a script its document, so it becomes a report with

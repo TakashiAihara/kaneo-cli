@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { configureClient, setRateLimitWaits } from "../../src/api/http";
 import { failOpen } from "../../src/cli/failopen";
-import { postMarker } from "../../src/session/attach";
+import { confirmMarker, postMarker } from "../../src/session/attach";
 import type { Marker } from "../../src/session/marker";
 
 const marker: Marker = {
@@ -59,5 +59,39 @@ describe("posting a session marker", () => {
   test("with a readable reply returns the comment", async () => {
     answers(200, JSON.stringify({ id: "c1", content: "x", userId: "u1", createdAt: "2026-09-30T00:00:00Z" }));
     expect((await postMarker("t1", marker, 7, "kept nothing here", "run it again")).createdAt).toBe("2026-09-30T00:00:00.000Z");
+  });
+});
+
+// What the comment listing answers for the marker just posted: the reply's id
+// is c1, and content is whatever the server claims to have stored.
+const listedAs = (id: string, content: string) =>
+  JSON.stringify([
+    { id, taskId: "t1", userId: "u1", content, createdAt: "2026-09-30T00:00:00Z", updatedAt: "2026-09-30T00:00:00Z", user: { name: "Claude", image: null } },
+  ]);
+
+const posted = { id: "c1", content: "sent", userId: "u1", userName: "", createdAt: "2026-09-30T00:00:00.000Z" };
+
+describe("confirming a posted marker", () => {
+  const body = "<!-- kn:session id=s1 -->\nwrite tests";
+
+  test("the listing holds the very text that was sent", async () => {
+    answers(200, listedAs("c1", body));
+    await expect(confirmMarker("t1", 7, posted, body, "hard")).resolves.toBeUndefined();
+  });
+
+  // The id alone does not say the marker survived: a server that dropped or
+  // rewrote the body would leave a comment that parses as nothing.
+  test("the listing holds the id but different text", async () => {
+    answers(200, listedAs("c1", "<!-- kn:session id=s1 -->\nwrite tests "));
+    await expect(confirmMarker("t1", 7, posted, body, "fail-open")).rejects.toThrow(
+      "posted the marker on #7 but the server stored different text; check kaneo comment ls t1 before retrying",
+    );
+  });
+
+  test("the listing does not hold the id at all", async () => {
+    answers(200, listedAs("c9", body));
+    await expect(confirmMarker("t1", 7, posted, body, "hard")).rejects.toThrow(
+      "posted the marker on #7 but it is not among its comments; check kaneo comment ls t1 before retrying",
+    );
   });
 });

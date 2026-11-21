@@ -221,6 +221,60 @@ test("TestGetBoardMakesOneRequestWhenThereIsOnePage", async () => {
   expect(calls).toBe(1);
 });
 
+// The listing carries each column's isFinal through to the board, which is
+// what closedStatuses reads to judge finished work without another request.
+test("TestGetBoardCarriesColumnIsFinal", async () => {
+  newServer(
+    () =>
+      new Response(boardPage(1, 1, 1, 1, columns([boardTask("t1", 1, [])])), {
+        headers: { "content-type": "application/json" },
+      }),
+  );
+  const b = await api.getBoard("p1");
+  expect(b.columns.map((c) => [c.id, c.isFinal])).toEqual([
+    ["to-do", false],
+    ["done", true],
+  ]);
+});
+
+// A board as closedStatuses reads it, with isFinal left out where a column
+// does not report it.
+const boardWith = (cols: { id: string; isFinal?: boolean }[]): api.Board => ({
+  projectId: "p1",
+  projectName: "Board",
+  projectSlug: "b",
+  columns: cols.map((c) => ({ id: c.id, name: c.id, tasks: [], ...(c.isFinal === undefined ? {} : { isFinal: c.isFinal }) })),
+});
+
+// The statuses that hold finished work are the project's own final columns
+// plus archived; planned is open backlog and stays out.
+test("TestClosedStatusesAreTheFinalColumnsPlusArchived", () => {
+  const b = boardWith([
+    { id: "to-do", isFinal: false },
+    { id: "done", isFinal: true },
+    { id: "released", isFinal: true },
+  ]);
+  expect([...api.closedStatuses(b)].sort()).toEqual(["archived", "done", "released"]);
+});
+
+// A server that predates final columns sends no isFinal on any column; there
+// done was the only final column, so it is named instead.
+test("TestClosedStatusesFallBackToDoneWhenNoColumnReportsIsFinal", () => {
+  const b = boardWith([{ id: "to-do" }, { id: "in-progress" }, { id: "done" }]);
+  expect([...api.closedStatuses(b)].sort()).toEqual(["archived", "done"]);
+});
+
+// The field being absent and being false are different answers: a board whose
+// columns all report isFinal false has no finished column at all, not even a
+// column named done.
+test("TestClosedStatusesWithNoFinalColumnCloseOnlyArchived", () => {
+  const b = boardWith([
+    { id: "to-do", isFinal: false },
+    { id: "done", isFinal: false },
+  ]);
+  expect([...api.closedStatuses(b)]).toEqual(["archived"]);
+});
+
 // A number lookup stops at the page holding the task, but only once that page's
 // related pages are read: the task's other labels arrive there.
 test("TestFindTaskByNumberReadsTheRelatedPagesOfItsPage", async () => {

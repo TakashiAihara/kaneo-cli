@@ -3,7 +3,7 @@ import { minimumArgs, noArgs, type RunContext } from "./args";
 import { failOpen, hard, strictFlag } from "./failopen";
 import { hookEnv, runHook } from "./hook";
 import { resolveTask } from "./task";
-import { CLOSED, RUNNING } from "../session/marker";
+import { CLOSED, format, RUNNING } from "../session/marker";
 import * as store from "../session/store";
 import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
@@ -77,7 +77,7 @@ export const sessionCommand = {
           "this command keeps no local record, so nothing here is out of step",
           `it can be run again, that would only post a second marker; \`kaneo comment ls ${shellWord(reference)}\` shows it`,
         );
-        await confirmMarker(taskId, number, posted, "fail-open");
+        await confirmMarker(taskId, number, posted, format(marker), "fail-open");
 
         app.out.human(`#${number} next: ${step}`);
         // A Go map, which its encoder writes with the keys sorted. The report is
@@ -196,7 +196,7 @@ export const sessionCommand = {
             `released ${ref(closed.projectSlug, closed.number, closed.projectId)} ${closed.title} here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written`,
           );
         }
-        await confirmMarker(closed.taskId, closed.number, posted, "fail-open");
+        await confirmMarker(closed.taskId, closed.number, posted, format(marker), "fail-open");
 
         app.out.human(`closed: #${closed.number} ${closed.title}`);
         app.out.data({ number: closed.number, taskId: closed.taskId });
@@ -276,13 +276,18 @@ const targetTask = async (app: App, ref: string): Promise<{ taskId: string; numb
 };
 
 // Whether a --task value names the held task in a form close can recognise
-// without asking the server: its id, its slug#number (any case, as the slug
-// lookup reads it), or a bare number when the current project is the held one.
-// Without a slug on record, `#N` is not matched: it would read as the current
-// project's task.
+// without asking the server: its id, its slug#number or slug-number (any case,
+// as the slug lookup reads it), or a bare number when the current project is
+// the held one. Without a slug on record, `#N` is not matched: it would read as
+// the current project's task.
 const heldAs = (app: App, held: store.Attachment, named: string): boolean => {
   if (named === held.taskId) return true;
   const slug = held.projectSlug ?? "";
-  if (slug !== "" && named.toLowerCase() === ref(slug, held.number).toLowerCase()) return true;
+  if (slug !== "") {
+    const lower = named.toLowerCase();
+    if (lower === ref(slug, held.number).toLowerCase()) return true;
+    // The dash form the server and UI write (`slug-N`) names the same task.
+    if (lower === `${slug}-${held.number}`.toLowerCase()) return true;
+  }
   return /^\d+$/.test(named) && Number(named) === held.number && taskProject(app) === held.projectId;
 };

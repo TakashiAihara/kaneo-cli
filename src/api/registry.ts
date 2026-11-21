@@ -85,4 +85,11 @@ export const OPERATIONS: Operation[] = [
   { id: "getTimeEntry", method: "GET", path: "/time-entry/{id}", command: "kaneo time get / update / stop" },
   { id: "createTimeEntry", method: "POST", path: "/time-entry", command: "kaneo time add" },
   { id: "updateTimeEntry", method: "PUT", path: "/time-entry/{id}", command: "kaneo time update / stop" },
+  { id: "listGiteaRepositories", method: "POST", path: "/gitea-integration/repositories", command: "kaneo integration gitea repos" },
+  { id: "verifyGiteaAccess", method: "POST", path: "/gitea-integration/verify", command: "kaneo integration gitea verify" },
+  { id: "getGiteaIntegration", method: "GET", path: "/gitea-integration/project/{projectId}", command: "kaneo integration gitea get" },
+  { id: "createGiteaIntegration", method: "POST", path: "/gitea-integration/project/{projectId}", command: "kaneo integration gitea connect" },
+  { id: "updateGiteaIntegration", method: "PATCH", path: "/gitea-integration/project/{projectId}", command: "kaneo integration gitea update" },
+  { id: "deleteGiteaIntegration", method: "DELETE", path: "/gitea-integration/project/{projectId}", command: "kaneo integration gitea rm" },
+  { id: "importGiteaIssues", method: "POST", path: "/gitea-integration/import-issues", command: "kaneo integration gitea import" },
 ];

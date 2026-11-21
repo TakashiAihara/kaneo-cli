@@ -1,0 +1,55 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "connect",
+        "acme/app",
+        "--base-url",
+        "https://gitea.example.com",
+        "--token",
+        "-",
+        "-p",
+        "proj-beta",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/gitea-integration/project/proj-beta: 409: Repository acme/app on this Gitea instance is already linked to another project\"\n}\n",
+      "stderr": "Error: POST /api/gitea-integration/project/proj-beta: 409: Repository acme/app on this Gitea instance is already linked to another project\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "rm",
+        "--yes",
+        "-p",
+        "proj-beta",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"this project has no gitea integration to delete\"\n}\n",
+      "stderr": "Error: this project has no gitea integration to delete\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/gitea-integration/project/proj-beta",
+      "query": "",
+      "body": {
+        "baseUrl": "https://gitea.example.com",
+        "repositoryOwner": "acme",
+        "repositoryName": "app",
+        "accessToken": "fake-gitea-token"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/gitea-integration/project/proj-beta",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

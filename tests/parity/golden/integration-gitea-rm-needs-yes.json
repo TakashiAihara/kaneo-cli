@@ -1,0 +1,62 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "rm",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to delete the gitea integration of acme/app on https://gitea.example.com without --yes\n"
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"success\": true,\n  \"message\": \"Gitea integration deleted\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "gitea",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"this project has no gitea integration to delete\"\n}\n",
+      "stderr": "Error: this project has no gitea integration to delete\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/gitea-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

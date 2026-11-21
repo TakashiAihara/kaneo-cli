@@ -32,11 +32,13 @@ import {
   deleteTask as removeTask,
   getNotificationPreferences as readNotificationPreferences,
   deleteTaskComment,
+  deleteGiteaIntegration as removeGiteaIntegration,
   deleteTaskRelation as removeRelation,
   deleteWorkflowRule as removeRule,
   exportTasks as readExport,
   getColumns as readColumns,
   getCurrentUser,
+  getGiteaIntegration as readGiteaIntegration,
   getInvitationDetails,
   getWorkspaceMembers,
   globalSearch,
@@ -50,17 +52,21 @@ import {
   getTaskTimeEntries,
   getTimeEntry,
   getWorkflowRules as readRules,
+  importGiteaIssues as postGiteaImport,
   importTasks as postImport,
+  listGiteaRepositories as postGiteaRepositories,
   listOrganization,
   listProjects,
   listAssignedTasks,
   listTasks,
   markAllNotificationsAsRead,
   markNotificationAsRead,
+  createGiteaIntegration as postGiteaIntegration,
   moveTask as putTaskMove,
   reorderColumns as putColumns,
   reorderProjects as putProjects,
   unarchiveProject,
+  updateGiteaIntegration as patchGiteaIntegration,
   updateNotificationPreferences as putNotificationPreferences,
   updateColumn as putColumn,
   updateOrganization,
@@ -75,14 +81,21 @@ import {
   updateTaskTitle,
   updateTimeEntry,
   upsertWorkflowRule as putRule,
+  verifyGiteaAccess as postGiteaVerify,
 } from "./gen/kaneo";
 import type {
   Board as GenBoard,
   BoardTask,
+  CreateGiteaIntegrationBody,
   CreateNotificationBody,
   BulkUpdateTasksBody,
   Column as GenColumn,
   CreateTaskBody,
+  GiteaDeleteResult as GenGiteaDeleteResult,
+  GiteaImportResult as GenGiteaImportResult,
+  GiteaIntegration as GenGiteaIntegration,
+  GiteaRepository as GenGiteaRepository,
+  GiteaVerificationResult as GenGiteaVerificationResult,
   Notification as GenNotification,
   NotificationPreferences as GenNotificationPreferences,
   CreateTaskRelationBody,
@@ -99,11 +112,13 @@ import type {
   Task as GenTask,
   TaskRelation as GenRelation,
   TaskRelationWithTasks,
+  UpdateGiteaIntegrationBody,
   UpdateNotificationPreferencesBody,
   TimeEntry as GenTimeEntry,
   UpdateTaskBody,
   UpdateTaskPriorityBody,
   UpsertNotificationPreferenceWorkspaceRuleBody,
+  VerifyGiteaAccessBody,
   WorkflowRule as GenWorkflowRule,
   WorkflowRuleRow as GenWorkflowRuleRow,
 } from "./gen/model";
@@ -2082,6 +2097,199 @@ const externalLink = (l: GenExternalLink): ExternalLink => ({
 // added by hand.
 export const listExternalLinks = async (taskId: string): Promise<ExternalLink[]> =>
   zeroList(await readExternalLinks(pathParam(taskId))).map(externalLink);
+
+// A project's link to a Gitea repository.
+//
+// The access token itself is never returned: maskedAccessToken is the only view
+// of it the server gives. webhookSecret comes back only for a caller holding
+// workspace:manage_settings — empty for anyone else — since it is the value
+// pasted into the webhook Gitea posts to. isActive is nullable: an integration
+// row can carry no flag at all, which reads as neither on nor off.
+export type GiteaIntegration = {
+  id: string;
+  projectId: string;
+  baseUrl: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  maskedAccessToken: string;
+  webhookUrl: string | null;
+  webhookSecret: string | null;
+  branchPattern: string | null;
+  commentTaskLinkOnGiteaIssue: boolean | null;
+  isActive: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const giteaIntegration = (g: GenGiteaIntegration | undefined): GiteaIntegration | null => {
+  // A null reply is the server saying the project has no integration, which is
+  // an answer rather than a failure; an absent one (a 2xx with no body) reads
+  // the same way.
+  if (g === null || g === undefined) return null;
+  return {
+    id: g.id ?? "",
+    projectId: g.projectId ?? "",
+    baseUrl: g.baseUrl ?? "",
+    repositoryOwner: g.repositoryOwner ?? "",
+    repositoryName: g.repositoryName ?? "",
+    maskedAccessToken: g.maskedAccessToken ?? "",
+    webhookUrl: g.webhookUrl ?? null,
+    webhookSecret: g.webhookSecret ?? null,
+    branchPattern: g.branchPattern ?? null,
+    commentTaskLinkOnGiteaIssue: g.commentTaskLinkOnGiteaIssue ?? null,
+    isActive: g.isActive ?? null,
+    createdAt: isoTime(g, "createdAt"),
+    updatedAt: isoTime(g, "updatedAt"),
+  };
+};
+
+// The Gitea instance and repository an integration command works against, and
+// the token that reaches them. accessToken is optional where the server lets
+// the stored one answer instead: verify reuses it only when the base URL is the
+// saved integration's, and connect keeps it when the field is left out.
+export type GiteaTarget = {
+  baseUrl: string;
+  accessToken?: string;
+  repositoryOwner: string;
+  repositoryName: string;
+};
+
+const giteaTarget = (wanted: GiteaTarget): Pick<VerifyGiteaAccessBody, "baseUrl" | "accessToken" | "repositoryOwner" | "repositoryName"> => ({
+  baseUrl: wanted.baseUrl,
+  ...(wanted.accessToken === undefined ? {} : { accessToken: wanted.accessToken }),
+  repositoryOwner: wanted.repositoryOwner,
+  repositoryName: wanted.repositoryName,
+});
+
+// The integration a project has, or null when it has none.
+export const getGiteaIntegration = async (projectId: string): Promise<GiteaIntegration | null> =>
+  giteaIntegration(await readGiteaIntegration(pathParam(projectId)));
+
+// Links a project to a Gitea repository, or re-links it: the server verifies
+// the token reaches the repository before storing, and keeps the webhook secret
+// an earlier link generated. accessToken left out keeps the stored token.
+//
+// The route answers with the stored integration, never null, so a reply that
+// reads as none is a reply that cannot be reported as a link that was made.
+export const createGiteaIntegration = async (projectId: string, wanted: GiteaTarget): Promise<GiteaIntegration> => {
+  const body: CreateGiteaIntegrationBody = {
+    baseUrl: wanted.baseUrl,
+    repositoryOwner: wanted.repositoryOwner,
+    repositoryName: wanted.repositoryName,
+    ...(wanted.accessToken === undefined ? {} : { accessToken: wanted.accessToken }),
+  };
+  const created = giteaIntegration(await postGiteaIntegration(pathParam(projectId), body));
+  if (created === null) {
+    throw new Error(`/gitea-integration/project/${projectId}: server answered without the integration`);
+  }
+  return created;
+};
+
+// The two settings the update route takes; everything else about the link —
+// the instance, the repository, the token — is changed by connecting again.
+export type GiteaIntegrationChanges = UpdateGiteaIntegrationBody;
+
+// Changes isActive or commentTaskLinkOnGiteaIssue and keeps the rest. The
+// server's update is partial, so only the fields given are sent.
+export const updateGiteaIntegration = async (
+  projectId: string,
+  changes: GiteaIntegrationChanges,
+): Promise<GiteaIntegration> => {
+  const updated = giteaIntegration(await patchGiteaIntegration(pathParam(projectId), changes));
+  if (updated === null) {
+    throw new Error(`/gitea-integration/project/${projectId}: server answered without the integration`);
+  }
+  return updated;
+};
+
+// Unlinks the project. The reply is the server's own two fields.
+export const deleteGiteaIntegration = async (projectId: string): Promise<{ success: boolean; message: string }> => {
+  const deleted = zeroRecord<GenGiteaDeleteResult>(await removeGiteaIntegration(pathParam(projectId)));
+  return { success: deleted.success ?? false, message: deleted.message ?? "" };
+};
+
+// A repository a Gitea token can reach. The fields keep Gitea's own names
+// (full_name, html_url) mapped to the camelCase the rest of this client uses.
+export type GiteaRepository = {
+  id: number;
+  name: string;
+  fullName: string;
+  owner: string;
+  private: boolean;
+  htmlUrl: string;
+};
+
+const giteaRepository = (r: GenGiteaRepository): GiteaRepository => ({
+  id: r.id ?? 0,
+  name: r.name ?? "",
+  fullName: r.full_name ?? "",
+  owner: r.owner?.login ?? "",
+  private: r.private ?? false,
+  htmlUrl: r.html_url ?? "",
+});
+
+// The repositories the token can reach on the instance, for picking one to
+// link. accessToken is required here: unlike verify and connect, this route
+// has no saved-token path.
+export const listGiteaRepositories = async (wanted: {
+  projectId: string;
+  baseUrl: string;
+  accessToken: string;
+}): Promise<GiteaRepository[]> =>
+  zeroList(zeroRecord(await postGiteaRepositories({ projectId: wanted.projectId, baseUrl: wanted.baseUrl, accessToken: wanted.accessToken })).repositories).map(
+    giteaRepository,
+  );
+
+// What a verification found. Every check is reported rather than failing the
+// request: a URL that is not a Gitea instance, a repository the token cannot
+// see and a token short on issue permissions are all 200 answers here, with
+// the reason in the fields.
+export type GiteaVerification = {
+  isInstalled: boolean;
+  hasRequiredPermissions: boolean;
+  repositoryExists: boolean;
+  repositoryPrivate: boolean | null;
+  missingPermissions: string[];
+  message: string;
+  failureReason: string | null;
+};
+
+const giteaVerification = (v: GenGiteaVerificationResult | undefined): GiteaVerification => ({
+  isInstalled: v?.isInstalled ?? false,
+  hasRequiredPermissions: v?.hasRequiredPermissions ?? false,
+  repositoryExists: v?.repositoryExists ?? false,
+  repositoryPrivate: v?.repositoryPrivate ?? null,
+  missingPermissions: zeroList(v?.missingPermissions),
+  message: v?.message ?? "",
+  failureReason: v?.failureReason ?? null,
+});
+
+// Checks the instance, the token and the repository without storing anything.
+// accessToken left out asks the server to verify with the saved token, which
+// it does only when the base URL is the saved integration's.
+export const verifyGiteaAccess = async (wanted: { projectId: string } & GiteaTarget): Promise<GiteaVerification> =>
+  giteaVerification(zeroRecord(await postGiteaVerify({ projectId: wanted.projectId, ...giteaTarget(wanted) })));
+
+// What an issue import did. errors lists the issues it could not bring in,
+// each with its reason; the counts still cover every issue it looked at.
+export type GiteaImportResult = {
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+};
+
+// Imports the linked repository's open issues as tasks. Issues that already
+// have a task are refreshed rather than duplicated.
+export const importGiteaIssues = async (projectId: string): Promise<GiteaImportResult> => {
+  const r = zeroRecord<GenGiteaImportResult>(await postGiteaImport({ projectId }));
+  return {
+    imported: r.imported ?? 0,
+    updated: r.updated ?? 0,
+    skipped: r.skipped ?? 0,
+    errors: zeroList(r.errors),
+  };
+};
 
 export type CheckResult = {
   serverOperations: number;

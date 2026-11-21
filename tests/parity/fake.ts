@@ -33,6 +33,9 @@ export type Seed = {
   comments?: { taskId: string; content: string; id?: string; userId?: string }[];
   // Labels already on a task, for a board that carries one before anything runs.
   labels?: { taskId: string; name: string; color?: string }[];
+  // Workspace labels whose deletion has already started: still listed, but a
+  // feed create naming one is refused the way the server refuses it.
+  deletingLabels?: { workspaceId: string; name: string; color?: string }[];
   // Users the server knows, so assign has a name to report.
   users?: { id: string; name: string }[];
   // The key's own notifications, oldest first.
@@ -293,9 +296,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   // One table for both kinds, as the server keeps them: a workspace label has
   // taskId null, and attaching inserts a copy carrying the task's id.
   const labels: z.input<typeof M.Label>[] = [];
-  const addLabel = (name: string, color: string, workspaceId: string, taskId: string | null) => {
+  const addLabel = (name: string, color: string, workspaceId: string, taskId: string | null, deleting = false) => {
     const at = now();
-    const l = { id: id("lbl"), name, color, createdAt: at, updatedAt: at, deletionStartedAt: null, taskId, workspaceId };
+    const l = { id: id("lbl"), name, color, createdAt: at, updatedAt: at, deletionStartedAt: deleting ? at : null, taskId, workspaceId };
     labels.push(l);
     return l;
   };
@@ -306,6 +309,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     const project = projects.find((p) => p.id === tasks.find((t) => t.id === l.taskId)?.projectId);
     if (project !== undefined) addLabel(l.name, l.color ?? "gray", project.workspaceId, l.taskId);
   }
+  for (const l of seed.deletingLabels ?? []) addLabel(l.name, l.color ?? "gray", l.workspaceId, null, true);
   const requests: Recorded[] = [];
   let grew = 0;
 

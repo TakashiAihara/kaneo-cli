@@ -194,7 +194,9 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // failure names the call that was made rather than the hop that failed.
   const served = servedPath(target);
   let headers = new Headers(request.headers);
-  headers.set("Accept", "application/json");
+  // A request that names its own document type keeps it — the calendar feed's
+  // text/calendar — and everything else still asks for JSON.
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
   const key = anonymous ? "" : settings.apiKey();
   if (key !== "") {
     if (!keepsCredential(target.href)) {

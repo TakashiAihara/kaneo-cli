@@ -7,7 +7,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "[\n  {\n    \"id\": \"feed0001\",\n    \"projectId\": \"proj-alpha\",\n    \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001\",\n    \"labelIds\": [\n      \"lbl0004\"\n    ],\n    \"timeZone\": \"UTC\",\n    \"createdAt\": \"2026-01-01T01:00:00.000Z\"\n  }\n]\n",
+      "stdout": "[\n  {\n    \"id\": \"feed0001\",\n    \"projectId\": \"proj-alpha\",\n    \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001\",\n    \"labelIds\": [\n      \"lbl0006\"\n    ],\n    \"timeZone\": \"UTC\",\n    \"createdAt\": \"2026-01-01T01:00:00.000Z\"\n  }\n]\n",
       "stderr": ""
     },
     {
@@ -30,7 +30,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"feed0002\",\n  \"projectId\": \"proj-alpha\",\n  \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0002\",\n  \"labelIds\": [\n    \"lbl0004\"\n  ],\n  \"timeZone\": \"Europe/Berlin\",\n  \"createdAt\": \"2026-01-01T01:00:01.000Z\"\n}\n",
+      "stdout": "{\n  \"id\": \"feed0002\",\n  \"projectId\": \"proj-alpha\",\n  \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0002\",\n  \"labelIds\": [\n    \"lbl0006\"\n  ],\n  \"timeZone\": \"Europe/Berlin\",\n  \"createdAt\": \"2026-01-01T01:00:01.000Z\"\n}\n",
       "stderr": ""
     },
     {
@@ -38,10 +38,10 @@
         "feed",
         "create",
         "solo",
-        "--json"
+        "--human"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"feed0003\",\n  \"projectId\": \"proj-alpha\",\n  \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0003\",\n  \"labelIds\": [\n    \"lbl0005\"\n  ],\n  \"timeZone\": \"UTC\",\n  \"createdAt\": \"2026-01-01T01:00:02.000Z\"\n}\n",
+      "stdout": "created feed0003  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0003/calendar.ics  solo  UTC  2026-01-01T01:00:02.000Z\n",
       "stderr": ""
     },
     {
@@ -71,6 +71,17 @@
       "args": [
         "feed",
         "create",
+        "doomed",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no label \\\"doomed\\\" in this workspace; kaneo label ls lists them\"\n}\n",
+      "stderr": "Error: no label \"doomed\" in this workspace; kaneo label ls lists them\n"
+    },
+    {
+      "args": [
+        "feed",
+        "create",
         "bug",
         "--time-zone",
         "Nowhere/Special",
@@ -94,12 +105,34 @@
       "args": [
         "feed",
         "get",
+        " feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001 "
+      ],
+      "exit": 0,
+      "stdout": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Kaneo//Calendar Feed//EN\r\nCALSCALE:GREGORIAN\r\nX-WR-CALNAME:Alpha\r\nBEGIN:VEVENT\r\nUID:task-cal@kaneo\r\nDTSTAMP:20260101T000008Z\r\nCREATED:20260101T000008Z\r\nLAST-MODIFIED:20260101T000008Z\r\nDTSTART;VALUE=DATE:20260105\r\nDTEND;VALUE=DATE:20260108\r\nSUMMARY:Ship the feed\r\nDESCRIPTION:line one\\nline two\r\nTRANSP:TRANSPARENT\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "get",
         "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0003",
         "--json"
       ],
-      "exit": 0,
-      "stdout": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Kaneo//Calendar Feed//EN\r\nCALSCALE:GREGORIAN\r\nX-WR-CALNAME:Alpha\r\nBEGIN:VEVENT\r\nUID:task-cal2@kaneo\r\nDTSTAMP:20260101T000009Z\r\nCREATED:20260101T000009Z\r\nLAST-MODIFIED:20260101T000009Z\r\nDTSTART;VALUE=DATE:20260109\r\nDTEND;VALUE=DATE:20260110\r\nSUMMARY:Solo dated\r\nTRANSP:TRANSPARENT\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
-      "stderr": ""
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--json and --jq do not apply to feed get; the iCalendar document is written to stdout as it arrives\"\n}\n",
+      "stderr": "Error: --json and --jq do not apply to feed get; the iCalendar document is written to stdout as it arrives\n"
+    },
+    {
+      "args": [
+        "feed",
+        "get",
+        "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0003",
+        "--jq",
+        "."
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --json and --jq do not apply to feed get; the iCalendar document is written to stdout as it arrives\n"
     },
     {
       "args": [
@@ -141,7 +174,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"id\": \"feed0002\",\n  \"projectId\": \"proj-alpha\",\n  \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0002\",\n  \"labelIds\": [\n    \"lbl0004\"\n  ],\n  \"timeZone\": \"Europe/Berlin\",\n  \"createdAt\": \"2026-01-01T01:00:01.000Z\"\n}\n",
+      "stdout": "{\n  \"id\": \"feed0002\",\n  \"projectId\": \"proj-alpha\",\n  \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0002\",\n  \"labelIds\": [\n    \"lbl0006\"\n  ],\n  \"timeZone\": \"Europe/Berlin\",\n  \"createdAt\": \"2026-01-01T01:00:01.000Z\"\n}\n",
       "stderr": ""
     },
     {
@@ -177,6 +210,18 @@
       "exit": 0,
       "stdout": "feed0001  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001/calendar.ics  bug  UTC  2026-01-01T01:00:00.000Z\nfeed0003  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0003/calendar.ics  solo  UTC  2026-01-01T01:00:02.000Z\nfeed0004  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0004/calendar.ics  bug  UTC  2026-01-01T01:00:03.000Z\n",
       "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "rm",
+        " feed0004 ",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"feed0004\",\n  \"projectId\": \"proj-alpha\",\n  \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0004\",\n  \"labelIds\": [\n    \"lbl0006\"\n  ],\n  \"timeZone\": \"UTC\",\n  \"createdAt\": \"2026-01-01T01:00:03.000Z\"\n}\n",
+      "stderr": ""
     }
   ],
   "requests": [
@@ -206,7 +251,7 @@
       "query": "",
       "body": {
         "labelIds": [
-          "lbl0004"
+          "lbl0006"
         ],
         "timeZone": "Europe/Berlin"
       }
@@ -232,12 +277,17 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/calendar-feed/project/proj-alpha",
       "query": "",
       "body": {
         "labelIds": [
-          "lbl0004"
+          "lbl0006"
         ]
       }
     },
@@ -252,12 +302,22 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/calendar-feed/project/proj-alpha",
       "query": "",
       "body": {
         "labelIds": [
-          "lbl0004"
+          "lbl0006"
         ],
         "timeZone": "Nowhere/Special"
       }
@@ -269,7 +329,7 @@
     },
     {
       "method": "GET",
-      "path": "/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0003/calendar.ics",
+      "path": "/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001/calendar.ics",
       "query": ""
     },
     {
@@ -335,6 +395,16 @@
     {
       "method": "GET",
       "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/calendar-feed/project/proj-alpha/feed0004",
       "query": ""
     }
   ],

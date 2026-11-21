@@ -2121,10 +2121,10 @@ export const revokeCalendarFeed = async (projectId: string, id: string): Promise
 };
 
 // The iCalendar document a feed's link serves. The route is public — the token
-// is the credential — so the call is anonymous and the body comes back as the
-// text it is rather than as JSON.
+// is the credential — so the call is anonymous, asks for the document's own
+// media type, and the body comes back as the text it is rather than as JSON.
 export const calendarFeedIcs = async (token: string): Promise<string> =>
-  readCalendarFeed(pathParam(token), { anonymous: true, text: true });
+  readCalendarFeed(pathParam(token), { anonymous: true, text: true, headers: { Accept: "text/calendar" } });
 
 // A link from a task to something outside the board.
 //

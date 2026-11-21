@@ -57,6 +57,14 @@ export const sanitizeControl = (text: string): string => {
     .join("");
 };
 
+// sanitizeControl for a whole document whose CRLF line endings are the format:
+// the text is sanitised a line at a time and the CRLF kept, so an iCalendar
+// feed still reads as the document it is while a stray control sequence inside
+// a line is neutralised as usual. A lone CR is not a line ending here and is
+// replaced like any other control character.
+export const sanitizeDocument = (text: string): string =>
+  text.split("\r\n").map((line) => sanitizeControl(line)).join("\r\n");
+
 export class Writer {
   // The filter, where `--jq` asked for one. It is not part of the mode: the
   // mode decides what a command is allowed to write, and the filter decides

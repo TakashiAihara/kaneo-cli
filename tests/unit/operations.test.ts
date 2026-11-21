@@ -690,13 +690,17 @@ describe("calendar feeds", () => {
 
   // The route is public — the token is the credential — so the call neither
   // asks for the key nor sends it, which a key fetched by command would show.
+  // And since the reply is a document rather than JSON, the request asks for
+  // the route's own media type instead of the JSON every other call advertises.
   test("the calendar read asks for no key", async () => {
     const auths: (string | null)[] = [];
+    const accepts: (string | null)[] = [];
     const s = Bun.serve({
       hostname: "127.0.0.1",
       port: 0,
       fetch: (req) => {
         auths.push(req.headers.get("authorization"));
+        accepts.push(req.headers.get("accept"));
         return new Response("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", { headers: { "content-type": "text/calendar" } });
       },
     });
@@ -704,7 +708,7 @@ describe("calendar feeds", () => {
     let asked = 0;
     configureClient({ baseUrl: `http://127.0.0.1:${s.port}`, apiKey: () => (asked++, "test-key") });
     expect(await api.calendarFeedIcs("t")).toBe("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n");
-    expect({ asked, auths }).toEqual({ asked: 0, auths: [null] });
+    expect({ asked, auths, accepts }).toEqual({ asked: 0, auths: [null], accepts: ["text/calendar"] });
   });
 
   // The reply is the document itself: not JSON, so it is not parsed, and a

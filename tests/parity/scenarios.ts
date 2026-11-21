@@ -1238,13 +1238,18 @@ export const SCENARIOS: Scenario[] = [
   {
     // A seeded feed resolves its label names to workspace definitions the way
     // create does, so "bug" is a definition while "solo" exists only as a copy
-    // on task-cal2 until `feed create solo` materializes one.
+    // on task-cal2 until `feed create solo` materializes one. "doomed" exists
+    // as a live copy on task-cal3 and as a workspace definition whose deletion
+    // has started: the feed form drops the whole name, the way the task label
+    // picker does, so create refuses it before the server is asked.
     name: "feed create, list, get and rm",
     seed: {
       labels: [
         { taskId: "task-cal", name: "bug" },
         { taskId: "task-cal2", name: "solo" },
+        { taskId: "task-cal3", name: "doomed" },
       ],
+      deletingLabels: [{ workspaceId: WS, name: "doomed" }],
       calendarFeeds: [{ projectId: P1, labels: ["bug"] }],
     },
     extraTasks: [
@@ -1256,12 +1261,21 @@ export const SCENARIOS: Scenario[] = [
       ["feed", "ls", "--json"],
       ["feed", "ls", "--human"],
       ["feed", "create", "bug", "--time-zone", "Europe/Berlin", "--json"],
-      ["feed", "create", "solo", "--json"],
+      // Human mode, so the line has to name the definition the create
+      // materialized for "solo" rather than the copy it was resolved from.
+      ["feed", "create", "solo", "--human"],
       ["feed", "create", "bug", "bug", "--human"],
       ["feed", "create", "nope", "--json"],
+      ["feed", "create", "doomed", "--json"],
       ["feed", "create", "bug", "--time-zone", "Nowhere/Special", "--json"],
       ["feed", "get", feedToken(1)],
+      // The token is trimmed like every other argument: the padding is not
+      // part of it, and the document still arrives.
+      ["feed", "get", ` ${feedToken(1)} `],
+      // The document is not JSON, so the output flags are refused rather than
+      // answered with text they cannot read.
       ["feed", "get", feedToken(3), "--json"],
+      ["feed", "get", feedToken(3), "--jq", "."],
       ["feed", "get", "not-a-token"],
       ["feed", "get", feedToken(99)],
       ["feed", "rm", "feed0001", "--json"],
@@ -1269,6 +1283,7 @@ export const SCENARIOS: Scenario[] = [
       ["feed", "rm", "feed9999", "--yes", "--json"],
       ["feed", "ls", "-p", "BET", "--json"],
       ["feed", "ls", "--human"],
+      ["feed", "rm", " feed0004 ", "--yes", "--json"],
     ],
   },
   {

@@ -12,6 +12,7 @@ import {
 import { normalizeBaseUrl } from "../api/http";
 import { exactArgs, minimumArgs, noArgs, type RunContext } from "./args";
 import { withProject } from "./lookup";
+import { sanitizeDocument } from "../output/output";
 
 // The subscribe link a feed's token stands for: the API serves it without a
 // key, which is what makes it pasteable into a calendar app.
@@ -42,10 +43,15 @@ const feedLine = (app: App, feed: CalendarFeed, names: Map<string, string>): str
 // them (apps/web get-calendar-label-options.ts): one option per name, the
 // workspace's own definition preferred over a task's copy, so a name that
 // exists only on tasks still offers the copy whose id the server turns into a
-// definition.
+// definition. A name with a label being deleted is dropped whole, the way the
+// task label picker drops it: the server resolves a feed's labels by name to
+// a live workspace definition, and refuses the name while any of its rows is
+// mid-deletion.
 const calendarLabelOptions = (labels: LabelRecord[]): { id: string; name: string }[] => {
+  const deleting = new Set(labels.filter((l) => l.deletionStartedAt !== null).map((l) => l.name));
   const byName = new Map<string, LabelRecord>();
   for (const label of labels) {
+    if (deleting.has(label.name)) continue;
     if (!byName.has(label.name) || label.taskId === null) byName.set(label.name, label);
   }
   return [...byName.values()]
@@ -117,14 +123,20 @@ export const feedCommand = {
         const labelIds = [...new Set(args.map((arg) => resolveFeedLabel(options, arg.trim())))];
         const timeZone = String(flags["time-zone"] ?? "");
         const feed = await withProject(wanted, (id) => createCalendarFeed(id, labelIds, timeZone));
-        app.out.human(`created ${feedLine(app, feed, labelNames(rows))}`);
+        // The names are read after the write: a label that existed only as a
+        // task's copy has a workspace definition by now — the create
+        // materialized it — and the rows fetched before it would print the
+        // feed's raw id where `feed ls` prints the name. JSON mode carries the
+        // ids and needs no listing.
+        const names = app.out.mode.json ? new Map<string, string>() : await feedLabelNames(app);
+        app.out.human(`created ${feedLine(app, feed, names)}`);
         app.out.data(feed);
       },
     },
     {
       name: "rm",
       aliases: ["delete"],
-      use: "rm <feed> --yes",
+      use: "rm <feed>",
       short: "Revoke a calendar feed",
       long:
         "Revoke a calendar feed.\n\n" +
@@ -164,12 +176,25 @@ export const feedCommand = {
         "The token is the secret half of the feed's subscribe link, as printed by\n" +
         "`kaneo feed ls` and `kaneo feed create`. The route is public — the token\n" +
         "is the credential — so this needs no API key and no project. The\n" +
-        "document is written to stdout as it arrived.",
+        "document is written to stdout as it arrived: it is not JSON, so\n" +
+        "--json and --jq are refused.\n",
       args: exactArgs(1),
-      run: async ({ args }: RunContext<App>) => {
+      run: async ({ args, changed, app }: RunContext<App>) => {
+        // There is no JSON form of the document for the output flags to hand
+        // back, so asking for one is refused rather than silently answered
+        // with text a filter cannot read. An empty --jq is no expression at
+        // all, the same as everywhere else.
+        if (changed.has("json") || app.out.filter !== undefined) {
+          throw new Error("--json and --jq do not apply to feed get; the iCalendar document is written to stdout as it arrives");
+        }
         const token = args[0]!.trim();
         if (token === "") throw new Error("a feed token cannot be blank");
-        writeSync(1, await calendarFeedIcs(token));
+        const ics = await calendarFeedIcs(token);
+        // Task titles and descriptions are server text, so a terminal gets the
+        // document with control characters neutralised — line by line, so the
+        // CRLF the format is written in survives — while a pipe or a file gets
+        // the bytes as they arrived, which `feed get > cal.ics` relies on.
+        writeSync(1, app.out.terminal ? sanitizeDocument(ics) : ics);
       },
     },
   ],

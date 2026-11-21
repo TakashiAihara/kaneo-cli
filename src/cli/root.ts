@@ -32,6 +32,7 @@ import { commentCommand } from "./comment";
 import { notificationCommand } from "./notification";
 import { labelCommand } from "./label";
 import { timeCommand } from "./time";
+import { integrationCommand } from "./integration";
 import { apiCheckCommand } from "./apicheck";
 import { completeCommand, completionCommand } from "./completion";
 
@@ -110,6 +111,7 @@ export const rootCommand = (): { root: Command<App> } => {
     activityCommand,
     labelCommand,
     timeCommand,
+    integrationCommand,
     apiCheckCommand,
     completionCommand,
     helpCommand,

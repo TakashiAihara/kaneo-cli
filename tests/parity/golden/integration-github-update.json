@@ -1,0 +1,45 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "update",
+        "--active=false",
+        "--comment-task-link=false",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"ghi0002\",\n  \"projectId\": \"proj-alpha\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"kaneo\",\n  \"installationId\": 42,\n  \"requiresVerification\": false,\n  \"importProgress\": null,\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGitHubIssue\": false,\n  \"isActive\": false,\n  \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:10.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "github",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "repository   acme/kaneo\nactive       no\nverified     yes\ninstallation 42\ncomments     off\nbranches     {slug}-{number}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "PATCH",
+      "path": "/github-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "isActive": false,
+        "commentTaskLinkOnGitHubIssue": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/github-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

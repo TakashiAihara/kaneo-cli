@@ -85,4 +85,12 @@ export const OPERATIONS: Operation[] = [
   { id: "getTimeEntry", method: "GET", path: "/time-entry/{id}", command: "kaneo time get / update / stop" },
   { id: "createTimeEntry", method: "POST", path: "/time-entry", command: "kaneo time add" },
   { id: "updateTimeEntry", method: "PUT", path: "/time-entry/{id}", command: "kaneo time update / stop" },
+  { id: "getGitHubAppInfo", method: "GET", path: "/github-integration/app-info", command: "kaneo integration github app-info" },
+  { id: "listGitHubRepositories", method: "GET", path: "/github-integration/repositories/{projectId}", command: "kaneo integration github repos" },
+  { id: "verifyGitHubInstallation", method: "POST", path: "/github-integration/verify", command: "kaneo integration github verify" },
+  { id: "getGitHubIntegration", method: "GET", path: "/github-integration/project/{projectId}", command: "kaneo integration github get" },
+  { id: "createGitHubIntegration", method: "POST", path: "/github-integration/project/{projectId}", command: "kaneo integration github connect" },
+  { id: "updateGitHubIntegration", method: "PATCH", path: "/github-integration/project/{projectId}", command: "kaneo integration github update" },
+  { id: "deleteGitHubIntegration", method: "DELETE", path: "/github-integration/project/{projectId}", command: "kaneo integration github rm" },
+  { id: "importGitHubIssues", method: "POST", path: "/github-integration/import-issues", command: "kaneo integration github import" },
 ];

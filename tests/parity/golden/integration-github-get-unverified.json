@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"ghi0002\",\n  \"projectId\": \"proj-alpha\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"kaneo\",\n  \"installationId\": 42,\n  \"requiresVerification\": true,\n  \"importProgress\": null,\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGitHubIssue\": true,\n  \"isActive\": false,\n  \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:00.000Z\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/github-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

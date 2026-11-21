@@ -1,0 +1,24 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"DELETE /api/github-integration/project/proj-alpha: 404: GitHub integration not found\"\n}\n",
+      "stderr": "Error: DELETE /api/github-integration/project/proj-alpha: 404: GitHub integration not found\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "DELETE",
+      "path": "/github-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

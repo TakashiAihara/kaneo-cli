@@ -219,6 +219,14 @@ kaneo task due <task> [date]       # no date clears it
 kaneo task bulk <task>... --status done   # one change for many tasks; --help lists the change flags
 kaneo task export > tasks.json     # the project's tasks as JSON, labels by name
 kaneo task import tasks.json       # creates them in the resolved project; - reads stdin; exits non-zero if any task failed
+kaneo integration github app-info                    # the GitHub App this instance is configured with
+kaneo integration github repos [--installation-page N] [--repository-page N]
+kaneo integration github verify <owner> <repo>       # the App's installation and permissions on a repository, as data
+kaneo integration github get                         # the project's GitHub integration, or none
+kaneo integration github connect <owner> <repo>      # link the project to a repository the App reaches
+kaneo integration github update [--active=false] [--comment-task-link=false]   # only what is passed changes
+kaneo integration github rm --yes                    # unlink the project from its repository
+kaneo integration github import [--run-id ID]        # import the repository's issues as tasks, resuming until done
 ```
 
 A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds. `task update` writes the status first, and when a field after it fails the error names the fields that were already updated.
@@ -246,6 +254,10 @@ A request the API key's rate limiter refuses (429 `RATE_LIMITED`, which the serv
 A workflow rule moves a task with nobody at the board: `kaneo workflow set github pr_opened in-review` says that a task whose pull request was opened lands in that column. The integration and the event are Kaneo's own names, the ones its plugins fire, and not the provider's webhook names: an integration of `github`, `gitea` or `gitlab`, and an event of `branch_push`, `pr_opened`, `pr_merged`, `issue_opened`, `issue_closed` or `issue_reopened`. Anything else is stored as written and warned about on stderr, since no plugin fires it. The server's upsert looks for a rule the project already has for the pair and moves its column, so setting a pair again moves the rule already there rather than adding a second one — though nothing on the server keeps it to one, and `workflow rm` refuses a pair it finds twice rather than delete one of the two. `kaneo workflow rm` deletes a rule by its id, wherever it is, or by the integration and event it names in the resolved project.
 
 `kaneo task external-links <task>` lists what a task points at outside the board: the links an integration brought in — an issue, a pull request — and the ones somebody added by hand. A link that came through an integration is marked with the integration it came through, since the same URL can be either.
+
+`kaneo integration github` works with the GitHub integration a project can have. `app-info` says which GitHub App the instance is configured with and whether the key's user has a GitHub account linked; `repos` lists the repositories an installation reaches, one page at a time — the reply's `nextPage` names the `--installation-page` and `--repository-page` for the following one; `verify` checks an installation and its permissions before anything is linked, answering its findings as data rather than as an error. `get` asks only for workspace membership, `update` and `rm` ask for `manage_settings`, and `import` asks for task create and update.
+
+Three of the routes — `repos`, `verify` and `connect` — need a user session rather than an API key: the server refuses a key with `403 A user session is required`, because linking a repository inherits the reach of the GitHub account behind the session. `import` works the repository in pages: the server answers 202 with the run's progress while pages remain and 200 once done, and each answer names the `runId` the next request continues. The command follows it to the end; repeating it — or passing `--run-id` — resumes where the run stopped rather than starting over, and the integration's `importProgress` keeps the last run's counts.
 
 ### Shell completion
 

@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "repos",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/github-integration/repositories/proj-alpha: 403: A user session is required\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/github-integration/repositories/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

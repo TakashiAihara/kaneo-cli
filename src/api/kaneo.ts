@@ -75,6 +75,14 @@ import {
   updateTaskTitle,
   updateTimeEntry,
   upsertWorkflowRule as putRule,
+  createGitHubIntegration as postGitHubIntegration,
+  deleteGitHubIntegration as removeGitHubIntegration,
+  getGitHubAppInfo as readGitHubAppInfo,
+  getGitHubIntegration as readGitHubIntegration,
+  importGitHubIssues as postGitHubIssueImport,
+  listGitHubRepositories as readGitHubRepositories,
+  updateGitHubIntegration as patchGitHubIntegration,
+  verifyGitHubInstallation as postGitHubVerification,
 } from "./gen/kaneo";
 import type {
   Board as GenBoard,
@@ -106,6 +114,15 @@ import type {
   UpsertNotificationPreferenceWorkspaceRuleBody,
   WorkflowRule as GenWorkflowRule,
   WorkflowRuleRow as GenWorkflowRuleRow,
+  CreateGitHubIntegrationBody,
+  CreatedGitHubIntegration as GenCreatedGitHubIntegration,
+  GitHubInstallation as GenGitHubInstallation,
+  GitHubRepository as GenGitHubRepository,
+  ImportGitHubIssuesBody,
+  IssueImportResult as GenIssueImportResult,
+  ListGitHubRepositoriesParams,
+  UpdateGitHubIntegrationBody,
+  VerifyGitHubInstallationBody,
 } from "./gen/model";
 import { updateTaskBodyPositionMax } from "./gen/model";
 
@@ -2082,6 +2099,288 @@ const externalLink = (l: GenExternalLink): ExternalLink => ({
 // added by hand.
 export const listExternalLinks = async (taskId: string): Promise<ExternalLink[]> =>
   zeroList(await readExternalLinks(pathParam(taskId))).map(externalLink);
+
+// ---- GitHub integration ----
+//
+// The GitHub surface of `kaneo integration github`. Three of its routes —
+// repositories, verify and connect — sit behind the server's user-session
+// check, which an API key alone does not pass on v2.32.0, so against that
+// release they answer 403 until the web app's GitHub sign-in has run. The
+// calls are made the same way regardless: a server that accepts the key
+// answers them, and the refusal the key-only server gives is itself the
+// answer.
+
+// The GitHub App this instance is configured with. accountConnected is about
+// the key's user rather than the App: linking a GitHub account is a web-app
+// flow, and it is what the repository routes need before they will answer
+// anything but a session refusal.
+export type GitHubAppInfo = {
+  appName: string | null;
+  accountConnected: boolean;
+  accountLinkingAvailable: boolean;
+};
+
+export const githubAppInfo = async (): Promise<GitHubAppInfo> => {
+  const info = zeroRecord(await readGitHubAppInfo());
+  return {
+    appName: info.appName ?? null,
+    accountConnected: info.accountConnected ?? false,
+    accountLinkingAvailable: info.accountLinkingAvailable ?? false,
+  };
+};
+
+// A repository the installed App reaches. The field names stay GitHub's own —
+// full_name, html_url, installation_id — because the server echoes them from
+// GitHub's API, and --json keeps them so a value reads the same here as it
+// does there.
+type GitHubRepository = {
+  id: number;
+  name: string;
+  full_name: string;
+  private: boolean;
+  owner: { login: string; avatar_url: string; type: string };
+  description: string | null;
+  html_url: string;
+  permissions?: { admin: boolean; push: boolean; pull: boolean };
+  updated_at: string;
+  installation_id: number;
+};
+
+const gitHubRepository = (r: GenGitHubRepository): GitHubRepository => ({
+  id: r.id ?? 0,
+  name: r.name ?? "",
+  full_name: r.full_name ?? "",
+  private: r.private ?? false,
+  owner: {
+    login: r.owner?.login ?? "",
+    avatar_url: r.owner?.avatar_url ?? "",
+    type: r.owner?.type ?? "",
+  },
+  description: r.description ?? null,
+  html_url: r.html_url ?? "",
+  permissions: r.permissions,
+  updated_at: isoTime(r, "updated_at"),
+  installation_id: r.installation_id ?? 0,
+});
+
+// One App installation and the repositories under it. account is null for an
+// installation GitHub attributes to no account; repositories holds full names
+// and is empty when the server could not list them.
+type GitHubInstallation = {
+  id: number;
+  account: { login: string; type: string } | null;
+  repositories: string[];
+};
+
+const gitHubInstallation = (i: GenGitHubInstallation): GitHubInstallation => ({
+  id: i.id ?? 0,
+  account:
+    i.account === null || i.account === undefined
+      ? null
+      : { login: i.account.login ?? "", type: i.account.type ?? "" },
+  repositories: zeroList(i.repositories),
+});
+
+// One page of the repositories the App reaches. The server pages
+// installations and each installation's repositories separately; nextPage is
+// the cursor to pass back for the following page and is null once both are
+// exhausted.
+export type GitHubRepositoryPage = {
+  repositories: GitHubRepository[];
+  installations: GitHubInstallation[];
+  total: number;
+  nextPage: { installationPage: number; repositoryPage: number } | null;
+};
+
+export const listGitHubRepositories = async (
+  projectId: string,
+  page: { installationPage?: string; repositoryPage?: string } = {},
+): Promise<GitHubRepositoryPage> => {
+  const params: ListGitHubRepositoriesParams = {};
+  if (page.installationPage !== undefined) params.installationPage = page.installationPage;
+  if (page.repositoryPage !== undefined) params.repositoryPage = page.repositoryPage;
+  const reply = zeroRecord(await readGitHubRepositories(pathParam(projectId), params));
+  return {
+    repositories: zeroList(reply.repositories).map(gitHubRepository),
+    installations: zeroList(reply.installations).map(gitHubInstallation),
+    total: reply.total ?? 0,
+    nextPage: reply.nextPage ?? null,
+  };
+};
+
+// What verify reports about a repository before it is linked: whether the App
+// is installed on it and holds the permissions Kaneo needs. Problems are data
+// rather than errors — the route answers 200 either way — so the result is
+// returned as sent for the caller to read. settingsUrl and installationUrl are
+// absent rather than null when there is nowhere to point.
+export type GitHubVerification = {
+  isInstalled: boolean;
+  installationId: number | null;
+  repositoryExists: boolean | null;
+  repositoryPrivate: boolean | null;
+  permissions: Record<string, string> | null;
+  hasRequiredPermissions: boolean;
+  missingPermissions: string[];
+  message: string;
+  settingsUrl: string | null;
+  installationUrl: string | null;
+};
+
+export const verifyGitHubRepository = async (
+  projectId: string,
+  repositoryOwner: string,
+  repositoryName: string,
+): Promise<GitHubVerification> => {
+  const body: VerifyGitHubInstallationBody = { projectId, repositoryOwner, repositoryName };
+  const reply = zeroRecord(await postGitHubVerification(body));
+  return {
+    isInstalled: reply.isInstalled ?? false,
+    installationId: reply.installationId ?? null,
+    repositoryExists: reply.repositoryExists ?? null,
+    repositoryPrivate: reply.repositoryPrivate ?? null,
+    permissions: reply.permissions ?? null,
+    hasRequiredPermissions: reply.hasRequiredPermissions ?? false,
+    missingPermissions: zeroList(reply.missingPermissions),
+    message: reply.message ?? "",
+    settingsUrl: reply.settingsUrl ?? null,
+    installationUrl: reply.installationUrl ?? null,
+  };
+};
+
+// The progress of a GitHub issue import, as both the import route and the
+// integration read report it.
+export type GitHubImportResult = {
+  runId: string;
+  pending: boolean;
+  imported: number;
+  updated: number;
+  skipped: number;
+};
+
+const importResult = (r: GenIssueImportResult): GitHubImportResult => ({
+  runId: r.runId ?? "",
+  pending: r.pending ?? false,
+  imported: r.imported ?? 0,
+  updated: r.updated ?? 0,
+  skipped: r.skipped ?? 0,
+});
+
+// The integration a project is linked to. The optional fields are the ones a
+// reply may leave out: importProgress only rides along while the server holds
+// a run for the linked repository, and branchPattern and
+// commentTaskLinkOnGitHubIssue only when the stored config carries them —
+// both default on the server, so an absent one reads as the default there.
+// isActive is null only on replies that carry no row flag at all.
+export type GitHubIntegration = {
+  id: string;
+  projectId: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  installationId: number | null;
+  requiresVerification: boolean;
+  importProgress: GitHubImportResult | null;
+  branchPattern: string | null;
+  commentTaskLinkOnGitHubIssue: boolean | null;
+  isActive: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const gitHubIntegration = (i: GenCreatedGitHubIntegration): GitHubIntegration => ({
+  id: i.id ?? "",
+  projectId: i.projectId ?? "",
+  repositoryOwner: i.repositoryOwner ?? "",
+  repositoryName: i.repositoryName ?? "",
+  installationId: i.installationId ?? null,
+  requiresVerification: i.requiresVerification ?? false,
+  importProgress: i.importProgress ? importResult(i.importProgress) : null,
+  branchPattern: i.branchPattern ?? null,
+  commentTaskLinkOnGitHubIssue: i.commentTaskLinkOnGitHubIssue ?? null,
+  isActive: i.isActive ?? null,
+  createdAt: isoTime(i, "createdAt"),
+  updatedAt: isoTime(i, "updatedAt"),
+});
+
+// The project's GitHub integration, or null when it has none.
+export const getGitHubIntegration = async (projectId: string): Promise<GitHubIntegration | null> => {
+  const reply = (await readGitHubIntegration(pathParam(projectId))) ?? null;
+  return reply === null ? null : gitHubIntegration(reply);
+};
+
+// Links the project to a repository the App installation reaches. The server
+// verifies ownership and admin access first, answers the existing integration
+// when the same repository is already linked, and refuses a different one with
+// 409 — disconnect first to switch.
+export const connectGitHubRepository = async (
+  projectId: string,
+  repositoryOwner: string,
+  repositoryName: string,
+): Promise<GitHubIntegration> => {
+  const body: CreateGitHubIntegrationBody = { repositoryOwner, repositoryName };
+  return gitHubIntegration(zeroRecord(await postGitHubIntegration(pathParam(projectId), body)));
+};
+
+// Writes the settings a caller names and leaves the rest as stored. An empty
+// changes object is refused here rather than sent: the route answers the
+// current integration either way, which would look like a change that was not.
+export const updateGitHubIntegration = async (
+  projectId: string,
+  changes: UpdateGitHubIntegrationBody,
+): Promise<GitHubIntegration | null> => {
+  if (Object.keys(changes).length === 0) throw new Error("no GitHub integration settings to change");
+  const reply = (await patchGitHubIntegration(pathParam(projectId), changes)) ?? null;
+  return reply === null ? null : gitHubIntegration(reply);
+};
+
+// What the delete route answers.
+export type GitHubDeleteResult = {
+  success: boolean;
+  message: string;
+};
+
+export const deleteGitHubIntegration = async (projectId: string): Promise<GitHubDeleteResult> => {
+  const reply = zeroRecord(await removeGitHubIntegration(pathParam(projectId)));
+  return { success: reply.success ?? false, message: reply.message ?? "" };
+};
+
+// Runs a GitHub issue import to completion. The route is resumable: it answers
+// 202 with pending while a run has pages left and 200 once done, and the next
+// request continues the same run when it carries the runId the last reply
+// named. A call without runId resumes an unfinished run or starts a new one,
+// so repeating the request is safe. The runId is sent only once the server has
+// named one — an empty one would be refused.
+//
+// The import lock is held for the length of one request's pages, and another
+// client's request holding it is answered 429 with Retry-After: 1; that is
+// waited out the way a busy label delete is, five times in a row at most, the
+// count starting over after each page that went through.
+export const importGitHubIssues = async (projectId: string, runId?: string): Promise<GitHubImportResult> => {
+  let run = runId;
+  let busy = 0;
+  for (;;) {
+    const body: ImportGitHubIssuesBody = { projectId };
+    if (run !== undefined && run !== "") body.runId = run;
+    let reply: GenIssueImportResult;
+    try {
+      reply = zeroRecord(await postGitHubIssueImport(body));
+    } catch (e) {
+      if (e instanceof KaneoApiError && e.statusCode === 429 && busy < IMPORT_BUSY_RETRIES) {
+        busy++;
+        await Bun.sleep(IMPORT_BUSY_WAIT_MS);
+        continue;
+      }
+      throw e;
+    }
+    const result = importResult(reply);
+    if (result.pending !== true) return result;
+    busy = 0;
+    if (result.runId !== "") run = result.runId;
+  }
+};
+
+// The server's own numbers: the lock's 429 carries Retry-After: 1.
+const IMPORT_BUSY_RETRIES = 5;
+const IMPORT_BUSY_WAIT_MS = 1000;
 
 export type CheckResult = {
   serverOperations: number;

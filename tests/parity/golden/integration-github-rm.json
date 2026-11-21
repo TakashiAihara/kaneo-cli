@@ -1,0 +1,51 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "rm",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"refusing to delete the GitHub integration without --yes; the project is unlinked from its repository\"\n}\n",
+      "stderr": "Error: refusing to delete the GitHub integration without --yes; the project is unlinked from its repository\n"
+    },
+    {
+      "args": [
+        "integration",
+        "github",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"success\": true,\n  \"message\": \"GitHub integration deleted\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "github",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "no GitHub integration; `kaneo integration github connect <owner> <repo>` links one\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "DELETE",
+      "path": "/github-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/github-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

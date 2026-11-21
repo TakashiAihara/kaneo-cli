@@ -560,7 +560,8 @@ const failure = (
 // of a 500 that carries no reason a caller could decide on. A key beyond the
 // four the server's error schema has (a rate limit's `details`, which holds the
 // wait) keeps the body shown whole. `issues` and `missingPermissions` stay in
-// the error's body: the message already names the first issue.
+// the error's body: a validation message names the first issue, and a missing
+// permission's list is read from there.
 const CODED_KEYS = ["message", "code", "issues", "missingPermissions"];
 
 const codedMessage = (text: string): string[] | undefined => {

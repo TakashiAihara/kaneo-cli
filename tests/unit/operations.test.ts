@@ -115,7 +115,8 @@ test("TestGeneratedCallFailuresKeepTheServerMessage", async () => {
 // it is the message, the way an envelope's would be; markup, other JSON, several
 // lines or a long body stay a body only. The first case is the transport's trim.
 // The one JSON that carries a message is v2.50's {"message","code"}, the
-// "Project not found" row; the JSON rows around it stay a body.
+// "Project not found" row. The other JSON rows are not that shape, so they stay
+// a body, except that a bare `null` is short single-line text.
 test.each([
   ["Workspace ID could not be determined\n", ["Workspace ID could not be determined"]],
   ["<html><body>Bad Gateway</body></html>", []],

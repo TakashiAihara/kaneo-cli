@@ -453,6 +453,10 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["DeleteLabel", "DELETE", "/api/label/a%2Fb", () => api.deleteLabel(id)],
     ["AttachLabel", "PUT", "/api/label/a%2Fb/task", () => api.attachLabel(id, "t")],
     ["DetachLabel", "DELETE", "/api/label/a%2Fb/task", () => api.detachLabel(id)],
+    ["ListCalendarFeeds", "GET", "/api/calendar-feed/project/a%2Fb", () => api.listCalendarFeeds(id)],
+    ["CreateCalendarFeed", "POST", "/api/calendar-feed/project/a%2Fb", () => api.createCalendarFeed(id, ["l1"], "")],
+    ["RevokeCalendarFeed", "DELETE", "/api/calendar-feed/project/a%2Fb/a%2Fb", () => api.revokeCalendarFeed(id, id)],
+    ["GetCalendarFeed", "GET", "/api/calendar-feed/a%2Fb/calendar.ics", () => api.calendarFeedIcs(id)],
   ];
   test.each(calls)("%s", async (name, method, path, call) => {
     const seen: { method: string; path: string }[] = [];
@@ -634,6 +638,81 @@ test("TestUpdateLabelRefusesAnEmptyRead", async () => {
   });
   expect(String(await failure(api.updateLabel("l1", { color: "green" })))).toContain("not writing");
   expect(methods).toEqual(["GET"]);
+});
+
+const FEED = `{"id":"feed1","projectId":"p1","token":"${"0".repeat(63)}1","labelIds":["l1","l2"],"timeZone":"Asia/Tokyo","createdAt":"${TIME}"}`;
+
+describe("calendar feeds", () => {
+  // What each read maps onto the CLI's types, field by field.
+  test("list maps every field", async () => {
+    recorder(`[${FEED}]`);
+    expect(await api.listCalendarFeeds("p1")).toEqual([
+      { id: "feed1", projectId: "p1", token: `${"0".repeat(63)}1`, labelIds: ["l1", "l2"], timeZone: "Asia/Tokyo", createdAt: TIME },
+    ]);
+  });
+
+  // An empty time zone leaves the server's default rather than sending "":
+  // the body the route takes has timeZone optional for that reason.
+  test("create sends the labels and only a time zone that was given", async () => {
+    const sent: string[] = [];
+    newServer(async (req) => {
+      sent.push(await req.text());
+      return new Response(FEED, { status: 201, headers: { "content-type": "application/json" } });
+    });
+    await api.createCalendarFeed("p1", ["l1", "l2"], "");
+    await api.createCalendarFeed("p1", ["l1"], "Asia/Tokyo");
+    expect(sent.map((s) => JSON.parse(s))).toEqual([{ labelIds: ["l1", "l2"] }, { labelIds: ["l1"], timeZone: "Asia/Tokyo" }]);
+  });
+
+  test("create maps the reply", async () => {
+    recorder(FEED);
+    expect(await api.createCalendarFeed("p1", ["l1"], "UTC")).toEqual({
+      id: "feed1",
+      projectId: "p1",
+      token: `${"0".repeat(63)}1`,
+      labelIds: ["l1", "l2"],
+      timeZone: "Asia/Tokyo",
+      createdAt: TIME,
+    });
+  });
+
+  test("revoke answers with the server's flag", async () => {
+    const seen = recorder('{"success":true}');
+    expect(await api.revokeCalendarFeed("p1", "feed1")).toEqual({ success: true });
+    expect([seen.method, seen.path]).toEqual(["DELETE", "/api/calendar-feed/project/p1/feed1"]);
+  });
+
+  // The route is public — the token is the credential — so the call neither
+  // asks for the key nor sends it, which a key fetched by command would show.
+  test("the calendar read asks for no key", async () => {
+    const auths: (string | null)[] = [];
+    const s = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: (req) => {
+        auths.push(req.headers.get("authorization"));
+        return new Response("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", { headers: { "content-type": "text/calendar" } });
+      },
+    });
+    servers.push(s);
+    let asked = 0;
+    configureClient({ baseUrl: `http://127.0.0.1:${s.port}`, apiKey: () => (asked++, "test-key") });
+    expect(await api.calendarFeedIcs("t")).toBe("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n");
+    expect({ asked, auths }).toEqual({ asked: 0, auths: [null] });
+  });
+
+  // The reply is the document itself: not JSON, so it is not parsed, and a
+  // status the server refused still fails the call.
+  test("the calendar read returns the text it arrived as", async () => {
+    const ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
+    newServer(() => new Response(ics, { headers: { "content-type": "text/calendar; charset=utf-8" } }));
+    expect(await api.calendarFeedIcs("t")).toBe(ics);
+
+    newServer(() => new Response("Calendar feed not found", { status: 404, headers: { "content-type": "text/plain;charset=UTF-8" } }));
+    const err = await failure(api.calendarFeedIcs("t"));
+    expect(err).toBeInstanceOf(KaneoApiError);
+    expect((err as KaneoApiError).messages).toEqual(["Calendar feed not found"]);
+  });
 });
 
 // What each read maps onto the CLI's types, field by field.

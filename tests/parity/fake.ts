@@ -24,6 +24,9 @@ export type Seed = {
     priority?: string;
     description?: string | null;
     userId?: string | null;
+    // Calendar feeds only list tasks carrying a start or a due date.
+    startDate?: string;
+    dueDate?: string;
   }[];
   // A comment with a userId of its own was written by someone else, so only
   // the server's author check stands between it and a delete.
@@ -44,6 +47,9 @@ export type Seed = {
   workflowRules?: { projectId: string; integrationType: string; eventType: string; columnSlug: string }[];
   // A link without an integration is one a person added by hand.
   externalLinks?: { taskId: string; url: string; title?: string | null; resourceType?: string; externalId?: string; integration?: { id: string; type: string } }[];
+  // A feed names its labels the way create's body does; the workspace
+  // definitions it resolves to are materialized as the route would.
+  calendarFeeds?: { projectId: string; labels?: string[]; timeZone?: string }[];
 };
 
 export type Recorded = { method: string; path: string; query: string; body: unknown };
@@ -373,6 +379,38 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     });
   }
 
+  // Calendar feeds number, date and mint their tokens apart from everything
+  // else, like notifications do, so seeding them leaves the ids and times the
+  // other scenarios record alone. A token is the feed's whole credential — 64
+  // hex characters — so "feed" repeated to the sequence's width stays hex and
+  // readable in a recorded subscribe URL.
+  let feedSeq = 0;
+  let feedClock = 0;
+  const feeds: z.input<typeof M.CalendarFeed>[] = [];
+  const addFeed = (projectId: string, labelIds: string[], timeZone: string) => {
+    feedSeq += 1;
+    const feed = {
+      id: `feed${String(feedSeq).padStart(4, "0")}`,
+      projectId,
+      token: `${"feed".repeat(15)}${feedSeq.toString(16).padStart(4, "0")}`,
+      labelIds,
+      timeZone,
+      createdAt: new Date(T0 + 3_600_000 + 1000 * feedClock++).toISOString(),
+    };
+    feeds.push(feed);
+    return feed;
+  };
+  for (const f of seed.calendarFeeds ?? []) {
+    const project = projects.find((p) => p.id === f.projectId)!;
+    const names = [...new Set(f.labels ?? [])].sort((a, b) => a.localeCompare(b));
+    const roots = names.map((name) => {
+      let root = labels.find((l) => l.workspaceId === project.workspaceId && l.name === name && l.taskId === null);
+      if (!root) root = addLabel(name, "gray", project.workspaceId, null);
+      return root;
+    });
+    addFeed(f.projectId, roots.map((r) => r.id), f.timeZone ?? "UTC");
+  }
+
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
@@ -447,8 +485,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     requests.push({ method: req.method, path, query: url.search, body });
 
     if (!url.pathname.startsWith("/api/")) return new Response("<html>app</html>", { headers: { "content-type": "text/html" } });
-    // The document is served without authentication, as the real server does.
-    if (!(req.method === "GET" && path === "/openapi") && req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
+    // The document is served without authentication, as the real server does —
+    // and so is the calendar itself: its route declares security: [] and the
+    // token in the path is the credential.
+    const open = (req.method === "GET" && path === "/openapi") || (req.method === "GET" && /^\/calendar-feed\/[^/]+\/calendar\.ics$/.test(path));
+    if (!open && req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
     if (failing?.test(`${req.method} ${path}`) && (failingQuery?.test(url.search) ?? true) && skipped++ >= (opts.failOnSkip ?? 0)) return opts.failMessage === undefined ? fail(opts.failStatus ?? 500, "injected failure") : failText(opts.failStatus ?? 500, opts.failMessage);
 
     // The server validates request bodies against the same schemas the
@@ -483,6 +524,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       ["POST", /^\/label$/, M.CreateLabelBody],
       ["PUT", /^\/label\/[^/]+$/, M.UpdateLabelBody],
       ["PUT", /^\/label\/[^/]+\/task$/, M.AttachLabelToTaskBody],
+      ["POST", /^\/calendar-feed\/project\/[^/]+$/, M.CreateCalendarFeedBody],
       ["POST", /^\/time-entry$/, M.CreateTimeEntryBody],
       ["PUT", /^\/time-entry\/[^/]+$/, M.UpdateTimeEntryBody],
     ];
@@ -1375,6 +1417,98 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
     }
 
+    // The management routes sit under the project's workspace check like every
+    // other project route; the calendar itself was let through above.
+    if ((p = m(/^\/calendar-feed\/project\/([^/]+)$/))) {
+      const projectId = decodeURIComponent(p[1]);
+      const project = projects.find((x) => x.id === projectId);
+      if (!project) return failText(400, "Workspace ID could not be determined");
+      if (req.method === "GET") {
+        return ok(
+          z.array(M.CalendarFeed),
+          [...feeds]
+            .filter((f) => f.projectId === projectId)
+            .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+        );
+      }
+      if (req.method === "POST") {
+        const b = body as z.input<typeof M.CreateCalendarFeedBody>;
+        // The route's own schema refines timeZone beyond what the document can
+        // carry; an unknown zone fails the same validation the others do.
+        try {
+          new Intl.DateTimeFormat("en-US", { timeZone: b.timeZone ?? "UTC" });
+        } catch {
+          return fail(400, "Invalid key: timeZone: Invalid time zone");
+        }
+        // As createCalendarFeed in v2.32.0's service: the ids dedupe and must
+        // all be live labels of the project's workspace, then resolve by name
+        // to the workspace's definitions, materializing the ones it lacks.
+        const ids = [...new Set(b.labelIds)];
+        const found = labels.filter((l) => l.workspaceId === project.workspaceId && ids.includes(l.id) && l.deletionStartedAt === null);
+        if (found.length !== ids.length) return failText(400, "Select labels from this workspace");
+        const byName = new Map(found.map((l) => [l.name, l]));
+        const roots = [...byName.keys()].sort((a, b2) => a.localeCompare(b2)).map((name) => {
+          let root = labels.find((l) => l.workspaceId === project.workspaceId && l.name === name && l.taskId === null && l.deletionStartedAt === null);
+          if (!root) root = addLabel(name, byName.get(name)!.color, project.workspaceId, null);
+          return root;
+        });
+        return ok(M.CalendarFeed, addFeed(projectId, roots.map((r) => r.id), b.timeZone ?? "UTC"), 201);
+      }
+    }
+    if (req.method === "DELETE" && (p = m(/^\/calendar-feed\/project\/([^/]+)\/([^/]+)$/))) {
+      const projectId = decodeURIComponent(p[1]);
+      const feedId = decodeURIComponent(p[2]);
+      if (!projects.some((x) => x.id === projectId)) return failText(400, "Workspace ID could not be determined");
+      const i = feeds.findIndex((f) => f.projectId === projectId && f.id === feedId);
+      if (i < 0) return failText(404, "Calendar feed not found");
+      feeds.splice(i, 1);
+      return ok(M.RevokeCalendarFeed200, { success: true });
+    }
+    if (req.method === "GET" && (p = m(/^\/calendar-feed\/([^/]+)\/calendar\.ics$/))) {
+      const token = decodeURIComponent(p[1]);
+      // The token param's own pattern, which the validator enforces first.
+      if (!/^[a-f0-9]{64}$/.test(token)) return failText(400, "Invalid feed token");
+      const feed = feeds.find((f) => f.token === token);
+      if (!feed) return failText(404, "Calendar feed not found");
+      const project = projects.find((x) => x.id === feed.projectId)!;
+      // As getCalendarFeed: the feed's label ids resolve to names on every
+      // read, and a feed whose labels resolve to nothing — or that stores
+      // none — is an empty calendar, never a broader one.
+      const names = new Set(
+        feed.labelIds.length === 0
+          ? []
+          : labels.filter((l) => l.workspaceId === project.workspaceId && feed.labelIds.includes(l.id)).map((l) => l.name),
+      );
+      const matched =
+        names.size === 0
+          ? []
+          : tasks
+              .filter(
+                (t) =>
+                  t.projectId === project.id &&
+                  (t.startDate !== null || t.dueDate !== null) &&
+                  labels.some((l) => l.taskId === t.id && l.workspaceId === project.workspaceId && names.has(l.name)),
+              )
+              .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      // The service bounds feed text in SQL before it is serialized.
+      const icsTasks: IcsTask[] = matched.map((t) => ({
+        id: t.id,
+        title: excerpt(t.title, 1024),
+        description: excerptOrNull(t.description, 4096),
+        startDate: t.startDate,
+        dueDate: t.dueDate,
+        createdAt: t.createdAt,
+      }));
+      return new Response(calendarDocument(excerpt(project.name, 1024), feed.timeZone, icsTasks), {
+        headers: {
+          "content-type": "text/calendar; charset=utf-8",
+          "content-disposition": 'inline; filename="kaneo.ics"',
+          "cache-control": "private, no-store",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    }
+
     return fail(404, `no route: ${req.method} ${path}`);
   };
 
@@ -1395,6 +1529,86 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     stop: () => server.stop(true),
   };
 }
+
+// Postgres' char_length and left, which the service uses to bound feed text
+// before it is serialized: counted in characters, not UTF-16 units.
+const excerpt = (value: string, characters: number): string => {
+  const chars = [...value];
+  return chars.length > characters ? `${chars.slice(0, characters).join("")}…` : value;
+};
+const excerptOrNull = (value: string | null, characters: number): string | null => (value === null ? null : excerpt(value, characters));
+
+// The document the public route streams, as apps/api/src/calendar-feed/ical.ts
+// writes it at v2.32.0: CRLF lines folded at 75 octets, all-day dates in the
+// feed's zone, and a due date made exclusive the way iCalendar's DTEND wants.
+type IcsTask = { id: string; title: string; description: string | null; startDate: string | null; dueDate: string | null; createdAt: string };
+
+const icsEscape = (value: string): string => value.replaceAll("\\", "\\\\").replace(/\r\n|\r|\n/g, "\\n").replaceAll(";", "\\;").replaceAll(",", "\\,");
+
+const icsFold = (line: string): string => {
+  const lines: string[] = [];
+  let current = "";
+  let bytes = 0;
+  for (const character of line) {
+    const size = Buffer.byteLength(character, "utf8");
+    if (bytes + size > 75) {
+      lines.push(current);
+      current = " ";
+      bytes = 1;
+    }
+    current += character;
+    bytes += size;
+  }
+  lines.push(current);
+  return lines.join("\r\n");
+};
+
+const icsTimestamp = (iso: string): string => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+
+const icsDay = (iso: string, formatter: Intl.DateTimeFormat): string => {
+  const parts = formatter.formatToParts(new Date(iso));
+  return ["year", "month", "day"].map((type) => parts.find((part) => part.type === type)?.value).join("");
+};
+
+const icsNextDay = (date: string): string => {
+  const day = new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() + 1);
+  return day.toISOString().slice(0, 10).replaceAll("-", "");
+};
+
+const calendarDocument = (name: string, timeZone: string, tasks: IcsTask[]): string => {
+  const formatter = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
+  const event = (task: IcsTask): string[] => {
+    const scheduled = task.startDate ?? task.dueDate;
+    if (!scheduled) return [];
+    const start = icsDay(scheduled, formatter);
+    const due = icsDay(task.dueDate ?? scheduled, formatter);
+    return [
+      "BEGIN:VEVENT",
+      `UID:${task.id}@kaneo`,
+      // The fake keeps no updatedAt; createdAt stands in for both stamps.
+      `DTSTAMP:${icsTimestamp(task.createdAt)}`,
+      `CREATED:${icsTimestamp(task.createdAt)}`,
+      `LAST-MODIFIED:${icsTimestamp(task.createdAt)}`,
+      `DTSTART;VALUE=DATE:${start}`,
+      `DTEND;VALUE=DATE:${icsNextDay(due < start ? start : due)}`,
+      `SUMMARY:${icsEscape(task.title)}`,
+      ...(task.description ? [`DESCRIPTION:${icsEscape(task.description)}`] : []),
+      "TRANSP:TRANSPARENT",
+      "END:VEVENT",
+    ];
+  };
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Kaneo//Calendar Feed//EN",
+    "CALSCALE:GREGORIAN",
+    `X-WR-CALNAME:${icsEscape(name)}`,
+    ...tasks.flatMap(event),
+    "END:VCALENDAR",
+  ];
+  return `${lines.map(icsFold).join("\r\n")}\r\n`;
+};
 
 // The slug the server derives from a column's name, which is what a task's
 // status has to be set to in order to land in the column. Copied from toSlug in

@@ -73,7 +73,7 @@ export const clientShapes = (
 ): Record<string, RequestShape> => {
   const shapes: Record<string, RequestShape> = {};
   for (const op of operations) {
-    const shape = { ...(pinned[op.id] ?? {}) };
+    const shape = { ...pinned[op.id] };
     for (const field of op.neverSent ?? []) delete shape[field];
     for (const field of op.alwaysSent ?? []) shape[field] = true;
     shapes[op.id] = shape;

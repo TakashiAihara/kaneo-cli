@@ -1,0 +1,91 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "repos",
+        "--installation-page",
+        "0"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--installation-page must be a page number from 1 to 999999\"\n}\n",
+      "stderr": "Error: --installation-page must be a page number from 1 to 999999\n"
+    },
+    {
+      "args": [
+        "integration",
+        "github",
+        "repos",
+        "--repository-page",
+        "1000000"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--repository-page must be a page number from 1 to 999999\"\n}\n",
+      "stderr": "Error: --repository-page must be a page number from 1 to 999999\n"
+    },
+    {
+      "args": [
+        "integration",
+        "github",
+        "verify",
+        "acme"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"accepts 2 arg(s), received 1\"\n}\n",
+      "stderr": "Error: accepts 2 arg(s), received 1\n"
+    },
+    {
+      "args": [
+        "integration",
+        "github",
+        "verify",
+        " ",
+        "kaneo"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"repository owner cannot be blank\"\n}\n",
+      "stderr": "Error: repository owner cannot be blank\n"
+    },
+    {
+      "args": [
+        "integration",
+        "github",
+        "import",
+        "--run-id",
+        ""
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty --run-id\"\n}\n",
+      "stderr": "Error: empty --run-id\n"
+    },
+    {
+      "args": [
+        "integration",
+        "bogus"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"unknown command \\\"bogus\\\" for \\\"kaneo integration\\\"\"\n}\n",
+      "stderr": "Error: unknown command \"bogus\" for \"kaneo integration\"\n"
+    },
+    {
+      "args": [
+        "integration"
+      ],
+      "exit": 0,
+      "stdout": "Work with the project's integrations\n\nUsage:\n  kaneo integration [command]\n\nAliases:\n  integration, integrations\n\nAvailable Commands:\n  github      Work with the project's GitHub integration\n  gitlab      Work with the project's GitLab integration\n\nFlags:\n  -h, --help   help for integration\n\nGlobal Flags:\n      --api-key string     API key; prefer KANEO_API_KEY, since a flag is visible in the process list\n      --api-url string     Kaneo base URL (env KANEO_API_URL)\n      --human              force human-readable output, even through a pipe\n      --jq string          filter JSON output with a jq expression (implies --json)\n      --json               force JSON output\n  -p, --project string     project id, slug or name (env KANEO_PROJECT)\n      --timeout duration   per-request timeout (default 10s)\n  -w, --workspace string   workspace id, slug or name (env KANEO_WORKSPACE)\n\nUse \"kaneo integration [command] --help\" for more information about a command.\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "github"
+      ],
+      "exit": 0,
+      "stdout": "Work with the project's GitHub integration\n\nUsage:\n  kaneo integration github [command]\n\nAliases:\n  github, gh\n\nAvailable Commands:\n  app-info    Show the GitHub App this instance is configured with\n  connect     Link the project to a GitHub repository\n  get         Show the project's GitHub integration\n  import      Import the repository's issues as tasks, resuming until done\n  repos       List the repositories the GitHub App can reach, one page at a time\n  rm          Disconnect the project from its GitHub repository\n  update      Change the GitHub integration's settings\n  verify      Check the App's installation and permissions on a repository\n\nFlags:\n  -h, --help   help for github\n\nGlobal Flags:\n      --api-key string     API key; prefer KANEO_API_KEY, since a flag is visible in the process list\n      --api-url string     Kaneo base URL (env KANEO_API_URL)\n      --human              force human-readable output, even through a pipe\n      --jq string          filter JSON output with a jq expression (implies --json)\n      --json               force JSON output\n  -p, --project string     project id, slug or name (env KANEO_PROJECT)\n      --timeout duration   per-request timeout (default 10s)\n  -w, --workspace string   workspace id, slug or name (env KANEO_WORKSPACE)\n\nUse \"kaneo integration github [command] --help\" for more information about a command.\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

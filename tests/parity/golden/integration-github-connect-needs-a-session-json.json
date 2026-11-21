@@ -1,0 +1,29 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "connect",
+        "acme",
+        "kaneo",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/github-integration/project/proj-alpha: 403: A user session is required\"\n}\n",
+      "stderr": "Error: POST /api/github-integration/project/proj-alpha: 403: A user session is required\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/github-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "repositoryOwner": "acme",
+        "repositoryName": "kaneo"
+      }
+    }
+  ],
+  "files": {}
+}

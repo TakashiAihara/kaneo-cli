@@ -1,0 +1,60 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"ghi0002\",\n  \"projectId\": \"proj-alpha\",\n  \"repositoryOwner\": \"acme\",\n  \"repositoryName\": \"kaneo\",\n  \"installationId\": 42,\n  \"requiresVerification\": false,\n  \"importProgress\": null,\n  \"branchPattern\": \"{slug}-{number}\",\n  \"commentTaskLinkOnGitHubIssue\": true,\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:00.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "github",
+        "update",
+        "--active=false",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PATCH /api/github-integration/project/proj-alpha: 403: Insufficient permissions\"\n}\n",
+      "stderr": "Error: PATCH /api/github-integration/project/proj-alpha: 403: Insufficient permissions\n"
+    },
+    {
+      "args": [
+        "integration",
+        "github",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"DELETE /api/github-integration/project/proj-alpha: 403: Insufficient permissions\"\n}\n",
+      "stderr": "Error: DELETE /api/github-integration/project/proj-alpha: 403: Insufficient permissions\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/github-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/github-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "isActive": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/github-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

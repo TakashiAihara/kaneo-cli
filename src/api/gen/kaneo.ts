@@ -18,16 +18,22 @@ import {
   Column,
   Comment,
   CreateNotification200,
+  CreatedGitHubIntegration,
   CurrentUser,
   CustomFieldDefinition,
   CustomFieldFilterValues,
   CustomFieldValue,
   ExternalLink,
+  GitHubAppInfo,
+  GitHubDeleteResult,
+  GitHubRepositoryList,
+  GitHubVerificationResult,
   GitlabDeleteResult,
   GitlabImportResult,
   GitlabProjectList,
   GitlabVerificationResult,
   InvitationDetails,
+  IssueImportResult,
   Label,
   MoveTaskResult,
   MovedProject,
@@ -64,6 +70,7 @@ import type {
   CreateCalendarFeedBody,
   CreateColumnBody,
   CreateCustomFieldBody,
+  CreateGitHubIntegrationBody,
   CreateGitlabIntegrationBody,
   CreateLabelBody,
   CreateNotificationBody,
@@ -76,11 +83,14 @@ import type {
   GetActivitiesParams,
   GetTaskByTicketIdParams,
   GetTaskParams,
+  GitHubIntegration,
   GitlabIntegration,
   GlobalSearchParams,
+  ImportGitHubIssuesBody,
   ImportGitlabIssuesBody,
   ImportTasksBody,
   ListAssignedTasksParams,
+  ListGitHubRepositoriesParams,
   ListGitlabProjectsBody,
   ListNotificationsParams,
   ListProjectsParams,
@@ -95,6 +105,7 @@ import type {
   ReorderProjectsParams,
   SetCustomFieldValueBody,
   UpdateColumnBody,
+  UpdateGitHubIntegrationBody,
   UpdateGitlabIntegrationBody,
   UpdateLabelBody,
   UpdateNotificationPreferencesBody,
@@ -112,6 +123,7 @@ import type {
   UploadProjectBackgroundBody,
   UpsertNotificationPreferenceWorkspaceRuleBody,
   UpsertWorkflowRuleBody,
+  VerifyGitHubInstallationBody,
   VerifyGitlabAccessBody
 } from './model';
 
@@ -2475,6 +2487,279 @@ export const globalSearch = async (params: GlobalSearchParams, options?: Paramet
 
     ,
     schema: SearchResponse
+  }
+);}
+
+
+
+export const getGetGitHubAppInfoUrl = () => {
+
+
+
+
+  return `/github-integration/app-info`
+}
+
+/**
+ * Get the GitHub App this instance is configured with, so the client can build an install link.
+ * @summary Get GitHub app info
+ */
+export const getGitHubAppInfo = async ( options?: Parameters<typeof kaneoFetch>[1]): Promise<GitHubAppInfo> => {
+
+  return kaneoFetch<GitHubAppInfo>(getGetGitHubAppInfoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: GitHubAppInfo
+  }
+);}
+
+
+
+export const getListGitHubRepositoriesUrl = (projectId: string,
+    params?: ListGitHubRepositoriesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/github-integration/repositories/${projectId}?${stringifiedParams}` : `/github-integration/repositories/${projectId}`
+}
+
+/**
+ * List the repositories reachable through the installed GitHub App, for picking one to link.
+ * @summary List GitHub repositories
+ */
+export const listGitHubRepositories = async (projectId: string,
+    params?: ListGitHubRepositoriesParams, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitHubRepositoryList> => {
+
+  return kaneoFetch<GitHubRepositoryList>(getListGitHubRepositoriesUrl(projectId,params),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: GitHubRepositoryList
+  }
+);}
+
+
+
+export const getVerifyGitHubInstallationUrl = () => {
+
+
+
+
+  return `/github-integration/verify`
+}
+
+/**
+ * Check that the GitHub App is installed on a repository and holds the permissions Kaneo needs. Always 200 -- problems are reported in the body so the client can guide the user.
+ * @summary Verify GitHub installation
+ */
+export const verifyGitHubInstallation = async (verifyGitHubInstallationBody: VerifyGitHubInstallationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitHubVerificationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GitHubVerificationResult>(getVerifyGitHubInstallationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(verifyGitHubInstallationBody),
+    schema: GitHubVerificationResult
+  }
+);}
+
+
+
+export const getGetGitHubIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/github-integration/project/${projectId}`
+}
+
+/**
+ * Get the GitHub integration for a project, or null when none is configured.
+ * @summary Get GitHub integration
+ */
+export const getGitHubIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitHubIntegration | null> => {
+
+  return kaneoFetch<GitHubIntegration | null>(getGetGitHubIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCreateGitHubIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/github-integration/project/${projectId}`
+}
+
+/**
+ * Link a project to a GitHub repository. Disconnect first to switch repositories; existing issue and pull request links cannot be reused for another repository.
+ * @summary Create GitHub integration
+ */
+export const createGitHubIntegration = async (projectId: string,
+    createGitHubIntegrationBody: CreateGitHubIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<CreatedGitHubIntegration> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<CreatedGitHubIntegration>(getCreateGitHubIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createGitHubIntegrationBody),
+    schema: CreatedGitHubIntegration
+  }
+);}
+
+
+
+export const getUpdateGitHubIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/github-integration/project/${projectId}`
+}
+
+/**
+ * Update the GitHub integration. Omitted fields keep their current value.
+ * @summary Update GitHub integration
+ */
+export const updateGitHubIntegration = async (projectId: string,
+    updateGitHubIntegrationBody: UpdateGitHubIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitHubIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GitHubIntegration | null>(getUpdateGitHubIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateGitHubIntegrationBody)
+  }
+);}
+
+
+
+export const getDeleteGitHubIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/github-integration/project/${projectId}`
+}
+
+/**
+ * Unlink a project from its GitHub repository.
+ * @summary Delete GitHub integration
+ */
+export const deleteGitHubIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<GitHubDeleteResult> => {
+
+  return kaneoFetch<GitHubDeleteResult>(getDeleteGitHubIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: GitHubDeleteResult
+  }
+);}
+
+
+
+export const getImportGitHubIssuesUrl = () => {
+
+
+
+
+  return `/github-integration/import-issues`
+}
+
+/**
+ * Import open issues and link open pull requests in bounded steps. Existing tasks are updated. Continue 202 responses with the returned runId until 200; the same runId safely retries completion. Progress is saved after each page. New calls without runId resume an unfinished import or start a new one after completion.
+ * @summary Import GitHub issues
+ */
+export const importGitHubIssues = async (importGitHubIssuesBody: ImportGitHubIssuesBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<IssueImportResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<IssueImportResult>(getImportGitHubIssuesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(importGitHubIssuesBody),
+    schema: IssueImportResult
   }
 );}
 

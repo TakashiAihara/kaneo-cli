@@ -109,4 +109,12 @@ export const OPERATIONS: Operation[] = [
   { id: "updateGitlabIntegration", method: "PATCH", path: "/gitlab-integration/project/{projectId}", command: "kaneo integration gitlab update" },
   { id: "deleteGitlabIntegration", method: "DELETE", path: "/gitlab-integration/project/{projectId}", command: "kaneo integration gitlab rm" },
   { id: "importGitlabIssues", method: "POST", path: "/gitlab-integration/import-issues", command: "kaneo integration gitlab import" },
+  { id: "getGitHubAppInfo", method: "GET", path: "/github-integration/app-info", command: "kaneo integration github app-info" },
+  { id: "listGitHubRepositories", method: "GET", path: "/github-integration/repositories/{projectId}", command: "kaneo integration github repos" },
+  { id: "verifyGitHubInstallation", method: "POST", path: "/github-integration/verify", command: "kaneo integration github verify" },
+  { id: "getGitHubIntegration", method: "GET", path: "/github-integration/project/{projectId}", command: "kaneo integration github get" },
+  { id: "createGitHubIntegration", method: "POST", path: "/github-integration/project/{projectId}", command: "kaneo integration github connect" },
+  { id: "updateGitHubIntegration", method: "PATCH", path: "/github-integration/project/{projectId}", command: "kaneo integration github update" },
+  { id: "deleteGitHubIntegration", method: "DELETE", path: "/github-integration/project/{projectId}", command: "kaneo integration github rm" },
+  { id: "importGitHubIssues", method: "POST", path: "/github-integration/import-issues", command: "kaneo integration github import" },
 ];

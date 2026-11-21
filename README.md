@@ -240,6 +240,14 @@ kaneo task due <task> [date]       # no date clears it
 kaneo task bulk <task>... --status done   # one change for many tasks; --help lists the change flags
 kaneo task export > tasks.json     # the project's tasks as JSON, labels by name
 kaneo task import tasks.json       # creates them in the resolved project; - reads stdin; exits non-zero if any task failed
+kaneo integration github app-info                    # the GitHub App this instance is configured with
+kaneo integration github repos [--installation-page N] [--repository-page N]
+kaneo integration github verify <owner> <repo>       # the App's installation and permissions on a repository, as data
+kaneo integration github get                         # the project's GitHub integration, or none
+kaneo integration github connect <owner> <repo>      # link the project to a repository the App reaches
+kaneo integration github update [--active=false] [--comment-task-link=false]   # only what is passed changes
+kaneo integration github rm --yes                    # unlink the project from its repository
+kaneo integration github import [--run-id ID]        # import the repository's issues as tasks, resuming until done
 ```
 
 A status is a column slug. The defaults are `to-do`, `in-progress`, `in-review` and `done`, but a project can define more, and `kaneo column ls` is what says which columns it has. The server also takes `planned` and `archived`, which no column holds. `task update` writes the status first, and when a field after it fails the error names the fields that were already updated.
@@ -277,6 +285,10 @@ A custom field is a definition a project carries — a text, number, date, dropd
 `kaneo integration gitlab` works the link between a project and a GitLab project. `connect` stores it — the instance's root URL, the project's full path (`group/sub/project`), and the token — and answers the webhook URL and secret to give GitLab afterwards; connecting again keeps the stored token while the GitLab URL is unchanged and asks for a new one when it is not. `verify` runs the same checks without storing anything and answers its findings as data rather than an error — a failed check still exits 0, and only a refused request fails the command — `projects` lists what a token can see to pick the project, `update` changes only the flags passed, `import` brings the linked project's open issues in as tasks, and `rm --yes` removes the link.
 
 The GitLab token is a secret, so `--access-token` takes only `-`, which reads it from stdin: a literal value is refused rather than written into the process list or the shell history. One trailing line ending is dropped and empty stdin is an error. `connect` may omit the token for the reuse above. The stored token is only ever answered masked, and the webhook secret only to a caller that may manage the workspace's settings — a plain member reads the link with both withheld, is refused `connect`, `update`, `rm`, `verify` and `projects`, and can still `import`, which asks for task permissions instead.
+
+`kaneo integration github` works with the GitHub integration a project can have. `app-info` says which GitHub App the instance is configured with and whether the key's user has a GitHub account linked; `repos` lists the repositories an installation reaches, one page at a time — the reply's `nextPage` names the `--installation-page` and `--repository-page` for the following one; `verify` checks an installation and its permissions before anything is linked, answering its findings as data rather than as an error. `get` asks only for workspace membership, `update` and `rm` ask for `manage_settings`, and `import` asks for task create and update.
+
+Three of the routes — `repos`, `verify` and `connect` — need a user session rather than an API key: the server refuses a key with `403 A user session is required`, because linking a repository inherits the reach of the GitHub account behind the session. `import` works the repository in pages: the server answers 202 with the run's progress while pages remain and 200 once done, and each answer names the `runId` the next request continues. The command follows it to the end; repeating it — or passing `--run-id` — resumes where the run stopped rather than starting over, and the integration's `importProgress` keeps the last run's counts.
 
 `kaneo feed` manages a project's calendar feeds: subscription links that serve the project's scheduled tasks — those with a start or due date and carrying any of the feed's labels — as an iCalendar document. `feed create` takes at least one label, by workspace label id or name, and `--time-zone` names the zone all-day dates are read in; left out, the server's UTC applies. A feed's subscribe link is the public half of `feed get <token>`: the route needs no key, which is what makes it pasteable into a calendar app, and `feed rm` revokes it for good — a feed created again gets a new token, so anything already subscribed has to be given the new link.
 

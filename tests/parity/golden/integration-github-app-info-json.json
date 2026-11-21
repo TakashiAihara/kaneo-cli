@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "app-info",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"appName\": \"kaneo\",\n  \"accountConnected\": true,\n  \"accountLinkingAvailable\": true\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/github-integration/app-info",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

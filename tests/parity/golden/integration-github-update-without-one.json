@@ -1,0 +1,27 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "update",
+        "--active=false",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PATCH /api/github-integration/project/proj-alpha: 404: {\\\"error\\\":\\\"Integration not found\\\"}\"\n}\n",
+      "stderr": "Error: PATCH /api/github-integration/project/proj-alpha: 404: {\"error\":\"Integration not found\"}\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PATCH",
+      "path": "/github-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "isActive": false
+      }
+    }
+  ],
+  "files": {}
+}

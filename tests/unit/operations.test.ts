@@ -467,6 +467,14 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
     ["GetProjectBackground", "GET", "/api/project/a%2Fb/background", () => api.getProjectBackground(id)],
     ["DeleteProjectBackground", "DELETE", "/api/project/a%2Fb/background", () => api.deleteProjectBackground(id)],
     ["SetProjectBackground", "PUT", "/api/project/a%2Fb/background-upload", () => api.setProjectBackground(id, "image/png", new Uint8Array([1]))],
+    ["GitHubAppInfo", "GET", "/api/github-integration/app-info", () => api.githubAppInfo()],
+    ["GitHubRepositories", "GET", "/api/github-integration/repositories/a%2Fb", () => api.listGitHubRepositories(id)],
+    ["GitHubVerify", "POST", "/api/github-integration/verify", () => api.verifyGitHubRepository("p1", "o", "n")],
+    ["GitHubGet", "GET", "/api/github-integration/project/a%2Fb", () => api.getGitHubIntegration(id)],
+    ["GitHubConnect", "POST", "/api/github-integration/project/a%2Fb", () => api.connectGitHubRepository(id, "o", "n")],
+    ["GitHubUpdate", "PATCH", "/api/github-integration/project/a%2Fb", () => api.updateGitHubIntegration(id, { isActive: true })],
+    ["GitHubDelete", "DELETE", "/api/github-integration/project/a%2Fb", () => api.deleteGitHubIntegration(id)],
+    ["GitHubImport", "POST", "/api/github-integration/import-issues", () => api.importGitHubIssues("p1")],
   ];
   test.each(calls)("%s", async (name, method, path, call) => {
     const seen: { method: string; path: string }[] = [];
@@ -497,6 +505,7 @@ describe("TestEveryCallHitsItsRouteWithTheIDEscaped", () => {
         "SetStartAndPosition",
         "SetProjectBackground",
         "MoveProject",
+        "GitHubUpdate",
       ].includes(name),
     );
     expect(seen[0]).toEqual({ method, path });
@@ -1812,4 +1821,487 @@ describe("custom fields", () => {
     await api.deleteCustomField("f/1");
     expect([seen.method, seen.path]).toEqual(["DELETE", "/api/custom-field/f%2F1"]);
   });
+});
+
+// ---- GitHub integration ----
+//
+// The eight github-integration operations. The routes that need a user
+// session answer 403 to a key on v2.32.0; that refusal is the server's own
+// answer and is kept as it came.
+
+test.each([
+  ["kaneo", "kaneo"],
+  [null, null],
+])("TestGitHubAppInfoReadsTheConfiguredApp (%#)", async (appName, want) => {
+  recorder(JSON.stringify({ accountConnected: true, accountLinkingAvailable: false, appName }));
+  const got = await api.githubAppInfo();
+  expect(got).toEqual({ appName: want, accountConnected: true, accountLinkingAvailable: false });
+});
+
+// The repository fields keep GitHub's own names — full_name, html_url,
+// installation_id — because the server echoes them from GitHub's API.
+test("TestGitHubRepositoriesKeepsGitHubsFieldNames", async () => {
+  recorder(
+    JSON.stringify({
+      repositories: [
+        {
+          id: 11,
+          name: "kaneo",
+          full_name: "acme/kaneo",
+          private: true,
+          owner: { login: "acme", avatar_url: "https://avatars.example/acme", type: "Organization" },
+          description: "the app",
+          html_url: "https://github.com/acme/kaneo",
+          permissions: { admin: true, push: true, pull: true },
+          updated_at: TIME,
+          installation_id: 42,
+        },
+      ],
+      installations: [
+        { id: 42, account: { login: "acme", type: "Organization" }, repositories: ["acme/kaneo", "acme/api"] },
+        { id: 43, account: null, repositories: [] },
+      ],
+      total: 1,
+      nextPage: { installationPage: 1, repositoryPage: 2 },
+    }),
+  );
+  const got = await api.listGitHubRepositories("p1");
+  expect(got).toEqual({
+    repositories: [
+      {
+        id: 11,
+        name: "kaneo",
+        full_name: "acme/kaneo",
+        private: true,
+        owner: { login: "acme", avatar_url: "https://avatars.example/acme", type: "Organization" },
+        description: "the app",
+        html_url: "https://github.com/acme/kaneo",
+        permissions: { admin: true, push: true, pull: true },
+        updated_at: TIME,
+        installation_id: 42,
+      },
+    ],
+    installations: [
+      { id: 42, account: { login: "acme", type: "Organization" }, repositories: ["acme/kaneo", "acme/api"] },
+      { id: 43, account: null, repositories: [] },
+    ],
+    total: 1,
+    nextPage: { installationPage: 1, repositoryPage: 2 },
+  });
+});
+
+// The pages are strings on the wire — the spec's pattern, not a number — and
+// an unset page is left out so the server's own default of "1" applies.
+test("TestGitHubRepositoriesSendsThePageCursor", async () => {
+  const queries: string[] = [];
+  newServer((req) => {
+    queries.push(new URL(req.url).search.replace(/^\?/, ""));
+    return new Response(
+      JSON.stringify({ repositories: [], installations: [], total: 0, nextPage: null }),
+      { headers: { "content-type": "application/json" } },
+    );
+  });
+  await api.listGitHubRepositories("p1");
+  await api.listGitHubRepositories("p1", { installationPage: "2", repositoryPage: "3" });
+  await api.listGitHubRepositories("p1", { repositoryPage: "4" });
+  expect(queries).toEqual(["", "installationPage=2&repositoryPage=3", "repositoryPage=4"]);
+});
+
+// Verify answers 200 either way — the problems are in the body — so the
+// result is read as sent, and a URL the server did not give is null.
+test("TestGitHubVerifyReadsTheResultAsSent", async () => {
+  const seen = recorder(
+    JSON.stringify({
+      isInstalled: true,
+      installationId: 42,
+      repositoryExists: true,
+      repositoryPrivate: false,
+      permissions: { issues: "write", pull_requests: "write" },
+      hasRequiredPermissions: true,
+      missingPermissions: [],
+      message: "The App can reach acme/kaneo",
+      settingsUrl: "https://github.com/settings/installations/42",
+    }),
+  );
+  const got = await api.verifyGitHubRepository("p1", "acme", "kaneo");
+  expect([seen.method, seen.path]).toEqual(["POST", "/api/github-integration/verify"]);
+  expect(JSON.parse(seen.body)).toEqual({ projectId: "p1", repositoryOwner: "acme", repositoryName: "kaneo" });
+  expect(got).toEqual({
+    isInstalled: true,
+    installationId: 42,
+    repositoryExists: true,
+    repositoryPrivate: false,
+    permissions: { issues: "write", pull_requests: "write" },
+    hasRequiredPermissions: true,
+    missingPermissions: [],
+    message: "The App can reach acme/kaneo",
+    settingsUrl: "https://github.com/settings/installations/42",
+    installationUrl: null,
+  });
+});
+
+// The connect body carries only the repository: the project is in the path,
+// and the reply's optional fields are absent rather than null.
+test("TestGitHubConnectSendsOnlyTheRepository", async () => {
+  const seen = recorder(
+    JSON.stringify({
+      id: "gi1",
+      projectId: "p1",
+      repositoryOwner: "acme",
+      repositoryName: "kaneo",
+      installationId: 42,
+      requiresVerification: false,
+      isActive: true,
+      createdAt: TIME,
+      updatedAt: TIME,
+    }),
+  );
+  const got = await api.connectGitHubRepository("p1", "acme", "kaneo");
+  expect([seen.method, seen.path]).toEqual(["POST", "/api/github-integration/project/p1"]);
+  expect(JSON.parse(seen.body)).toEqual({ repositoryOwner: "acme", repositoryName: "kaneo" });
+  expect(got).toEqual({
+    id: "gi1",
+    projectId: "p1",
+    repositoryOwner: "acme",
+    repositoryName: "kaneo",
+    installationId: 42,
+    requiresVerification: false,
+    importProgress: null,
+    branchPattern: null,
+    commentTaskLinkOnGitHubIssue: null,
+    isActive: true,
+    createdAt: TIME,
+    updatedAt: TIME,
+  });
+});
+
+// The update body carries only what was asked; the route reads an omitted
+// field as keep-as-stored.
+test("TestGitHubUpdateSendsOnlyWhatChanged", async () => {
+  const bodies: unknown[] = [];
+  newServer(async (req) => {
+    bodies.push(await req.json());
+    return new Response(
+      JSON.stringify({
+        id: "gi1",
+        projectId: "p1",
+        repositoryOwner: "acme",
+        repositoryName: "kaneo",
+        installationId: 42,
+        requiresVerification: false,
+        isActive: false,
+        createdAt: TIME,
+        updatedAt: TIME,
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+  });
+  const got = await api.updateGitHubIntegration("p1", { isActive: false });
+  expect(bodies).toEqual([{ isActive: false }]);
+  expect(got.isActive).toBe(false);
+  expect(got.commentTaskLinkOnGitHubIssue).toBeNull();
+});
+
+// A changes object that serializes to nothing is refused before a request:
+// the route would answer the current integration either way, which reads as
+// a change that was not. A field set to undefined serializes away the same
+// way an absent one does, so it does not count either.
+test("TestGitHubUpdateRefusesAnEmptyChange", async () => {
+  const seen: string[] = [];
+  newServer((req) => {
+    seen.push(req.method);
+    return new Response("{}");
+  });
+  for (const changes of [{}, { isActive: undefined }, { isActive: undefined, commentTaskLinkOnGitHubIssue: undefined }]) {
+    expect(String(await failure(api.updateGitHubIntegration("p1", changes)))).toContain("no GitHub integration settings");
+  }
+  expect(seen).toEqual([]);
+});
+
+// The route answers 404 for a project with no integration, so a 200 carrying
+// none is a reply that confirms nothing was changed — it is refused rather
+// than reported as updated.
+test("TestGitHubUpdateRefusesAReplyWithNoIntegration", async () => {
+  recorder("null");
+  const err = await failure(api.updateGitHubIntegration("p1", { isActive: true }));
+  expect(String(err)).toContain("server did not echo the update");
+});
+
+// No integration is null, not an error and not an empty record.
+test("TestGitHubGetReturnsNullWhenThereIsNone", async () => {
+  recorder("null");
+  expect(await api.getGitHubIntegration("p1")).toBeNull();
+});
+
+// The integration read maps every field, the import progress riding along
+// only while the server holds a run.
+test("TestGitHubGetMapsTheIntegration", async () => {
+  recorder(
+    JSON.stringify({
+      id: "gi1",
+      projectId: "p1",
+      repositoryOwner: "acme",
+      repositoryName: "kaneo",
+      installationId: 42,
+      requiresVerification: false,
+      importProgress: { runId: "run1", pending: true, imported: 3, updated: 1, skipped: 2 },
+      branchPattern: "{slug}-{number}",
+      commentTaskLinkOnGitHubIssue: false,
+      isActive: true,
+      createdAt: TIME,
+      updatedAt: TIME,
+    }),
+  );
+  const got = await api.getGitHubIntegration("p1");
+  expect(got).toEqual({
+    id: "gi1",
+    projectId: "p1",
+    repositoryOwner: "acme",
+    repositoryName: "kaneo",
+    installationId: 42,
+    requiresVerification: false,
+    importProgress: { runId: "run1", pending: true, imported: 3, updated: 1, skipped: 2 },
+    branchPattern: "{slug}-{number}",
+    commentTaskLinkOnGitHubIssue: false,
+    isActive: true,
+    createdAt: TIME,
+    updatedAt: TIME,
+  });
+});
+
+test("TestGitHubDeleteAnswersTheServerResult", async () => {
+  recorder(JSON.stringify({ success: true, message: "GitHub integration deleted" }));
+  expect(await api.deleteGitHubIntegration("p1")).toEqual({ success: true, message: "GitHub integration deleted" });
+});
+
+// The import route is resumable: 202 while pages remain, 200 once done, and
+// the next request continues the run the last reply named. The runId is sent
+// from the second request on.
+test("TestGitHubImportContinuesUntilDone", async () => {
+  const bodies: unknown[] = [];
+  const replies = [
+    { status: 202, body: { runId: "run1", pending: true, imported: 1, updated: 0, skipped: 0 } },
+    { status: 202, body: { runId: "run1", pending: true, imported: 2, updated: 0, skipped: 1 } },
+    { status: 200, body: { runId: "run1", pending: false, imported: 3, updated: 1, skipped: 2 } },
+  ];
+  let calls = 0;
+  newServer(async (req) => {
+    bodies.push(await req.json());
+    const reply = replies[calls++]!;
+    return new Response(JSON.stringify(reply.body), { status: reply.status, headers: { "content-type": "application/json" } });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(3);
+  expect(bodies).toEqual([
+    { projectId: "p1" },
+    { projectId: "p1", runId: "run1" },
+    { projectId: "p1", runId: "run1" },
+  ]);
+  expect(got).toEqual({ runId: "run1", pending: false, imported: 3, updated: 1, skipped: 2 });
+});
+
+// A runId handed in starts the loop already inside that run.
+test("TestGitHubImportStartsFromAGivenRun", async () => {
+  const bodies: unknown[] = [];
+  newServer(async (req) => {
+    bodies.push(await req.json());
+    return new Response(JSON.stringify({ runId: "run9", pending: false, imported: 0, updated: 0, skipped: 0 }), {
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1", "run9");
+  expect(bodies).toEqual([{ projectId: "p1", runId: "run9" }]);
+  expect(got.runId).toBe("run9");
+});
+
+// A failure mid-run is the caller's to see: the pages already imported stay
+// imported, and the same call resumes them.
+test("TestGitHubImportStopsOnAFailureMidRun", async () => {
+  let calls = 0;
+  newServer(() => {
+    calls++;
+    return calls === 1
+      ? new Response(JSON.stringify({ runId: "run1", pending: true, imported: 1, updated: 0, skipped: 0 }), {
+          status: 202,
+          headers: { "content-type": "application/json" },
+        })
+      : new Response("boom", { status: 500 });
+  });
+  const err = await failure(api.importGitHubIssues("p1"));
+  expect(err).toBeInstanceOf(KaneoApiError);
+  expect((err as KaneoApiError).statusCode).toBe(500);
+  expect(calls).toBe(2);
+});
+
+// The import lock's 429 asks for a retry after a second, and a request that
+// gets one page through starts the count over.
+test("TestGitHubImportWaitsOutABusyLock", async () => {
+  const replies = [429, 202, 200];
+  let calls = 0;
+  newServer(() => {
+    const at = calls++;
+    if (replies[at] === 429) return new Response("GitHub import is busy; retry this request", { status: 429, headers: { "Retry-After": "1" } });
+    const pending = replies[at] === 202;
+    return new Response(JSON.stringify({ runId: "run1", pending, imported: 1, updated: 0, skipped: 0 }), {
+      status: replies[at],
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(3);
+  expect(got.pending).toBe(false);
+}, 10_000);
+
+// The busy count starts over after a page that went through: five busy
+// answers, a page, one more busy answer and the end is an import that
+// finishes, not one given up on.
+test("TestGitHubImportBusyCountStartsOverAfterAPage", async () => {
+  const replies = [429, 429, 429, 429, 429, 202, 429, 200];
+  let calls = 0;
+  newServer(() => {
+    const at = calls++;
+    if (replies[at] === 429) return new Response("GitHub import is busy; retry this request", { status: 429, headers: { "Retry-After": "1" } });
+    const pending = replies[at] === 202;
+    return new Response(JSON.stringify({ runId: "run1", pending, imported: 1, updated: 0, skipped: 0 }), {
+      status: replies[at],
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(8);
+  expect(got.pending).toBe(false);
+}, 15_000);
+
+// Five busy answers in a row are given up on, so a lock that stays held does
+// not keep the command polling.
+test("TestGitHubImportGivesUpOnALockThatStaysBusy", async () => {
+  let calls = 0;
+  newServer(() => {
+    calls++;
+    return new Response("busy", { status: 429 });
+  });
+  const err = await failure(api.importGitHubIssues("p1"));
+  expect(err).toBeInstanceOf(KaneoApiError);
+  expect(calls).toBe(6);
+}, 10_000);
+
+// A run whose counts never move is stuck: the pages that finish an issue's
+// labels and comments and every pull-request page report the same numbers,
+// but a run reporting them request after request is given up on rather than
+// polled for ever. The error names how to resume the saved run.
+test("TestGitHubImportGivesUpOnARunThatNeverProgresses", async () => {
+  let calls = 0;
+  newServer(() => {
+    calls++;
+    return new Response(JSON.stringify({ runId: "run1", pending: true, imported: 1, updated: 0, skipped: 0 }), {
+      status: 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const err = await failure(api.importGitHubIssues("p1"));
+  expect(String(err)).toContain("counts have not changed in 100 requests");
+  expect(String(err)).toContain("kaneo integration github import -p p1 --run-id run1");
+  expect(calls).toBe(100);
+}, 10_000);
+
+// A pending reply that never names its run leaves the resume to the bare
+// command, which still has to name the project the run belongs to.
+test("TestGitHubImportStallHintWithoutARunIdStillNamesTheProject", async () => {
+  let calls = 0;
+  newServer(() => {
+    calls++;
+    return new Response(JSON.stringify({ pending: true, imported: 1, updated: 0, skipped: 0 }), {
+      status: 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const err = await failure(api.importGitHubIssues("p1"));
+  expect(String(err)).toContain("`kaneo integration github import -p p1` resumes it");
+  expect(calls).toBe(100);
+}, 10_000);
+
+// Counts that hold for a few requests and then move are a run still working,
+// not a stuck one: only an unbroken run of identical counts is given up on.
+test("TestGitHubImportSurvivesCountsThatHoldThenMove", async () => {
+  const counts = [1, 1, 1, 2, 2, 2, 3];
+  let calls = 0;
+  newServer(() => {
+    const imported = counts[Math.min(calls++, counts.length - 1)]!;
+    const done = calls > counts.length;
+    return new Response(JSON.stringify({ runId: "run1", pending: !done, imported, updated: 0, skipped: 0 }), {
+      status: done ? 200 : 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(8);
+  expect(got).toEqual({ runId: "run1", pending: false, imported: 3, updated: 0, skipped: 0 });
+});
+
+// Held counts on either side of a move add up to more pending replies than the
+// stall bound, and the run still finishes: the count of identical replies
+// starts over when any of the three counts moves, so two stretches of 99 are
+// not the 198-in-a-row that would be given up on.
+test("TestGitHubImportSurvivesCountsThatHoldThenMoveThenHold", async () => {
+  let calls = 0;
+  newServer(() => {
+    const at = calls++;
+    const done = at === 198;
+    const imported = at < 99 ? 1 : 2;
+    return new Response(JSON.stringify({ runId: "run1", pending: !done, imported, updated: 0, skipped: 0 }), {
+      status: done ? 200 : 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(199);
+  expect(got).toEqual({ runId: "run1", pending: false, imported: 2, updated: 0, skipped: 0 });
+});
+
+// A re-import of an already-imported repository grows only updated while
+// imported and skipped hold, and that is still progress: three stretches of
+// 50 identical replies total 150 pendings, past the stall bound, and none of
+// them reaches it. Watching imported alone would read the whole run as stuck.
+test("TestGitHubImportSurvivesWhenOnlyUpdatedMoves", async () => {
+  let calls = 0;
+  newServer(() => {
+    const at = calls++;
+    const done = at === 150;
+    const updated = done ? 2 : Math.floor(at / 50);
+    return new Response(JSON.stringify({ runId: "run1", pending: !done, imported: 0, updated, skipped: 0 }), {
+      status: done ? 200 : 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(151);
+  expect(got).toEqual({ runId: "run1", pending: false, imported: 0, updated: 2, skipped: 0 });
+});
+
+// The same for skipped: it is one of the three counts compared, so a run
+// where only it moves is working, not stuck.
+test("TestGitHubImportSurvivesWhenOnlySkippedMoves", async () => {
+  let calls = 0;
+  newServer(() => {
+    const at = calls++;
+    const done = at === 150;
+    const skipped = done ? 2 : Math.floor(at / 50);
+    return new Response(JSON.stringify({ runId: "run1", pending: !done, imported: 0, updated: 0, skipped }), {
+      status: done ? 200 : 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(151);
+  expect(got).toEqual({ runId: "run1", pending: false, imported: 0, updated: 0, skipped: 2 });
+});
+
+// The routes behind the server's user-session check refuse a key with their
+// own words; the message is kept for the caller.
+test("TestGitHubSessionRefusalKeepsTheServerMessage", async () => {
+  newServer(() => new Response("A user session is required", { status: 403, headers: { "content-type": "text/plain" } }));
+  const err = await failure(api.verifyGitHubRepository("p1", "acme", "kaneo"));
+  expect(err).toBeInstanceOf(KaneoApiError);
+  expect((err as KaneoApiError).statusCode).toBe(403);
+  expect((err as KaneoApiError).messages).toEqual(["A user session is required"]);
 });

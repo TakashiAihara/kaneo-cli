@@ -1,0 +1,27 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "repos",
+        "--installation-page",
+        "2",
+        "--repository-page",
+        "3",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/github-integration/repositories/proj-alpha: 403: A user session is required\"\n}\n",
+      "stderr": "Error: GET /api/github-integration/repositories/proj-alpha: 403: A user session is required\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/github-integration/repositories/proj-alpha",
+      "query": "?installationPage=2&repositoryPage=3"
+    }
+  ],
+  "files": {}
+}

@@ -2448,4 +2448,156 @@ export const SCENARIOS: Scenario[] = [
       ["integration", "gitlab", "import", "--human"],
     ],
   },
+
+  // ---- GitHub integration ----
+  // app-info is the one route that answers an API key on every release; the
+  // repositories, verify and connect routes need a user session and refuse
+  // the key with the server's own words, which is the answer goldened.
+  ...both("integration github app-info", ["integration", "github", "app-info"]),
+  ...both("integration github repos needs a session", ["integration", "github", "repos"]),
+  {
+    // The page cursor is recorded with the refused request, so the golden
+    // shows the query the CLI would have sent.
+    name: "integration github repos pages",
+    steps: [["integration", "github", "repos", "--installation-page", "2", "--repository-page", "3", "--json"]],
+  },
+  ...both("integration github verify needs a session", ["integration", "github", "verify", "acme", "kaneo"]),
+  ...both("integration github connect needs a session", ["integration", "github", "connect", "acme", "kaneo"]),
+  {
+    // The session refusal runs before the project is placed, so a project
+    // that does not exist gets it rather than a lookup.
+    name: "integration github repos unknown project",
+    steps: [["integration", "github", "repos", "-p", "nope", "--json"]],
+  },
+  {
+    name: "integration github get without one",
+    steps: [
+      ["integration", "github", "get", "--json"],
+      ["integration", "github", "get", "-p", "BET", "--json"],
+      ["integration", "github", "get", "--human"],
+    ],
+  },
+  {
+    name: "integration github get",
+    seed: {
+      githubIntegrations: [
+        { projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", branchPattern: "feature/{slug}-{number}", commentTaskLinkOnGitHubIssue: false },
+      ],
+    },
+    steps: [["integration", "github", "get", "--json"], ["integration", "github", "get", "--human"]],
+  },
+  {
+    // An unverified binding reads as requiring verification and folds into
+    // isActive, the way get-github-integration.ts answers it.
+    name: "integration github get unverified",
+    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", verified: false }] },
+    steps: [["integration", "github", "get", "--json"]],
+  },
+  {
+    name: "integration github update",
+    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo" }] },
+    steps: [
+      ["integration", "github", "update", "--active=false", "--comment-task-link=false", "--json"],
+      ["integration", "github", "get", "--human"],
+    ],
+  },
+  {
+    name: "integration github update nothing",
+    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo" }] },
+    steps: [["integration", "github", "update", "--json"]],
+  },
+  {
+    // The route's own not-found shape is not the error envelope, so what the
+    // failure prints is the server's words either way.
+    name: "integration github update without one",
+    steps: [["integration", "github", "update", "--active=false", "--json"]],
+  },
+  {
+    // manage_settings is what update and rm ask; a member without it is
+    // refused there while the read asks only for membership and answers.
+    name: "integration github member reads but cannot write",
+    plainMember: true,
+    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo" }] },
+    steps: [
+      ["integration", "github", "get", "--json"],
+      ["integration", "github", "update", "--active=false", "--json"],
+      ["integration", "github", "rm", "--yes", "--json"],
+    ],
+  },
+  {
+    name: "integration github rm",
+    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo" }] },
+    steps: [
+      ["integration", "github", "rm", "--json"],
+      ["integration", "github", "rm", "--yes", "--json"],
+      ["integration", "github", "get", "--human"],
+    ],
+  },
+  { name: "integration github rm without one", steps: [["integration", "github", "rm", "--yes", "--json"]] },
+  {
+    // Five provider pages: the first request works four and answers 202, the
+    // second continues the named run and finishes with 200. Repeating the
+    // finished runId then answers the saved progress without new pages.
+    name: "integration github import",
+    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", importPages: 5 }] },
+    steps: [
+      ["integration", "github", "import", "--json"],
+      ["integration", "github", "import", "--run-id", "run-0001", "--json"],
+      ["integration", "github", "get", "--human"],
+    ],
+  },
+  {
+    // A slug goes through the lookup the way every project reference does:
+    // the first request carries it, the 404 sends the lookup, and the retry
+    // carries the id.
+    name: "integration github import by slug",
+    env: { KANEO_PROJECT: "ALP" },
+    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", importPages: 1 }] },
+    steps: [["integration", "github", "import", "--json"]],
+  },
+  {
+    name: "integration github import paused",
+    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", isActive: false }] },
+    steps: [["integration", "github", "import", "--json"]],
+  },
+  {
+    name: "integration github import unverified",
+    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", verified: false }] },
+    steps: [["integration", "github", "import", "--json"]],
+  },
+  {
+    // A null installationId is the row with no installation bound: the verified
+    // flag alone does not bind it, so get reports requiresVerification and
+    // import refuses the way verified:false does. The seed must keep the null
+    // rather than default it, or this state cannot be reproduced.
+    name: "integration github no installation",
+    seed: {
+      githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", installationId: null, verified: true }],
+    },
+    steps: [
+      ["integration", "github", "get", "--json"],
+      ["integration", "github", "import", "--json"],
+    ],
+  },
+  { name: "integration github import without one", steps: [["integration", "github", "import", "--json"]] },
+  {
+    // A runId the server never issued is the 409 the route reserves for a
+    // changed or unknown run.
+    name: "integration github import unknown run",
+    seed: { githubIntegrations: [{ projectId: P1, repositoryOwner: "acme", repositoryName: "kaneo", importPages: 1 }] },
+    steps: [["integration", "github", "import", "--run-id", "run-9999", "--json"]],
+  },
+  {
+    name: "integration github bad input",
+    steps: [
+      ["integration", "github", "repos", "--installation-page", "0"],
+      ["integration", "github", "repos", "--repository-page", "1000000"],
+      ["integration", "github", "verify", "acme"],
+      ["integration", "github", "verify", " ", "kaneo"],
+      ["integration", "github", "import", "--run-id", ""],
+      ["integration", "bogus"],
+      ["integration"],
+      ["integration", "github"],
+    ],
+  },
 ];

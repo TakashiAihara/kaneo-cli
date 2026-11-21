@@ -1,0 +1,18 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "close",
+        "--session",
+        "sess-gone",
+        "--strict"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--session releases another session's hold, which this machine has no record of; name the task with --task\"\n}\n",
+      "stderr": "Error: --session releases another session's hold, which this machine has no record of; name the task with --task\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

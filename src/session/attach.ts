@@ -51,7 +51,7 @@ export const attachTask = async (
   // Looked up before the marker is posted, so the lookups do not widen the
   // window where the server has a marker and this host has no record.
   const attachment = attachmentOf(task);
-  const slug = await describeBoard(task, attachment);
+  const slug = await describeBoard(task, attachment, "attach");
 
   const marker = store.describe(env, cwd(), RUNNING);
   marker.nextStep = nextStep;
@@ -72,7 +72,7 @@ export const attachTask = async (
     // The marker is already on the server. Reporting success here would
     // leave `session next` believing nothing is attached, and a retry
     // would post a second marker.
-    throw hard(`attached #${task.number} on the server, but could not record it locally: ${(e as Error).message}`);
+    throw hard(`attached ${taskRef(attachment.projectSlug, attachment.number, attachment.projectId, attachment.taskId)} on the server, but could not record it locally: ${(e as Error).message}`);
   }
   try {
     // Appended after the attachment is in place: a history line for an
@@ -82,7 +82,7 @@ export const attachTask = async (
   } catch (e) {
     // The attachment is saved, so `session next` works; what is missing is
     // the record a check after close relies on, which is worth failing over.
-    throw hard(`attached #${task.number}, but could not add it to the session history: ${(e as Error).message}`);
+    throw hard(`attached ${taskRef(attachment.projectSlug, attachment.number, attachment.projectId, attachment.taskId)}, but could not add it to the session history: ${(e as Error).message}`);
   }
 
   await runHook(app, "attach", hookEnv("attach", sessionId, task.id, task.number, slug));
@@ -188,22 +188,25 @@ export const confirmMarker = async (
 // Fills in which project and workspace the task is on, which the attachment keeps
 // as well as answers the project's slug for the attach hook.
 //
+// op names the command doing the lookup, so a debug line says which of them
+// could not place the board.
+//
 // Best effort: failing the attach over a name a statusline wants would leave the
 // session unattached. A lookup that fails leaves its fields unset, which a reader
 // treats as absent.
-export const describeBoard = async (task: Task, attachment: Attachment): Promise<string> => {
+export const describeBoard = async (task: Task, attachment: Attachment, op: string): Promise<string> => {
   // Never filled from the cwd's project: that is the wrong answer this field
   // exists to avoid, so an unknown project stays unknown.
   attachment.projectId = task.projectId;
   if (attachment.projectId === "") {
-    debug(`attach: task ${task.id} carries no projectId; board not recorded`);
+    debug(`${op}: task ${task.id} carries no projectId; board not recorded`);
     return "";
   }
   let project;
   try {
     project = await getProject(attachment.projectId);
   } catch (e) {
-    debug(`attach: project ${attachment.projectId} lookup failed: ${(e as Error).message}`);
+    debug(`${op}: project ${attachment.projectId} lookup failed: ${(e as Error).message}`);
     return "";
   }
   attachment.projectName = project.name;
@@ -217,7 +220,7 @@ export const describeBoard = async (task: Task, attachment: Attachment): Promise
   try {
     workspaces = await listWorkspaces();
   } catch (e) {
-    debug(`attach: workspace lookup failed: ${(e as Error).message}`);
+    debug(`${op}: workspace lookup failed: ${(e as Error).message}`);
     return project.slug;
   }
   for (const workspace of workspaces) {
@@ -227,3 +230,24 @@ export const describeBoard = async (task: Task, attachment: Attachment): Promise
   }
   return project.slug;
 };
+
+// Rewrites the local attachment of every session holding this task with what
+// the task carries now — its number and board after a move — so `session
+// status` does not keep printing the project it had at attach time.
+// Answers how many records were rewritten.
+//
+// The board fields are re-derived rather than kept: the old project's slug
+// would otherwise survive beside the new projectId and name a board the task
+// is no longer on. History lines are left alone — they record what was known
+// at the moment, which a move does not change.
+export const refreshHolders = async (task: Task): Promise<number> =>
+  store.updateForTask(store.sessionStore(), task.id, async (held) => {
+    held.number = task.number;
+    held.title = task.title;
+    delete held.projectId;
+    delete held.projectName;
+    delete held.projectSlug;
+    delete held.workspaceId;
+    delete held.workspaceName;
+    await describeBoard(task, held, "move");
+  });

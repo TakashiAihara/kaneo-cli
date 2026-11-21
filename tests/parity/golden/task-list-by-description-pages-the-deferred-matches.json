@@ -21,16 +21,6 @@
     },
     {
       "method": "GET",
-      "path": "/task/tasks/proj-alpha",
-      "query": "?page=2"
-    },
-    {
-      "method": "GET",
-      "path": "/task/tasks/proj-alpha",
-      "query": "?page=3"
-    },
-    {
-      "method": "GET",
       "path": "/task/description-matches/proj-alpha",
       "query": "?query=needle"
     },

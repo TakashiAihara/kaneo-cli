@@ -66,7 +66,7 @@ import { shellWord } from "../output/output";
 import { KaneoApiError, putUpload } from "../api/http";
 import { resolveWorkspace, slugOr, withProject, workspaceInReference } from "./lookup";
 import { resolveField } from "./field";
-import { attachTask, currentSessionId } from "../session/attach";
+import { attachTask, currentSessionId, refreshHolders } from "../session/attach";
 import { BAD_ID, validSessionId } from "../session/store";
 import { sharedReference, similarOpenTasks } from "./similar";
 
@@ -847,6 +847,16 @@ export const taskCommand = {
         );
         const after = await taskAfterWrite(task, "project was set");
         readBack("project", after.projectId, projectId);
+        // The session attachments naming this task are snapshots from attach
+        // time; the move makes their project and number stale, so they are
+        // rewritten here — the one place that knows the task changed. A record
+        // that cannot be rewritten leaves `session status` showing the old
+        // board, which is worth a line on stderr rather than a failed move.
+        try {
+          await refreshHolders(after);
+        } catch (e) {
+          app.out.status(`task moved, but the session records naming it could not be updated: ${e instanceof Error ? e.message : String(e)}`);
+        }
         // The destination as it was typed: the read-back above has already
         // confirmed the task sits on the project the value resolved to, so a
         // reader is shown what they asked for rather than the id behind it.

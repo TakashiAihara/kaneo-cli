@@ -239,6 +239,13 @@ export type FakeOptions = {
   // board that never settles is reproduced.
   growOnPage?: number;
   growTimes?: number;
+  // Moves promoteTaskId to the front of the listing when the listing is asked
+  // for this page, so the board's order changes while it is being read without
+  // its total moving — the case a count comparison cannot see. promoteTimes
+  // caps how many requests move it.
+  promoteOnPage?: number;
+  promoteTaskId?: string;
+  promoteTimes?: number;
   // Answers the listing without applying status or priority, so what the CLI
   // prints is seen not to rest on the server having filtered.
   ignoreFilters?: boolean;
@@ -438,6 +445,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   for (const l of seed.deletingLabels ?? []) addLabel(l.name, l.color ?? "gray", l.workspaceId, null, true);
   const requests: Recorded[] = [];
   let grew = 0;
+  let promoted = 0;
 
   // The binary documents, seeded and then kept as the avatar route writes
   // them. Response takes a string or bytes as they are.
@@ -2003,6 +2011,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         grew += 1;
         addTask(proj.id, { title: `Arrived late ${grew}` });
       }
+      // Moved before the page is cut, as growOnPage grows before it: the order
+      // the page is sliced from is the one the change left, while the pages
+      // already answered keep the old one and the total never moves.
+      if (opts.promoteOnPage === page && promoted < (opts.promoteTimes ?? Infinity) && opts.promoteTaskId !== undefined) {
+        promoted += 1;
+        const at = tasks.findIndex((t) => t.id === opts.promoteTaskId);
+        if (at > 0) tasks.unshift(tasks.splice(at, 1)[0]!);
+      }
       // Filters apply before the page is cut, as the document says they do.
       const filterStatus = opts.ignoreFilters ? null : url.searchParams.get("status");
       const filterPriority = opts.ignoreFilters ? null : url.searchParams.get("priority");
@@ -2509,9 +2525,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       if (req.method === "POST") {
         const added = addComment(taskId, (body as any).content);
+        // The route answers the stored activity row, as PUT below does.
+        const activity = asActivity(added);
         // Sent past the schema, which requires the id this reply exists to leave out.
-        if (opts.commentReplyWithoutId) return Response.json({ ...M.Comment.parse(added), id: undefined });
-        return ok(M.Comment, added);
+        if (opts.commentReplyWithoutId) return Response.json({ ...M.Activity.parse(activity), id: undefined });
+        return ok(M.Activity, activity);
       }
     }
     // PUT takes the comment's id where GET and POST take the task's, and

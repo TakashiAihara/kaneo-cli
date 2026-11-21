@@ -1,0 +1,18 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "status",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "attached: task-a1 Write the parser\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [],
+  "files": {
+    ".config/kaneo/sessions/sess-older.json": "{\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\"}"
+  }
+}

@@ -1196,10 +1196,14 @@ const changed = (projectId: string): string =>
 // add up to either. Such a read is taken again, and a board that is still moving
 // is reported on stderr so the JSON a script reads on stdout stays a document.
 //
-// Only a change in the number of tasks is seen. A task that moves to another
-// position, a delete and a create within one read, or a label added between two
-// related pages leave the total where it was, and such a read is answered as if
-// it were whole.
+// A change seen while the pages are read is taken again, and a board that is
+// still moving is reported on stderr so the JSON a script reads on stdout
+// stays a document. The keyed listing sends no revisions, so what it can see
+// is structural: the total, a task answered on two task pages, and a count of
+// distinct tasks that does not come back to the total. A delete and a create
+// inside one read, or an edit between two related pages that moves nothing,
+// can still slip through — there is no snapshot behind the pages to compare
+// against.
 export const getBoard = async (projectId: string, filters: TaskFilters = {}): Promise<Board> => {
   let read = await readBoard(projectId, filters);
   for (let again = 0; read.moved && again < REREADS; again++) read = await readBoard(projectId, filters);
@@ -1278,6 +1282,10 @@ const readPages = async (
   const columnAt = new Map<string, number>();
   const offBoard = new Map(OFF_BOARD.map((column) => [column.id, [] as Task[]]));
   const taskAt = new Map<string, Task>();
+  // The task page each task was first answered on, so a task met again can be
+  // told apart as a related page's repeat from a second task page's copy.
+  const pageOf = new Map<string, number>();
+  let repeated = false;
   let first: number | undefined;
   let last: number | undefined;
   let revision: string | undefined;
@@ -1316,17 +1324,25 @@ const readPages = async (
         };
       }
       const target = board;
-      // A task seen again on a related page brings more labels; the same task on
-      // a later task page is the same task twice.
+      // A task seen again on a related page of the same task page brings more
+      // labels; the same task on a later task page is the same task twice.
       const place = (from: BoardTask[], into: Task[]): void => {
         for (const task of from) {
           const seen = taskAt.get(task.id);
           if (seen !== undefined) {
-            if (related > 1) seen.labels = appendNewLabels(seen.labels, labels(task.labels));
+            if (pageOf.get(task.id) === page) {
+              if (related > 1) seen.labels = appendNewLabels(seen.labels, labels(task.labels));
+            } else {
+              // The listing slices disjoint pages out of one order, so a task
+              // answered on two task pages means the board moved while it was
+              // read — a reorder the total never has to change for.
+              repeated = true;
+            }
             continue;
           }
           const placed = toTask(task);
           taskAt.set(task.id, placed);
+          pageOf.set(task.id, page);
           into.push(placed);
           onPage.push(placed);
         }
@@ -1345,6 +1361,11 @@ const readPages = async (
       }
     }
     stopped = stopAt?.(onPage);
+    // Once the distinct tasks held reach the total the listing reports, the
+    // pages left can only repeat them: the first request, which names no
+    // page, may already have answered the whole board while the pagination
+    // still counts the pages a paged request would take.
+    if (typeof last === "number" && taskAt.size >= last) break;
   }
 
   if (board === undefined || board.projectId === "") {
@@ -1354,7 +1375,10 @@ const readPages = async (
     const tasks = offBoard.get(column.id)!;
     if (tasks.length > 0) board.columns.push({ id: column.id, name: column.name, tasks });
   }
-  return { board, stopped, moved: (first !== undefined && first !== last) || revisionMoved };
+  // A read that stopped early holds only the pages it asked for, so the count
+  // of distinct tasks it met says nothing against the whole-board total.
+  const countMoved = stopped === undefined && typeof last === "number" && taskAt.size !== last;
+  return { board, stopped, moved: (first !== undefined && first !== last) || revisionMoved || repeated || countMoved };
 };
 
 // Every task the listing answered, the planned and the archived ones included,

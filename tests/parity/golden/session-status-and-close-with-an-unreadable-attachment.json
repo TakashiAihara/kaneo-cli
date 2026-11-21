@@ -1,0 +1,49 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "status",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"sessionId\": \"sess-bad\",\n  \"attached\": null,\n  \"history\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "status",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "attached: none\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "status",
+        "--strict",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"sessionId\": \"sess-bad\",\n  \"attached\": null,\n  \"history\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "close",
+        "--strict"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"this session is not attached to a task\"\n}\n",
+      "stderr": "Error: this session is not attached to a task\n"
+    }
+  ],
+  "requests": [],
+  "files": {
+    ".config/kaneo/sessions/sess-bad.json": "3"
+  }
+}

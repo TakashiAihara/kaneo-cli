@@ -1,0 +1,76 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "1",
+        "--strict"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"attached ALP#1, but could not add it to the session history: EISDIR: illegal operation on a directory, read\"\n}\n",
+      "stderr": "Error: attached ALP#1, but could not add it to the session history: EISDIR: illegal operation on a directory, read\n"
+    },
+    {
+      "args": [
+        "session",
+        "close",
+        "--strict"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"closed ALP#1 on the server, but could not add it to the session history (still attached here): EISDIR: illegal operation on a directory, read\"\n}\n",
+      "stderr": "Error: closed ALP#1 on the server, but could not add it to the session history (still attached here): EISDIR: illegal operation on a directory, read\n"
+    },
+    {
+      "args": [
+        "session",
+        "status",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"sessionId\": \"sess-ord\",\n  \"attached\": {\n    \"taskId\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"projectId\": \"proj-alpha\",\n    \"projectName\": \"Alpha\",\n    \"projectSlug\": \"ALP\",\n    \"workspaceId\": \"ws-main\",\n    \"workspaceName\": \"Main\"\n  },\n  \"history\": []\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-ord host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-ord host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-ord`."
+      }
+    }
+  ],
+  "files": {
+    ".config/kaneo/sessions/sess-ord.json": "{\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}"
+  }
+}

@@ -162,6 +162,12 @@ export type Scenario = {
   // requests grow it; without a cap it never settles.
   growOnPage?: number;
   growTimes?: number;
+  // The fake moves this task to the front of the listing when the listing is
+  // asked for this page, so the board's order changes mid-read while its
+  // total stays put.
+  promoteOnPage?: number;
+  promoteTaskId?: string;
+  promoteTimes?: number;
   // The fake answers the listing without applying status or priority.
   ignoreFilters?: boolean;
   assignedLimit?: number;
@@ -170,6 +176,14 @@ export type Scenario = {
   // Written into the cwd before the first step, for the file a flag names —
   // bytes when the upload has to be something text cannot write, like a PNG.
   files?: Record<string, string | Uint8Array>;
+  // Written under the scenario's HOME before the first step, parents created —
+  // for what a command reads out of the config directory, like a session
+  // store file written by hand.
+  homeFiles?: Record<string, string | Uint8Array>;
+  // Directories made under the scenario's HOME before the first step, for a
+  // path that must be a directory rather than hold a file — like the history
+  // path that makes an append fail.
+  homeDirs?: string[];
 };
 
 const both = (name: string, args: string[]): Scenario[] => [
@@ -2178,6 +2192,137 @@ export const SCENARIOS: Scenario[] = [
     env: { KANEO_SESSION_ID: "" },
     steps: [["session", "status", "--json"]],
   },
+  // A session file that is valid JSON but not an attachment — "null", "3" — is
+  // as unreadable as a broken one: status says nothing is held rather than
+  // printing fields that are not there, and close says so instead of failing
+  // on them. --strict is accepted and changes nothing, since status is not
+  // fail-open.
+  {
+    name: "session status and close with an unreadable attachment",
+    env: { KANEO_SESSION_ID: "sess-bad" },
+    homeFiles: { ".config/kaneo/sessions/sess-bad.json": "3" },
+    steps: [
+      ["session", "status", "--json"],
+      ["session", "status", "--human"],
+      ["session", "status", "--strict", "--json"],
+      ["session", "close", "--strict"],
+    ],
+  },
+  // A record written before the slug was kept names its board by id rather than
+  // reading as the current project's task of that number.
+  {
+    name: "session status names a slug-less record by project id",
+    env: { KANEO_SESSION_ID: "sess-old" },
+    homeFiles: {
+      ".config/kaneo/sessions/sess-old.json": '{"taskId":"task-a1","number":1,"title":"Write the parser","projectId":"proj-alpha"}',
+    },
+    steps: [["session", "status", "--human"], ["session", "status", "--json"]],
+  },
+  // With no board fields at all the task id is the only name that still
+  // resolves, so it is what the record is shown as.
+  {
+    name: "session status names a record with no board by task id",
+    env: { KANEO_SESSION_ID: "sess-older" },
+    homeFiles: {
+      ".config/kaneo/sessions/sess-older.json": '{"taskId":"task-a1","number":1,"title":"Write the parser"}',
+    },
+    steps: [["session", "status", "--human"]],
+  },
+  // A bare number in --task names the held task even when the project the
+  // session works in is another: resolving it would close that project's task
+  // of the same number.
+  {
+    name: "session close --task bare number keeps the held task's project",
+    env: { KANEO_SESSION_ID: "sess-xproj" },
+    steps: [
+      ["session", "attach", "BET#1", "--strict"],
+      ["session", "close", "--task", "1", "--strict"],
+      ["session", "status", "--json"],
+    ],
+  },
+  // The history is appended before the attachment is dropped, on close as on
+  // attach: when the append fails the attachment stays, so the act can be run
+  // again once the file can be written.
+  {
+    name: "session keeps the attachment when the history append fails",
+    env: { KANEO_SESSION_ID: "sess-ord" },
+    homeDirs: [".config/kaneo/sessions/sess-ord.history.jsonl"],
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "close", "--strict"],
+      ["session", "status", "--json"],
+    ],
+  },
+  // The board lookups a close makes for a task it does not hold are the
+  // close's, not an attach's.
+  {
+    name: "session close debug names its own board lookup",
+    env: { KANEO_SESSION_ID: "sess-test", KANEO_DEBUG: "1" },
+    failOn: "^GET /project/proj-alpha$",
+    steps: [["session", "close", "--task", "task-a1"]],
+  },
+  // A marker left by a session whose host is gone — an imported board carries
+  // them — is released by naming the session: the closed marker is posted for
+  // that id on the task --task resolves, and the board stops listing the hold.
+  {
+    name: "session close --session releases another session's hold",
+    env: { KANEO_SESSION_ID: "sess-here" },
+    seed: {
+      comments: [
+        { taskId: "task-a1", content: "<!-- kn:session id=sess-gone host=oldhost cwd=/old branch=main state=running enc=1 -->\nnext step" },
+        { taskId: "task-a2", content: "<!-- kn:session id=sess-gone2 host=oldhost cwd=/old branch=main state=running enc=1 -->" },
+      ],
+    },
+    steps: [
+      ["board", "--human"],
+      ["session", "close", "--session", "sess-gone", "--task", "1", "--human"],
+      ["session", "close", "--session", "sess-gone2", "--task", "2", "--json"],
+      ["board", "--human"],
+    ],
+  },
+  // The hold has to be there: a closed marker for a session that is not
+  // holding the task records an ending that never began.
+  {
+    name: "session close --session refuses a session not holding the task",
+    env: { KANEO_SESSION_ID: "sess-here" },
+    seed: {
+      comments: [
+        { taskId: "task-a1", content: "<!-- kn:session id=sess-live host=h cwd=/w branch=b state=running enc=1 -->" },
+      ],
+    },
+    steps: [["session", "close", "--session", "sess-ghost", "--task", "1", "--strict"]],
+  },
+  // --task names the task the hold is on; there is no attachment here to
+  // default to.
+  {
+    name: "session close --session needs --task",
+    env: { KANEO_SESSION_ID: "sess-here" },
+    steps: [["session", "close", "--session", "sess-gone", "--strict"]],
+  },
+  // This session's own hold is a plain close's job; releasing it by name here
+  // would post a second marker for a hold about to be let go anyway.
+  {
+    name: "session close --session refuses this session's own id",
+    env: { KANEO_SESSION_ID: "sess-here" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "close", "--session", "sess-here", "--task", "1", "--strict"],
+      ["session", "status", "--json"],
+    ],
+  },
+  // A task that moves keeps its id, and the session's attachment is a snapshot
+  // from attach time: the move rewrites it, so status names the board and
+  // number the task has now rather than the ones it had then.
+  {
+    name: "task move updates the session attachment",
+    env: { KANEO_SESSION_ID: "sess-move" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["task", "move", "1", "--to", "BET", "--json"],
+      ["session", "status", "--json"],
+      ["session", "status", "--human"],
+    ],
+  },
   ...both("board", ["board"]),
   ...both("board archived", ["board", "--archived"]),
   { name: "board pages past one page", pageSize: 2, steps: [["task", "ls", "--all", "--json"], ["board", "--json"]] },
@@ -2187,6 +2332,35 @@ export const SCENARIOS: Scenario[] = [
   // A board that keeps moving is reported rather than passed on as if it were
   // whole.
   { name: "board keeps changing", pageSize: 2, growOnPage: 2, steps: [["task", "ls", "--all", "--json"]] },
+  // The board's order changes while it is read with the total held steady:
+  // the same task answered on two task pages is a moved board, and the read is
+  // taken again rather than answered short a task.
+  {
+    name: "board reordered mid-read",
+    pageSize: 2,
+    extraTasks: [{ id: "task-a4", projectId: P1, title: "Fourth" }],
+    promoteOnPage: 2,
+    promoteTaskId: "task-a4",
+    promoteTimes: 1,
+    steps: [["task", "ls", "--all", "--json"], ["board", "--json"]],
+  },
+  // A session can attach to a planned or archived task, so the board reports
+  // those holds too: the session list reads every task the listing answered,
+  // not only the open columns.
+  {
+    name: "board lists sessions on planned and archived tasks",
+    seed: {
+      comments: [
+        { taskId: "task-p1", content: "<!-- kn:session id=sess-planned host=h1 cwd=/w branch=b state=running enc=1 -->\nnext" },
+        { taskId: "task-arch1", content: "<!-- kn:session id=sess-arch host=h2 cwd=/w branch=b state=running enc=1 -->\nnext" },
+      ],
+    },
+    extraTasks: [
+      { id: "task-p1", projectId: P1, title: "Planned held", status: "planned" },
+      { id: "task-arch1", projectId: P1, title: "Archived held", status: "archived" },
+    ],
+    steps: [["board", "--json"], ["board", "--human"]],
+  },
 
   ...both("api-check", ["api-check"]),
   ...both("api-check request drift", ["api-check"]).map((s): Scenario => ({ ...s, driftedSpec: true })),

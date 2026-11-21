@@ -1,0 +1,103 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "BET#1",
+        "--strict"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"taskId\": \"task-b1\",\n  \"number\": 1,\n  \"title\": \"Beta first\",\n  \"projectId\": \"proj-beta\",\n  \"projectName\": \"Beta\",\n  \"projectSlug\": \"BET\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "close",
+        "--task",
+        "1",
+        "--strict"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"number\": 1,\n  \"taskId\": \"task-b1\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "status",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"sessionId\": \"sess-xproj\",\n  \"attached\": null,\n  \"history\": [\n    {\n      \"event\": \"attach\",\n      \"at\": \"<TIME>Z\",\n      \"taskId\": \"task-b1\",\n      \"number\": 1,\n      \"title\": \"Beta first\",\n      \"projectId\": \"proj-beta\",\n      \"projectName\": \"Beta\",\n      \"projectSlug\": \"BET\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\"\n    },\n    {\n      \"event\": \"close\",\n      \"at\": \"<TIME>Z\",\n      \"taskId\": \"task-b1\",\n      \"number\": 1,\n      \"title\": \"Beta first\",\n      \"projectId\": \"proj-beta\",\n      \"projectName\": \"Beta\",\n      \"projectSlug\": \"BET\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-b1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-xproj host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-b1",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-b1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-xproj host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-xproj`."
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-b1",
+      "query": ""
+    }
+  ],
+  "files": {
+    ".config/kaneo/sessions/sess-xproj.history.jsonl": "{\"event\":\"attach\",\"at\":\"<TIME>Z\",\"taskId\":\"task-b1\",\"number\":1,\"title\":\"Beta first\",\"projectId\":\"proj-beta\",\"projectName\":\"Beta\",\"projectSlug\":\"BET\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n{\"event\":\"close\",\"at\":\"<TIME>Z\",\"taskId\":\"task-b1\",\"number\":1,\"title\":\"Beta first\",\"projectId\":\"proj-beta\",\"projectName\":\"Beta\",\"projectSlug\":\"BET\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n"
+  }
+}

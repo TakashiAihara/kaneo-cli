@@ -3093,6 +3093,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (row === undefined) return failText(404, "Gitea integration not found");
       if (!row.isActive) return failText(400, "Gitea integration is not active");
       if (row.token.trim() === "" || row.baseUrl.trim() === "") return failText(400, "Gitea access token or base URL not configured");
+      // import-gitea-issues.ts's listIssues runs before the per-issue try/catch
+      // and nothing translates its GiteaApiError, so a failing instance ends
+      // the call in the app's plain 500 rather than an errors entry.
+      if (giteaMode !== "ok") return Response.json({ message: "Internal Server Error" }, { status: 500 });
       let imported = 0;
       let updated = 0;
       let skipped = 0;

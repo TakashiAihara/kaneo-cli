@@ -2751,6 +2751,20 @@ export const SCENARIOS: Scenario[] = [
     steps: [["integration", "gitea", "import", "--json"]],
   },
 
+  // The issue listing runs before any per-issue work and outside its error
+  // handling, so an instance that rejects the stored token fails the whole
+  // import with the server's plain 500 — nothing is imported.
+  {
+    name: "integration gitea import with a failing instance",
+    seed: {
+      giteaInstance: { mode: "bad-token" },
+      giteaRepositories: [{ owner: "acme", name: "app" }],
+      giteaIntegrations: [{ projectId: P1, baseUrl: "https://gitea.example.com", accessToken: "seeded-token", repositoryOwner: "acme", repositoryName: "app" }],
+      giteaRepoIssues: [{ baseUrl: "https://gitea.example.com", repositoryOwner: "acme", repositoryName: "app", issues: [{ number: 1, title: "Never imported" }] }],
+    },
+    steps: [["integration", "gitea", "import", "--json"]],
+  },
+
   // Reconnecting moves the link, and the issue list moves with the repository:
   // acme/other's own issues import, acme/third has none seeded so its import
   // is empty rather than acme/app's leftovers, and back on acme/app its own

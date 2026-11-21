@@ -221,8 +221,9 @@ export type FakeOptions = {
   // Responses are then not checked against the schema, since departing from
   // it is the point.
   legacy?: boolean;
-  // Leaves these fields out of a project read, as a server older than the
-  // document does; the reply to a write is whole.
+  // Leaves these fields out of a project read and out of a write's reply, as a
+  // server older than the document does: upstream answers both with the same
+  // row, so the field is missing from either or neither.
   readWithout?: string[];
   // Sends these fields with these values in a project read (null, or a value
   // of another type): a fault to inject, not a reply Kaneo is known to send.
@@ -1013,6 +1014,16 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   const failText = (status: number, message: string) =>
     new Response(message, { status, headers: { "content-type": "text/plain;charset=UTF-8" } });
 
+  // A project's reply as a server older than the document sends it. The read
+  // and the write's reply are the same row upstream, so readWithout leaves the
+  // fields out of both; readAs is a fault injected into the read alone.
+  const projectReply = (proj: (typeof projects)[number], injected: Record<string, unknown> = {}) => {
+    if (opts.readWithout === undefined && Object.keys(injected).length === 0) return ok(M.Project, proj);
+    const reply: Record<string, unknown> = { ...M.Project.parse(proj), ...injected };
+    for (const field of opts.readWithout ?? []) delete reply[field];
+    return Response.json(reply);
+  };
+
   // A description above 64 KiB is left out of the listing, which marks the task
   // rather than carrying the text; the task detail route still has it, and the
   // description-matches route searches exactly these.
@@ -1777,12 +1788,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // Checked by the server's workspace middleware before the route runs, as on
       // the task routes below.
       if (!proj) return failText(400, "Workspace ID could not be determined");
-      if (req.method === "GET" && !p[2]) {
-        if (opts.readWithout === undefined && opts.readAs === undefined) return ok(M.Project, proj);
-        const reply: Record<string, unknown> = { ...M.Project.parse(proj), ...opts.readAs };
-        for (const field of opts.readWithout ?? []) delete reply[field];
-        return Response.json(reply);
-      }
+      if (req.method === "GET" && !p[2]) return projectReply(proj, opts.readAs);
       if (opts.plainMember) return failText(403, "Insufficient permissions");
       if (req.method === "PUT" && !p[2]) {
         // Upstream's update body requires the slug; the CLI always sends it.
@@ -1790,7 +1796,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         const taken = typeof slug === "string" && !sameKey(slug, proj.slug) ? keyTaken(proj.workspaceId, slug, proj.id) : undefined;
         if (taken) return failText(409, keyTakenMessage(slug, taken.name));
         Object.assign(proj, body);
-        return ok(M.Project, proj);
+        return projectReply(proj);
       }
       if (req.method === "PUT" && p[3] === "archive") return ok(M.Project, Object.assign(proj, { archivedAt: now() }));
       if (req.method === "PUT" && p[3] === "unarchive") {

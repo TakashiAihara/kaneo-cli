@@ -1,0 +1,69 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "rm",
+        " Padded",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0004\",\n  \"slug\": \"padded\",\n  \"name\": \"Padded \",\n  \"position\": 3,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "rename",
+        "Café",
+        "Coffee",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0005\",\n  \"slug\": \"cafe\",\n  \"name\": \"Coffee\",\n  \"position\": 4,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "column",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "to-do        To Do\nin-progress  In Progress\ndone         Done  (final)\ncafe         Coffee\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/column/col0004",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/column/col0005",
+      "query": "",
+      "body": {
+        "name": "Coffee"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

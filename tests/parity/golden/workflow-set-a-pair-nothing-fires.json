@@ -29,11 +29,37 @@
     {
       "args": [
         "workflow",
+        "set",
+        "GitHub",
+        "pr_opened",
+        "done",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "GitHub pr_opened -> done\n",
+      "stderr": "warning: Kaneo ships no integration for GitHub (did you mean github? the names are case-sensitive) (known integrations: github, gitea, gitlab); the rule is stored but will not move a task\n"
+    },
+    {
+      "args": [
+        "workflow",
+        "set",
+        "github",
+        "PR_OPENED",
+        "done",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "github PR_OPENED -> done\n",
+      "stderr": "warning: Kaneo fires PR_OPENED for no integration it ships (did you mean pr_opened? the names are case-sensitive) (known events: branch_push, pr_opened, pr_merged, issue_opened, issue_closed, issue_reopened); the rule is stored but will not move a task\n"
+    },
+    {
+      "args": [
+        "workflow",
         "ls",
         "--human"
       ],
       "exit": 0,
-      "stdout": "github pull_request.opened -> done  (rule0002)\ngerrit pr_opened -> done  (rule0003)\n",
+      "stdout": "github pull_request.opened -> done  (rule0002)\ngerrit pr_opened -> done  (rule0003)\nGitHub pr_opened -> done  (rule0004)\ngithub PR_OPENED -> done  (rule0005)\n",
       "stderr": ""
     }
   ],
@@ -65,6 +91,36 @@
       "body": {
         "integrationType": "gerrit",
         "eventType": "pr_opened",
+        "columnId": "col0003"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/workflow-rule/proj-alpha",
+      "query": "",
+      "body": {
+        "integrationType": "GitHub",
+        "eventType": "pr_opened",
+        "columnId": "col0003"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/workflow-rule/proj-alpha",
+      "query": "",
+      "body": {
+        "integrationType": "github",
+        "eventType": "PR_OPENED",
         "columnId": "col0003"
       }
     },

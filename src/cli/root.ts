@@ -13,7 +13,7 @@ import {
 } from "./args";
 import type { App } from "./app";
 import { resolveFromEnvironment, type Flags as ResolvedFlags } from "../config/resolve";
-import { isTTY, resolveMode, sanitizeControl, Writer } from "../output/output";
+import { isTTY, ReportedError, resolveMode, sanitizeControl, Writer } from "../output/output";
 import { loadFilter, JqFailure, type Filter } from "../output/jq";
 import { configureClient, setRateLimitWaits } from "../api/http";
 import { contextCommand } from "./context";
@@ -261,7 +261,7 @@ export const run = async (argv: string[]): Promise<number> => {
       return e instanceof JqFailure ? e.exitCode : 1;
     }
     const writer = out ?? writerFor(undefined, askedFor(argv, "--json"), askedFor(argv, "--human"));
-    writer.error(message);
+    writer.error(message, e instanceof ReportedError ? e.fields : {});
     return 1;
   }
 };

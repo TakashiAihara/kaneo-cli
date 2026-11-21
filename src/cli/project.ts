@@ -1,5 +1,5 @@
 import { writeSync } from "node:fs";
-import { apiKey, project, workspace, type App } from "./app";
+import { apiKey, project, projects, workspace, type App } from "./app";
 import {
   archived,
   createProject,
@@ -10,6 +10,7 @@ import {
   getProjectBackground,
   listMembers,
   listProjectsIn,
+  listWorkspaces,
   moveProject,
   reorderProjects,
   setProjectArchived,
@@ -22,8 +23,9 @@ import {
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
 import { sourceName } from "./input";
 import { allProjects, firstMatch, resolveWorkspace, slugOr, unlistedMessage, withProject, type ProjectIn, type Unlisted } from "./lookup";
-import { shellWord } from "../output/output";
+import { ReportedError, shellWord } from "../output/output";
 import { KaneoApiError } from "../api/http";
+import * as store from "../session/store";
 
 // `archive` and `unarchive` are the same request with the opposite verb, so they
 // are built from one place rather than written out twice.
@@ -73,6 +75,22 @@ const projectLine = (project: Project, workspaceName = ""): string => {
 // belongs to at the end, where a reader looking for it will look last.
 const named = ({ project, workspaceName }: ProjectIn) => ({ ...project, workspaceName });
 
+// The configured project values that name the project just deleted, as the
+// settings spelled them — an id, a slug or a name. Empty when the settings name
+// none (or cannot be read), which is the ordinary case outside a checkout.
+const staleDefault = (app: App, found: Project): string[] => {
+  let configured: string[];
+  try {
+    configured = projects(app);
+  } catch {
+    return [];
+  }
+  return configured.filter((value) => {
+    const folded = value.toLowerCase();
+    return value === found.id || folded === found.slug.toLowerCase() || folded === found.name.toLowerCase();
+  });
+};
+
 // Kaneo compares project keys NFKC-normalised and lower-cased (project-key.ts
 // in the API), so the check made before a create has to fold them the same way.
 const keyOf = (slug: string): string => slug.normalize("NFKC").toLowerCase();
@@ -119,11 +137,13 @@ const withDescription = async (created: Project, description: string): Promise<P
     // A 403 here means project update would be refused the same way, so the
     // line says why rather than suggesting it.
     const why = await permissionHint(e, "setting a description", "update", async () => created.workspaceId);
-    throw new Error(
+    const message =
       why === undefined
         ? `created project ${created.id} but could not set its description: ${(e as Error).message}; set it with \`kaneo project update ${shellWord(created.id)} -d TEXT\``
-        : `created project ${created.id} but could not set its description: ${(e as Error).message}: ${why}`,
-    );
+        : `created project ${created.id} but could not set its description: ${(e as Error).message}: ${why}`;
+    // The project exists either way, so the JSON error carries its id as a
+    // field: inside the prose alone a script cannot tell what was made.
+    throw new ReportedError(message, { projectId: created.id });
   }
 };
 
@@ -320,7 +340,7 @@ export const projectCommand = {
         // The read of the project comes first inside updateProject, so a value the
         // server does not know is retried before anything is written rather than
         // after.
-        const { before, after, unread } = await withProject(args[0]!, (id) =>
+        const { before, after, unread, nulled } = await withProject(args[0]!, (id) =>
           updateProject(id, changes).catch(refused("updating a project", "update", () => projectWorkspace(id))),
         );
         app.out.human(`updated ${after.id}`);
@@ -332,12 +352,15 @@ export const projectCommand = {
         ] as const) {
           const notRead = unread.includes(field);
           if (from === to && !notRead) continue;
-          const was = notRead ? "(not read)" : JSON.stringify(from);
+          // A field the reply sent as null was read, as no value; only one left
+          // out entirely is "not read".
+          const was = notRead ? (nulled.includes(field) ? "null" : "(not read)") : JSON.stringify(from);
           app.out.human(`  ${field}  ${was} -> ${JSON.stringify(to)}`);
         }
         // The slug is the prefix of every task identifier, so changing it renames
-        // them all and the reader has to be told.
-        // A slug the read lacked leaves no before to compare with.
+        // them all and the reader has to be told. A slug the read lacked leaves
+        // no before to compare with, and whether it changed is then unknown —
+        // the write's reply having one does not say what it was.
         if (unread.includes("slug")) {
           app.out.human(`  task identifiers may now start with ${after.slug}; the slug was not read, so whether it changed is unknown`);
         } else if (before.slug !== after.slug) app.out.human(`  task identifiers now start with ${after.slug}`);
@@ -406,10 +429,15 @@ export const projectCommand = {
         // links, its columns, its workflow rules — and the server keeps no copy,
         // so there is nothing to restore from; archive is the reversible way off
         // the board. A name or a slug was accepted here, so the refusal says
-        // which project it resolved to rather than echoing the word typed.
+        // which project it resolved to rather than echoing the word typed — and
+        // which workspace it is in, since the lookup spans every workspace the
+        // key reaches and the same name can live in two of them.
         if (flags.yes !== true) {
+          const inWorkspace = await listWorkspaces()
+            .then((all) => all.find((w) => w.id === found.workspaceId)?.name ?? found.workspaceId)
+            .catch(() => found.workspaceId);
           throw new Error(
-            `refusing to delete project ${found.name}${found.slug === "" ? "" : ` [${found.slug}]`} (${found.id}) without --yes; \`kaneo project archive ${shellWord(found.id)}\` keeps it`,
+            `refusing to delete project ${found.name}${found.slug === "" ? "" : ` [${found.slug}]`} (${found.id}) in workspace ${JSON.stringify(inWorkspace)} without --yes; \`kaneo project archive ${shellWord(found.id)}\` keeps it`,
           );
         }
         const deleted = await deleteProject(found.id).catch(refused("deleting a project", "delete", async () => found.workspaceId));
@@ -417,6 +445,22 @@ export const projectCommand = {
         // for; the reply is the server's own record of what it removed, and that
         // is what the report carries.
         app.out.human(`deleted ${found.id}  ${found.name}`);
+        // The settings may still resolve to the project just deleted, and the
+        // next command that asks for the default gets the server's "Workspace ID
+        // could not be determined" rather than this explanation.
+        const stale = staleDefault(app, found);
+        if (stale.length > 0) {
+          app.out.status(
+            `note: ${stale.map(shellWord).join(", ")} ${stale.length === 1 ? "is" : "are"} still configured as the project, but it was just deleted; pass --project, set KANEO_PROJECT or update .kaneo.json before the next command`,
+          );
+        }
+        // An attached session keeps the project in its attachment the same way
+        // the settings do; its next command fails on the task that went with
+        // it, and `session close` is what releases the attachment.
+        const held = store.load(store.sessionStore(), store.currentId((name) => process.env[name] ?? ""));
+        if (held?.projectId === found.id) {
+          app.out.status("note: this session is attached to a task on the project just deleted; `kaneo session close` releases the attachment");
+        }
         app.out.data(deleted);
       },
     },

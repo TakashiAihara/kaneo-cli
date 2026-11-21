@@ -282,10 +282,15 @@ export const SCENARIOS: Scenario[] = [
     steps: [["project", "update", "proj-noslug", "--name", "Has a name now", "--json"]],
   },
   {
-    // The read has no slug, so the line cannot say what it was.
+    // The read has no slug and the write's reply is the same row, so a slug
+    // written cannot be echoed back and is reported as such; a write that
+    // leaves it alone still gets its line, with no after to name.
     name: "project update of a project whose read lacks the slug",
     readWithout: ["slug"],
-    steps: [["project", "update", P1, "--slug", "AL2", "--human"]],
+    steps: [
+      ["project", "update", P1, "--slug", "AL2", "--human"],
+      ["project", "update", P1, "--name", "Alpha 2", "--human"],
+    ],
   },
   {
     // Written back unchanged, a field the read lacked still gets its line.
@@ -309,6 +314,24 @@ export const SCENARIOS: Scenario[] = [
     steps: [["project", "update", P1, "--icon", "Star", "--json"]],
   },
   {
+    // A field the read sent as null was read, as no value: the line says null,
+    // not "not read".
+    name: "project update of a project whose read nulls the icon",
+    readAs: { icon: null },
+    steps: [["project", "update", P1, "--icon", "Star", "--human"]],
+  },
+  {
+    // The read drops the slug but the write's reply has it: the field line says
+    // "(not read)", and the identifier line says whether it changed is unknown
+    // rather than claiming it did.
+    name: "project update of a project whose read drops only the slug",
+    readAs: { slug: undefined },
+    steps: [
+      ["project", "update", P1, "--slug", "AL2", "--human"],
+      ["project", "update", P1, "--slug", "AL3", "--json"],
+    ],
+  },
+  {
     // A field left out, one sent as null and one sent as another type are each
     // named for what the server did.
     name: "project update refuses a read that lacks, nulls and mistypes fields",
@@ -317,10 +340,11 @@ export const SCENARIOS: Scenario[] = [
     steps: [["project", "update", P1, "--name", "Alpha 2", "--human"]],
   },
   {
-    // The order of unread is the order slug, description, icon.
+    // The order of unread is the order slug, description, icon. The fields are
+    // left unwritten so the update can succeed on a server that lacks them.
     name: "project update json of a project whose read lacks every optional field",
     readWithout: ["slug", "description", "icon"],
-    steps: [["project", "update", P1, "--slug", "AL2", "-d", "", "--icon", "Star", "--json"]],
+    steps: [["project", "update", P1, "--name", "Alpha 2", "-d", "", "--json"]],
   },
   // A project whose id the shell would split or expand: the hints quote it.
   {
@@ -356,6 +380,21 @@ export const SCENARIOS: Scenario[] = [
   },
   { name: "project archive and unarchive", steps: [["project", "archive", P2, "--json"], ["project", "ls", "--human"], ["project", "unarchive", P2, "--human"], ["project", "ls", "--json"]] },
   { name: "project rm needs --yes", steps: [["project", "rm", P2, "--human"], ["project", "rm", "Beta", "--yes", "--json"], ["project", "ls", "--human"], ["project", "ls", "--archived", "--human"], ["task", "ls", "-p", P2, "--json"], ["project", "rm", "OLD", "--yes", "--human"]] },
+  // KANEO_PROJECT names proj-alpha in every scenario; deleting it leaves the
+  // setting pointing at nothing, which the note says before the next command
+  // finds out the hard way.
+  { name: "project rm of the configured project", steps: [["project", "rm", "ALP", "--yes", "--human"], ["project", "get", "--json"]] },
+  // An attached session keeps the project in its attachment too; the note says
+  // `session close` is what releases it, and status still shows the hold.
+  {
+    name: "project rm of the attached session's project",
+    env: { KANEO_SESSION_ID: "sess-rm" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["project", "rm", "ALP", "--yes", "--human"],
+      ["session", "status", "--human"],
+    ],
+  },
   { name: "project rm unknown", steps: [["project", "rm", "nope", "--yes", "--json"]] },
   { name: "project reorder", steps: [["project", "reorder", "Beta", "ALP", "--human"], ["project", "ls", "--archived", "--json"], ["project", "reorder", P1, P2, "--json"], ["project", "reorder", "bet", "alp", "--json"]] },
   { name: "project reorder must name every project", steps: [["project", "reorder", "Alpha", "--json"], ["project", "reorder", "Alpha", "Alpha", "Beta", "--json"], ["project", "reorder", "Alpha", "nope", "Beta", "--json"], ["project", "reorder", "Alpha", "Beta", "Old", "--json"]] },
@@ -503,6 +542,59 @@ export const SCENARIOS: Scenario[] = [
   { name: "column create and reorder", steps: [["column", "create", "Waiting", "--json"], ["column", "reorder", "to-do", "waiting", "in-progress", "done", "--human"], ["column", "ls", "--json"], ["task", "status", "1", "waiting", "--json"], ["board", "--human"]] },
   { name: "column reorder must name every column", steps: [["column", "reorder", "done", "to-do", "--json"], ["column", "reorder", "to-do", "to-do", "in-progress", "done", "--json"], ["column", "reorder", "to-do", "nope", "in-progress", "done", "--json"]] },
   { name: "column rename", steps: [["column", "rename", "in-progress", "Doing", "--json"], ["column", "ls", "--human"]] },
+  // Name, icon, color and done state all move after creation; what is not
+  // passed stays, and an empty --icon or --color clears it.
+  {
+    name: "column update",
+    steps: [
+      ["column", "update", "in-progress", "--name", "Doing", "--icon", "Clock", "--color", "#f00", "--final", "--json"],
+      ["column", "update", "Doing", "--icon", "", "--color", "", "--final=false", "--human"],
+      ["column", "ls", "--human"],
+      ["column", "update", "done", "--json"],
+      ["column", "update", "in-progress", "--name", " ", "--json"],
+      ["column", "update", "nope", "--name", "x", "--json"],
+    ],
+  },
+  // A name is matched with its surrounding spaces off and in one normalization
+  // form, so a column stored or typed either way is still the one named.
+  {
+    name: "column names match across spaces and normalization",
+    seed: {
+      columns: [
+        { slug: "to-do", name: "To Do" },
+        { slug: "in-progress", name: "In Progress" },
+        { slug: "done", name: "Done", isFinal: true },
+        { slug: "padded", name: "Padded " },
+        // Stored decomposed; the rename below types it composed.
+        { slug: "cafe", name: "Café" },
+      ],
+    },
+    steps: [
+      ["column", "rm", " Padded", "--yes", "--json"],
+      ["column", "rename", "Café", "Coffee", "--json"],
+      ["column", "ls", "--human"],
+    ],
+  },
+  // A name two columns share cannot pick one, so the reorder refusal names the
+  // ambiguity with the slugs that tell them apart — alongside every other way
+  // the list falls short, before anything is written.
+  {
+    name: "column reorder refuses an ambiguous name",
+    seed: {
+      columns: [
+        { slug: "to-do", name: "To Do" },
+        { slug: "in-progress", name: "In Progress" },
+        { slug: "done", name: "Done", isFinal: true },
+        { slug: "same-a", name: "Same" },
+        { slug: "same-b", name: "Same" },
+      ],
+    },
+    steps: [
+      ["column", "reorder", "to-do", "in-progress", "done", "Same", "nope", "--json"],
+      ["column", "rename", "Same", "x", "--json"],
+      ["column", "ls", "--human"],
+    ],
+  },
   { name: "column rm needs --yes", steps: [["column", "rm", "done", "--human"], ["column", "rm", "done", "--yes", "--json"], ["column", "create", "Waiting", "--json"], ["column", "rm", "waiting", "--yes", "--json"], ["column", "ls", "--json"]] },
   { name: "column unknown", steps: [["column", "rename", "nope", "x", "--json"]] },
   // A rule cannot outlive its column, so the delete takes the rules pointing at
@@ -514,7 +606,18 @@ export const SCENARIOS: Scenario[] = [
   { name: "workflow set and rm", steps: [["workflow", "set", "github", "pr_opened", "in-progress", "--json"], ["workflow", "set", "github", "pr_opened", "Done", "--human"], ["workflow", "set", "gitea", "issue_closed", "col0003", "--json"], ["workflow", "ls", "--human"], ["workflow", "rm", "github", "pr_opened", "--json"], ["workflow", "ls", "--json"]] },
   // A pair no plugin of the shipped ones fires is stored all the same, and said so
   // on stderr rather than left as a rule that moves nothing.
-  { name: "workflow set a pair nothing fires", steps: [["workflow", "set", "github", "pull_request.opened", "done", "--human"], ["workflow", "set", "gerrit", "pr_opened", "done", "--human"], ["workflow", "ls", "--human"]] },
+  {
+    name: "workflow set a pair nothing fires",
+    steps: [
+      ["workflow", "set", "github", "pull_request.opened", "done", "--human"],
+      ["workflow", "set", "gerrit", "pr_opened", "done", "--human"],
+      // The names are matched exactly, so a case variant is stored as a rule
+      // that never fires — with the known name pointed out.
+      ["workflow", "set", "GitHub", "pr_opened", "done", "--human"],
+      ["workflow", "set", "github", "PR_OPENED", "done", "--human"],
+      ["workflow", "ls", "--human"],
+    ],
+  },
   { name: "workflow rm by id", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }] }, steps: [["workflow", "ls", "--json"], ["workflow", "rm", "rule0002", "--human"], ["workflow", "ls", "--json"]] },
   { name: "workflow rm by pair matches the event", seed: { workflowRules: [{ projectId: P1, integrationType: "github", eventType: "pr_merged", columnSlug: "done" }, { projectId: P1, integrationType: "github", eventType: "pr_opened", columnSlug: "in-progress" }] }, steps: [["workflow", "rm", "github", "pr_opened", "--human"], ["workflow", "ls", "--human"]] },
   // Every integration fires the same six events, so a pair's integration is what

@@ -5,12 +5,14 @@ import {
   listColumns,
   renameColumn,
   reorderColumns,
+  updateColumn,
   type Column,
+  type ColumnChanges,
 } from "../api/kaneo";
 import { KaneoApiError } from "../api/http";
 import { exactArgs, minimumArgs, noArgs, type FlagValues } from "./args";
 import { withProject } from "./lookup";
-import { shellWord } from "../output/output";
+import { displayWidth, padCells, shellWord } from "../output/output";
 
 // The columns of the resolved project, and the changes to them.
 export const columnCommand = {
@@ -82,6 +84,68 @@ export const columnCommand = {
       },
     },
     {
+      name: "update",
+      use: "update <column>",
+      short: "Change a column's name, icon, color or done state",
+      long:
+        "Change a column's name, icon, color or done state; what is not passed stays.\n\n" +
+        "icon and color take null to clear, so an empty --icon or --color removes\n" +
+        "the one the column had. The slug is derived from the name at creation\n" +
+        "and never changes, so a rename leaves every task's status in the column.",
+      args: exactArgs(1),
+      flags: [
+        { name: "name", type: "string" as const, usage: "new name", defaultValue: "" },
+        { name: "icon", type: "string" as const, usage: "new icon name; empty clears it", defaultValue: "" },
+        { name: "color", type: "string" as const, usage: "new color; empty clears it", defaultValue: "" },
+        {
+          name: "final",
+          type: "bool" as const,
+          usage: "done state: tasks in it count as completed on the board and get no overdue reminders",
+          defaultValue: "false",
+        },
+      ],
+      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+        // Only a flag that was passed is a change: `--icon ""` clears the icon,
+        // and leaving the flag out has to keep it.
+        const changes: ColumnChanges = {};
+        if (changed.has("name")) {
+          const name = String(flags.name ?? "").trim();
+          if (name === "") throw new Error("a column name cannot be blank");
+          changes.name = name;
+        }
+        if (changed.has("icon")) {
+          const icon = String(flags.icon ?? "").trim();
+          changes.icon = icon === "" ? null : icon;
+        }
+        if (changed.has("color")) {
+          const color = String(flags.color ?? "").trim();
+          changes.color = color === "" ? null : color;
+        }
+        if (changed.has("final")) changes.isFinal = flags.final === true;
+        if (Object.keys(changes).length === 0) {
+          throw new Error("nothing to change: pass --name, --icon, --color or --final");
+        }
+
+        apiKey(app);
+        const { found, updated } = await withProject(project(app), async (projectId) => {
+          const found = await resolveColumn(projectId, args[0]!);
+          const updated = await updateColumn(found.id, changes);
+          return { found, updated };
+        });
+        app.out.human(`updated column ${updated.slug} ${updated.name}`);
+        for (const [field, was, now] of [
+          ["name", found.name, updated.name],
+          ["icon", found.icon, updated.icon],
+          ["color", found.color, updated.color],
+          ["isFinal", found.isFinal, updated.isFinal],
+        ] as const) {
+          if (was === now) continue;
+          app.out.human(`  ${field}  ${JSON.stringify(was)} -> ${JSON.stringify(now)}`);
+        }
+        app.out.data(updated);
+      },
+    },
+    {
       name: "reorder",
       use: "reorder <column>...",
       short: "Put a project's columns in a new order",
@@ -145,7 +209,8 @@ export const columnCommand = {
   ],
 };
 
-// The column a reference names, if any.
+// One reference's answer against the columns: the column an id, slug or name
+// names, the several a shared name could mean, or nothing.
 //
 // A reference is a column id, a slug or a name. The id is what the routes address
 // the column by and the slug is what a task's status holds; both are unique in a
@@ -153,15 +218,30 @@ export const columnCommand = {
 // columns can share one, and a name that does is refused rather than guessed.
 // All of it is read off the listing rather than by asking the server, so a word
 // that is none of these is a mistake this names rather than one answered by 404.
-const findColumn = (columns: Column[], ref: string): Column | undefined => {
+//
+// A name matches with its surrounding spaces off and in one normalization
+// form: a name typed or stored with either is still the name the board shows,
+// and a name stored in NFD still finds the column a person reads in NFC.
+const matchColumn = (columns: Column[], ref: string): { column?: Column; ambiguous?: Column[] } => {
   const wanted = ref.trim();
   const exact = columns.find((column) => column.id === wanted || column.slug === wanted);
-  if (exact !== undefined) return exact;
-  const named = columns.filter((column) => column.name === wanted);
-  if (named.length > 1) {
-    throw new Error(`${named.length} columns are named ${JSON.stringify(wanted)}; name one by its slug (${named.map((c) => c.slug).join(", ")})`);
+  if (exact !== undefined) return { column: exact };
+  const folded = wanted.normalize("NFC");
+  const named = columns.filter((column) => column.name.normalize("NFC").trim() === folded);
+  if (named.length > 1) return { ambiguous: named };
+  return named.length === 1 ? { column: named[0] } : {};
+};
+
+// The column a reference names, if any; a name two columns share throws, since
+// picking one would move or rename the wrong column.
+const findColumn = (columns: Column[], ref: string): Column | undefined => {
+  const match = matchColumn(columns, ref);
+  if (match.ambiguous !== undefined) {
+    throw new Error(
+      `${match.ambiguous.length} columns are named ${JSON.stringify(ref.trim())}; name one by its slug (${match.ambiguous.map((c) => c.slug).join(", ")})`,
+    );
   }
-  return named[0];
+  return match.column;
 };
 
 // The same, refused rather than undefined when nothing matches, so a caller that
@@ -185,12 +265,13 @@ const newName = (words: string[]): string => {
 };
 
 // One column as a person reads it: the slug a task's status would carry, padded
-// so the names line up, and marked when the board counts the column as done.
+// by display cells so the names line up even when a slug is full-width, and
+// marked when the board counts the column as done.
 const columnLine = (column: Column, width: number): string =>
-  `${column.slug.padEnd(width)}  ${column.name}${column.isFinal ? "  (final)" : ""}`;
+  `${padCells(column.slug, width)}  ${column.name}${column.isFinal ? "  (final)" : ""}`;
 
 const printColumns = (app: App, columns: Column[]): void => {
-  const width = columns.reduce((at, column) => Math.max(at, column.slug.length), 0);
+  const width = columns.reduce((at, column) => Math.max(at, displayWidth(column.slug)), 0);
   for (const column of columns) app.out.human(columnLine(column, width));
 };
 
@@ -205,20 +286,24 @@ const newOrder = (columns: Column[], refs: string[]): Column[] => {
   const taken = new Set<string>();
   const unknown: string[] = [];
   const repeated: string[] = [];
+  const ambiguous: string[] = [];
   for (const ref of refs) {
     const wanted = ref.trim();
-    const found = findColumn(columns, wanted);
-    if (found === undefined) unknown.push(wanted);
-    else if (taken.has(found.id)) repeated.push(wanted);
+    const match = matchColumn(columns, wanted);
+    if (match.ambiguous !== undefined) {
+      ambiguous.push(`${wanted} (${match.ambiguous.map((column) => column.slug).join(", ")})`);
+    } else if (match.column === undefined) unknown.push(wanted);
+    else if (taken.has(match.column.id)) repeated.push(wanted);
     else {
-      taken.add(found.id);
-      ordered.push(found);
+      taken.add(match.column.id);
+      ordered.push(match.column);
     }
   }
   const missing = columns.filter((column) => !taken.has(column.id)).map((column) => column.slug);
   const wrong = [
     ...(unknown.length === 0 ? [] : [`unknown: ${unknown.join(", ")}`]),
     ...(repeated.length === 0 ? [] : [`repeated: ${repeated.join(", ")}`]),
+    ...(ambiguous.length === 0 ? [] : [`ambiguous: ${ambiguous.join(", ")}`]),
     ...(missing.length === 0 ? [] : [`missing: ${missing.join(", ")}`]),
   ];
   if (wrong.length > 0) {

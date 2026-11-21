@@ -8,6 +8,7 @@ import {
   KaneoApiError,
   keepsCredential,
   normalizeBaseUrl,
+  presignedPut,
 } from "../src/api/http";
 
 // The contract of the transport under the generated client, ported from the
@@ -715,5 +716,178 @@ describe("responses", () => {
       kaneoFetch("/project/p1", { method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}", schema }),
     );
     expect(lines.join("\n")).toContain("kaneo: PUT /project/p1: response does not match the schema");
+  });
+});
+
+describe("binary replies", () => {
+  // Bytes no JSON parser could read: a PNG's signature and a tail that is not
+  // UTF-8, so a decode-and-reencode would not give them back.
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0x00, 0xfe]);
+
+  test("a blob reply is the body as it arrived, with the type it was served as", async () => {
+    const url = serve(() => new Response(PNG, { headers: { "content-type": "image/png; charset=binary" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const blob = await kaneoFetch<Blob>("/project/p1/background", { method: "GET", blob: true, headers: { Accept: "image/*" } });
+    expect(blob.type).toBe("image/png");
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(PNG);
+  });
+
+  test("a blob reply is not read as JSON and no schema is asked of it", async () => {
+    const url = serve(() => new Response(PNG, { headers: { "content-type": "image/png" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    // A schema the bytes could never satisfy is still not consulted.
+    const blob = await kaneoFetch<Blob>("/project/p1/background", { method: "GET", blob: true, schema: z.string() });
+    expect(blob.size).toBe(PNG.byteLength);
+  });
+
+  test("an empty blob reply is an empty Blob, not the empty-JSON undefined", async () => {
+    const url = serve(() => new Response(null, { headers: { "content-type": "image/png" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const blob = await kaneoFetch<Blob>("/project/p1/background", { method: "GET", blob: true });
+    expect(blob.size).toBe(0);
+  });
+
+  test("a failed blob call still reports the server's status and message", async () => {
+    const url = serve(() => new Response("Project background not found", { status: 404, headers: { "content-type": "text/plain" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/project/p1/background", { method: "GET", blob: true }))) as KaneoApiError;
+    expect(e.statusCode).toBe(404);
+    expect(e.messages).toEqual(["Project background not found"]);
+  });
+
+  test("the Accept a caller names is the one sent", async () => {
+    let accept = "";
+    const url = serve((req) => {
+      accept = req.headers.get("accept") ?? "";
+      return new Response(PNG, { headers: { "content-type": "image/png" } });
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    await kaneoFetch<Blob>("/project/p1/background", { method: "GET", blob: true, headers: { Accept: "image/*" } });
+    expect(accept).toBe("image/*");
+  });
+});
+
+describe("presignedPut", () => {
+  test("PUTs the bytes to the URL with the signed headers and no key", async () => {
+    const seen: { method: string; path: string; query: string; auth: string | null; type: string | null; body: Uint8Array } = {
+      method: "",
+      path: "",
+      query: "",
+      auth: null,
+      type: null,
+      body: new Uint8Array(),
+    };
+    const url = serve(async (req) => {
+      const target = new URL(req.url);
+      Object.assign(seen, {
+        method: req.method,
+        path: target.pathname,
+        query: target.search,
+        auth: req.headers.get("authorization"),
+        type: req.headers.get("content-type"),
+        body: new Uint8Array(await req.arrayBuffer()),
+      });
+      return new Response(null, { status: 200 });
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const bytes = new Uint8Array([0x89, 0x00, 0xff]);
+    await presignedPut(`${url}/storage/k1?signature=secret`, { "Content-Type": "image/png" }, bytes);
+    expect(seen.method).toBe("PUT");
+    expect(seen.path).toBe("/storage/k1");
+    expect(seen.query).toBe("?signature=secret");
+    expect(seen.auth).toBeNull();
+    expect(seen.type).toBe("image/png");
+    expect(seen.body).toEqual(bytes);
+  });
+
+  test("a refusal names where it went, without the query that authorizes it", async () => {
+    const url = serve(() => new Response("SignatureDoesNotMatch", { status: 403 }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = await failure(presignedPut(`${url}/storage/k1?X-Amz-Signature=abc123`, {}, new Uint8Array([1])));
+    expect(String(e)).toContain(`PUT ${url}/storage/k1: 403`);
+    expect(String(e)).toContain("SignatureDoesNotMatch");
+    expect(String(e)).not.toContain("X-Amz-Signature");
+    expect(String(e)).not.toContain("abc123");
+  });
+
+  test("an unreachable storage URL fails naming the call, query left out", async () => {
+    configureClient({ baseUrl: "http://127.0.0.1:9", apiKey: "test-key" });
+    const e = await failure(presignedPut("http://127.0.0.1:9/storage/k?sig=1", {}, new Uint8Array([1])));
+    expect(String(e)).toContain("PUT http://127.0.0.1:9/storage/k:");
+    expect(String(e)).not.toContain("sig=1");
+  });
+
+  // A followed redirect would resend the signed headers and body to a host
+  // the signature was not written for, or turn the PUT into a GET that
+  // answers 200 and reads as an upload that never landed.
+  test("a redirect is a failure, not followed", async () => {
+    let landed = 0;
+    const target = serve(() => {
+      landed++;
+      return new Response("landed", { status: 200 });
+    });
+    const url = serve(() => new Response(null, { status: 302, headers: { location: `${target}/storage/k1` } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = await failure(presignedPut(`${url}/storage/k1?signature=secret`, {}, new Uint8Array([1])));
+    expect(String(e)).toContain(`PUT ${url}/storage/k1:`);
+    expect(landed).toBe(0);
+  });
+
+  // An S3-style error puts the signature it checked beside the code and
+  // message; only those two fields may reach the report.
+  test("a markup refusal reports its code and message, not the signature fields", async () => {
+    const url = serve(
+      () =>
+        new Response(
+          `<Error><Code>SignatureDoesNotMatch</Code><Message>Access &quot;denied&quot;: check the key</Message><StringToSign>AWS4-HMAC-SHA256\n20260101\nsecret</StringToSign><SignatureProvided>deadbeef</SignatureProvided></Error>`,
+          { status: 403 },
+        ),
+    );
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = await failure(presignedPut(`${url}/storage/k1?signature=secret`, {}, new Uint8Array([1])));
+    expect(String(e)).toContain("PUT " + url + "/storage/k1: 403: SignatureDoesNotMatch: Access \"denied\": check the key");
+    expect(String(e)).not.toContain("StringToSign");
+    expect(String(e)).not.toContain("SignatureProvided");
+    expect(String(e)).not.toContain("deadbeef");
+    expect(String(e)).not.toContain("AWS4-HMAC-SHA256");
+  });
+
+  // Markup without the two fields is withheld rather than echoed: whatever
+  // else it holds is the storage server's business, not the caller's.
+  test("a markup refusal without code or message is not echoed", async () => {
+    const url = serve(() => new Response(`<Error><StringToSign>secret-material</StringToSign></Error>`, { status: 403 }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = await failure(presignedPut(`${url}/storage/k1`, {}, new Uint8Array([1])));
+    expect(String(e)).toBe(`Error: PUT ${url}/storage/k1: 403`);
+  });
+
+  // The signed query and headers are the credential and the bytes the
+  // payload, so plain http to a host that is not loopback would put both on
+  // the wire in the clear. Refused before the request, the way the API key
+  // is — the unreachable host could not answer either way, so the refusal
+  // itself is what the message pins.
+  test("a plain-http URL off loopback is refused before sending", async () => {
+    configureClient({ baseUrl: "http://127.0.0.1:9", apiKey: "test-key" });
+    const e = await failure(presignedPut("http://kaneo.example.invalid/storage/k?sig=1", {}, new Uint8Array([1])));
+    expect(String(e)).toBe(
+      "Error: PUT http://kaneo.example.invalid/storage/k: refusing to send the upload over a URL that is not https, or http to a loopback host",
+    );
+  });
+
+  // https is fine wherever it points: the check passes and the call fails
+  // only at the connection, named the way every other transport failure is.
+  test("an https URL passes the check and fails only at the connection", async () => {
+    configureClient({ baseUrl: "http://127.0.0.1:9", apiKey: "test-key" });
+    const e = await failure(presignedPut("https://127.0.0.1:9/storage/k?sig=1", {}, new Uint8Array([1])));
+    expect(String(e)).toContain("PUT https://127.0.0.1:9/storage/k:");
+    expect(String(e)).not.toContain("refusing to send the upload");
+  });
+
+  // The allowance is https, or http to loopback — another scheme is refused
+  // even on loopback rather than left for fetch to reject.
+  test("a non-http scheme is refused even on loopback", async () => {
+    configureClient({ baseUrl: "http://127.0.0.1:9", apiKey: "test-key" });
+    const e = await failure(presignedPut("ftp://127.0.0.1/storage/k", {}, new Uint8Array([1])));
+    expect(String(e)).toContain("PUT ftp://127.0.0.1/storage/k: refusing to send the upload");
   });
 });

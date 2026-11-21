@@ -1,0 +1,53 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "move",
+        "proj-alpha",
+        "--to",
+        "Other",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/project/proj-alpha/move: 403: Insufficient permissions: moving a project needs the project update and delete permissions in the source workspace, and project creation plus workspace settings management in the destination, which the owner and admin roles have unless the workspace's roles were changed; your role in the source is member; `kaneo workspace members -w ws-main` and `kaneo workspace members -w ws-other` list each member's role\"\n}\n",
+      "stderr": "Error: PUT /api/project/proj-alpha/move: 403: Insufficient permissions: moving a project needs the project update and delete permissions in the source workspace, and project creation plus workspace settings management in the destination, which the owner and admin roles have unless the workspace's roles were changed; your role in the source is member; `kaneo workspace members -w ws-main` and `kaneo workspace members -w ws-other` list each member's role\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha/move",
+      "query": "",
+      "body": {
+        "workspaceId": "ws-other"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/user/me",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-main/members",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-other/members",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

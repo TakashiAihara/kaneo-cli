@@ -1,0 +1,49 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "background",
+        "set",
+        "proj-alpha",
+        "bg.png",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/project/proj-alpha/background-upload/finalize: 400: Image upload could not be finalized\"\n}\n",
+      "stderr": "Error: POST /api/project/proj-alpha/background-upload/finalize: 400: Image upload could not be finalized\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha/background-upload",
+      "query": "",
+      "body": {
+        "contentType": "image/png",
+        "size": 9
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/storage/workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001",
+      "query": "?signature=fake",
+      "body": {
+        "key": "workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001",
+        "bytes": 9
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/project/proj-alpha/background-upload/finalize",
+      "query": "",
+      "body": {
+        "key": "workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001",
+        "contentType": "image/png",
+        "version": "bg0001",
+        "size": 9
+      }
+    }
+  ],
+  "files": {}
+}

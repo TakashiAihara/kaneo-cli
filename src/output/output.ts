@@ -80,6 +80,14 @@ export class Writer {
   // error() writes nothing to stdout there anyway.
   private wroteData = false;
 
+  // A command whose stdout is a payload that is not JSON — the background
+  // image's bytes — has no room for the error object error() would add, so it
+  // marks stdout as spoken for before the payload is on its way: a failure is
+  // then reported on stderr alone, as one after the payload is.
+  dataOnly(): void {
+    this.wroteData = true;
+  }
+
   // The payload of a command. In JSON mode it is the only thing on stdout, and
   // with a filter it is what the filter makes of it.
   data(value: Json): void {

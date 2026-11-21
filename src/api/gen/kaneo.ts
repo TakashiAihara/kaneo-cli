@@ -30,11 +30,14 @@ import {
   InvitationDetails,
   Label,
   MoveTaskResult,
+  MovedProject,
   Notification,
   NotificationBulkResult,
   NotificationPreferences,
   Organization,
   Project,
+  ProjectBackgroundFinalize,
+  ProjectBackgroundUpload,
   ProjectListItem,
   ReorderCustomFieldsResponse,
   RevokeCalendarFeed200,
@@ -69,6 +72,7 @@ import type {
   CreateTaskCommentBody,
   CreateTaskRelationBody,
   CreateTimeEntryBody,
+  FinalizeProjectBackgroundUploadBody,
   GetActivitiesParams,
   GetTaskByTicketIdParams,
   GetTaskParams,
@@ -82,6 +86,7 @@ import type {
   ListProjectsParams,
   ListTasksParams,
   MarkAllNotificationsAsReadParams,
+  MoveProjectBody,
   MoveTaskBody,
   PendingLabelDeletion,
   ReorderColumnsBody,
@@ -104,6 +109,7 @@ import type {
   UpdateTaskStatusBody,
   UpdateTaskTitleBody,
   UpdateTimeEntryBody,
+  UploadProjectBackgroundBody,
   UpsertNotificationPreferenceWorkspaceRuleBody,
   UpsertWorkflowRuleBody,
   VerifyGitlabAccessBody
@@ -196,6 +202,47 @@ return kaneoFetch<Organization>(getUpdateOrganizationUrl(),
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateOrganizationBody),
     schema: Organization
+  }
+);}
+
+
+
+export const getMoveProjectUrl = (id: string,) => {
+
+
+
+
+  return `/project/${id}/move`
+}
+
+/**
+ * Move a project and its tasks. Requires update and delete permission in the source, plus project creation and workspace settings management permission in the destination. Remove cross-project task relationships before moving.
+ * @summary Move a project to another workspace
+ */
+export const moveProject = async (id: string,
+    moveProjectBody: MoveProjectBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<MovedProject> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<MovedProject>(getMoveProjectUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moveProjectBody),
+    schema: MovedProject
   }
 );}
 
@@ -367,6 +414,56 @@ export const deleteProject = async (id: string, options?: Parameters<typeof kane
 
 
 
+export const getGetProjectBackgroundUrl = (id: string,) => {
+
+
+
+
+  return `/project/${id}/background`
+}
+
+/**
+ * Download the current project board background image.
+ * @summary Download project background
+ */
+export const getProjectBackground = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<Blob> => {
+
+  return kaneoFetch<Blob>(getGetProjectBackgroundUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getDeleteProjectBackgroundUrl = (id: string,) => {
+
+
+
+
+  return `/project/${id}/background`
+}
+
+/**
+ * Remove the current project board background image.
+ * @summary Delete project background
+ */
+export const deleteProjectBackground = async (id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<void> => {
+
+  return kaneoFetch<void>(getDeleteProjectBackgroundUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
 export const getReorderProjectsUrl = (params: ReorderProjectsParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -462,6 +559,88 @@ export const unarchiveProject = async (id: string, options?: Parameters<typeof k
 
     ,
     schema: Project
+  }
+);}
+
+
+
+export const getUploadProjectBackgroundUrl = (id: string,) => {
+
+
+
+
+  return `/project/${id}/background-upload`
+}
+
+/**
+ * Create a presigned background image upload URL for a project.
+ * @summary Prepare project background upload
+ */
+export const uploadProjectBackground = async (id: string,
+    uploadProjectBackgroundBody: UploadProjectBackgroundBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<ProjectBackgroundUpload> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<ProjectBackgroundUpload>(getUploadProjectBackgroundUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(uploadProjectBackgroundBody),
+    schema: ProjectBackgroundUpload
+  }
+);}
+
+
+
+export const getFinalizeProjectBackgroundUploadUrl = (id: string,) => {
+
+
+
+
+  return `/project/${id}/background-upload/finalize`
+}
+
+/**
+ * Save an uploaded image as the project's board background.
+ * @summary Finalize project background upload
+ */
+export const finalizeProjectBackgroundUpload = async (id: string,
+    finalizeProjectBackgroundUploadBody: FinalizeProjectBackgroundUploadBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<ProjectBackgroundFinalize> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<ProjectBackgroundFinalize>(getFinalizeProjectBackgroundUploadUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(finalizeProjectBackgroundUploadBody),
+    schema: ProjectBackgroundFinalize
   }
 );}
 

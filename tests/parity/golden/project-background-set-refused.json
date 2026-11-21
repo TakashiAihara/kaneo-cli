@@ -1,0 +1,196 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "background",
+        "set",
+        "proj-alpha",
+        "missing.png",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"reading missing.png: ENOENT: no such file or directory, open 'missing.png'\"\n}\n",
+      "stderr": "Error: reading missing.png: ENOENT: no such file or directory, open 'missing.png'\n"
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "set",
+        "proj-alpha",
+        "notes.txt",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/project/proj-alpha/background-upload: 400: Unsupported content type \\\"text/plain;charset=utf-8\\\". Upload a supported image.\"\n}\n",
+      "stderr": "Error: PUT /api/project/proj-alpha/background-upload: 400: Unsupported content type \"text/plain;charset=utf-8\". Upload a supported image.\n"
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "set",
+        "proj-alpha",
+        "blob",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"blob gives no usable content type; pass --content-type\"\n}\n",
+      "stderr": "Error: blob gives no usable content type; pass --content-type\n"
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "set",
+        "proj-alpha",
+        "empty.png",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/project/proj-alpha/background-upload: 400: Upload size must be greater than zero.\"\n}\n",
+      "stderr": "Error: PUT /api/project/proj-alpha/background-upload: 400: Upload size must be greater than zero.\n"
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "set",
+        "proj-alpha",
+        "bg.png",
+        "--content-type",
+        "image/gif",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"project\": \"proj-alpha\",\n  \"url\": \"<URL>/project/proj-alpha/background?v=bg0001\",\n  \"version\": \"bg0001\",\n  \"contentType\": \"image/gif\",\n  \"size\": 3\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "get",
+        "proj-alpha",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--json and --jq do not apply to project background get; the image is written to stdout as it arrives\"\n}\n",
+      "stderr": "Error: --json and --jq do not apply to project background get; the image is written to stdout as it arrives\n"
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "get",
+        "proj-alpha",
+        "--jq",
+        ".url"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --json and --jq do not apply to project background get; the image is written to stdout as it arrives\n"
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "rm",
+        "proj-alpha",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: refusing to remove the background of Alpha [ALP] (proj-alpha) without --yes\n"
+    },
+    {
+      "args": [
+        "project",
+        "background",
+        "rm",
+        "nope",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha/background-upload",
+      "query": "",
+      "body": {
+        "contentType": "text/plain;charset=utf-8",
+        "size": 12
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha/background-upload",
+      "query": "",
+      "body": {
+        "contentType": "image/png",
+        "size": 0
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha/background-upload",
+      "query": "",
+      "body": {
+        "contentType": "image/gif",
+        "size": 3
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/storage/workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001",
+      "query": "?signature=fake",
+      "body": {
+        "key": "workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001",
+        "bytes": 3
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/project/proj-alpha/background-upload/finalize",
+      "query": "",
+      "body": {
+        "key": "workspace/ws-main/project/proj-alpha/backgrounds/background-bg0001",
+        "contentType": "image/gif",
+        "version": "bg0001",
+        "size": 3
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/nope",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    }
+  ],
+  "files": {}
+}

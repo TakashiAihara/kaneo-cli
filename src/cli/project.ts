@@ -1,19 +1,26 @@
+import { writeSync } from "node:fs";
 import { apiKey, project, workspace, type App } from "./app";
 import {
   archived,
   createProject,
   currentUser,
   deleteProject,
+  deleteProjectBackground,
   getProject,
+  getProjectBackground,
   listMembers,
   listProjectsIn,
+  moveProject,
   reorderProjects,
   setProjectArchived,
+  setProjectBackground,
   updateProject,
   type Project,
   type ProjectChanges,
+  type User,
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
+import { sourceName } from "./input";
 import { allProjects, firstMatch, resolveWorkspace, slugOr, unlistedMessage, withProject, type ProjectIn, type Unlisted } from "./lookup";
 import { shellWord } from "../output/output";
 import { KaneoApiError } from "../api/http";
@@ -338,6 +345,41 @@ export const projectCommand = {
         app.out.data({ from: before, to: after, unread });
       },
     },
+    {
+      name: "move",
+      use: "move <project> --to <workspace>",
+      short: "Move a project to another workspace",
+      long:
+        "Move a project to another workspace.\n\n" +
+        "The project keeps its id and moves with its tasks. The server refuses\n" +
+        "the move when the destination already has a project with the same key,\n" +
+        "or when a task in it is related to a task in another project, and it\n" +
+        "unassigns the tasks whose assignee is not a member of the destination\n" +
+        "workspace — the count is in the reply.\n\n" +
+        "The project is named the way `project rm` names it — required rather\n" +
+        "than resolved from the settings, since a move typed inside a checkout\n" +
+        "would otherwise hit whichever project that repo maps to. --to is a\n" +
+        "workspace id, slug or name, matched the way --workspace is.",
+      args: exactArgs(1),
+      flags: [{ name: "to", type: "string" as const, usage: "destination workspace id, slug or name", defaultValue: "" }],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
+        const target = String(flags.to ?? "");
+        if (target === "") throw new Error("no destination: pass --to <workspace>");
+        apiKey(app);
+        // The destination is resolved before the project is tried: a bad --to
+        // is reported without a project lookup, and the workspace listing is
+        // one small request either way.
+        const workspaceId = await resolveWorkspace(target);
+        const moved = await withProject(args[0]!, (id) =>
+          moveProject(id, workspaceId).catch(moveRefused(id, workspaceId)),
+        );
+        app.out.human(`moved ${moved.id}  ${moved.name}${moved.slug === "" ? "" : ` [${moved.slug}]`}  to ${workspaceId}`);
+        if (moved.unassignedTaskCount > 0) {
+          app.out.human(`  ${moved.unassignedTaskCount} task(s) lost their assignee: not a member of the destination workspace`);
+        }
+        app.out.data(moved);
+      },
+    },
     archiveCommand("archive"),
     archiveCommand("unarchive"),
     {
@@ -407,8 +449,170 @@ export const projectCommand = {
         app.out.data(reply);
       },
     },
+    {
+      name: "background",
+      short: "Work with a project's board background image",
+      children: [
+        {
+          name: "get",
+          use: "get [project]",
+          short: "Write the project's background image to stdout",
+          long:
+            "Write the project's background image to stdout.\n\n" +
+            "The image is written as it arrives — it is not JSON, so --json and\n" +
+            "--jq are refused, and so is a terminal: the bytes are the server's\n" +
+            "to choose and can carry escape sequences. Redirect it to a file\n" +
+            "(`> bg.png`) or pipe it on.\n\n" +
+            "The project falls back to the resolved one the way `project get` does.",
+          args: maximumArgs(1),
+          run: async ({ args, changed, app }: { args: string[]; changed: ReadonlySet<string>; app: App }) => {
+            // There is no JSON form of an image for the output flags to hand
+            // back, so asking for one is refused rather than silently answered
+            // with bytes a filter cannot read. An empty --jq is no expression
+            // at all, the same as everywhere else.
+            if (changed.has("json") || app.out.filter !== undefined) {
+              throw new Error("--json and --jq do not apply to project background get; the image is written to stdout as it arrives");
+            }
+            // The bytes are the server's to choose, so a terminal is refused
+            // them the way curl refuses binary output: an image can carry
+            // escape sequences, and only a file or a pipe should get them.
+            if (app.out.terminal) {
+              throw new Error("refusing to write an image to a terminal; redirect it to a file (`> bg.png`) or pipe it on");
+            }
+            // stdout is the image or nothing, so an error object has no place
+            // in a file the bytes are being redirected into: failures are
+            // stderr-only from here on.
+            app.out.dataOnly();
+            apiKey(app);
+            const blob = await withProject(args[0] ?? project(app), (id) => getProjectBackground(id));
+            // The bytes go out as they arrived: an image is not text, so
+            // nothing here may decode or re-encode it. writeSync reports the
+            // bytes it took, which on a pipe can be fewer than it was given,
+            // so the rest goes out until the image is whole; a write that
+            // takes nothing is a failure rather than a silently cut image.
+            const image = new Uint8Array(await blob.arrayBuffer());
+            for (let offset = 0; offset < image.byteLength; ) {
+              const written = writeSync(1, image, offset, image.byteLength - offset);
+              if (written === 0) throw new Error(`stdout accepted none of the remaining ${image.byteLength - offset} image bytes`);
+              offset += written;
+            }
+          },
+        },
+        {
+          name: "set",
+          use: "set <project> <file>",
+          short: "Set the project's background image from a file",
+          long:
+            "Set the project's background image from a file.\n\n" +
+            "The bytes are uploaded through the presigned URL the API prepares,\n" +
+            "then finalized, the way the web app's upload runs. The content type\n" +
+            "comes from --content-type, or from the file's extension; the server\n" +
+            "accepts only the image types it lists and files up to its size\n" +
+            "limit. `-` reads the bytes from stdin, which then needs\n" +
+            "--content-type.\n\n" +
+            "Both arguments are required rather than resolved from the settings,\n" +
+            "as `project rm`'s is: a file path cannot double as a project\n" +
+            "reference.",
+          args: exactArgs(2),
+          flags: [
+            {
+              name: "content-type",
+              type: "string" as const,
+              usage: "MIME type of the image (default: the file's, from its extension)",
+              defaultValue: "",
+            },
+          ],
+          run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+            apiKey(app);
+            const ref = args[0]!;
+            const source = args[1]!;
+            const named = sourceName(source);
+            // What --content-type asked for, "" included: an empty one is
+            // refused the same as none below. stdin has no file to take a
+            // type from, so for it the flag is the only source — checked
+            // before the read, which on a terminal would wait for EOF before
+            // reporting the missing flag.
+            const contentTypeFlag = changed.has("content-type") ? String(flags["content-type"] ?? "").trim() : undefined;
+            if (source === "-" && (contentTypeFlag === undefined || contentTypeFlag === "")) {
+              throw new Error(`${named} gives no usable content type; pass --content-type`);
+            }
+            let bytes: Uint8Array;
+            let fileType = "";
+            try {
+              if (source === "-") {
+                bytes = await Bun.stdin.bytes();
+              } else {
+                const file = Bun.file(source);
+                fileType = file.type;
+                bytes = await file.bytes();
+              }
+            } catch (e) {
+              throw new Error(`reading ${named}: ${e instanceof Error ? e.message : String(e)}`);
+            }
+            // Bun.file().type answers application/octet-stream when the name
+            // says nothing, which is no image type the server takes, so it
+            // counts as no content type here; stdin has no file to ask and is
+            // "" outright. --content-type wins either way, and an empty one is
+            // refused the same as none.
+            const detected = fileType === "application/octet-stream" ? "" : fileType;
+            const contentType = contentTypeFlag ?? detected;
+            if (contentType === "") throw new Error(`${named} gives no usable content type; pass --content-type`);
+            const done = await withProject(ref, async (id) => ({
+              project: id,
+              ...(await setProjectBackground(id, contentType, bytes).catch(
+                refused("setting a project background", "update", () => projectWorkspace(id)),
+              )),
+            }));
+            app.out.human(`set the background of ${done.project} from ${named} (${contentType}, ${bytes.byteLength} bytes)`);
+            app.out.human(`  ${done.url}`);
+            app.out.data({ project: done.project, url: done.url, version: done.version, contentType, size: bytes.byteLength });
+          },
+        },
+        {
+          name: "rm",
+          aliases: ["delete"],
+          use: "rm <project>",
+          short: "Remove the project's background image",
+          long:
+            "Remove the project's background image.\n\n" +
+            "The project keeps everything else; `background set` puts an image\n" +
+            "back.\n\n" +
+            "The project is named the way `project rm` names it — required rather\n" +
+            "than resolved from the settings — and --yes confirms, as every\n" +
+            "delete asks.",
+          args: exactArgs(1),
+          flags: [{ name: "yes", type: "bool" as const, usage: "confirm the removal", defaultValue: "false" }],
+          run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
+            apiKey(app);
+            const found = await withProject(args[0]!, (id) => getProject(id));
+            // The image is gone for good — there is no trash to restore it
+            // from — so the confirmation is asked for the way every other
+            // delete asks for it.
+            if (flags.yes !== true) {
+              throw new Error(
+                `refusing to remove the background of ${found.name}${found.slug === "" ? "" : ` [${found.slug}]`} (${found.id}) without --yes`,
+              );
+            }
+            await deleteProjectBackground(found.id).catch(refused("removing a project background", "update", async () => found.workspaceId));
+            app.out.human(`removed the background of ${found.id}  ${found.name}`);
+            app.out.data({ project: found.id, backgroundRemoved: true });
+          },
+        },
+      ],
+    },
   ],
 };
+
+// The server's bare 403 "Insufficient permissions", which is all a refused
+// permission check says: it does not name the permission or, for a move,
+// which workspace's check refused.
+const insufficientPermissions = (e: unknown): boolean =>
+  e instanceof KaneoApiError && e.statusCode === 403 && e.messages.includes("Insufficient permissions");
+
+// The caller's role in one workspace's member list, "" when the list cannot
+// be read or does not name them.
+const roleIn = async (me: User, workspaceId: string): Promise<string> =>
+  (await listMembers(workspaceId)).find((m) => m.id === me.id)?.role ?? "";
 
 // What the server's bare 403 "Insufficient permissions" means for a project
 // route: which permission it checks (Kaneo 2.32.0's requireWorkspacePermission),
@@ -419,10 +623,10 @@ export const projectCommand = {
 const permissionHint = async (
   e: unknown,
   doing: string,
-  permission: "update" | "delete",
+  permission: "update" | "delete" | "update and delete",
   workspaceOf: () => Promise<string>,
 ): Promise<string | undefined> => {
-  if (!(e instanceof KaneoApiError && e.statusCode === 403 && e.messages.includes("Insufficient permissions"))) return undefined;
+  if (!insufficientPermissions(e)) return undefined;
   const workspaceId = await workspaceOf().catch(() => "");
   const role =
     workspaceId === ""
@@ -430,17 +634,61 @@ const permissionHint = async (
       : // One after the other, so the requests go out in the same order every run.
         await (async () => {
           const me = await currentUser();
-          return (await listMembers(workspaceId)).find((m) => m.id === me.id)?.role ?? "";
+          return roleIn(me, workspaceId);
         })().catch(() => "");
   const yours = role === "" ? "" : `; your role there is ${role}`;
   const where = workspaceId === "" ? "kaneo workspace members" : `kaneo workspace members -w ${shellWord(workspaceId)}`;
-  return `${doing} needs the project ${permission} permission in the workspace, which the owner and admin roles have unless the workspace's roles were changed${yours}; \`${where}\` lists each member's role`;
+  const noun = permission.includes(" and ") ? "permissions" : "permission";
+  return `${doing} needs the project ${permission} ${noun} in the workspace, which the owner and admin roles have unless the workspace's roles were changed${yours}; \`${where}\` lists each member's role`;
+};
+
+// The same refusal for a move, which the server can answer for either side:
+// the source needs the project's update and delete permissions, the
+// destination project creation and workspace settings management, and the
+// 403 does not say which side refused. Both are named, with the caller's
+// role in each workspace where it can be read — the destination's id is
+// already resolved, the source's is read back off the project.
+const movePermissionHint = async (
+  e: unknown,
+  projectId: string,
+  destinationId: string,
+): Promise<string | undefined> => {
+  if (!insufficientPermissions(e)) return undefined;
+  const sourceId = await projectWorkspace(projectId).catch(() => "");
+  const me = await currentUser().catch(() => undefined);
+  const role = async (workspaceId: string): Promise<string> =>
+    me === undefined || workspaceId === "" ? "" : await roleIn(me, workspaceId).catch(() => "");
+  const inSource = await role(sourceId);
+  const inDestination = sourceId === destinationId ? inSource : await role(destinationId);
+  const yours =
+    inSource !== "" && inDestination !== ""
+      ? `; your role in the source is ${inSource} and in the destination is ${inDestination}`
+      : inSource !== ""
+        ? `; your role in the source is ${inSource}`
+        : inDestination !== ""
+          ? `; your role in the destination is ${inDestination}`
+          : "";
+  const members = (workspaceId: string) => `kaneo workspace members -w ${shellWord(workspaceId)}`;
+  const where =
+    sourceId !== "" && sourceId !== destinationId
+      ? `\`${members(sourceId)}\` and \`${members(destinationId)}\` list each member's role`
+      : `\`${members(destinationId)}\` lists each member's role`;
+  return `moving a project needs the project update and delete permissions in the source workspace, and project creation plus workspace settings management in the destination, which the owner and admin roles have unless the workspace's roles were changed${yours}; ${where}`;
 };
 
 const refused =
-  (doing: string, permission: "update" | "delete", workspaceOf: () => Promise<string>) =>
+  (doing: string, permission: "update" | "delete" | "update and delete", workspaceOf: () => Promise<string>) =>
   async (e: unknown): Promise<never> => {
     const why = await permissionHint(e, doing, permission, workspaceOf);
+    if (why === undefined) throw e;
+    throw new Error(`${(e as Error).message}: ${why}`);
+  };
+
+// A move's refusal can come from either workspace, so its hint is its own.
+const moveRefused =
+  (projectId: string, destinationId: string) =>
+  async (e: unknown): Promise<never> => {
+    const why = await movePermissionHint(e, projectId, destinationId);
     if (why === undefined) throw e;
     throw new Error(`${(e as Error).message}: ${why}`);
   };

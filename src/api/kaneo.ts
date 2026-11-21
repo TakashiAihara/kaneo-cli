@@ -1,7 +1,7 @@
 import { OPERATIONS, type Operation } from "./registry";
 import { requestDrift, requestShapes, serverOperations, type Drift, type RequestShape, type ServerOperation } from "./shape";
 import pinnedRequests from "./gen/requests.json";
-import { kaneoFetch, KaneoApiError, originOf } from "./http";
+import { kaneoFetch, KaneoApiError, originOf, presignedPut } from "./http";
 import type { Json } from "../output/json";
 import { shellWord } from "../output/output";
 import {
@@ -30,6 +30,7 @@ import {
   deleteColumn as removeColumn,
   createTimeEntry,
   deleteProject as removeProject,
+  deleteProjectBackground as removeProjectBackground,
   deleteTask as removeTask,
   getNotificationPreferences as readNotificationPreferences,
   deleteTaskComment,
@@ -44,6 +45,7 @@ import {
   globalSearch,
   getExternalLinksByTask as readExternalLinks,
   getProject as readProject,
+  getProjectBackground as readProjectBackground,
   getTask as readTask,
   getTaskByTicketId as readTaskByTicketId,
   getTaskComments,
@@ -75,11 +77,14 @@ import {
   listTasks,
   markAllNotificationsAsRead,
   markNotificationAsRead,
+  moveProject as putProjectMove,
   moveTask as putTaskMove,
+  finalizeProjectBackgroundUpload as postProjectBackgroundFinalize,
   reorderColumns as putColumns,
   reorderProjects as putProjects,
   revokeCalendarFeed as removeCalendarFeed,
   unarchiveProject,
+  uploadProjectBackground as putProjectBackgroundUpload,
   updateNotificationPreferences as putNotificationPreferences,
   updateColumn as putColumn,
   updateOrganization,
@@ -721,6 +726,76 @@ export const updateProject = async (
 // Go's %q, which quotes whatever it is given rather than only its strings.
 const quoted = (value: string | boolean): string =>
   typeof value === "string" ? JSON.stringify(value) : JSON.stringify(String(value));
+
+// A project moved into another workspace, as the move route answers it: the
+// project with its new workspaceId, plus how many of its tasks lost their
+// assignee because the assignee is not a member of the workspace it landed in.
+export type MovedProject = Project & { unassignedTaskCount: number };
+
+// Moves a project to another workspace, which the server does with its tasks.
+// The destination is a workspace id; resolving a slug or a name to one is the
+// caller's job, the same split every other workspace-taking call keeps.
+export const moveProject = async (projectId: string, workspaceId: string): Promise<MovedProject> => {
+  const moved = zeroRecord(await putProjectMove(pathParam(projectId), { workspaceId }));
+  // The count is the move reply's own addition to the project: a reply
+  // without it cannot say how many tasks lost their assignee, and reading it
+  // as none would report a move that unassigned work as having unassigned
+  // nothing.
+  if (typeof moved.unassignedTaskCount !== "number") {
+    throw new Error(`/project/${projectId}/move: reply carries no unassignedTaskCount`);
+  }
+  return { ...project(moved), unassignedTaskCount: moved.unassignedTaskCount };
+};
+
+// The project background image, as the bytes the route serves. The document
+// declares image/*, which is not JSON, so the transport hands back a Blob.
+export const getProjectBackground = async (projectId: string): Promise<Blob> =>
+  readProjectBackground(pathParam(projectId), { blob: true, headers: { Accept: "image/*" } });
+
+// Removes the project background image. The route answers 204 whether or not
+// the project had one, so there is nothing to map.
+export const deleteProjectBackground = async (projectId: string): Promise<void> => {
+  await removeProjectBackground(pathParam(projectId));
+};
+
+// An image as the project's board background, through the three steps the web
+// app's uploadProjectBackground runs: the API prepares a presigned PUT, the
+// bytes go to it with the headers it signed — no key, since the URL itself is
+// the credential — and the finalize names the staged key and version back.
+export const setProjectBackground = async (
+  projectId: string,
+  contentType: string,
+  bytes: Uint8Array,
+): Promise<{ url: string; version: string }> => {
+  const id = pathParam(projectId);
+  const stage = zeroRecord(await putProjectBackgroundUpload(id, { contentType, size: bytes.byteLength }));
+  // A stage that names no URL, key, version or headers cannot be finished:
+  // the PUT would go nowhere or unsigned, and the finalize would be refused
+  // for the empty key.
+  const missing = (
+    [
+      ["upload URL", stage.uploadUrl],
+      ["key", stage.key],
+      ["version", stage.version],
+      ["headers", stage.headers],
+    ] as const
+  )
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+  if (missing.length > 0) {
+    throw new Error(`/project/${projectId}/background-upload: reply carries no ${missing.join(", ")}`);
+  }
+  await presignedPut(stage.uploadUrl, stage.headers, bytes);
+  const done = zeroRecord(
+    await postProjectBackgroundFinalize(id, { key: stage.key, contentType, version: stage.version, size: bytes.byteLength }),
+  );
+  // The URL is the only thing the finalize answers with: a reply without it
+  // cannot say where the image landed.
+  if (typeof done.url !== "string" || done.url === "") {
+    throw new Error(`/project/${projectId}/background-upload/finalize: reply carries no URL`);
+  }
+  return { url: done.url, version: stage.version };
+};
 
 // A lane on a project's board.
 //

@@ -23,11 +23,16 @@ import { OPERATIONS, type Operation } from "./registry";
 // keepsCredential protection the key gets — refused over plain HTTP to a
 // non-loopback host on the first hop and on every redirect, where a header
 // could have been stripped and the path cannot.
+// blob marks a route whose document declares a binary body (the project
+// background's image/*): the reply is handed back as a Blob of the bytes it
+// arrived as, since there is no JSON value to parse and no schema to check it
+// against.
 export type KaneoInit<T = unknown> = RequestInit & {
   schema?: ZodType<T> | ZodType;
   anonymous?: boolean;
   text?: boolean;
   credentialInUrl?: boolean;
+  blob?: boolean;
 };
 
 type ClientConfig = {
@@ -190,7 +195,7 @@ const describeFailure = (
 export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T> => {
   if (settings.baseUrl === "") throw new Error("no API URL configured");
 
-  const { schema, anonymous, text: wantText, credentialInUrl, ...request } = init;
+  const { schema, anonymous, text: wantText, credentialInUrl, blob: wantBlob, ...request } = init;
   // The endpoint as the generated client wrote it, query included: the spelling
   // the operation is looked up by, since reading it back first would split an id
   // that needed escaping into two segments of its own.
@@ -206,7 +211,8 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   const served = servedPath(target);
   let headers = new Headers(request.headers);
   // A request that names its own document type keeps it — the calendar feed's
-  // text/calendar — and everything else still asks for JSON.
+  // text/calendar, the project background's image/* — and everything else
+  // still asks for JSON.
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
   const key = anonymous ? "" : settings.apiKey();
   // credentialInUrl puts a URL-carried credential under the same check the
@@ -349,6 +355,15 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // issues without the generated client (the server's own document, for
   // api-check) is trimmed first and reported the way Client.Do reported it.
   const operation = operationAt(called, path);
+
+  // A binary reply is the body itself, empty included: there is no JSON value
+  // to parse and no schema to check it against, and the type the document
+  // declares is the Blob, so an empty body is an empty Blob rather than the
+  // undefined an empty JSON reply stands for.
+  if (wantBlob) {
+    const type = (response.headers.get("content-type") ?? "").split(";")[0]!.trim();
+    return new Blob([bytes], { type }) as T;
+  }
 
   // A write that reports 204 has nothing to decode, and the generated types
   // say so by having nothing to return. What counts as empty is the Go build's
@@ -679,5 +694,82 @@ const tryAgainIn = (bytes: ArrayBuffer): number | undefined => {
     return typeof wait === "number" && Number.isFinite(wait) && wait >= 0 ? wait : undefined;
   } catch {
     return undefined;
+  }
+};
+
+// A PUT to a presigned storage URL, the middle of an upload the server
+// prepared: not a Kaneo request, so it gets no /api prefix, no key and no
+// JSON — only the headers the server signed for it, and the same per-request
+// timeout every other call gets. The URL's query can carry the signature that
+// authorizes it, so a failure names where it went without it.
+export const presignedPut = async (url: string, headers: Record<string, string>, body: Uint8Array): Promise<void> => {
+  const target = presignedTarget(url);
+  // The signed query and headers are the credential and the bytes the
+  // payload, so the URL is held to the rule the API key is: https, or http
+  // to a loopback instance. Checked before the request, so nothing leaves
+  // the process on a plain-HTTP hop.
+  const parsed = parseUrl(url);
+  const allowed =
+    parsed !== undefined && (parsed.protocol === "https:" || (parsed.protocol === "http:" && isLoopback(hostName(parsed))));
+  if (!allowed) {
+    throw new Error(`PUT ${target}: refusing to send the upload over a URL that is not https, or http to a loopback host`);
+  }
+  const cap = settings.timeoutMs > 0 ? AbortSignal.timeout(settings.timeoutMs) : AbortSignal.abort();
+  let response: Response;
+  try {
+    // Followed by hand for the same reason kaneoFetch does: a redirect would
+    // resend the signed headers and body to a host the signature was not
+    // written for, or turn the PUT into a GET that answers 200 and reads as
+    // an upload that never landed. A 3xx is a failure, as it is there.
+    response = await fetch(url, { method: "PUT", headers, body, signal: cap, redirect: "manual" });
+  } catch (e) {
+    throw new Error(`PUT ${target}: ${reason(e)}`, { cause: e });
+  }
+  // Read either way: an error's body is the report, and a success's is small
+  // enough that leaving it unread would only hold the connection open.
+  const text = await response.text().catch(() => "");
+  if (response.ok) return;
+  const shown = storageError(text);
+  throw new Error(`PUT ${target}: ${response.status}${shown === "" ? "" : `: ${shown}`}`);
+};
+
+// What a storage server's refusal is allowed to say back. An S3-style XML
+// error puts the signature it checked beside the code and message
+// (<StringToSign>, <SignatureProvided>), which must not reach the terminal,
+// so only those two fields are lifted out of markup; markup without them is
+// withheld rather than echoed. Any other body is shown bounded, as it was:
+// a plain error is its whole report.
+const storageError = (body: string): string => {
+  const trimmed = body.trim();
+  if (trimmed === "") return "";
+  if (trimmed.startsWith("<")) {
+    const shown = [xmlField(trimmed, "Code"), xmlField(trimmed, "Message")].filter((s) => s !== "").join(": ");
+    return shown;
+  }
+  return trimmed.length > BODY_LIMIT ? `${trimmed.slice(0, BODY_LIMIT)}...` : trimmed;
+};
+
+// The text of one element of a markup error body, "" when it is not there.
+// The element's text cannot hold a raw "<" (it would be &lt;), so the match
+// stops at the first one, which is its own closing tag.
+const xmlField = (body: string, name: string): string => {
+  const found = new RegExp(`<${name}>([^<]*)</${name}>`).exec(body)?.[1];
+  return found === undefined ? "" : xmlText(found);
+};
+
+// The five entities XML defines by name, which is all an error field carries.
+const xmlText = (text: string): string =>
+  text.replace(/&(amp|lt|gt|quot|apos);/g, (_, name: string) => XML_ENTITIES[name]!);
+
+const XML_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+
+// Where a presigned PUT went, without the query that authorizes it.
+const presignedTarget = (url: string): string => {
+  try {
+    const target = new URL(url);
+    return `${target.origin}${target.pathname}`;
+  } catch {
+    // Unparseable or not, the query is where a signature would sit.
+    return url.split(/[?#]/)[0]!;
   }
 };

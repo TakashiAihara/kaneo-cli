@@ -125,6 +125,9 @@ export type Scenario = {
   failStatus?: number;
   failMessage?: string;
   plainMember?: boolean;
+  // The fake refuses a project move into this workspace with the bare 403 the
+  // destination-side permission check gives, while the source check passes.
+  moveDeniedTarget?: string;
   noCurrentUser?: boolean;
   blankCurrentUserId?: boolean;
   failOnSkip?: number;
@@ -354,6 +357,131 @@ export const SCENARIOS: Scenario[] = [
       ],
     },
     steps: [["project", "reorder", "Beta", "Alpha", "--human"], ["project", "ls", "--archived", "--json"]],
+  },
+  // The assignee of task-a2 belongs to the source workspace alone, so the move
+  // unassigns it and the reply counts the one it did.
+  {
+    name: "project move",
+    seed: {
+      members: [
+        { id: "user-self", name: "Self", email: "self@example.com", role: "owner" },
+        { id: "user-1", name: "Ada", email: "ada@example.com", role: "member", workspaceId: WS },
+      ],
+    },
+    steps: [
+      ["project", "move", P1, "--to", "Other", "--json"],
+      ["project", "get", P1, "--human"],
+      ["project", "ls", "-w", "ws-other", "--human"],
+      ["task", "ls", "-p", P1, "--json"],
+    ],
+  },
+  {
+    // proj-taken's key is taken in ws-other, so the move is refused on the
+    // conflict rather than on anything else.
+    name: "project move refused",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-taken", workspaceId: WS, name: "Taken", slug: "CLASH" },
+        { id: "proj-clash", workspaceId: "ws-other", name: "Clash", slug: "clash" },
+      ],
+    },
+    steps: [
+      ["project", "move", P1, "--to", "Main", "--json"],
+      ["project", "move", P1, "--json"],
+      ["project", "move", P1, "--to", "nope", "--json"],
+      ["project", "move", "nope", "--to", "Other", "--json"],
+      ["project", "move", "proj-taken", "--to", "Other", "--json"],
+    ],
+  },
+  {
+    name: "project move as a plain member",
+    plainMember: true,
+    seed: { members: [{ id: "user-self", name: "Self", email: "self@example.com", role: "member" }] },
+    steps: [["project", "move", P1, "--to", "Other", "--json"]],
+  },
+  {
+    // The 403 does not say which workspace's check refused, so the hint names
+    // both sides' permissions and the caller's role in each it could read —
+    // here a member of the source alone.
+    name: "project move refused at the destination",
+    moveDeniedTarget: "ws-other",
+    seed: { members: [{ id: "user-self", name: "Self", email: "self@example.com", role: "member", workspaceId: WS }] },
+    steps: [["project", "move", P1, "--to", "Other", "--json"]],
+  },
+  // The upload is the web app's three steps: prepare, PUT the bytes to the
+  // presigned URL it names, finalize — and get writes them back out untouched.
+  {
+    name: "project background set get rm",
+    files: { "bg.png": "PNG-BYTES-0123456789" },
+    steps: [
+      ["project", "background", "set", P1, "bg.png", "--json"],
+      ["project", "background", "get", "BET"],
+      ["project", "background", "get", P1],
+      ["project", "background", "get"],
+      ["project", "background", "rm", P1, "--yes", "--human"],
+      ["project", "background", "get", P1],
+    ],
+  },
+  {
+    name: "project background set refused",
+    files: { "notes.txt": "not an image", "bg.png": "PNG", "empty.png": "", "blob": "PNG" },
+    steps: [
+      ["project", "background", "set", P1, "missing.png", "--json"],
+      ["project", "background", "set", P1, "notes.txt", "--json"],
+      // No extension, so Bun.file().type can only answer octet-stream, which
+      // is no image type: refused here rather than sent for the server to
+      // refuse. --content-type would override it.
+      ["project", "background", "set", P1, "blob", "--json"],
+      ["project", "background", "set", P1, "empty.png", "--json"],
+      ["project", "background", "set", P1, "bg.png", "--content-type", "image/gif", "--json"],
+      ["project", "background", "get", P1, "--json"],
+      ["project", "background", "get", P1, "--jq", ".url"],
+      ["project", "background", "rm", P1, "--human"],
+      ["project", "background", "rm", "nope", "--yes", "--json"],
+    ],
+  },
+  {
+    // The finalize is the last of the three upload steps: a refusal there
+    // leaves the staged bytes orphaned and the project unchanged.
+    name: "project background set finalize refused",
+    files: { "bg.png": "PNG-BYTES" },
+    failOn: "POST /project/proj-alpha/background-upload/finalize",
+    failStatus: 400,
+    failMessage: "Image upload could not be finalized",
+    steps: [["project", "background", "set", P1, "bg.png", "--json"]],
+  },
+  {
+    // The storage PUT answers outside the API's envelope, in the storage
+    // server's own markup — which carries the signature it checked, so only
+    // its Code and Message may reach the report.
+    name: "project background set storage refused",
+    files: { "bg.png": "PNG-BYTES" },
+    failOn: "PUT /storage/",
+    failStatus: 403,
+    failMessage:
+      '<Error><Code>SignatureDoesNotMatch</Code><Message>The request signature does not match</Message><StringToSign>AWS4-HMAC-SHA256\n20260101\nshould-not-appear</StringToSign><SignatureProvided>deadbeef</SignatureProvided></Error>',
+    steps: [["project", "background", "set", P1, "bg.png", "--json"]],
+  },
+  {
+    name: "project background set from stdin",
+    stdin: "STDIN-PNG-BYTES",
+    steps: [["project", "background", "set", P1, "-", "--content-type", "image/png", "--json"]],
+  },
+  {
+    name: "project background set from stdin needs a type",
+    stdin: "x",
+    steps: [["project", "background", "set", P1, "-", "--json"]],
+  },
+  {
+    name: "project background as a plain member",
+    plainMember: true,
+    seed: { members: [{ id: "user-self", name: "Self", email: "self@example.com", role: "member" }] },
+    files: { "bg.png": "PNG" },
+    steps: [
+      ["project", "background", "set", P1, "bg.png", "--json"],
+      ["project", "background", "rm", P1, "--yes", "--json"],
+    ],
   },
 
   ...both("column list", ["column", "list"]),

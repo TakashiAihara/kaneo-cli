@@ -1,0 +1,88 @@
+{
+  "steps": [
+    {
+      "args": [
+        "project",
+        "move",
+        "proj-alpha",
+        "--to",
+        "Other",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"proj-alpha\",\n  \"name\": \"Alpha\",\n  \"slug\": \"ALP\",\n  \"icon\": \"Layout\",\n  \"description\": \"\",\n  \"workspaceId\": \"ws-other\",\n  \"isPublic\": false,\n  \"archivedAt\": null,\n  \"unassignedTaskCount\": 1\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "get",
+        "proj-alpha",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "project",
+        "ls",
+        "-w",
+        "ws-other",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "proj-alpha  Alpha  [ALP]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "-p",
+        "proj-alpha",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"description\": \"multi\\nline\",\n    \"status\": \"to-do\",\n    \"priority\": \"high\",\n    \"position\": 0,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n    \"labels\": []\n  },\n  {\n    \"id\": \"task-a2\",\n    \"number\": 2,\n    \"title\": \"Ship it\",\n    \"description\": \"\",\n    \"status\": \"in-progress\",\n    \"priority\": \"no-priority\",\n    \"position\": 1,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n    \"labels\": []\n  }\n]\n",
+      "stderr": "(1 done / planned / archived task left out; --all to include them)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/project/proj-alpha/move",
+      "query": "",
+      "body": {
+        "workspaceId": "ws-other"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

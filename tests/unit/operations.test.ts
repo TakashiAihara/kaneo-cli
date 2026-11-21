@@ -111,9 +111,11 @@ test("TestGeneratedCallFailuresKeepTheServerMessage", async () => {
   expect(e.messages).toEqual(['Invalid key: Expected "destinationProjectId"']);
 });
 
-// The server sends an HTTPException as a plain-text body. A short line of it is
-// the message, the way an envelope's would be; markup, other JSON, several lines
-// or a long body stay a body only. The first case is the transport's trim.
+// Kaneo up to v2.32 sends an HTTPException as a plain-text body. A short line of
+// it is the message, the way an envelope's would be; markup, other JSON, several
+// lines or a long body stay a body only. The first case is the transport's trim.
+// The one JSON that carries a message is v2.50's {"message","code"}, the
+// "Project not found" row; the JSON rows around it stay a body.
 test.each([
   ["Workspace ID could not be determined\n", ["Workspace ID could not be determined"]],
   ["<html><body>Bad Gateway</body></html>", []],

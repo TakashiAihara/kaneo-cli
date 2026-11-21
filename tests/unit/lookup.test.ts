@@ -114,7 +114,7 @@ test("explain is added when the value names a project only in another workspace"
 test.each([
   [404, "Project not found", "NOT_FOUND"],
   [400, "Workspace ID could not be determined", "BAD_REQUEST"],
-])("a slug the server refuses with %p %p in its JSON error shape is looked up", async (status, message, code) => {
+])("a slug the server refuses with %p %p (%p) in its JSON error shape is looked up", async (status, message, code) => {
   const s = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,

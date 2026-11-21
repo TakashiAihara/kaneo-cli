@@ -423,6 +423,7 @@ describe("failures", () => {
   test.each([
     ["no code", { message: "Internal Server Error" }],
     ["a code that is not text", { message: "Project not found", code: 404 }],
+    ["an empty code", { message: "Project not found", code: "" }],
     ["a message that is not text", { message: ["Project not found"], code: "NOT_FOUND" }],
     ["an empty message", { message: "", code: "NOT_FOUND" }],
     ["no message", { code: "NOT_FOUND" }],

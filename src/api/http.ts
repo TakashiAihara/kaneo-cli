@@ -557,9 +557,10 @@ const failure = (
 // Kaneo v2.50 sends every HTTPException (v2.32 sent it as plain text, below;
 // the release that changed it is not pinned down), or undefined when the body
 // is not that shape. The code is what tells it from the bare {"message": ...}
-// of a 500 that carries no reason a caller could decide on, and a key beyond
-// the four the server's error schema has (a rate limit's `details`) is a body
-// that says more than its message, so it is shown whole.
+// of a 500 that carries no reason a caller could decide on. A key beyond the
+// four the server's error schema has (a rate limit's `details`, which holds the
+// wait) keeps the body shown whole. `issues` and `missingPermissions` stay in
+// the error's body: the message already names the first issue.
 const CODED_KEYS = ["message", "code", "issues", "missingPermissions"];
 
 const codedMessage = (text: string): string[] | undefined => {
@@ -569,10 +570,10 @@ const codedMessage = (text: string): string[] | undefined => {
   } catch {
     return undefined;
   }
-  if (parsed === null || typeof parsed !== "object") return undefined;
+  if (parsed === null) return undefined;
   if (Object.keys(parsed).some((k) => !CODED_KEYS.includes(k))) return undefined;
   const { message, code } = parsed as { message?: unknown; code?: unknown };
-  return typeof message === "string" && message !== "" && typeof code === "string" ? [message] : undefined;
+  return typeof message === "string" && message !== "" && typeof code === "string" && code !== "" ? [message] : undefined;
 };
 
 // The message of a failure sent as plain text. Kaneo up to v2.32 sends every
@@ -580,8 +581,8 @@ const codedMessage = (text: string): string[] | undefined => {
 // its validation failures — so this is the shape most failures arrive in, and a
 // caller deciding on the server's message has to find it in `messages` either
 // way. Only a short single line of text counts: markup, JSON that is not the
-// envelope (a 500's `{"message": ...}`), a stack or a long body is reported as a
-// body, not matched as a message.
+// envelope (a 500's `{"message": ...}`, once codedMessage has declined it), a
+// stack or a long body is reported as a body, not matched as a message.
 const plainMessage = (text: string): string[] =>
   text === "" || /^[<{[]/.test(text) || text.includes("\n") || text.length > BODY_LIMIT ? [] : [text];
 

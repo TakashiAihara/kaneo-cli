@@ -14,6 +14,7 @@ import {
   AssignedTasks,
   BoardResponse,
   BulkTaskResult,
+  CalendarFeed,
   Column,
   Comment,
   CreateNotification200,
@@ -36,6 +37,7 @@ import {
   Project,
   ProjectListItem,
   ReorderCustomFieldsResponse,
+  RevokeCalendarFeed200,
   SearchResponse,
   SetCustomFieldValueResponse,
   Task,
@@ -56,6 +58,7 @@ import type {
   BulkUpdateTasksBody,
   ClearAllNotificationsParams,
   CreateActivityBody,
+  CreateCalendarFeedBody,
   CreateColumnBody,
   CreateCustomFieldBody,
   CreateGitlabIntegrationBody,
@@ -107,6 +110,31 @@ import type {
 } from './model';
 
 import { kaneoFetch } from '../http';
+export const getGetCalendarFeedUrl = (token: string,) => {
+
+
+
+
+  return `/calendar-feed/${token}/calendar.ics`
+}
+
+/**
+ * Read scheduled project tasks using a secret calendar feed link. Anyone with the link can read matching task titles, descriptions, and dates. Responses are streamed; descriptions longer than 4096 characters and titles or calendar names longer than 1024 characters are truncated with an ellipsis.
+ * @summary Subscribe to a calendar feed
+ */
+export const getCalendarFeed = async (token: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<string> => {
+
+  return kaneoFetch<string>(getGetCalendarFeedUrl(token),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
 export const getListOrganizationUrl = () => {
 
 
@@ -434,6 +462,101 @@ export const unarchiveProject = async (id: string, options?: Parameters<typeof k
 
     ,
     schema: Project
+  }
+);}
+
+
+
+export const getListCalendarFeedsUrl = (projectId: string,) => {
+
+
+
+
+  return `/calendar-feed/project/${projectId}`
+}
+
+/**
+ * List secret calendar subscription links. Requires project sharing permission.
+ * @summary List project calendar feeds
+ */
+export const listCalendarFeeds = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<CalendarFeed[]> => {
+
+  return kaneoFetch<CalendarFeed[]>(getListCalendarFeedsUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+    ,
+    schema: zod.array(CalendarFeed)
+  }
+);}
+
+
+
+export const getCreateCalendarFeedUrl = (projectId: string,) => {
+
+
+
+
+  return `/calendar-feed/project/${projectId}`
+}
+
+/**
+ * Create a calendar subscription matching any selected label. Tasks need a start or due date. All-day dates use the supplied time zone. Creating a missing workspace label definition also requires label:create permission.
+ * @summary Create a calendar feed
+ */
+export const createCalendarFeed = async (projectId: string,
+    createCalendarFeedBody: CreateCalendarFeedBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<CalendarFeed> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<CalendarFeed>(getCreateCalendarFeedUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createCalendarFeedBody),
+    schema: CalendarFeed
+  }
+);}
+
+
+
+export const getRevokeCalendarFeedUrl = (projectId: string,
+    id: string,) => {
+
+
+
+
+  return `/calendar-feed/project/${projectId}/${id}`
+}
+
+/**
+ * Revoke a calendar subscription link, preventing further access through it.
+ * @summary Revoke a calendar feed
+ */
+export const revokeCalendarFeed = async (projectId: string,
+    id: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<RevokeCalendarFeed200> => {
+
+  return kaneoFetch<RevokeCalendarFeed200>(getRevokeCalendarFeedUrl(projectId,id),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: RevokeCalendarFeed200
   }
 );}
 

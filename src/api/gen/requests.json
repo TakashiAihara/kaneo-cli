@@ -17,6 +17,10 @@
     "body.taskId": true,
     "body.type": true
   },
+  "createCalendarFeed": {
+    "body.labelIds": true,
+    "body.timeZone": false
+  },
   "createColumn": {
     "body.color": false,
     "body.icon": false,
@@ -99,6 +103,7 @@
   "getActivities": {
     "query.limit": false
   },
+  "getCalendarFeed": {},
   "getColumns": {},
   "getCurrentUser": {},
   "getCustomFieldFilterValues": {},
@@ -145,6 +150,7 @@
     "query.countOnly": false,
     "query.workspaceId": true
   },
+  "listCalendarFeeds": {},
   "listGitlabProjects": {
     "body.accessToken": true,
     "body.baseUrl": true,
@@ -189,6 +195,7 @@
     "body.projects": true,
     "query.workspaceId": true
   },
+  "revokeCalendarFeed": {},
   "setCustomFieldValue": {
     "body.fieldId": true,
     "body.taskId": true,

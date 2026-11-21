@@ -222,6 +222,10 @@ kaneo label attach <task> <label>    # a label by name or id
 kaneo label detach <task> <label>
 kaneo label update <label> [--name NAME] [--color COLOR]   # tasks carrying it follow
 kaneo label rm <label> --yes         # also removes it from every task
+kaneo feed ls                        # the resolved project's calendar feeds, with subscribe links
+kaneo feed create <label>... [--time-zone ZONE]
+kaneo feed rm <feed> --yes           # the subscribe link stops working for good
+kaneo feed get <token>               # the feed's iCalendar document, as a calendar app reads it
 kaneo time ls <task-id>
 kaneo time get <entry-id>
 kaneo time add <task-id> [--start TIME] [-d TEXT]               # starts a running timer, now by default (alias: time start)
@@ -265,6 +269,8 @@ A custom field is a definition a project carries — a text, number, date, dropd
 `kaneo integration gitlab` works the link between a project and a GitLab project. `connect` stores it — the instance's root URL, the project's full path (`group/sub/project`), and the token — and answers the webhook URL and secret to give GitLab afterwards; connecting again keeps the stored token while the GitLab URL is unchanged and asks for a new one when it is not. `verify` runs the same checks without storing anything and answers its findings as data rather than an error — a failed check still exits 0, and only a refused request fails the command — `projects` lists what a token can see to pick the project, `update` changes only the flags passed, `import` brings the linked project's open issues in as tasks, and `rm --yes` removes the link.
 
 The GitLab token is a secret, so `--access-token` takes only `-`, which reads it from stdin: a literal value is refused rather than written into the process list or the shell history. One trailing line ending is dropped and empty stdin is an error. `connect` may omit the token for the reuse above. The stored token is only ever answered masked, and the webhook secret only to a caller that may manage the workspace's settings — a plain member reads the link with both withheld, is refused `connect`, `update`, `rm`, `verify` and `projects`, and can still `import`, which asks for task permissions instead.
+
+`kaneo feed` manages a project's calendar feeds: subscription links that serve the project's scheduled tasks — those with a start or due date and carrying any of the feed's labels — as an iCalendar document. `feed create` takes at least one label, by workspace label id or name, and `--time-zone` names the zone all-day dates are read in; left out, the server's UTC applies. A feed's subscribe link is the public half of `feed get <token>`: the route needs no key, which is what makes it pasteable into a calendar app, and `feed rm` revokes it for good — a feed created again gets a new token, so anything already subscribed has to be given the new link.
 
 ### Shell completion
 

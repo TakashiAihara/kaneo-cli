@@ -1,0 +1,48 @@
+{
+  "steps": [
+    {
+      "args": [
+        "feed",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "feed0001  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001/calendar.ics  lbl0002  UTC  2026-01-01T01:00:00.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"feed0001\",\n    \"projectId\": \"proj-alpha\",\n    \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001\",\n    \"labelIds\": [\n      \"lbl0002\"\n    ],\n    \"timeZone\": \"UTC\",\n    \"createdAt\": \"2026-01-01T01:00:00.000Z\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "create",
+        "bug",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no workspace: pass --workspace, set KANEO_WORKSPACE, or add one to .kaneo.json\"\n}\n",
+      "stderr": "Error: no workspace: pass --workspace, set KANEO_WORKSPACE, or add one to .kaneo.json\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

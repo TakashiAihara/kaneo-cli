@@ -1,0 +1,342 @@
+{
+  "steps": [
+    {
+      "args": [
+        "feed",
+        "ls",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"feed0001\",\n    \"projectId\": \"proj-alpha\",\n    \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001\",\n    \"labelIds\": [\n      \"lbl0004\"\n    ],\n    \"timeZone\": \"UTC\",\n    \"createdAt\": \"2026-01-01T01:00:00.000Z\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "feed0001  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001/calendar.ics  bug  UTC  2026-01-01T01:00:00.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "create",
+        "bug",
+        "--time-zone",
+        "Europe/Berlin",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"feed0002\",\n  \"projectId\": \"proj-alpha\",\n  \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0002\",\n  \"labelIds\": [\n    \"lbl0004\"\n  ],\n  \"timeZone\": \"Europe/Berlin\",\n  \"createdAt\": \"2026-01-01T01:00:01.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "create",
+        "solo",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"feed0003\",\n  \"projectId\": \"proj-alpha\",\n  \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0003\",\n  \"labelIds\": [\n    \"lbl0005\"\n  ],\n  \"timeZone\": \"UTC\",\n  \"createdAt\": \"2026-01-01T01:00:02.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "create",
+        "bug",
+        "bug",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created feed0004  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0004/calendar.ics  bug  UTC  2026-01-01T01:00:03.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "create",
+        "nope",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no label \\\"nope\\\" in this workspace; kaneo label ls lists them\"\n}\n",
+      "stderr": "Error: no label \"nope\" in this workspace; kaneo label ls lists them\n"
+    },
+    {
+      "args": [
+        "feed",
+        "create",
+        "bug",
+        "--time-zone",
+        "Nowhere/Special",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/calendar-feed/project/proj-alpha: 400: Invalid key: timeZone: Invalid time zone\"\n}\n",
+      "stderr": "Error: POST /api/calendar-feed/project/proj-alpha: 400: Invalid key: timeZone: Invalid time zone\n"
+    },
+    {
+      "args": [
+        "feed",
+        "get",
+        "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001"
+      ],
+      "exit": 0,
+      "stdout": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Kaneo//Calendar Feed//EN\r\nCALSCALE:GREGORIAN\r\nX-WR-CALNAME:Alpha\r\nBEGIN:VEVENT\r\nUID:task-cal@kaneo\r\nDTSTAMP:20260101T000008Z\r\nCREATED:20260101T000008Z\r\nLAST-MODIFIED:20260101T000008Z\r\nDTSTART;VALUE=DATE:20260105\r\nDTEND;VALUE=DATE:20260108\r\nSUMMARY:Ship the feed\r\nDESCRIPTION:line one\\nline two\r\nTRANSP:TRANSPARENT\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "get",
+        "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0003",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Kaneo//Calendar Feed//EN\r\nCALSCALE:GREGORIAN\r\nX-WR-CALNAME:Alpha\r\nBEGIN:VEVENT\r\nUID:task-cal2@kaneo\r\nDTSTAMP:20260101T000009Z\r\nCREATED:20260101T000009Z\r\nLAST-MODIFIED:20260101T000009Z\r\nDTSTART;VALUE=DATE:20260109\r\nDTEND;VALUE=DATE:20260110\r\nSUMMARY:Solo dated\r\nTRANSP:TRANSPARENT\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "get",
+        "not-a-token"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/calendar-feed/not-a-token/calendar.ics: 400: Invalid feed token\"\n}\n",
+      "stderr": "Error: GET /api/calendar-feed/not-a-token/calendar.ics: 400: Invalid feed token\n"
+    },
+    {
+      "args": [
+        "feed",
+        "get",
+        "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0063"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0063/calendar.ics: 404: Calendar feed not found\"\n}\n",
+      "stderr": "Error: GET /api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0063/calendar.ics: 404: Calendar feed not found\n"
+    },
+    {
+      "args": [
+        "feed",
+        "rm",
+        "feed0001",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"refusing to revoke calendar feed feed0001 without --yes; its subscribe link stops working and a new feed gets a new one\"\n}\n",
+      "stderr": "Error: refusing to revoke calendar feed feed0001 without --yes; its subscribe link stops working and a new feed gets a new one\n"
+    },
+    {
+      "args": [
+        "feed",
+        "rm",
+        "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0002",
+        "--yes",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"feed0002\",\n  \"projectId\": \"proj-alpha\",\n  \"token\": \"feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0002\",\n  \"labelIds\": [\n    \"lbl0004\"\n  ],\n  \"timeZone\": \"Europe/Berlin\",\n  \"createdAt\": \"2026-01-01T01:00:01.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "rm",
+        "feed9999",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no calendar feed \\\"feed9999\\\" in this project; kaneo feed ls lists them\"\n}\n",
+      "stderr": "Error: no calendar feed \"feed9999\" in this project; kaneo feed ls lists them\n"
+    },
+    {
+      "args": [
+        "feed",
+        "ls",
+        "-p",
+        "BET",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "feed",
+        "ls",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "feed0001  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001/calendar.ics  bug  UTC  2026-01-01T01:00:00.000Z\nfeed0003  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0003/calendar.ics  solo  UTC  2026-01-01T01:00:02.000Z\nfeed0004  <URL>/api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0004/calendar.ics  bug  UTC  2026-01-01T01:00:03.000Z\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": "",
+      "body": {
+        "labelIds": [
+          "lbl0004"
+        ],
+        "timeZone": "Europe/Berlin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": "",
+      "body": {
+        "labelIds": [
+          "lbl0003"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": "",
+      "body": {
+        "labelIds": [
+          "lbl0004"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": "",
+      "body": {
+        "labelIds": [
+          "lbl0004"
+        ],
+        "timeZone": "Nowhere/Special"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001/calendar.ics",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0003/calendar.ics",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/not-a-token/calendar.ics",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0063/calendar.ics",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/calendar-feed/project/proj-alpha/feed0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/label/workspace/ws-main",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/calendar-feed/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

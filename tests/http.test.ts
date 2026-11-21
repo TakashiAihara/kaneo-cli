@@ -612,6 +612,32 @@ describe("responses", () => {
     expect(e.message).toBe("GET /api/project/p1: 200: nope");
   });
 
+  // A reply whose document is not JSON — the calendar feed's text/calendar —
+  // comes back as the text it arrived as: not parsed, not checked, and empty
+  // included, since there is no zero value a missing body would stand for.
+  test("a text reply is the body as it arrived", async () => {
+    const ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
+    const url = serve(() => new Response(ics, { headers: { "content-type": "text/calendar; charset=utf-8" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    expect(await kaneoFetch<string>("/calendar-feed/t/calendar.ics", { method: "GET", text: true })).toBe(ics);
+  });
+
+  test("a text reply of no bytes is the empty string, not undefined", async () => {
+    const url = serve(() => new Response(null, { status: 204 }));
+    configureClient({ baseUrl: url });
+    expect(await kaneoFetch<string>("/calendar-feed/t/calendar.ics", { method: "GET", text: true })).toBe("");
+  });
+
+  // The failure checks run before the text hand-back: a status the server
+  // refused, or a 2xx carrying the failure envelope, still fails the call.
+  test("a text reply still fails on an error status", async () => {
+    const url = serve(() => new Response("Calendar feed not found", { status: 404 }));
+    configureClient({ baseUrl: url });
+    const e = (await failure(kaneoFetch<string>("/calendar-feed/t/calendar.ics", { method: "GET", text: true }))) as KaneoApiError;
+    expect(e).toBeInstanceOf(KaneoApiError);
+    expect(e.messages).toEqual(["Calendar feed not found"]);
+  });
+
   test("a body that matches the schema is returned", async () => {
     const url = serve(() => Response.json({ id: "p1", backgroundVersion: null }));
     configureClient({ baseUrl: url, apiKey: "test-key" });

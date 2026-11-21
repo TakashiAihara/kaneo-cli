@@ -288,8 +288,8 @@ export type FakeOptions = {
   // looked for in the listing is exercised.
   commentReplyWithoutId?: boolean;
   // Serves the pinned document with createActivity requiring userId, as
-  // Kaneo 2.20 does, and createTask without customFields, the request drift
-  // api-check reports.
+  // Kaneo 2.20 does, and createTask without dueDate — a field the client does
+  // send — the request drift api-check reports.
   driftedSpec?: boolean;
   // Serves the pinned document without createTask, an operation the client calls.
   specWithoutOperation?: boolean;
@@ -1612,7 +1612,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const doc = JSON.parse(readFileSync(SPEC_PATH, "utf8"));
       const body = (p: string, m: string) => doc.paths[p][m].requestBody.content["application/json"].schema;
       if (opts.driftedSpec) {
-        delete body("/task/{projectId}", "post").properties.customFields;
+        delete body("/task/{projectId}", "post").properties.dueDate;
         body("/activity/create", "post").required.push("userId");
       }
       if (opts.specWithoutOperation) {

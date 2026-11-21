@@ -355,7 +355,7 @@ kaneo session close
 kaneo board                     # open tasks, and which sessions hold them
 ```
 
-The session is identified by `KANEO_SESSION_ID`, falling back to `CLAUDE_CODE_SESSION_ID`.
+The session is identified by `KANEO_SESSION_ID`, falling back to `CLAUDE_CODE_SESSION_ID`, `COPILOT_AGENT_SESSION_ID`, `DEVIN_SESSION_ID`, and the Devin CLI session this process runs under — Devin exports no session id variable, so that one is read from the session lock an ancestor process holds under the data directory's `devin/cli/session_locks`.
 
 `kaneo session close [--task <task>]` acts on the task in the attachment, the one last attached; `--task` names another one, as `slug#number` (the form `session status` prints), a number in the current project, or an id, so a session that has attached to several tasks releases only the one named. The attachment is only removed when it is that task, and a task can be closed by name with no attachment at all — a session that attached, re-attached elsewhere and then wants the first one released.
 

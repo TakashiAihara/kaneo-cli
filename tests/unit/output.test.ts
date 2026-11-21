@@ -11,7 +11,7 @@ const JQ = join(import.meta.dir, "../../src/output/jq");
 
 const cleanEnv = () => {
   const env = { ...process.env };
-  for (const key of ["KANEO_API_KEY", "KANEO_API_URL", "KANEO_SESSION_ID", "CLAUDE_CODE_SESSION_ID"]) delete env[key];
+  for (const key of ["KANEO_API_KEY", "KANEO_API_URL", "KANEO_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "COPILOT_AGENT_SESSION_ID", "DEVIN_SESSION_ID"]) delete env[key];
   return env;
 };
 

@@ -209,16 +209,52 @@ const sameRecord = (a: string | Binary | undefined, b: string | Binary): boolean
   return a !== undefined && a.base64 === b.base64;
 };
 
+// A search and the archived-inclusive project listing it is fired with are
+// the two requests in flight at once, so which one the fake sees first is the
+// sockets' choice. They are sent for the same workspace, which is what makes
+// the pair: an --all-workspaces search puts one pair per workspace back to
+// back, and only the workspace tells a pair's two halves from the next
+// pair's. They are the only requests the command has in flight, so nothing
+// lands between them and an adjacent same-workspace search/project pair is
+// always the two halves of one Promise.all.
+const settlePairs = (requests: Recorded[]): Recorded[] => {
+  const out: Recorded[] = [];
+  for (let i = 0; i < requests.length; i++) {
+    const a = requests[i]!;
+    const b = requests[i + 1];
+    if (b !== undefined && isSearchPair(a, b)) {
+      out.push(a.path === "/search" ? a : b, a.path === "/search" ? b : a);
+      i++;
+    } else {
+      out.push(a);
+    }
+  }
+  return out;
+};
+
+const isSearchPair = (a: Recorded, b: Recorded): boolean => {
+  if (a.method !== "GET" || b.method !== "GET") return false;
+  const pair =
+    (a.path === "/search" && b.path === "/project") || (a.path === "/project" && b.path === "/search");
+  if (!pair) return false;
+  const project = a.path === "/project" ? a : b;
+  if (new URLSearchParams(project.query).get("includeArchived") !== "true") return false;
+  const workspaceOf = (r: Recorded) => new URLSearchParams(r.query).get("workspaceId");
+  const workspace = workspaceOf(a);
+  return workspace !== null && workspace === workspaceOf(b);
+};
+
 // Listings that are asked for together arrive in whatever order the sockets
 // connect, so a run of them is recorded by query rather than by arrival.
-const settle = (requests: Recorded[]): Recorded[] => {
+// Exported for tests/unit/settle.test.ts.
+export const settle = (requests: Recorded[]): Recorded[] => {
   const out: Recorded[] = [];
   let run: Recorded[] = [];
   const flush = () => {
     out.push(...run.sort((a, b) => (a.query < b.query ? -1 : a.query > b.query ? 1 : 0)));
     run = [];
   };
-  for (const r of requests) {
+  for (const r of settlePairs(requests)) {
     if (r.method === "GET" && r.path === "/project") run.push(r);
     else {
       flush();

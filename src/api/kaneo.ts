@@ -625,6 +625,19 @@ export const lastTaskNumbers = async (workspaceId: string): Promise<{ project: P
 export const listProjectsIn = async (workspaceId: string, includeArchived: boolean): Promise<Project[]> =>
   zeroList(await listProjects({ ...(includeArchived ? { includeArchived: "true" } : {}), workspaceId })).map(project);
 
+// A project with the creation time the search results are ordered by, which
+// Project leaves out: only the search's slug matching reads it.
+export type DatedProject = Project & { createdAt: string };
+
+// The projects of a workspace with their creation times, archived included:
+// the search endpoint matches archived projects, so the slug matches the CLI
+// adds for it have to see them too.
+export const listProjectsForSearch = async (workspaceId: string): Promise<DatedProject[]> =>
+  zeroList(await listProjects({ includeArchived: "true", workspaceId })).map((item) => ({
+    ...project(item),
+    createdAt: isoTime(item, "createdAt"),
+  }));
+
 // What every route that returns a project agrees on. The listing adds rollup
 // statistics and the detail route adds timestamps; neither is part of what this
 // CLI reads a project for.

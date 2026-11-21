@@ -786,7 +786,33 @@ export const SCENARIOS: Scenario[] = [
       projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
       tasks: [...SEED.tasks, { id: "task-g1", projectId: "proj-gamma", title: "Filed elsewhere first", priority: "low" }],
     },
-    steps: [["search", "elsewhere", "--json"], ["search", "elsewhere", "-A", "--human"], ["search", "first", "--all-workspaces", "--json"], ["search", "first", "-A", "--limit", "2", "--human"], ["search", "first", "-A", "--in-project", "--json"], ["search", "first", "-A", "-p", "BET", "--human"], ["search", "other", "-A", "--type", "workspaces", "--json"], ["search", "er", "-A", "--limit", "2", "--human"], ["search", "first", "-A", "--limit", "1", "--json"], ["search", "x", "-A", "--limit", "0", "--json"], ["search", "x", "-A", "--limit", "51", "--human"], ["search", "x", "-A", "--limit", "1.5", "--human"], ["search", "first", "-A", "--limit", "3", "--human"], ["search", "er", "--limit", "3", "--human"], ["search", "er", "--limit", "2", "--json"]],
+    steps: [["search", "elsewhere", "--json"], ["search", "elsewhere", "-A", "--human"], ["search", "first", "--all-workspaces", "--json"], ["search", "first", "-A", "--limit", "2", "--human"], ["search", "first", "-A", "--in-project", "--json"], ["search", "first", "-A", "-p", "BET", "--human"], ["search", "first", "-A", "-w", "ws-main", "--human"], ["search", "first", "--all-workspaces", "--workspace", "Other", "--json"], ["search", "other", "-A", "--type", "workspaces", "--json"], ["search", "er", "-A", "--limit", "2", "--human"], ["search", "first", "-A", "--limit", "1", "--json"], ["search", "x", "-A", "--limit", "0", "--json"], ["search", "x", "-A", "--limit", "51", "--human"], ["search", "x", "-A", "--limit", "1.5", "--human"], ["search", "first", "-A", "--limit", "3", "--human"], ["search", "er", "--limit", "3", "--human"], ["search", "er", "--limit", "2", "--json"]],
+  },
+  {
+    // The server's project query matches name and description but never slug
+    // (global-search.ts in Kaneo v2.32.0), so a project is only reachable by the
+    // key every task reference starts with if the CLI adds the slug matches the
+    // server cannot see. Both seeded projects carry slugs their names do not
+    // contain, one in each workspace, so the scoped and the -A answers differ.
+    name: "search matches a project by its slug",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-web", workspaceId: WS, name: "Web app", slug: "acme-web" },
+        { id: "proj-handbook", workspaceId: "ws-other", name: "Handbook", slug: "acme-docs" },
+      ],
+    },
+    steps: [
+      ["search", "acme-web", "--human"],
+      ["search", "acme-web", "--json"],
+      ["search", "acme", "-A", "--human"],
+      ["search", "acme", "--type", "projects", "--json"],
+      // The name and the slug both contain "web": the project is one result,
+      // not the server's and the supplement's.
+      ["search", "web", "--type", "projects", "--json"],
+      // acme-docs lives in the workspace the settings do not name.
+      ["search", "acme-docs", "--human"],
+    ],
   },
   ...both("workspace members", ["workspace", "members"]).map((s) => ({ ...s, seed: { members: MEMBERS } })),
   { name: "workspace members by name", seed: { members: MEMBERS }, env: { KANEO_WORKSPACE: "Other" }, steps: [["workspace", "members", "--human"]] },
@@ -2698,7 +2724,10 @@ export const SCENARIOS: Scenario[] = [
     // workspace the settings name is what the output shows.
     name: "project find",
     seed: { projects: [...SEED.projects, { id: "proj-beacon", workspaceId: "ws-other", name: "Beacon", slug: "BCN" }] },
-    steps: [["project", "find", "be", "--json"], ["project", "find", "OLD", "--human"], ["project", "find", "zzz", "--json"]],
+    // -A is accepted as the no-op it is — find already searches every
+    // workspace — while -w names a scope the command does not have, so it is
+    // refused rather than silently ignored.
+    steps: [["project", "find", "be", "--json"], ["project", "find", "be", "-A", "--json"], ["project", "find", "be", "-w", "ws-main", "--human"], ["project", "find", "OLD", "--human"], ["project", "find", "zzz", "--json"]],
   },
 
   // Gitea integration: the whole lifecycle against the fake's one instance.

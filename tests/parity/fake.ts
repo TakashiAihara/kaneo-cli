@@ -1716,8 +1716,22 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         }
       }
       for (const x of inWorkspace) {
-        if ((type === "all" || type === "projects") && hit(x.name, x.slug)) {
-          found.push({ id: x.id, type: "project", title: x.name, createdAt: x.createdAt, relevanceScore: 3, ...where(x) });
+        // The server's project query matches the name and the description,
+        // never the slug (global-search.ts in Kaneo); a name match outranks a
+        // description one. A project match names no projectName — it is the
+        // project — which `where` would add for the task-side hits.
+        const nameHit = hit(x.name);
+        if ((type === "all" || type === "projects") && (nameHit || hit(x.description))) {
+          const { projectName: _, ...rest } = where(x);
+          found.push({
+            id: x.id,
+            type: "project",
+            title: x.name,
+            ...(x.description ? { description: x.description } : {}),
+            createdAt: x.createdAt,
+            relevanceScore: nameHit ? 3 : 2,
+            ...rest,
+          });
         }
       }
       for (const x of inScope) {

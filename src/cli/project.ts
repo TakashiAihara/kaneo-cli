@@ -207,8 +207,25 @@ export const projectCommand = {
       // included, since one that has been archived is exactly the one somebody is
       // most often looking for.
       args: exactArgs(1),
+      flags: [
+        {
+          name: "all-workspaces",
+          shorthand: "A",
+          type: "bool" as const,
+          // find already searches every workspace, so the flag is accepted
+          // rather than refused: the flag set then matches search and
+          // project ls, which is what a caller expects of the three.
+          usage: "search every workspace the key can reach (already the default)",
+          defaultValue: "false",
+        },
+      ],
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
+        // Every workspace is searched by definition, so a workspace named on
+        // the command line contradicts the command rather than narrowing it.
+        if (app.flags.workspaceId !== "") {
+          throw new Error("project find searches every workspace, so it cannot be narrowed with --workspace");
+        }
         const wanted = args[0]!.toLowerCase();
         const everywhere = await allProjects(true);
         const found = everywhere.found.filter(

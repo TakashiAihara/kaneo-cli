@@ -18,7 +18,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "task  GAM#1  Filed elsewhere first  (to-do)  (Other)\n",
+      "stdout": "task  GAM#1  Filed elsewhere first  (to-do)  (workspace: Other)\n",
       "stderr": ""
     },
     {
@@ -42,7 +42,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "task  GAM#1  Filed elsewhere first  (to-do)  (Other)\ntask  BET#1  Beta first  (to-do)  (Main)\n2 shown; there may be more (--limit up to 50)\n",
+      "stdout": "task  GAM#1  Filed elsewhere first  (to-do)  (workspace: Other)\ntask  BET#1  Beta first  (to-do)  (workspace: Main)\n2 shown; there may be more (--limit up to 50)\n",
       "stderr": ""
     },
     {
@@ -73,6 +73,32 @@
     {
       "args": [
         "search",
+        "first",
+        "-A",
+        "-w",
+        "ws-main",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: --all-workspaces searches every workspace, so it cannot be narrowed with --workspace\n"
+    },
+    {
+      "args": [
+        "search",
+        "first",
+        "--all-workspaces",
+        "--workspace",
+        "Other",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--all-workspaces searches every workspace, so it cannot be narrowed with --workspace\"\n}\n",
+      "stderr": "Error: --all-workspaces searches every workspace, so it cannot be narrowed with --workspace\n"
+    },
+    {
+      "args": [
+        "search",
         "other",
         "-A",
         "--type",
@@ -93,7 +119,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "workspace         Other\ntask       GAM#1  Filed elsewhere first  (to-do)  (Other)\n2 shown; there may be more (--limit up to 50)\n",
+      "stdout": "workspace         Other\ntask       GAM#1  Filed elsewhere first  (to-do)  (workspace: Other)\n2 shown; there may be more (--limit up to 50)\n",
       "stderr": ""
     },
     {
@@ -158,7 +184,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "task     GAM#1  Filed elsewhere first  (to-do)  (Other)\ntask     BET#1  Beta first  (to-do)  (Main)\ncomment  ALP#1  Comment on Write the parser  (Main)\n",
+      "stdout": "task     GAM#1  Filed elsewhere first  (to-do)  (workspace: Other)\ntask     BET#1  Beta first  (to-do)  (workspace: Main)\ncomment  ALP#1  Comment on Write the parser  (workspace: Main)\n",
       "stderr": ""
     },
     {
@@ -199,6 +225,11 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/auth/organization/list",
       "query": ""
     },
@@ -209,23 +240,18 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/search",
       "query": "?limit=50&q=elsewhere&workspaceId=ws-other"
     },
     {
       "method": "GET",
-      "path": "/auth/organization/list",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/search",
-      "query": "?limit=50&q=first&workspaceId=ws-main"
-    },
-    {
-      "method": "GET",
-      "path": "/search",
-      "query": "?limit=50&q=first&workspaceId=ws-other"
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
     },
     {
       "method": "GET",
@@ -239,8 +265,43 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/search",
       "query": "?limit=50&q=first&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
     },
     {
       "method": "GET",
@@ -269,23 +330,18 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/search",
       "query": "?limit=50&q=er&workspaceId=ws-other"
     },
     {
       "method": "GET",
-      "path": "/auth/organization/list",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/search",
-      "query": "?limit=50&q=first&workspaceId=ws-main"
-    },
-    {
-      "method": "GET",
-      "path": "/search",
-      "query": "?limit=50&q=first&workspaceId=ws-other"
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
     },
     {
       "method": "GET",
@@ -299,8 +355,43 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/search",
       "query": "?limit=50&q=first&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=first&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
     },
     {
       "method": "GET",
@@ -314,6 +405,11 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/auth/organization/list",
       "query": ""
     },
@@ -321,6 +417,11 @@
       "method": "GET",
       "path": "/search",
       "query": "?limit=2&q=er&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
     }
   ],
   "files": {}

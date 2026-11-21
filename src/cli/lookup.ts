@@ -160,12 +160,16 @@ export const withProject = async <T>(
 // workspace with no projects in it. The listing costs one small request, and
 // holds only the workspaces the key's user is a member of, so an admin reaching
 // another one has to go through the web app.
-export const resolveWorkspace = async (value: string): Promise<string> => {
+export const resolveWorkspaceIn = async (value: string): Promise<Workspace> => {
   const found = workspacesNamed(await listWorkspaces(), value);
   if (found.length === 0) throw new Error(noWorkspace(value));
   if (found.length > 1) throw new Error(severalWorkspaces(value, found));
-  return found[0]!.id;
+  return found[0]!;
 };
+
+// The id alone, for the callers that send it on; resolveWorkspaceIn is for the
+// ones that also have to name the workspace it resolved to.
+export const resolveWorkspace = async (value: string): Promise<string> => (await resolveWorkspaceIn(value)).id;
 
 // A failure inside the lookup is reported next to the answer that started it,
 // rather than in its place: the server's answer is the part that says which

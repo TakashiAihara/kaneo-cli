@@ -2222,6 +2222,64 @@ test("TestGitHubImportSurvivesCountsThatHoldThenMove", async () => {
   expect(got).toEqual({ runId: "run1", pending: false, imported: 3, updated: 0, skipped: 0 });
 });
 
+// Held counts on either side of a move add up to more pending replies than the
+// stall bound, and the run still finishes: the count of identical replies
+// starts over when any of the three counts moves, so two stretches of 99 are
+// not the 198-in-a-row that would be given up on.
+test("TestGitHubImportSurvivesCountsThatHoldThenMoveThenHold", async () => {
+  let calls = 0;
+  newServer(() => {
+    const at = calls++;
+    const done = at === 198;
+    const imported = at < 99 ? 1 : 2;
+    return new Response(JSON.stringify({ runId: "run1", pending: !done, imported, updated: 0, skipped: 0 }), {
+      status: done ? 200 : 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(199);
+  expect(got).toEqual({ runId: "run1", pending: false, imported: 2, updated: 0, skipped: 0 });
+});
+
+// A re-import of an already-imported repository grows only updated while
+// imported and skipped hold, and that is still progress: three stretches of
+// 50 identical replies total 150 pendings, past the stall bound, and none of
+// them reaches it. Watching imported alone would read the whole run as stuck.
+test("TestGitHubImportSurvivesWhenOnlyUpdatedMoves", async () => {
+  let calls = 0;
+  newServer(() => {
+    const at = calls++;
+    const done = at === 150;
+    const updated = done ? 2 : Math.floor(at / 50);
+    return new Response(JSON.stringify({ runId: "run1", pending: !done, imported: 0, updated, skipped: 0 }), {
+      status: done ? 200 : 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(151);
+  expect(got).toEqual({ runId: "run1", pending: false, imported: 0, updated: 2, skipped: 0 });
+});
+
+// The same for skipped: it is one of the three counts compared, so a run
+// where only it moves is working, not stuck.
+test("TestGitHubImportSurvivesWhenOnlySkippedMoves", async () => {
+  let calls = 0;
+  newServer(() => {
+    const at = calls++;
+    const done = at === 150;
+    const skipped = done ? 2 : Math.floor(at / 50);
+    return new Response(JSON.stringify({ runId: "run1", pending: !done, imported: 0, updated: 0, skipped }), {
+      status: done ? 200 : 202,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const got = await api.importGitHubIssues("p1");
+  expect(calls).toBe(151);
+  expect(got).toEqual({ runId: "run1", pending: false, imported: 0, updated: 0, skipped: 2 });
+});
+
 // The routes behind the server's user-session check refuse a key with their
 // own words; the message is kept for the caller.
 test("TestGitHubSessionRefusalKeepsTheServerMessage", async () => {

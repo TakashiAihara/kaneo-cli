@@ -1,0 +1,144 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         integ0002\nproject    proj-alpha\nchannel    alerts\nwebhook    http…mber\nevents     task created, task status changed, task comment created\nactive     on\ncreated    2026-01-01T00:00:10.000Z\nupdated    2026-01-01T00:00:10.000Z\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--webhook-url",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PATCH /api/mattermost-integration/project/proj-alpha: 403: Insufficient permissions\"\n}\n",
+      "stderr": "Error: PATCH /api/mattermost-integration/project/proj-alpha: 403: Insufficient permissions\n"
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--webhook-url",
+        "-",
+        "-p",
+        "BET",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/mattermost-integration/project/proj-beta: 403: Insufficient permissions\"\n}\n",
+      "stderr": "Error: POST /api/mattermost-integration/project/proj-beta: 403: Insufficient permissions\n"
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--active=false",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PATCH /api/mattermost-integration/project/proj-alpha: 403: Insufficient permissions\"\n}\n",
+      "stderr": "Error: PATCH /api/mattermost-integration/project/proj-alpha: 403: Insufficient permissions\n"
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "rm",
+        "--yes",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"DELETE /api/mattermost-integration/project/proj-alpha: 403: Insufficient permissions\"\n}\n",
+      "stderr": "Error: DELETE /api/mattermost-integration/project/proj-alpha: 403: Insufficient permissions\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://example.com/mm-member-new"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/mattermost-integration/project/proj-beta",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://example.com/mm-member-new"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "isActive": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "DELETE",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

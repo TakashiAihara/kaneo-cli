@@ -1,0 +1,61 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--webhook-url",
+        "-",
+        "--active=false",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--active does not apply to a new integration; it is created active\"\n}\n",
+      "stderr": "Error: --active does not apply to a new integration; it is created active\n"
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--webhook-url",
+        "-",
+        "--active",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--active does not apply to a new integration; it is created active\"\n}\n",
+      "stderr": "Error: --active does not apply to a new integration; it is created active\n"
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "get",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "null\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

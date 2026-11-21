@@ -1,0 +1,43 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--webhook-url",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty --webhook-url on stdin\"\n}\n",
+      "stderr": "Error: empty --webhook-url on stdin\n"
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--secret",
+        "-",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty --secret on stdin\"\n}\n",
+      "stderr": "Error: empty --secret on stdin\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

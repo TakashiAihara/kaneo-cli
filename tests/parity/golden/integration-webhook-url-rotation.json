@@ -1,0 +1,49 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "set",
+        "--webhook-url",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…-new\",\n  \"secretConfigured\": true,\n  \"maskedSecret\": \"whse…t_13\",\n  \"events\": {\n    \"taskCreated\": false,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true,\n    \"taskDeleted\": true,\n    \"taskMoved\": false,\n    \"taskDueDateChanged\": false,\n    \"taskAssigneeChanged\": false,\n    \"taskUnassigned\": false,\n    \"dueDateReminder\": false\n  },\n  \"dueDateReminderLeadTimeMinutes\": 90,\n  \"isActive\": false,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:11.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "webhook",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         integ0002\nproject    proj-alpha\nwebhook    http…-new\nsecret     whse…t_13\nevents     task status changed, task comment created, task deleted\nreminder   90m before a due date\nactive     off\ncreated    2026-01-01T00:00:10.000Z\nupdated    2026-01-01T00:00:11.000Z\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://example.com/wh-new"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

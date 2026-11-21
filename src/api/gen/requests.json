@@ -35,6 +35,12 @@
     "body.required": false,
     "body.type": true
   },
+  "createGenericWebhookIntegration": {
+    "body.dueDateReminderLeadTimeMinutes": false,
+    "body.events": false,
+    "body.secret": false,
+    "body.webhookUrl": true
+  },
   "createGitHubIntegration": {
     "body.repositoryName": true,
     "body.repositoryOwner": true
@@ -50,6 +56,11 @@
     "body.name": true,
     "body.taskId": false,
     "body.workspaceId": true
+  },
+  "createMattermostIntegration": {
+    "body.channelName": false,
+    "body.events": false,
+    "body.webhookUrl": true
   },
   "createNotification": {
     "body.eventData": false,
@@ -94,9 +105,11 @@
   },
   "deleteColumn": {},
   "deleteCustomField": {},
+  "deleteGenericWebhookIntegration": {},
   "deleteGitHubIntegration": {},
   "deleteGitlabIntegration": {},
   "deleteLabel": {},
+  "deleteMattermostIntegration": {},
   "deleteNotificationPreferenceWorkspaceRule": {},
   "deleteProject": {},
   "deleteProjectBackground": {},
@@ -123,11 +136,13 @@
   "getCustomFieldValuesByTask": {},
   "getCustomFieldsByProject": {},
   "getExternalLinksByTask": {},
+  "getGenericWebhookIntegration": {},
   "getGitHubAppInfo": {},
   "getGitHubIntegration": {},
   "getGitlabIntegration": {},
   "getInvitationDetails": {},
   "getLabel": {},
+  "getMattermostIntegration": {},
   "getNotificationPreferences": {},
   "getProject": {},
   "getProjectBackground": {},
@@ -234,6 +249,13 @@
     "body.isFinal": false,
     "body.name": false
   },
+  "updateGenericWebhookIntegration": {
+    "body.dueDateReminderLeadTimeMinutes": false,
+    "body.events": false,
+    "body.isActive": false,
+    "body.secret": false,
+    "body.webhookUrl": false
+  },
   "updateGitHubIntegration": {
     "body.commentTaskLinkOnGitHubIssue": false,
     "body.isActive": false
@@ -245,6 +267,12 @@
   "updateLabel": {
     "body.color": true,
     "body.name": true
+  },
+  "updateMattermostIntegration": {
+    "body.channelName": false,
+    "body.events": false,
+    "body.isActive": false,
+    "body.webhookUrl": false
   },
   "updateNotificationPreferences": {
     "body.dueDateReminderEnabled": false,

@@ -1,0 +1,138 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--channel-name",
+        "alerts",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"creating an integration needs --webhook-url - or --webhook-url-file \\u003cpath\\u003e: the webhook URL is a credential read from stdin or a file so it never appears on the command line\"\n}\n",
+      "stderr": "Error: creating an integration needs --webhook-url - or --webhook-url-file <path>: the webhook URL is a credential read from stdin or a file so it never appears on the command line\n"
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--webhook-url",
+        "-",
+        "--active=false",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--active does not apply to a new integration; it is created active\"\n}\n",
+      "stderr": "Error: --active does not apply to a new integration; it is created active\n"
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--webhook-url",
+        "-",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"integ0002\",\n  \"projectId\": \"proj-alpha\",\n  \"channelName\": null,\n  \"webhookConfigured\": true,\n  \"maskedWebhookUrl\": \"http…beta\",\n  \"events\": {\n    \"taskCreated\": true,\n    \"taskStatusChanged\": true,\n    \"taskPriorityChanged\": false,\n    \"taskTitleChanged\": false,\n    \"taskDescriptionChanged\": false,\n    \"taskCommentCreated\": true\n  },\n  \"isActive\": true,\n  \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n  \"updatedAt\": \"2026-01-01T00:00:10.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"nothing to change: pass at least one of --webhook-url, --webhook-url-file, --channel-name, --active, --task-created, --task-status-changed, --task-priority-changed, --task-title-changed, --task-description-changed, --task-comment-created\"\n}\n",
+      "stderr": "Error: nothing to change: pass at least one of --webhook-url, --webhook-url-file, --channel-name, --active, --task-created, --task-status-changed, --task-priority-changed, --task-title-changed, --task-description-changed, --task-comment-created\n"
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--webhook-url",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--webhook-url cannot be cleared; the integration needs one\"\n}\n",
+      "stderr": "Error: --webhook-url cannot be cleared; the integration needs one\n"
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "set",
+        "--webhook-url",
+        "https://example.com/mm-lit",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--webhook-url is a secret and takes - only: pipe the value on stdin rather than passing it on the command line\"\n}\n",
+      "stderr": "Error: --webhook-url is a secret and takes - only: pipe the value on stdin rather than passing it on the command line\n"
+    },
+    {
+      "args": [
+        "integration",
+        "mattermost",
+        "get",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "id         integ0002\nproject    proj-alpha\nchannel    unset\nwebhook    http…beta\nevents     task created, task status changed, task comment created\nactive     on\ncreated    2026-01-01T00:00:10.000Z\nupdated    2026-01-01T00:00:10.000Z\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": "",
+      "body": {
+        "webhookUrl": "https://example.com/mm-beta"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

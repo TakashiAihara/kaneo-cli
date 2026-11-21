@@ -23,6 +23,8 @@ import {
   CustomFieldDefinition,
   CustomFieldFilterValues,
   CustomFieldValue,
+  DeleteGenericWebhookIntegration200,
+  DeleteMattermostIntegration200,
   ExternalLink,
   GitHubAppInfo,
   GitHubDeleteResult,
@@ -70,9 +72,11 @@ import type {
   CreateCalendarFeedBody,
   CreateColumnBody,
   CreateCustomFieldBody,
+  CreateGenericWebhookIntegrationBody,
   CreateGitHubIntegrationBody,
   CreateGitlabIntegrationBody,
   CreateLabelBody,
+  CreateMattermostIntegrationBody,
   CreateNotificationBody,
   CreateProjectBody,
   CreateTaskBody,
@@ -80,6 +84,7 @@ import type {
   CreateTaskRelationBody,
   CreateTimeEntryBody,
   FinalizeProjectBackgroundUploadBody,
+  GenericWebhookIntegration,
   GetActivitiesParams,
   GetTaskByTicketIdParams,
   GetTaskParams,
@@ -96,6 +101,7 @@ import type {
   ListProjectsParams,
   ListTasksParams,
   MarkAllNotificationsAsReadParams,
+  MattermostIntegration,
   MoveProjectBody,
   MoveTaskBody,
   PendingLabelDeletion,
@@ -105,9 +111,11 @@ import type {
   ReorderProjectsParams,
   SetCustomFieldValueBody,
   UpdateColumnBody,
+  UpdateGenericWebhookIntegrationBody,
   UpdateGitHubIntegrationBody,
   UpdateGitlabIntegrationBody,
   UpdateLabelBody,
+  UpdateMattermostIntegrationBody,
   UpdateNotificationPreferencesBody,
   UpdateOrganizationBody,
   UpdateProjectBody,
@@ -3011,6 +3019,268 @@ return kaneoFetch<GitlabImportResult>(getImportGitlabIssuesUrl(),
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(importGitlabIssuesBody),
     schema: GitlabImportResult
+  }
+);}
+
+
+
+export const getGetGenericWebhookIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/generic-webhook-integration/project/${projectId}`
+}
+
+/**
+ * Get the outgoing webhook integration for a project, or null when none is configured.
+ * @summary Get webhook integration
+ */
+export const getGenericWebhookIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<GenericWebhookIntegration | null> => {
+
+  return kaneoFetch<GenericWebhookIntegration | null>(getGetGenericWebhookIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCreateGenericWebhookIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/generic-webhook-integration/project/${projectId}`
+}
+
+/**
+ * Create or replace the outgoing webhook for a project. Kaneo POSTs the selected task events to this URL, signed with the secret when one is set.
+ * @summary Create webhook integration
+ */
+export const createGenericWebhookIntegration = async (projectId: string,
+    createGenericWebhookIntegrationBody: CreateGenericWebhookIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GenericWebhookIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GenericWebhookIntegration | null>(getCreateGenericWebhookIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createGenericWebhookIntegrationBody)
+  }
+);}
+
+
+
+export const getUpdateGenericWebhookIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/generic-webhook-integration/project/${projectId}`
+}
+
+/**
+ * Update the outgoing webhook. Omitted fields keep their current value, event toggles merge into the existing set, and a null secret clears it.
+ * @summary Update webhook integration
+ */
+export const updateGenericWebhookIntegration = async (projectId: string,
+    updateGenericWebhookIntegrationBody: UpdateGenericWebhookIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<GenericWebhookIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<GenericWebhookIntegration | null>(getUpdateGenericWebhookIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateGenericWebhookIntegrationBody)
+  }
+);}
+
+
+
+export const getDeleteGenericWebhookIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/generic-webhook-integration/project/${projectId}`
+}
+
+/**
+ * Remove the outgoing webhook from a project.
+ * @summary Delete webhook integration
+ */
+export const deleteGenericWebhookIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<DeleteGenericWebhookIntegration200> => {
+
+  return kaneoFetch<DeleteGenericWebhookIntegration200>(getDeleteGenericWebhookIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: DeleteGenericWebhookIntegration200
+  }
+);}
+
+
+
+export const getGetMattermostIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/mattermost-integration/project/${projectId}`
+}
+
+/**
+ * Get the Mattermost integration for a project, or null when none is configured.
+ * @summary Get Mattermost integration
+ */
+export const getMattermostIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<MattermostIntegration | null> => {
+
+  return kaneoFetch<MattermostIntegration | null>(getGetMattermostIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCreateMattermostIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/mattermost-integration/project/${projectId}`
+}
+
+/**
+ * Create or replace the Mattermost integration for a project. The webhook URL must use HTTPS and pass destination validation; delivery failures surface later.
+ * @summary Create Mattermost integration
+ */
+export const createMattermostIntegration = async (projectId: string,
+    createMattermostIntegrationBody: CreateMattermostIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<MattermostIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<MattermostIntegration | null>(getCreateMattermostIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createMattermostIntegrationBody)
+  }
+);}
+
+
+
+export const getUpdateMattermostIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/mattermost-integration/project/${projectId}`
+}
+
+/**
+ * Update the Mattermost integration. Omitted fields keep their current value, and event toggles are merged into the existing set.
+ * @summary Update Mattermost integration
+ */
+export const updateMattermostIntegration = async (projectId: string,
+    updateMattermostIntegrationBody: UpdateMattermostIntegrationBody, options?: Parameters<typeof kaneoFetch>[1]): Promise<MattermostIntegration | null> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return kaneoFetch<MattermostIntegration | null>(getUpdateMattermostIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateMattermostIntegrationBody)
+  }
+);}
+
+
+
+export const getDeleteMattermostIntegrationUrl = (projectId: string,) => {
+
+
+
+
+  return `/mattermost-integration/project/${projectId}`
+}
+
+/**
+ * Remove the Mattermost integration from a project.
+ * @summary Delete Mattermost integration
+ */
+export const deleteMattermostIntegration = async (projectId: string, options?: Parameters<typeof kaneoFetch>[1]): Promise<DeleteMattermostIntegration200> => {
+
+  return kaneoFetch<DeleteMattermostIntegration200>(getDeleteMattermostIntegrationUrl(projectId),
+  {
+    ...options,
+    method: 'DELETE'
+
+    ,
+    schema: DeleteMattermostIntegration200
   }
 );}
 

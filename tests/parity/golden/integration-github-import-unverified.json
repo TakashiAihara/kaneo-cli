@@ -1,0 +1,26 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "import",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"POST /api/github-integration/import-issues: 400: GitHub integration must be reconnected by a repository administrator\"\n}\n",
+      "stderr": "Error: POST /api/github-integration/import-issues: 400: GitHub integration must be reconnected by a repository administrator\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/github-integration/import-issues",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha"
+      }
+    }
+  ],
+  "files": {}
+}

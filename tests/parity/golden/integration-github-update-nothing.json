@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "args": [
+        "integration",
+        "github",
+        "update",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"nothing to change: pass --active or --comment-task-link\"\n}\n",
+      "stderr": "Error: nothing to change: pass --active or --comment-task-link\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

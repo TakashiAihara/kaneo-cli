@@ -23,6 +23,10 @@
     "body.isFinal": false,
     "body.name": true
   },
+  "createGitHubIntegration": {
+    "body.repositoryName": true,
+    "body.repositoryOwner": true
+  },
   "createLabel": {
     "body.color": true,
     "body.name": true,
@@ -71,6 +75,7 @@
     "body.taskId": true
   },
   "deleteColumn": {},
+  "deleteGitHubIntegration": {},
   "deleteLabel": {},
   "deleteNotificationPreferenceWorkspaceRule": {},
   "deleteProject": {},
@@ -86,6 +91,8 @@
   "getColumns": {},
   "getCurrentUser": {},
   "getExternalLinksByTask": {},
+  "getGitHubAppInfo": {},
+  "getGitHubIntegration": {},
   "getInvitationDetails": {},
   "getLabel": {},
   "getNotificationPreferences": {},
@@ -114,12 +121,20 @@
     "query.userEmail": false,
     "query.workspaceId": true
   },
+  "importGitHubIssues": {
+    "body.projectId": true,
+    "body.runId": false
+  },
   "importTasks": {
     "body.tasks": true
   },
   "listAssignedTasks": {
     "query.countOnly": false,
     "query.workspaceId": true
+  },
+  "listGitHubRepositories": {
+    "query.installationPage": false,
+    "query.repositoryPage": false
   },
   "listNotifications": {
     "query.workspaceId": false
@@ -162,6 +177,10 @@
     "body.icon": false,
     "body.isFinal": false,
     "body.name": false
+  },
+  "updateGitHubIntegration": {
+    "body.commentTaskLinkOnGitHubIssue": false,
+    "body.isActive": false
   },
   "updateLabel": {
     "body.color": true,
@@ -246,5 +265,10 @@
     "body.columnId": true,
     "body.eventType": true,
     "body.integrationType": true
+  },
+  "verifyGitHubInstallation": {
+    "body.projectId": true,
+    "body.repositoryName": true,
+    "body.repositoryOwner": true
   }
 }

@@ -264,6 +264,18 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
         body = null;
         headers.delete("content-type");
       }
+      // The body is the credential the headers cannot show: an integration
+      // call sends its token inside it, and withoutCredential can strip only
+      // the Authorization header. A hop that would replay the body against
+      // another origin — another host or port, or the same host under another
+      // scheme — is refused rather than followed, because the request was
+      // meant for the origin it was first sent to and the body cannot be
+      // redacted the way the key can.
+      if (body !== null && next.origin !== start.target.origin) {
+        throw new KaneoApiError(called, served, response.status, [
+          `refusing to follow the redirect to ${next.href}: the request body may carry a credential`,
+        ]);
+      }
       target = next;
     }
 

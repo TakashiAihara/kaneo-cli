@@ -70,6 +70,10 @@ describe("output JSON encoder", () => {
     );
   });
 
+  test("writes the short escapes Go writes for a newline, a carriage return and a tab", () => {
+    expect(compact("a\nb\rc\td")).toBe('"a\\nb\\rc\\td"');
+  });
+
   test("a string keeps its content and never prints an HTML or line-terminator character raw", () => {
     fc.assert(
       fc.property(hostile, (value) => {

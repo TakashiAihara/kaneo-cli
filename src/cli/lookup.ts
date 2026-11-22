@@ -1,6 +1,7 @@
 import { KaneoApiError } from "../api/http";
 import { archived, getProject, lastTaskNumbers, listProjectsIn, listWorkspaces, type Project, type Workspace } from "../api/kaneo";
 import type { Flag, FlagValues } from "./args";
+import { hard } from "./failopen";
 
 // Turning a value somebody typed into the id the API takes, so a slug or a name
 // works wherever an id does. A slug is what people and agents type: it is the
@@ -14,6 +15,14 @@ export type ProjectIn = { project: Project; workspaceName: string };
 
 // A workspace whose projects could not be listed, with what the server said.
 export type Unlisted = { workspaceName: string; reason: string };
+
+// The one scoped-lookup failure worth retrying unscoped: the value names
+// projects, but only outside the workspace the lookup was scoped to. `task
+// move --to` is why it exists — its destination may live in another workspace —
+// and every other scoped failure (a value that names nothing, an ambiguous
+// one, a workspace that could not be listed) would fail or widen the same way
+// unscoped, so a caller catching this retries only what it means to.
+export class OnlyElsewhereError extends Error {}
 
 // Every project the key can reach, each with the workspace it is in: one listing
 // per workspace, all asked at once. Archived projects are left out unless asked
@@ -58,9 +67,7 @@ const reasonOf = (e: unknown): string => {
 // that went ahead without them and by the lookups that missed or matched while
 // they were out.
 export const unlistedMessage = (unlisted: Unlisted[]): string =>
-  unlisted
-    .map((u) => `could not list the projects of workspace ${JSON.stringify(u.workspaceName)} (${u.reason})`)
-    .join("; ");
+  unlisted.map((u) => `could not list the projects of workspace ${JSON.stringify(u.workspaceName)} (${u.reason})`).join("; ");
 
 // Values already turned into an id in this run, so a command that names the same
 // project twice (`board` reads the project, then its board) looks it up once.
@@ -116,7 +123,9 @@ export const withProject = async <T>(
       }
       const homeId = home.project.workspaceId;
       candidates = everywhere.found.filter((f) => f.project.workspaceId === homeId);
-      // Only the task's own workspace can hold the destination, and it was listed.
+      // Only the task's own workspace can hold the destination, and it was
+      // listed, so workspaces outside it cannot make a home match ambiguous;
+      // they still qualify a miss below.
       unlisted = [];
     }
     const found = projectsNamed(candidates, value);
@@ -125,21 +134,19 @@ export const withProject = async <T>(
         everywhere.found.filter((f) => f.project.workspaceId !== home!.project.workspaceId),
         value,
       );
-      if (elsewhere.length > 0)
-        throw new Error(
-          `${e.message}: ${onlyElsewhere(value, elsewhere, home.workspaceName)}${explain === undefined ? "" : await explain()}`,
-        );
+      if (elsewhere.length > 0) throw new OnlyElsewhereError(`${e.message}: ${onlyElsewhere(value, elsewhere, home.workspaceName)}${explain === undefined ? "" : await explain()}`);
     }
     // A miss proves nothing while a workspace could not be listed: the project
     // may be in it. Saying it does not exist would send the reader to look for
-    // a typo that is not there.
-    if (found.length === 0 && unlisted.length > 0) {
+    // a typo that is not there. everywhere.unlisted rather than unlisted: a
+    // scoped lookup clears the latter for matches but a miss is qualified by
+    // every workspace that could not be listed.
+    if (found.length === 0 && everywhere.unlisted.length > 0) {
       throw new Error(
-        `${e.message}: ${noProject(value)} in the workspaces that could be listed; ${unlistedMessage(unlisted)}${explain === undefined ? "" : await explain()}`,
+        `${e.message}: ${noProject(value)} in the workspaces that could be listed; ${unlistedMessage(everywhere.unlisted)}${explain === undefined ? "" : await explain()}`,
       );
     }
-    if (found.length === 0)
-      throw new Error(`${e.message}: ${noProject(value)}${explain === undefined ? "" : await explain()}`);
+    if (found.length === 0) throw new Error(`${e.message}: ${noProject(value)}${explain === undefined ? "" : await explain()}`);
     if (found.length > 1) throw new Error(severalProjects(value, found));
     const only = found[0]!.project;
     // The value already was this project's id and the request failed anyway, so
@@ -255,12 +262,7 @@ export const slugOr = (slug: string, fallback: string): string => (slug === "" ?
 // the task's id is the only name that still resolves: a bare #N would read as
 // the current project's task, which is how a close hint once closed the wrong
 // board's task of the same number. Callers without the id keep the bare #N.
-export const taskRef = (
-  slug: string | undefined,
-  number: number | string,
-  projectId?: string,
-  taskId?: string,
-): string => {
+export const taskRef = (slug: string | undefined, number: number | string, projectId?: string, taskId?: string): string => {
   const board = slugOr(slug ?? "", projectId ?? "");
   return board === "" ? (taskId ?? `#${number}`) : `${board}#${number}`;
 };
@@ -274,9 +276,7 @@ export const workspaceInReference = async (value: string, number: number): Promi
   try {
     const named = workspacesNamed(await listWorkspaces(), value);
     if (named.length !== 1) return "";
-    const holding = (await lastTaskNumbers(named[0]!.id)).filter(
-      (p) => p.lastTaskNumber === null || p.lastTaskNumber >= number,
-    );
+    const holding = (await lastTaskNumbers(named[0]!.id)).filter((p) => p.lastTaskNumber === null || p.lastTaskNumber >= number);
     const listed =
       holding.length === 0
         ? `no active project in it has reached #${number}`
@@ -289,10 +289,7 @@ export const workspaceInReference = async (value: string, number: number): Promi
 
 const onlyElsewhere = (value: string, found: ProjectIn[], homeName: string): string =>
   `${JSON.stringify(value)} names no project in this task's workspace ${JSON.stringify(homeName)}, only ${found
-    .map(
-      (p) =>
-        `${p.project.slug === "" ? p.project.id : `${p.project.slug} (${p.project.id})`} in workspace ${JSON.stringify(p.workspaceName)}`,
-    )
+    .map((p) => `${p.project.slug === "" ? p.project.id : `${p.project.slug} (${p.project.id})`} in workspace ${JSON.stringify(p.workspaceName)}`)
     .join(", ")}; the server moves a task only within its own workspace`;
 
 const noProject = (value: string): string =>
@@ -368,7 +365,10 @@ export const guardProject = async (projectId: string, access: ProjectAccess = {}
   const project = await seenProject(projectId);
   if (!archived(project)) return;
   if (access.write === true && access.allowArchived !== true) {
-    throw new Error(`${archivedNote(project)}; pass --allow-archived to write to it anyway`);
+    // A refusal rather than a failure: the server is fine and the write is
+    // deliberately not made, so a fail-open caller that stayed quiet would
+    // leave a session hook believing the write landed.
+    throw hard(`${archivedNote(project)}; pass --allow-archived to write to it anyway`);
   }
   if (warned.has(project.id)) return;
   warned.add(project.id);

@@ -72,12 +72,12 @@
     },
     {
       "method": "GET",
-      "path": "/task/task-a1",
+      "path": "/comment/task-a1",
       "query": ""
     },
     {
       "method": "GET",
-      "path": "/comment/task-a1",
+      "path": "/task/task-a1",
       "query": ""
     },
     {

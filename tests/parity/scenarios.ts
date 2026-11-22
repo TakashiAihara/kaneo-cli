@@ -1321,6 +1321,34 @@ export const SCENARIOS: Scenario[] = [
     seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
     steps: [["task", "move", "1", "--to", "GAM", "--human"]],
   },
+  // A task that already carries the 移行先 pointer was migrated once: moving it
+  // again is refused with where the first copy went, rather than leaving a
+  // second live one. The copy itself moves like any task.
+  {
+    name: "task move across workspaces is not repeated",
+    seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
+    steps: [
+      ["task", "move", "1", "--to", "GAM", "--human"],
+      ["task", "move", "1", "--to", "GAM", "--human"],
+      ["task", "move", "GAM#1", "--to", "ALP", "--human"],
+    ],
+  },
+  // The folded comments are posted under the server's 10,000-character comment
+  // cap: comments that would not fit in one are split into as many comments as
+  // it takes rather than failing after the copy exists.
+  {
+    name: "task move across workspaces folds comments past the comment limit",
+    seed: {
+      projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
+      comments: [
+        ...(SEED.comments ?? []),
+        { taskId: "task-a1", content: "x".repeat(6000) },
+        { taskId: "task-a1", content: "y".repeat(6000) },
+        { taskId: "task-a1", content: "z".repeat(9950) },
+      ],
+    },
+    steps: [["task", "move", "1", "--to", "GAM", "--human"], ["comment", "ls", "GAM#1", "--human"]],
+  },
   // The server moves a task only within its own workspace, so a slug found only
   // in another one is migrated there rather than left as a bare 404.
   {
@@ -1395,6 +1423,9 @@ export const SCENARIOS: Scenario[] = [
       ["task", "status", "proj-old#1", "done", "--human"],
       ["comment", "add", "proj-old#1", "still here", "--human"],
       ["task", "create", "new one", "-p", "proj-old", "--human"],
+      // Fail-open does not hide this refusal: a session hook that stayed
+      // quiet would leave the attach silently not happening.
+      ["session", "attach", "proj-old#1"],
       ["session", "attach", "proj-old#1", "--strict"],
       ["task", "move", "1", "--to", "OLD", "--human"],
       ["task", "status", "proj-old#1", "done", "--allow-archived", "--human"],
@@ -1415,6 +1446,14 @@ export const SCENARIOS: Scenario[] = [
     name: "context reports a project the server does not have",
     env: { KANEO_PROJECT: "proj-gone" },
     steps: [["context", "--json"]],
+  },
+  // A project configured by slug or name resolves the way every command
+  // resolves it: GET /project/:id answers ids only, so the value goes through
+  // the same lookup first and the state reported is the resolved project's.
+  {
+    name: "context reports the state of a project configured by slug or name",
+    env: { KANEO_PROJECT: "OLD" },
+    steps: [["context", "--json"], ["context", "-p", "Alpha", "--json"], ["context", "-p", "old", "--human"]],
   },
   { name: "task due set and clear", steps: [["task", "due", "1", "2026-10-31", "--json"], ["task", "get", "1", "--json"], ["task", "due", "1", "--human"], ["task", "get", "1", "--json"]] },
   { name: "task due refuses a bad date", steps: [["task", "due", "1", "someday", "--json"], ["task", "due", "1", "", "--json"], ["task", "due", "1", " 2026-10-31 ", "--human"], ["task", "get", "1", "--human"]] },

@@ -85,12 +85,12 @@
     },
     {
       "method": "GET",
-      "path": "/task/task-g1",
+      "path": "/comment/task-g1",
       "query": ""
     },
     {
       "method": "GET",
-      "path": "/comment/task-g1",
+      "path": "/task/task-g1",
       "query": ""
     },
     {

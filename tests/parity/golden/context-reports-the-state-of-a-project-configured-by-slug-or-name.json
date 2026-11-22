@@ -1,0 +1,113 @@
+{
+  "steps": [
+    {
+      "args": [
+        "context",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"OLD\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-old\",\n      \"archived\": true\n    }\n  ],\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"env\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "context",
+        "-p",
+        "Alpha",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"Alpha\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-alpha\",\n      \"archived\": false\n    }\n  ],\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"flag\",\n    \"workspace\": \"env\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "context",
+        "-p",
+        "old",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "api url    <URL>  (env)\napi key    set  (env)\nworkspace  ws-main  (env)\nproject    old  (flag)\n           proj-old: archived\n\nrepo       -\nprofile    -\nlocal file -\nconfig     <HOME>/.config/kaneo/config.json\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/OLD",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/Alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

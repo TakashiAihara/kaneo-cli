@@ -3,6 +3,7 @@ import { resolveForRepo, type Resolved } from "../config/resolve";
 import { archived, getProject } from "../api/kaneo";
 import type { RunContext } from "./args";
 import type { App } from "./app";
+import { withProject } from "./lookup";
 
 // What the resolution chain settled on, and which layer supplied each value.
 // The key itself is never printed: this is the command someone runs before
@@ -51,15 +52,20 @@ const forRepo = (value: string, app: App): Resolved => {
 // A project that cannot be read is reported with the server's answer, since
 // "missing" and "unreachable" call for different things and neither may read
 // as "active".
+//
+// A configured value is an id, a slug or a name like everywhere else it is
+// accepted, so it goes through the same lookup the commands use: GET
+// /project/:id answers ids only, and a slug sent there reads as a project the
+// server does not have.
 const projectStates = async (ids: string[]): Promise<Report["project_state"]> => {
   if (ids.length === 0) return undefined;
   return Promise.all(
-    ids.map(async (id) => {
+    ids.map(async (value) => {
       try {
-        const project = await getProject(id);
-        return { id, archived: archived(project) };
+        const project = await withProject(value, (id) => getProject(id));
+        return { id: project.id, archived: archived(project) };
       } catch (e) {
-        return { id, error: e instanceof Error ? e.message : String(e) };
+        return { id: value, error: e instanceof Error ? e.message : String(e) };
       }
     }),
   );

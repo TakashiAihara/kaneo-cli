@@ -56,9 +56,9 @@
         "proj-gamma",
         "--json"
       ],
-      "exit": 0,
-      "stdout": "{\n  \"task\": {\n    \"id\": \"task0007\",\n    \"number\": 2,\n    \"title\": \"Write the parser\",\n    \"description\": \"移行元: Main / ALP#1\\n\\nmulti\\nline\",\n    \"status\": \"to-do\",\n    \"priority\": \"high\",\n    \"position\": 1,\n    \"projectId\": \"proj-gamma\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:16.000Z\",\n    \"labels\": null\n  },\n  \"from\": {\n    \"taskId\": \"task-a1\",\n    \"projectId\": \"proj-alpha\",\n    \"projectSlug\": \"ALP\",\n    \"number\": 1\n  },\n  \"to\": {\n    \"taskId\": \"task0007\",\n    \"projectId\": \"proj-gamma\",\n    \"projectSlug\": \"GAM\",\n    \"number\": 2\n  },\n  \"sessions\": [\n    \"sess-old1\",\n    \"sess-old2\"\n  ]\n}\n",
-      "stderr": ""
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"#1 was already moved to Other / GAM#1; move the copy it names instead of this task\"\n}\n",
+      "stderr": "Error: #1 was already moved to Other / GAM#1; move the copy it names instead of this task\n"
     }
   ],
   "requests": [
@@ -119,12 +119,12 @@
     },
     {
       "method": "GET",
-      "path": "/task/task-a1",
+      "path": "/comment/task-a1",
       "query": ""
     },
     {
       "method": "GET",
-      "path": "/comment/task-a1",
+      "path": "/task/task-a1",
       "query": ""
     },
     {
@@ -251,60 +251,8 @@
     },
     {
       "method": "GET",
-      "path": "/task/task-a1",
-      "query": ""
-    },
-    {
-      "method": "GET",
       "path": "/comment/task-a1",
       "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/column/proj-gamma",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/auth/organization/list",
-      "query": ""
-    },
-    {
-      "method": "POST",
-      "path": "/task/proj-gamma",
-      "query": "",
-      "body": {
-        "title": "Write the parser",
-        "description": "移行元: Main / ALP#1\n\nmulti\nline",
-        "priority": "high",
-        "status": "to-do"
-      }
-    },
-    {
-      "method": "POST",
-      "path": "/comment/task0007",
-      "query": "",
-      "body": {
-        "content": "Comments moved from Main / ALP#1:\n\n--- Self 2026-01-01T00:00:09.000Z ---\nfirst comment\n\n--- Self 2026-01-01T00:00:11.000Z ---\na note\n&lt;!-- kn:session id=sess-old1 host=h cwd=/w branch=b state=running enc=1 -->\n\n--- Self 2026-01-01T00:00:12.000Z ---\nand another\n&lt;!-- kn:session id=sess-old2 host=h cwd=/w branch=b state=closed enc=1 -->\n\n--- Self 2026-01-01T00:00:15.000Z ---\n移行先: Other / GAM#1"
-      }
-    },
-    {
-      "method": "GET",
-      "path": "/task/task0007",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/comment/task0007",
-      "query": ""
-    },
-    {
-      "method": "POST",
-      "path": "/comment/task-a1",
-      "query": "",
-      "body": {
-        "content": "移行先: Other / GAM#2"
-      }
     }
   ],
   "files": {}

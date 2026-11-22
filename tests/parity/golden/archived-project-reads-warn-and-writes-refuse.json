@@ -76,6 +76,16 @@
       "args": [
         "session",
         "attach",
+        "proj-old#1"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"project OLD (proj-old) is archived; pass --allow-archived to write to it anyway\"\n}\n",
+      "stderr": "Error: project OLD (proj-old) is archived; pass --allow-archived to write to it anyway\n"
+    },
+    {
+      "args": [
+        "session",
+        "attach",
         "proj-old#1",
         "--strict"
       ],
@@ -208,6 +218,16 @@
     {
       "method": "GET",
       "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-old",
       "query": ""
     },
     {

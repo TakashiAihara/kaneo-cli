@@ -34,16 +34,6 @@
       "method": "GET",
       "path": "/auth/organization/list",
       "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/project/BET",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/auth/organization/list",
-      "query": ""
     }
   ],
   "files": {}

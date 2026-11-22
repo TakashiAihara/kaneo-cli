@@ -9,7 +9,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: refusing to delete project Beta [BET] (proj-beta) without --yes; `kaneo project archive proj-beta` keeps it\n"
+      "stderr": "Error: refusing to delete project Beta [BET] (proj-beta) in workspace \"Main\" without --yes; `kaneo project archive proj-beta` keeps it\n"
     },
     {
       "args": [
@@ -78,6 +78,11 @@
     {
       "method": "GET",
       "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
       "query": ""
     },
     {

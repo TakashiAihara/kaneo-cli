@@ -41,6 +41,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/auth/organization/list",
       "query": ""
     },
@@ -52,6 +57,11 @@
     {
       "method": "GET",
       "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

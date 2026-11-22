@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: GET /api/project/GAM: 400: Workspace ID could not be determined: no project has the id, slug or name \"GAM\" (kaneo project find <text> searches names and slugs) in the workspaces that could be listed; could not list the projects of workspace \"Main\" (500: injected failure)\n"
+      "stderr": "Error: GET /api/project/GAM: 400: Workspace ID could not be determined: could not tell which workspace the task is in, so the destination cannot be looked up; could not list the projects of workspace \"Main\" (500: injected failure)\n"
     }
   ],
   "requests": [
@@ -24,26 +24,6 @@
       "method": "GET",
       "path": "/project/proj-alpha",
       "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/project/GAM",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/auth/organization/list",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-main"
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-other"
     },
     {
       "method": "GET",

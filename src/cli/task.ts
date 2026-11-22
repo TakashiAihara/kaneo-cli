@@ -53,6 +53,7 @@ import {
   stageTaskImage,
   taskSummary,
   type AssignedTask,
+  type Comment,
   type ExternalLink,
   type BulkOperation,
   type ImageSurface,
@@ -73,6 +74,7 @@ import {
   allowArchivedFlag,
   archivedNote,
   guardProject,
+  OnlyElsewhereError,
   resolveWorkspace,
   seenProject,
   slugOr,
@@ -887,11 +889,14 @@ export const taskCommand = {
         "Move a task to another project.\n\n" +
         "Inside one workspace the server moves the task and it keeps its id.\n" +
         "Across workspaces the server cannot, so the task is recreated in the\n" +
-        "destination project instead: its fields are carried over, its comments\n" +
-        "become one combined comment on the new task (a `kn:session` marker in\n" +
-        "one is escaped so it is not read as a live attachment there), the old\n" +
-        "task gets a comment pointing at the new one, and the session ids the\n" +
-        "old comments named are printed so they can be attached by hand.",
+        "destination project instead: the fields a task is created with are\n" +
+        "carried over — labels, relations, field values, time entries, links\n" +
+        "and attachments stay on the old task, which the pointer keeps — its\n" +
+        "comments become combined comments on the new task (a `kn:session`\n" +
+        "marker in one is escaped so it is not read as a live attachment\n" +
+        "there), the old task gets a comment pointing at the new one, and the\n" +
+        "session ids the old comments named are printed so they can be\n" +
+        "attached by hand.",
       args: exactArgs(1),
       flags: [
         { name: "to", type: "string" as const, usage: "destination project id, slug or name", defaultValue: "" },
@@ -912,7 +917,12 @@ export const taskCommand = {
         let dest: Project;
         try {
           dest = await withProject(target, (id) => getProject(id), { sameWorkspaceAs: task.projectId });
-        } catch {
+        } catch (e) {
+          // Only a value that names a project solely outside the task's
+          // workspace earns the unscoped retry; every other scoped failure
+          // would fail or resolve the same way unscoped, so it is reported
+          // as the scoped lookup said it.
+          if (!(e instanceof OnlyElsewhereError)) throw e;
           dest = await withProject(target, (id) => getProject(id));
         }
         // An archived destination refuses the write the way an archived source
@@ -997,7 +1007,9 @@ export const taskCommand = {
           if (destId === task.projectId) {
             throw new Error(`--to ${JSON.stringify(to)} is the project the task is already in`);
           }
-          const sourceWorkspace = (await getProject(task.projectId)).workspaceId;
+          // seenProject: the guard that resolved the task already fetched the
+          // source's project this run, so this asks nothing of the server.
+          const sourceWorkspace = (await seenProject(task.projectId)).workspaceId;
           if (destWorkspace !== sourceWorkspace) {
             throw new Error(
               `--to ${JSON.stringify(to)} names a project in another workspace; the server moves a task only within its own workspace`,
@@ -1420,7 +1432,7 @@ export const readBack = (field: string, read: string | null, sent: string): void
 //
 // What is carried is what a person would carry by hand: the fields the create
 // route takes, the description behind a pointer to where it came from, and the
-// comments as one combined comment — each still credited to its author and
+// comments folded onto the copy — each still credited to its author and
 // time, with `<!--` escaped so a session marker in one is not read as a live
 // attachment on the new task. The session ids the old comments named come back
 // for the caller to print, since re-attaching them is a choice, not a copy.
@@ -1430,15 +1442,57 @@ export const readBack = (field: string, read: string | null, sent: string): void
 // read-back that fails or disagrees leaves it unverified, and a pointer that
 // fails leaves the migration done with the old task unmarked. None of them
 // pretends the whole thing did not happen.
+
+// The comment a migrated task is left carrying, naming where it went. Its
+// presence is also how a repeated `task move` knows the task was already
+// migrated rather than making another copy.
+const MOVED_POINTER = "移行先:";
+
+// The server caps a comment at 10,000 characters (its comment schema), so the
+// comments a migration folds onto the copy are posted as several when they
+// would not fit in one — each under the cap, each opening with where they came
+// from. A `---` block is kept whole where a blank line is near the cut; one too
+// long for a comment alone is cut mid-text, since losing it is worse.
+const COMMENT_LIMIT = 10_000;
+
+const foldedComments = (comments: Comment[], sourceRef: string): string[] => {
+  if (comments.length === 0) return [];
+  const header = `Comments moved from ${sourceRef}:\n\n`;
+  const room = Math.max(1, COMMENT_LIMIT - header.length);
+  const bodies: string[] = [];
+  let rest = comments
+    .map((c) => `--- ${c.userName === "" ? c.userId : c.userName} ${c.createdAt} ---\n${c.content.replaceAll("<!--", "&lt;!--")}`)
+    .join("\n\n");
+  while (rest.length > room) {
+    const cut = rest.lastIndexOf("\n\n", room);
+    const at = cut > 0 ? cut : room;
+    bodies.push(`${header}${rest.slice(0, at)}`);
+    rest = rest.slice(at);
+    if (rest.startsWith("\n\n")) rest = rest.slice(2);
+  }
+  bodies.push(`${header}${rest}`);
+  return bodies;
+};
+
 const migrateAcrossWorkspaces = async (
   task: Task,
   source: Project,
   dest: Project,
 ): Promise<{ task: Task; sessions: string[]; createdRef: string; report: Json }> => {
+  const comments = await listComments(task.id);
+  // A task that already carries the pointer was migrated once: recreating it
+  // again would leave a second live copy, so the move refuses and names where
+  // the first one went.
+  const prior = comments.findLast((c) => c.content.startsWith(MOVED_POINTER));
+  if (prior !== undefined) {
+    const where = prior.content.slice(MOVED_POINTER.length).trim();
+    throw new Error(
+      `#${task.number} was already moved${where === "" ? "" : ` to ${where}`}; move the copy it names instead of this task`,
+    );
+  }
   // The whole record, not the board's row of it: the listing can leave a
   // description out, and a migration that carried half of one would lose it.
   const full = await getTask(task.id);
-  const comments = await listComments(task.id);
   const sessions = sessionIds(comments);
   // A status is a column of the project, and the destination's columns are its
   // own: one it lacks would create a task no column shows, the failure task
@@ -1471,6 +1525,7 @@ const migrateAcrossWorkspaces = async (
   // as the procedure this replaces wrote it by hand.
   const pointer = `移行元: ${sourceRef}`;
   const description = full.description === "" ? pointer : `${pointer}\n\n${full.description}`;
+  const movedComments = foldedComments(comments, sourceRef);
   let created: Task;
   try {
     created = await createTask(dest.id, {
@@ -1487,18 +1542,14 @@ const migrateAcrossWorkspaces = async (
   }
   const createdRef = `${destBase}#${created.number}`;
 
-  // The comments become one comment on the copy. `<!--` is escaped inside
-  // them so a `kn:session` marker copied over is not read as a live attachment
-  // on the new task; the ids were collected from the originals above.
-  if (comments.length > 0) {
-    const moved = `Comments moved from ${sourceRef}:\n\n${comments
-      .map((c) => `--- ${c.userName === "" ? c.userId : c.userName} ${c.createdAt} ---\n${c.content.replaceAll("<!--", "&lt;!--")}`)
-      .join("\n\n")}`;
-    try {
-      await addComment(created.id, moved);
-    } catch (e) {
-      throw new Error(`created ${createdRef} but copying the comments failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
+  // The comments become comments on the copy, as many as the server's
+  // 10,000-character cap takes. `<!--` was escaped inside them so a
+  // `kn:session` marker copied over is not read as a live attachment on the
+  // new task; the ids were collected from the originals above.
+  try {
+    for (const body of movedComments) await addComment(created.id, body);
+  } catch (e) {
+    throw new Error(`created ${createdRef} but copying the comments failed: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   // Read the copy back and compare it with what was sent, as `task update`
@@ -1525,7 +1576,7 @@ const migrateAcrossWorkspaces = async (
   } catch (e) {
     throw new Error(`created ${createdRef} but counting its comments failed: ${e instanceof Error ? e.message : String(e)}`);
   }
-  const expectedComments = comments.length > 0 ? 1 : 0;
+  const expectedComments = movedComments.length;
   if (commentCount !== expectedComments) {
     mismatched.push(`it has ${commentCount} comment(s), expected ${expectedComments}`);
   }
@@ -1535,7 +1586,7 @@ const migrateAcrossWorkspaces = async (
   // migration is done, so its failure says so rather than reading as a move
   // that never happened.
   try {
-    await addComment(task.id, `移行先: ${createdRef}`);
+    await addComment(task.id, `${MOVED_POINTER} ${createdRef}`);
   } catch (e) {
     throw new Error(`migrated #${task.number} to ${createdRef}, but leaving the pointer on the old task failed: ${e instanceof Error ? e.message : String(e)}`);
   }

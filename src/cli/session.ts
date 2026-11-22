@@ -9,7 +9,15 @@ import * as store from "../session/store";
 import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
 import { shellWord } from "../output/output";
-import { allowArchivedFlag, guardProject, placesNothing, resourceNotFound, taskRef, writeAccess, type ProjectAccess } from "./lookup";
+import {
+  allowArchivedFlag,
+  guardProject,
+  placesNothing,
+  resourceNotFound,
+  taskRef,
+  writeAccess,
+  type ProjectAccess,
+} from "./lookup";
 
 const requireSessionId = (): string => {
   const id = store.currentId(env);

@@ -116,6 +116,8 @@ The nearest file wins per field, so a parent can supply a workspace while a subd
 
 `owners` states a rule once for a whole organisation: every repository under it belongs to that workspace. It supplies a workspace only — a workspace does not imply a project, so `repos` or `.kaneo.json` still names that.
 
+Both maps match owner and repository names without regard to case, as GitHub treats them: a remote or `--repo` written `Acme/Widget` resolves a `acme/widget` entry.
+
 A `repos` entry takes either one project id or a list of them, because a workspace holds any number of projects and one repository can have work on several. `board` then shows a section per project. Everything else acts on one board, so in a repository mapped to several it asks which: `--project` or `KANEO_PROJECT` names it, and either of those also narrows `board` to that one.
 
 A finished project leaves the board by being archived, not by being edited out of `repos`:
@@ -239,7 +241,7 @@ kaneo task unlink <relation-id>
 kaneo task unlink <task> <other> [--type <type>]
 kaneo comment ls <task>
 kaneo comment add <task> <text...> | - | -F PATH [--status COL]   # --status moves the task first, then comments
-kaneo comment update <task> <comment-id> <text...>   # only the author may edit; `comment edit` is the same command
+kaneo comment update <task> <comment-id> <text...> | - | -F PATH   # only the author may edit; `comment edit` is the same command
 kaneo activity ls <task>                            # history: comments and events such as status changes
 kaneo activity add <task> <type> [message...] [--data '{"k":"v"}']   # a history entry only; cannot be removed on its own; Kaneo 2.23.0+
 kaneo label ls [task]                # the workspace's labels, or those on a task

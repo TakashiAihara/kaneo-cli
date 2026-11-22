@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readCredential, readInput } from "../../src/cli/input";
+import { readCredential, readInput, sourceName } from "../../src/cli/input";
 
 describe("readInput", () => {
   const dir = mkdtempSync(join(tmpdir(), "kaneo-input-"));
@@ -68,6 +68,15 @@ describe("readInput", () => {
     expect(message.startsWith(`reading ${missing}: `)).toBe(true);
     expect(message.slice(`reading ${missing}: `.length)).not.toBe("");
   });
+});
+
+// What a source is called in a message: `-` is stdin, and an empty path is
+// quoted rather than left bare, where `reading : ...` would read as a
+// complaint about nothing.
+test("sourceName names the source it was given", () => {
+  expect(sourceName("-")).toBe("stdin");
+  expect(sourceName("")).toBe('""');
+  expect(sourceName("body.md")).toBe("body.md");
 });
 
 describe("readCredential", () => {

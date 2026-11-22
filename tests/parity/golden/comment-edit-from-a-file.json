@@ -1,0 +1,107 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "edit",
+        "1",
+        "cmt0001",
+        "--file",
+        "c.md",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"cmt0001\",\n  \"content\": \"rewritten from a file\\n\",\n  \"userId\": \"user-self\",\n  \"userName\": \"Self\",\n  \"createdAt\": \"2026-01-01T00:00:08.000Z\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
+        "edit",
+        "1",
+        "cmt0001",
+        "-F",
+        "c.md",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "edited comment cmt0001 on #1\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
+        "ls",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "cmt0001  2026-01-01T00:00:08.000Z  rewritten from a file\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/comment/cmt0001",
+      "query": "",
+      "body": {
+        "content": "rewritten from a file\n"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/comment/cmt0001",
+      "query": "",
+      "body": {
+        "content": "rewritten from a file\n"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

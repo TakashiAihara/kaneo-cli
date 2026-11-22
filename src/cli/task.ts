@@ -616,15 +616,33 @@ export const taskCommand = {
         // and take that risk.
         const wrote: string[] = [];
         const landed = () => `${names(wrote)} ${wrote.length === 1 ? "was" : "were"} updated`;
+        // The fields this command set out to write, in the order it writes
+        // them, so a failure can name the ones it never reached.
+        const lastFields = [
+          ...(startDate === undefined ? [] : ["start date"]),
+          ...(position === undefined ? [] : ["position"]),
+        ];
+        const last = lastFields.length === 0 ? undefined : names(lastFields);
+        const planned = [
+          ...(status === undefined ? [] : ["status"]),
+          ...(title === undefined ? [] : ["title"]),
+          ...(description === undefined ? [] : ["description"]),
+          ...(priority === undefined ? [] : ["priority"]),
+          ...(assignee === undefined ? [] : ["assignee"]),
+          ...(last === undefined ? [] : [last]),
+        ];
         const write = async (field: string, put: () => Promise<void>): Promise<void> => {
           try {
             await put();
           } catch (e) {
             // The first write failing means nothing landed, so its own error is
             // the whole story. After one that succeeded, the failure has to say
-            // what did land or the task is left half changed with no word.
+            // what did land, what failed and what was never sent, or the task
+            // is left half changed with no word.
             if (wrote.length === 0) throw e;
-            throw new Error(`${landed()}; ${field} failed: ${e instanceof Error ? e.message : String(e)}`);
+            const unsent = planned.slice(planned.indexOf(field) + 1);
+            const tail = unsent.length === 0 ? "" : `; ${names(unsent)} not sent`;
+            throw new Error(`${landed()}; ${field} failed: ${e instanceof Error ? e.message : String(e)}${tail}`);
           }
           wrote.push(field);
         };
@@ -635,12 +653,8 @@ export const taskCommand = {
         if (assignee !== undefined) await write("assignee", () => setTaskAssignee(task.id, assignee));
         // Last, so the full update it goes through reads the task with the writes
         // above already in it and sends them back rather than undoing them.
-        if (startDate !== undefined || position !== undefined) {
-          const fields = [
-            ...(startDate === undefined ? [] : ["start date"]),
-            ...(position === undefined ? [] : ["position"]),
-          ];
-          await write(names(fields), async () => {
+        if (last !== undefined) {
+          await write(last, async () => {
             await setStartAndPosition(task.id, {
               ...(startDate === undefined ? {} : { startDate }),
               ...(position === undefined ? {} : { position }),

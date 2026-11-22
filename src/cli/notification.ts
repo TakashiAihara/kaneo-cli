@@ -154,7 +154,7 @@ const ruleFor = (
   workspaceId: string,
   flags: FlagValues,
   changed: ReadonlySet<string>,
-): WorkspaceRule => {
+): { rule: WorkspaceRule; dropped: string[] } => {
   const current = (prefs.workspaces ?? []).find((rule) => rule.workspaceId === workspaceId);
   // The server refuses a channel that cannot deliver globally, and an inactive
   // rule keeps a channel that has since been switched off globally, so a channel
@@ -185,7 +185,14 @@ const ruleFor = (
     rule.projectMode = ids.length === 0 ? "all" : "selected";
     rule.selectedProjectIds = ids;
   }
-  return rule;
+  // A channel the rule had on that the mask above turned off was dropped rather
+  // than asked for: a flag passed for it overrides the mask and the server
+  // judges that instead.
+  const dropped = (["email", "ntfy", "gotify", "webhook"] as const).filter((channel) => {
+    const field = `${channel}Enabled` as const;
+    return current?.[field] === true && !can[field] && !changed.has(channel);
+  });
+  return { rule, dropped };
 };
 
 const nothingToChange = (changed: ReadonlySet<string>, names: readonly string[]): void => {
@@ -265,8 +272,8 @@ const preferencesCommand = {
             "delivery on for it: the new rule is active and starts from the channels that can\n" +
             "deliver globally, which may be none. A channel must be on and set up globally to\n" +
             "be turned on here, and a channel that can no longer deliver is dropped from the\n" +
-            "rule. A rule with no channel on is not reached when a channel is later turned on\n" +
-            "globally.\n" +
+            "rule, which is said on stderr. A rule with no channel on is not reached when a\n" +
+            "channel is later turned on globally.\n" +
             "--projects takes comma-separated project ids; an empty value means every project.",
           args: exactArgs(1),
           flags: [
@@ -278,15 +285,21 @@ const preferencesCommand = {
             const workspaceId = args[0]!;
             nothingToChange(changed, [...RULE_SWITCHES.map(([f]) => f), "projects"]);
             const before = await getNotificationPreferences();
-            const prefs = await setWorkspaceRule(workspaceId, ruleFor(before, workspaceId, flags, changed));
-            const rule = (prefs.workspaces ?? []).find((r) => r.workspaceId === workspaceId);
-            if (rule === undefined) {
+            const { rule, dropped } = ruleFor(before, workspaceId, flags, changed);
+            const prefs = await setWorkspaceRule(workspaceId, rule);
+            const stored = (prefs.workspaces ?? []).find((r) => r.workspaceId === workspaceId);
+            if (stored === undefined) {
               throw new Error(
                 `the server accepted the rule but does not list one for workspace ${JSON.stringify(workspaceId)}`,
               );
             }
-            app.out.human(ruleLine(rule));
-            app.out.data(rule as Json);
+            // Said so the channels column changing is not the only word of a
+            // channel that was on in the rule and is not any more.
+            if (dropped.length > 0) {
+              console.error(`dropped ${dropped.join(", ")} from the rule: cannot deliver globally`);
+            }
+            app.out.human(ruleLine(stored));
+            app.out.data(stored as Json);
           },
         },
         {

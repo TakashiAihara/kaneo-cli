@@ -1,0 +1,81 @@
+{
+  "steps": [
+    {
+      "args": [
+        "context",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-alpha\",\n    \"proj-beta\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-alpha\",\n      \"archived\": false\n    },\n    {\n      \"id\": \"proj-beta\",\n      \"archived\": false\n    }\n  ],\n  \"repo\": \"Acme/Widget\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"repo-map\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "context",
+        "--repo",
+        "acme/WIDGET",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-alpha\",\n    \"proj-beta\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-alpha\",\n      \"archived\": false\n    },\n    {\n      \"id\": \"proj-beta\",\n      \"archived\": false\n    }\n  ],\n  \"repo\": \"acme/WIDGET\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"repo-map\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "context",
+        "--repo",
+        "ACME/widget",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-alpha\",\n    \"proj-beta\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-alpha\",\n      \"archived\": false\n    },\n    {\n      \"id\": \"proj-beta\",\n      \"archived\": false\n    }\n  ],\n  \"repo\": \"ACME/widget\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"repo-map\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "context",
+        "--repo",
+        "acme/other",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": null,\n  \"repo\": \"acme/other\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"unset\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    }
+  ],
+  "files": {
+    ".config/kaneo/config.json": "{\"repos\":{\"acme/widget\":[\"proj-alpha\",\"proj-beta\"]},\"owners\":{\"ACME\":\"ws-main\"}}"
+  }
+}

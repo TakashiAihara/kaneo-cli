@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 // Rebases the current branch onto origin/main and rebuilds what a merge
@@ -16,9 +16,11 @@ import { join } from "node:path";
 // avoiding. Conflicts in the generated paths are taken from main's side and
 // rebuilt; any other conflict stops the run with the list, and re-running the
 // command resumes wherever it stopped. Before rewriting — on a fresh run and
-// again when one resumes — the remote tip the fetch saw must already be in
-// the branch's local history, and the push leases on that exact tip, so a
-// coworker's push to the same branch is refused rather than overwritten.
+// again when one resumes — the remote tip the fetch saw must be provably
+// integrated: an ancestor of HEAD, or the exact tip an earlier run of this
+// command verified and recorded before its rewrite. The push leases on that
+// tip, so a coworker's push to the same branch is refused rather than
+// overwritten.
 //
 // Exit codes: 0 done, 1 error, 3 conflicts left for a human.
 
@@ -68,6 +70,18 @@ const inProgress = (): boolean => {
     existsSync(join(dir, "rebase-apply")) ||
     existsSync(join(dir, "MERGE_HEAD"))
   );
+};
+
+// The full ref HEAD is on (refs/heads/feat), or null when HEAD is detached
+// or points outside refs/heads — symbolic-ref -q fails on a detached HEAD.
+// The push leases on this full ref, never a shortened display name: a
+// same-named tag makes `rev-parse --abbrev-ref` ambiguous (it would say
+// heads/feat), which would aim the lease and refspec at refs/heads/heads/feat.
+const headRef = (): string | null => {
+  const r = capture(["git", "symbolic-ref", "-q", "HEAD"]);
+  if (r.code !== 0) return null;
+  const ref = r.stdout.trim();
+  return ref.startsWith("refs/heads/") ? ref : null;
 };
 
 // Paths whose content is generated rather than written: a conflict there is
@@ -136,50 +150,98 @@ const resolveAndContinue = (mode: "rebase" | "merge"): void => {
   }
 };
 
-// True when the remote tip's commits are part of this branch's local story:
-// reachable from HEAD, or from any tip the branch's reflog still remembers.
-// The reflog arm is what a retry after this script's own rewrite needs — the
-// verified tip stopped being an ancestor of HEAD when history was rewritten,
-// but it was an ancestor of the pre-rewrite tip the reflog records. A
-// coworker's push is never in the reflog, so it still fails both arms. This
-// is the same reachability --force-if-includes checks at push time.
-const tipIntegrated = (tip: string, branch: string): boolean => {
-  const isAncestor = (rev: string) => capture(["git", "merge-base", "--is-ancestor", tip, rev]).code === 0;
-  if (isAncestor("HEAD")) return true;
-  const reflog = capture(["git", "reflog", "show", `refs/heads/${branch}`, "--format=%H"]);
-  return reflog.code === 0 && reflog.stdout.split("\n").some((rev) => rev !== "" && isAncestor(rev));
+// The verification record a retry needs. Once this script rewrites history,
+// the remote tip it verified can never be an ancestor of HEAD again, so on
+// the next run reachability alone cannot tell that tip apart from a
+// coworker's push that is equally unanchored — and the branch's reflog is no
+// help either, because it still remembers any commit the user once pointed
+// the branch at, coworker's included. The file inside the git dir ties the
+// exact verified tip to the branch: verifiedRemoteTip writes it before any
+// rewrite, a successful push removes it, and a failure leaves it so a retry
+// with an unchanged remote still validates while a moved remote fails both
+// checks and is refused.
+const VERIFIED_TIP_FILE = "kaneo-rebase-main";
+
+type VerifiedTip = { branch: string; tip: string };
+
+// The recorded verification, or null when the file is absent or does not
+// read as "<branch ref>\n<tip sha>" — a corrupt record fails closed to the
+// HEAD check alone.
+const readVerifiedTip = (): VerifiedTip | null => {
+  let body: string;
+  try {
+    body = readFileSync(join(gitDir(), VERIFIED_TIP_FILE), "utf8");
+  } catch {
+    return null;
+  }
+  const lines = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+  if (lines.length !== 2) return null;
+  return { branch: lines[0]!, tip: lines[1]! };
 };
 
-// The tip origin/<branch> had at the last fetch, once verified integrated;
-// "" when the remote has no such branch. Refuses before rewriting when the
-// tip has commits this branch's history never held — the push leases on this
-// same value, so proceeding would drop them.
-const verifiedRemoteTip = (branch: string): string => {
+// True when the fetched remote tip is safe to lease over: an ancestor of
+// HEAD — the fresh-run case, checked before any rewrite — or the exact tip
+// this command already verified for this branch, per the record above.
+// Anything else (a moved remote, another branch's record, no record at all)
+// is refused.
+const tipIntegrated = (tip: string, branchRef: string): boolean => {
+  if (capture(["git", "merge-base", "--is-ancestor", tip, "HEAD"]).code === 0) return true;
+  const record = readVerifiedTip();
+  return record !== null && record.branch === branchRef && record.tip === tip;
+};
+
+// The tip origin/<branch> had at the last fetch, once verified safe to
+// lease over; "" when the remote has no such branch. Refuses before
+// rewriting when the tip has commits this branch's history never held and
+// no earlier run verified — the push leases on this same value, so
+// proceeding would drop them. A verified tip is recorded for the retry a
+// later failure makes necessary.
+const verifiedRemoteTip = (branchRef: string): string => {
+  const branch = branchRef.slice("refs/heads/".length);
   const tracking = capture(["git", "rev-parse", "--verify", `refs/remotes/origin/${branch}`]);
   if (tracking.code !== 0) return "";
   const tip = tracking.stdout.trim();
-  if (!tipIntegrated(tip, branch)) {
+  if (!tipIntegrated(tip, branchRef)) {
     fail(`origin/${branch} has commits this branch does not (${tip}); merge or rebase them in first`);
   }
+  writeFileSync(join(gitDir(), VERIFIED_TIP_FILE), `${branchRef}\n${tip}\n`);
   return tip;
 };
 
-// The branch a stopped operation was rewriting, for the resume-time remote
-// check. A merge in progress keeps HEAD on the branch; a rebase records it in
-// its state dir because HEAD is detached mid-replay. null when neither names
-// one (a detached rebase run by hand), where there is no branch to lease.
-const resumedBranch = (): string | null => {
+// The branch ref a stopped operation was rewriting, for the resume-time
+// remote check. A merge in progress keeps HEAD on the branch; a rebase
+// records it in its state dir because HEAD is detached mid-replay. null when
+// neither names one (a detached rebase run by hand), where there is no
+// branch to lease.
+const resumedBranchRef = (): string | null => {
   const dir = gitDir();
-  if (existsSync(join(dir, "MERGE_HEAD"))) {
-    const name = gitOut(["rev-parse", "--abbrev-ref", "HEAD"]);
-    return name === "HEAD" ? null : name;
-  }
+  if (existsSync(join(dir, "MERGE_HEAD"))) return headRef();
   for (const state of ["rebase-merge", "rebase-apply"]) {
     const headName = join(dir, state, "head-name");
     if (existsSync(headName)) {
       const ref = readFileSync(headName, "utf8").trim();
-      return ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : null;
+      return ref.startsWith("refs/heads/") ? ref : null;
     }
+  }
+  return null;
+};
+
+// The commit the in-progress operation is based on, as git recorded it: the
+// onto file of a rebase's state dir, MERGE_HEAD of a merge — the tip of
+// origin/main when the operation started. null when the state does not name
+// one.
+const operationBase = (mode: "rebase" | "merge"): string | null => {
+  const dir = gitDir();
+  if (mode === "merge") {
+    const mergeHead = join(dir, "MERGE_HEAD");
+    return existsSync(mergeHead) ? readFileSync(mergeHead, "utf8").trim() : null;
+  }
+  for (const state of ["rebase-merge", "rebase-apply"]) {
+    const onto = join(dir, state, "onto");
+    if (existsSync(onto)) return readFileSync(onto, "utf8").trim();
   }
   return null;
 };
@@ -204,8 +266,20 @@ const main = () => {
     // sat stopped must not be leased over. A rebase's HEAD is detached
     // mid-replay, so its state dir names the branch.
     gitOut(["fetch", "origin"]);
-    const branch = resumedBranch();
-    if (branch !== null) remoteTip = verifiedRemoteTip(branch);
+    // The fetch can also move origin/main while the stopped operation still
+    // sits on the old tip: continuing would resolve its conflicts against —
+    // and publish — a base the tests never saw move. Refuse before touching
+    // the operation; aborting and re-running starts it on the new tip.
+    const opBase = operationBase(mode);
+    const mainTip = gitOut(["rev-parse", "--verify", "origin/main"]);
+    if (opBase !== mainTip) {
+      const abort = mode === "rebase" ? "rebase --abort" : "merge --abort";
+      fail(
+        `origin/main moved while the ${mode} was in progress (base ${opBase ?? "unknown"}, now ${mainTip}); run \`git ${abort}\` and re-run \`bun run rebase:main\``,
+      );
+    }
+    const branchRef = resumedBranchRef();
+    if (branchRef !== null) remoteTip = verifiedRemoteTip(branchRef);
   } else {
     if (gitOut(["status", "--porcelain"]) !== "") {
       fail("the working tree is not clean; commit or stash first");
@@ -213,8 +287,12 @@ const main = () => {
     gitOut(["fetch", "origin"]);
     gitOut(["rev-parse", "--verify", "origin/main"]);
 
-    const branch = gitOut(["rev-parse", "--abbrev-ref", "HEAD"]);
-    if (branch === "HEAD" || branch === "main" || branch === "master") {
+    const branchRef = headRef();
+    if (branchRef === null) {
+      fail("refusing to rebase a detached HEAD; check out the branch to update");
+    }
+    const branch = branchRef.slice("refs/heads/".length);
+    if (branch === "main" || branch === "master") {
       fail(`refusing to rebase ${branch}; check out the branch to update`);
     }
 
@@ -222,7 +300,7 @@ const main = () => {
     // commits this branch's history never held, the rewrite below would drop
     // them: the push's lease compares the remote against this same verified
     // value. Refuse before rewriting.
-    remoteTip = verifiedRemoteTip(branch);
+    remoteTip = verifiedRemoteTip(branchRef);
 
     const merges = Number(gitOut(["rev-list", "--merges", "--count", "origin/main..HEAD"]));
     if (merges > 0) {
@@ -281,16 +359,19 @@ const main = () => {
   // note), so the type check runs here too.
   bun(["run", "typecheck"], "typecheck");
 
-  const branch = gitOut(["rev-parse", "--abbrev-ref", "HEAD"]);
+  const branchRef = headRef();
+  if (branchRef === null) {
+    fail("HEAD is not on a local branch; cannot push");
+  }
   // remoteTip is the remote tip verified against this branch's history right
   // after the fetch — a resumed run fetches too, so both paths pin the same
   // kind of value. "" expects the remote to have no such branch. The lease's
   // explicit expect makes --force-if-includes a no-op (git-push(1)), and the
   // integration check it would repeat already ran against this tip.
-  must(
-    ["push", `--force-with-lease=refs/heads/${branch}:${remoteTip}`, "-u", "origin", `HEAD:refs/heads/${branch}`],
-    "push",
-  );
+  must(["push", `--force-with-lease=${branchRef}:${remoteTip}`, "-u", "origin", `HEAD:${branchRef}`], "push");
+  // The push landed, so the verification record has done its job; left behind
+  // it would keep vouching for a tip on some later, unrelated run.
+  rmSync(join(gitDir(), VERIFIED_TIP_FILE), { force: true });
 
   // DIRTY means GitHub never starts CI on the pushed head, so it is worth one
   // look right after the push rather than a confused wait later.

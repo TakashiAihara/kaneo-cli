@@ -161,7 +161,8 @@ describe("rebase-main", () => {
     put(work, "f2.txt", "two\n");
     must(work, ["add", "-A"]);
     must(work, ["commit", "-m", "feat two"]);
-    must(work, ["push", "-u", "origin", "feat"]);
+    // feat stays unpushed: a remote tip this command did not verify itself
+    // would be refused on resume, and this test starts the rebase by hand.
 
     must(work, ["checkout", "main"]);
     put(work, "src/api/gen/g.txt", "main-one\n");
@@ -217,14 +218,20 @@ describe("rebase-main", () => {
     must(work, ["add", "-A"]);
     must(work, ["commit", "-m", "failing test"]);
 
+    const remoteBefore = remoteTip(work, "feat");
+    const headBefore = must(work, ["rev-parse", "HEAD"]);
+
     const first = run(work);
     expect(first.code).toBe(1);
     expect(first.err).toContain("bun test failed");
-    expect(remoteTip(work, "feat")).not.toBe(must(work, ["rev-parse", "HEAD"]));
+    // The rewrite ran but the push never did: the remote still sits on the
+    // verified tip while local HEAD already moved off it.
+    expect(remoteTip(work, "feat")).toBe(remoteBefore);
+    expect(must(work, ["rev-parse", "HEAD"])).not.toBe(headBefore);
 
     // The fix is an ordinary commit on the rewritten history; the remote tip
-    // the lease pins is no longer an ancestor of HEAD, only of a tip the
-    // branch's reflog remembers.
+    // the lease pins is no longer an ancestor of HEAD — only the verification
+    // record the first run left behind still vouches for it.
     put(
       work,
       "smoke.test.ts",
@@ -245,24 +252,25 @@ describe("rebase-main", () => {
     const { remote, work: seed } = seedRemote(root);
 
     must(seed, ["checkout", "-b", "feat"]);
-    put(seed, "src/api/gen/g.txt", "feat-one\n");
     put(seed, "feat.txt", "f\n");
     must(seed, ["add", "-A"]);
     must(seed, ["commit", "-m", "feat work"]);
     must(seed, ["push", "-u", "origin", "feat"]);
 
     must(seed, ["checkout", "main"]);
-    put(seed, "src/api/gen/g.txt", "main-one\n");
+    put(seed, "feat.txt", "m\n");
     must(seed, ["add", "-A"]);
     must(seed, ["commit", "-m", "main one"]);
     must(seed, ["push", "origin", "main"]);
     must(seed, ["fetch", "origin"]);
 
-    // The rebase stops on the generated-path conflict and is left for the
-    // script to resume, the way an interrupted run leaves it.
+    // The script's own run stops on the manual conflict, leaving the rebase
+    // in progress with its verified-tip record written — the way an
+    // interrupted run leaves it.
     must(seed, ["checkout", "feat"]);
-    const reb = git(seed, ["rebase", "origin/main"]);
-    expect(reb.code).not.toBe(0);
+    const first = run(seed);
+    expect(first.code).toBe(3);
+    expect(must(seed, ["status"])).toContain("rebase in progress");
 
     // A coworker pushes to feat while the rebase sits stopped.
     const coworker = join(root, "coworker");
@@ -275,7 +283,7 @@ describe("rebase-main", () => {
     const coworkerTip = must(coworker, ["rev-parse", "HEAD"]);
 
     // The user fetches before resuming, moving origin/feat to the coworker's
-    // tip — the value a bare lease would have compared against.
+    // tip — a value the recorded verification does not cover.
     must(seed, ["fetch", "origin"]);
 
     const r = run(seed);
@@ -326,5 +334,157 @@ describe("rebase-main", () => {
     // remote still points at the coworker's commit.
     expect(must(work, ["rev-parse", "HEAD"])).toBe(before);
     expect(remoteTip(work, "feat")).toBe(coworkerTip);
+  });
+
+  test("a remote tip that only survives in the branch reflog is refused", () => {
+    const root = scratch("rebase-main-reflog-");
+    const { remote, work: seed } = seedRemote(root);
+
+    // feat exists on the remote at A.
+    must(seed, ["checkout", "-b", "feat"]);
+    put(seed, "feat.txt", "a\n");
+    must(seed, ["add", "-A"]);
+    must(seed, ["commit", "-m", "feat base"]);
+    must(seed, ["push", "-u", "origin", "feat"]);
+    const tipA = must(seed, ["rev-parse", "HEAD"]);
+
+    // main moves so a rewrite would have something to do.
+    must(seed, ["checkout", "main"]);
+    put(seed, "main.txt", "m\n");
+    must(seed, ["add", "-A"]);
+    must(seed, ["commit", "-m", "main one"]);
+    must(seed, ["push", "origin", "main"]);
+
+    // A coworker's B lands on remote feat.
+    const coworker = join(root, "coworker");
+    must(root, ["clone", remote, coworker]);
+    must(coworker, ["checkout", "feat"]);
+    put(coworker, "cowork.txt", "b\n");
+    must(coworker, ["add", "-A"]);
+    must(coworker, ["commit", "-m", "coworker work"]);
+    must(coworker, ["push", "origin", "feat"]);
+    const tipB = must(coworker, ["rev-parse", "HEAD"]);
+
+    // The user once pointed local feat at B — to inspect it, say — then went
+    // back to A and built their own commit on top. B stays in the branch's
+    // reflog but is not part of the history the rewrite would carry.
+    must(seed, ["checkout", "feat"]);
+    must(seed, ["fetch", "origin"]);
+    must(seed, ["reset", "--hard", tipB]);
+    must(seed, ["reset", "--hard", tipA]);
+    put(seed, "local.txt", "l\n");
+    must(seed, ["add", "-A"]);
+    must(seed, ["commit", "-m", "local work"]);
+    const localTip = must(seed, ["rev-parse", "HEAD"]);
+    expect(must(seed, ["reflog", "show", "refs/heads/feat", "--format=%H"])).toContain(tipB);
+
+    const r = run(seed);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("has commits this branch does not");
+
+    // Nothing was rewritten and nothing was pushed.
+    expect(must(seed, ["rev-parse", "HEAD"])).toBe(localTip);
+    expect(remoteTip(seed, "feat")).toBe(tipB);
+  });
+
+  test("a resumed rebase refuses when origin/main moved while stopped", () => {
+    const root = scratch("rebase-main-stale-base-");
+    const { remote, work: seed } = seedRemote(root);
+
+    must(seed, ["checkout", "-b", "feat"]);
+    put(seed, "src/api/gen/g.txt", "feat\n");
+    put(seed, "feat.txt", "f\n");
+    must(seed, ["add", "-A"]);
+    must(seed, ["commit", "-m", "feat work"]);
+
+    must(seed, ["checkout", "main"]);
+    put(seed, "src/api/gen/g.txt", "main-one\n");
+    must(seed, ["add", "-A"]);
+    must(seed, ["commit", "-m", "main one"]);
+    must(seed, ["push", "origin", "main"]);
+    must(seed, ["fetch", "origin"]);
+
+    // The rebase stops on the generated-path conflict, based on main-one.
+    must(seed, ["checkout", "feat"]);
+    const reb = git(seed, ["rebase", "origin/main"]);
+    expect(reb.code).not.toBe(0);
+
+    // origin/main moves again while the rebase sits stopped.
+    const mover = join(root, "mover");
+    must(root, ["clone", remote, mover]);
+    put(mover, "m2.txt", "m2\n");
+    must(mover, ["add", "-A"]);
+    must(mover, ["commit", "-m", "main two"]);
+    must(mover, ["push", "origin", "main"]);
+
+    must(seed, ["fetch", "origin"]);
+    const r = run(seed);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("origin/main moved");
+    expect(r.err).toContain("rebase --abort");
+    expect(must(seed, ["status"])).toContain("rebase in progress");
+  });
+
+  test("a resumed merge refuses when origin/main moved while stopped", () => {
+    const root = scratch("rebase-main-stale-merge-");
+    const { remote, work: seed } = seedRemote(root);
+
+    must(seed, ["checkout", "-b", "feat"]);
+    put(seed, "feat.txt", "f\n");
+    must(seed, ["add", "-A"]);
+    must(seed, ["commit", "-m", "feat work"]);
+
+    must(seed, ["checkout", "main"]);
+    put(seed, "feat.txt", "m\n");
+    must(seed, ["add", "-A"]);
+    must(seed, ["commit", "-m", "main one"]);
+    must(seed, ["push", "origin", "main"]);
+    must(seed, ["fetch", "origin"]);
+
+    // The merge stops on the manual conflict, based on main-one.
+    must(seed, ["checkout", "feat"]);
+    const m = git(seed, ["merge", "origin/main", "--no-edit"]);
+    expect(m.code).not.toBe(0);
+
+    // origin/main moves again while the merge sits stopped.
+    const mover = join(root, "mover");
+    must(root, ["clone", remote, mover]);
+    put(mover, "m2.txt", "m2\n");
+    must(mover, ["add", "-A"]);
+    must(mover, ["commit", "-m", "main two"]);
+    must(mover, ["push", "origin", "main"]);
+
+    must(seed, ["fetch", "origin"]);
+    const r = run(seed);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("origin/main moved");
+    expect(r.err).toContain("merge --abort");
+    expect(must(seed, ["rev-parse", "-q", "--verify", "MERGE_HEAD"])).not.toBe("");
+  });
+
+  test("a same-named tag does not divert the push ref", () => {
+    const root = scratch("rebase-main-tag-");
+    const { work } = seedRemote(root);
+
+    must(work, ["checkout", "-b", "feat"]);
+    put(work, "feat.txt", "f\n");
+    must(work, ["add", "-A"]);
+    must(work, ["commit", "-m", "feat work"]);
+    // A tag sharing the branch's name makes rev-parse --abbrev-ref HEAD say
+    // heads/feat; the push must still aim at refs/heads/feat.
+    must(work, ["tag", "feat"]);
+
+    must(work, ["checkout", "main"]);
+    put(work, "main.txt", "m\n");
+    must(work, ["add", "-A"]);
+    must(work, ["commit", "-m", "main one"]);
+    must(work, ["push", "origin", "main"]);
+    must(work, ["fetch", "origin"]);
+    must(work, ["checkout", "feat"]);
+
+    const r = run(work);
+    expect(r.code).toBe(0);
+    expect(remoteTip(work, "feat")).toBe(must(work, ["rev-parse", "HEAD"]));
+    expect(must(work, ["ls-remote", "origin"])).not.toContain("refs/heads/heads/feat");
   });
 });

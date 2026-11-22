@@ -47,6 +47,16 @@ const captureStderr = async (fn: () => Promise<unknown>) => {
   return lines;
 };
 
+// The call calendarFeedIcs makes: anonymous, text, the token in the path, and
+// the template that marks which segment is the credential for masking.
+const feedCall = {
+  method: "GET",
+  anonymous: true,
+  text: true,
+  credentialInUrl: true,
+  servedAs: "/api/calendar-feed/{token}/calendar.ics",
+};
+
 describe("normalizeBaseUrl", () => {
   // The site root serves the web app and answers 200 with HTML for any path,
   // so a base that misses /api looks like a success that returns markup.
@@ -223,6 +233,19 @@ describe("a credential carried in the URL", () => {
     const e = (await failure(kaneoFetch<string>("/calendar-feed/t/calendar.ics", feedInit))) as Error;
     expect(e).toBeInstanceOf(InsecureCredentialError);
     expect(e.message).toContain("http://kaneo.example.invalid");
+  });
+
+  // A Location can make the token itself the refused hop's host, and the
+  // refusal names scheme and host — the token's spelling is masked there the
+  // way it is in the path fields.
+  test("a redirect naming the token as an insecure host is refused without printing it", async () => {
+    const url = serve(() => new Response(null, { status: 302, headers: { location: "//feed-token/" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", feedCall))) as Error;
+    expect(e).toBeInstanceOf(InsecureCredentialError);
+    expect(e.message).toBe(
+      "http://***: refusing to send credentials over plain HTTP; use https, or a loopback address for a local instance",
+    );
   });
 
   test("a redirect that stays on protected targets is followed", async () => {
@@ -569,6 +592,17 @@ describe("a Location that cannot be parsed", () => {
     expect(e.message).not.toContain("feed-token");
   });
 
+  // The reason Go gives for the refusal can carry the token too: an authority
+  // whose port is not digits is quoted whole in the error, and the echo is
+  // masked like the Location itself.
+  test("a credential-in-URL route masks the token in the refused port's reason", async () => {
+    const url = serve(() => new Response(null, { status: 302, headers: { location: "//h:feed-token" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", feedCall))) as Error;
+    expect(e.message).toContain('invalid port ":***" after host');
+    expect(e.message).not.toContain("feed-token");
+  });
+
   // Go's resolvePath keeps an escaped dot segment literal — %2e is not "." to
   // it — and its client sends the resolved path as resolved. This runtime's
   // URL parser reads %2e%2e as the ".." it encodes and would fetch /api/b
@@ -782,6 +816,20 @@ describe("a Location that parses but cannot be dialled", () => {
     expect(seen[0]).toBe(`${url}/api/x`);
     expect(seen.slice(1).every((href) => href === `${url}/api/x?`)).toBe(true);
     expect(e.message).toBe(`GET /api/x: Get "//?": stopped after 10 redirects`);
+  });
+
+  // The transport reasons can echo the credential too: the scheme Go cannot
+  // carry and the host it cannot dial are quoted in the error, and each is
+  // masked like the resolved URL beside it.
+  test.each([
+    ["feed-token:foo", 'unsupported protocol scheme "***"'],
+    ["//[feed-token]/", "dial tcp: lookup ***: no such host"],
+  ])("a credential-in-URL route masks the token in the reason for %p", async (location, why) => {
+    const url = serve(() => new Response(null, { status: 302, headers: { location } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", feedCall))) as Error;
+    expect(e.message).toContain(why);
+    expect(e.message).not.toContain("feed-token");
   });
 });
 

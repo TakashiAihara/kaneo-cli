@@ -238,7 +238,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // alone would never reach it.
   if (key !== "" || credentialInUrl === true) {
     if (!keepsCredential(target.href)) {
-      throw new InsecureCredentialError(`${target.protocol}//${target.host}`);
+      throw new InsecureCredentialError(safe(`${target.protocol}//${target.host}`));
     }
     if (key !== "") headers.set("Authorization", `Bearer ${key}`);
   }
@@ -298,21 +298,26 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       if ("bad" in red) {
         // The way Go's client reports a Location it cannot parse: the call, the
         // request that answered it, and url.Parse's own account of the refusal.
+        // The reason quotes pieces of the Location back — a refused port, a
+        // bad escape — so it goes through the mask like the fields beside it.
         throw new Error(
-          `${called} ${served}: ${goOp(called)} ${JSON.stringify(safe(shownHref(target, credentialInUrl === true)))}: failed to parse Location header ${JSON.stringify(safe(red.bad.location))}: parse ${JSON.stringify(safe(red.bad.at))}: ${red.bad.why}`,
+          `${called} ${served}: ${goOp(called)} ${JSON.stringify(safe(shownHref(target, credentialInUrl === true)))}: failed to parse Location header ${JSON.stringify(safe(red.bad.location))}: parse ${JSON.stringify(safe(red.bad.at))}: ${safe(red.bad.why)}`,
         );
       }
       if ("unreachable" in red) {
         // The way Go's client reports a request that failed below the parse:
         // the call, then the resolved URL and the transport's reason for it.
+        // The reason names what could not be carried — a scheme, a host — so
+        // it goes through the mask like the URL beside it.
         throw new Error(
-          `${called} ${served}: ${goOp(called)} ${JSON.stringify(safe(red.unreachable.url))}: ${red.unreachable.why}`,
+          `${called} ${served}: ${goOp(called)} ${JSON.stringify(safe(red.unreachable.url))}: ${safe(red.unreachable.why)}`,
         );
       }
       // A credential carried in the URL cannot be stripped the way the key's
       // header can, so an insecure hop is refused rather than followed bare.
+      // The refused target is a Location's host, which can be the token itself.
       if (credentialInUrl === true && !keepsCredential(red.to.href)) {
-        throw new InsecureCredentialError(`${red.to.protocol}//${red.to.host}`);
+        throw new InsecureCredentialError(safe(`${red.to.protocol}//${red.to.host}`));
       }
       location = red.location;
       // The key stays only where it would still be protected and where it was

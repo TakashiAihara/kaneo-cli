@@ -1,7 +1,15 @@
 import { apiKey, project, workspace, type App } from "./app";
-import { getProject, listWorkspaces, search, type SearchQuery, type SearchResult } from "../api/kaneo";
+import {
+  getProject,
+  listProjectsForSearch,
+  listWorkspaces,
+  search,
+  type DatedProject,
+  type SearchQuery,
+  type SearchResult,
+} from "../api/kaneo";
 import { minimumArgs, type FlagValues } from "./args";
-import { resolveWorkspace, slugOr, withProject } from "./lookup";
+import { resolveWorkspaceIn, slugOr, withProject } from "./lookup";
 
 // The server's own bounds on limit (v2.29.2 search/schema.ts), which the
 // document does not state.
@@ -31,7 +39,13 @@ export const searchCommand = {
     { name: "type", type: "string" as const, usage: "tasks, projects, workspaces, comments or activities (default every type)", defaultValue: "" },
     { name: "limit", type: "string" as const, usage: `most results to return, at most ${MAX_LIMIT} (default ${DEFAULT_LIMIT})`, defaultValue: "" },
     { name: "in-project", type: "bool" as const, usage: "narrow to the resolved project", defaultValue: "false" },
-    { name: "all-workspaces", shorthand: "A", type: "bool" as const, usage: "search every workspace the key can reach", defaultValue: "false" },
+    {
+      name: "all-workspaces",
+      shorthand: "A",
+      type: "bool" as const,
+      usage: "search every workspace the key can reach; cannot be combined with -w",
+      defaultValue: "false",
+    },
   ],
   run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
     apiKey(app);
@@ -44,6 +58,9 @@ export const searchCommand = {
     const narrow = flags["in-project"] === true || app.flags.projectId !== "";
     const acrossAll = flags["all-workspaces"] === true;
     if (narrow && acrossAll) throw new Error("--all-workspaces searches every workspace, so it cannot be narrowed to a project");
+    if (acrossAll && app.flags.workspaceId !== "") {
+      throw new Error("--all-workspaces searches every workspace, so it cannot be narrowed with --workspace");
+    }
     const limit = String(flags.limit ?? "");
     const type = String(flags.type ?? "");
     const wanted = limit === "" ? DEFAULT_LIMIT : Number(limit);
@@ -53,19 +70,45 @@ export const searchCommand = {
       ({ found, more } = await searchEverywhere({ query, workspaceId: "", projectId: "", type, limit }, wanted));
     } else {
       const inProject = narrow ? await withProject(project(app), (id) => getProject(id)) : undefined;
-      const page = await search({
-        query,
-        workspaceId: inProject?.workspaceId ?? (await resolveWorkspace(workspace(app))),
-        projectId: inProject?.id ?? "",
-        type,
-        limit,
-      });
+      // The workspace's name comes free with the resolution when the search is
+      // not narrowed; narrowed to a project it is only needed if a slug match
+      // is added below, and is looked up then.
+      let workspaceId: string;
+      let workspaceName: string | undefined;
+      if (inProject === undefined) {
+        const ws = await resolveWorkspaceIn(workspace(app));
+        workspaceId = ws.id;
+        workspaceName = ws.name;
+      } else {
+        workspaceId = inProject.workspaceId;
+      }
+      const [page, listed] = await Promise.all([
+        search({
+          query,
+          workspaceId,
+          projectId: inProject?.id ?? "",
+          type,
+          limit,
+        }),
+        wantsProjects(type) ? listProjectsForSearch(workspaceId) : Promise.resolve<DatedProject[]>([]),
+      ]);
       found = page.found;
       // totalCount cannot say whether matches were cut (see Search), so a page
       // the server filled, repeats counted, is taken to mean there may be more.
       // The repeats still take places in the server's page, so it can show fewer
       // than --limit even then.
       more = page.rows >= wanted;
+      // The server's project query matches name and description but not slug,
+      // so the slug matches it cannot see are added from the listing. They rank
+      // and cut like the server's own, so the merged list is resorted.
+      const candidates = slugCandidates(listed, found.results, query);
+      if (candidates.length > 0) {
+        const name = workspaceName ?? (await listWorkspaces()).find((w) => w.id === workspaceId)?.name ?? workspaceId;
+        const extra = candidates.map((p) => projectResult(p, name));
+        const merged = [...found.results, ...extra].sort(byRank);
+        found = { ...found, totalCount: found.totalCount + extra.length, results: merged.slice(0, wanted) };
+        more ||= merged.length > wanted;
+      }
     }
 
     const refs = found.results.map(ref);
@@ -74,9 +117,10 @@ export const searchCommand = {
     for (const [at, r] of found.results.entries()) {
       const status = r.status !== null ? `  (${r.status})` : "";
       // Slugs are unique only inside a workspace, so a reference from more than
-      // one has to say which, by the workspace name in parentheses (`project ls -A`
-      // spells it `(workspace: …)`). A workspace match is named by its own title.
-      const where = acrossAll && r.type !== "workspace" ? `  (${r.workspaceName})` : "";
+      // one has to say which, spelled out the way `project ls -A` spells it so
+      // it cannot be read as the status marker beside it. A workspace match is
+      // named by its own title.
+      const where = acrossAll && r.type !== "workspace" ? `  (workspace: ${r.workspaceName})` : "";
       app.out.human(`${r.type.padEnd(typeWidth)}  ${refs[at]!.padEnd(refWidth)}  ${r.title}${status}${where}`);
     }
     if (more) {
@@ -89,6 +133,51 @@ export const searchCommand = {
     app.out.data(found);
   },
 };
+
+// The types whose results can include a project. The server's default is
+// "all", so an empty --type asks for them too; the project listing is only
+// read for these, since no other type can return a project match.
+const wantsProjects = (type: string): boolean => type === "" || type === "all" || type === "projects";
+
+// The server's own ordering: relevance, then newest first on a tie.
+const byRank = (a: SearchResult, b: SearchResult): number =>
+  b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt);
+
+// The listed projects whose slug contains the query and that the server's
+// results do not already name. The server's project query matches the name
+// and the description but never the slug (global-search.ts in Kaneo), so a
+// project findable by the key every task reference starts with would
+// otherwise never surface.
+const slugCandidates = (listed: DatedProject[], results: SearchResult[], query: string): DatedProject[] => {
+  const have = new Set(results.filter((r) => r.type === "project").map((r) => r.id));
+  const q = query.toLowerCase();
+  return listed.filter((p) => !have.has(p.id) && p.slug.toLowerCase().includes(q));
+};
+
+// A project as a search result, the way the server shapes its own project
+// matches: description and slug are absent when empty, projectName is left
+// unset, and the slug is the project's key, so a slug match ranks like a name
+// match.
+const projectResult = (p: DatedProject, workspaceName: string): SearchResult => ({
+  id: p.id,
+  type: "project",
+  title: p.name,
+  description: p.description === "" ? null : p.description,
+  content: null,
+  projectId: p.id,
+  projectName: null,
+  projectSlug: p.slug === "" ? null : p.slug,
+  workspaceId: p.workspaceId,
+  workspaceName,
+  userId: null,
+  userName: null,
+  createdAt: p.createdAt,
+  relevanceScore: 3,
+  taskNumber: null,
+  number: null,
+  priority: null,
+  status: null,
+});
 
 // One search per workspace, merged the way v2.29.2 merges its per-type queries:
 // by relevance, newest first on a tie, then cut to the limit. The server takes
@@ -108,7 +197,10 @@ const searchEverywhere = async (wanted: SearchQuery, limit: number) => {
   const merged: SearchResult[] = [];
   let pageFull = false;
   for (const w of await listWorkspaces()) {
-    const page = await search({ ...wanted, workspaceId: w.id, limit: String(MAX_LIMIT) });
+    const [page, listed] = await Promise.all([
+      search({ ...wanted, workspaceId: w.id, limit: String(MAX_LIMIT) }),
+      wantsProjects(wanted.type) ? listProjectsForSearch(w.id) : Promise.resolve<DatedProject[]>([]),
+    ]);
     pageFull ||= page.rows >= MAX_LIMIT;
     for (const r of page.found.results) {
       const key = `${r.type} ${r.id}`;
@@ -116,8 +208,13 @@ const searchEverywhere = async (wanted: SearchQuery, limit: number) => {
       seen.add(key);
       merged.push(r);
     }
+    for (const p of slugCandidates(listed, merged, wanted.query)) {
+      const r = projectResult(p, w.name);
+      seen.add(`${r.type} ${r.id}`);
+      merged.push(r);
+    }
   }
-  merged.sort((a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  merged.sort(byRank);
   // totalCount counts the distinct matches before the cut, out of pages the
   // server has already cut to 50 each.
   const found = { query: wanted.query, totalCount: merged.length, results: merged.slice(0, limit) };

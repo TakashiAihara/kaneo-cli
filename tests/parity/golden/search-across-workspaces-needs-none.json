@@ -8,7 +8,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "task     BET#1  Beta first  (to-do)  (Main)\ncomment  ALP#1  Comment on Write the parser  (Main)\n",
+      "stdout": "task     BET#1  Beta first  (to-do)  (workspace: Main)\ncomment  ALP#1  Comment on Write the parser  (workspace: Main)\n",
       "stderr": ""
     }
   ],
@@ -25,8 +25,18 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/search",
       "query": "?limit=50&q=first&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
     }
   ],
   "files": {}

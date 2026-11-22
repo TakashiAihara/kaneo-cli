@@ -30,7 +30,7 @@ export const OPERATIONS: Operation[] = [
   { id: "getWorkspaceMembers", method: "GET", path: "/workspace/{workspaceId}/members", command: "kaneo workspace members" },
   { id: "getInvitationDetails", method: "GET", path: "/invitation/{id}", command: "kaneo invitation get" },
   { id: "globalSearch", method: "GET", path: "/search", command: "kaneo search", neverSent: ["query.userEmail"] },
-  { id: "listProjects", method: "GET", path: "/project", command: "kaneo project ls" },
+  { id: "listProjects", method: "GET", path: "/project", command: "kaneo project ls / search" },
   { id: "getProject", method: "GET", path: "/project/{id}", command: "kaneo project get" },
   { id: "createProject", method: "POST", path: "/project", command: "kaneo project create" },
   { id: "updateProject", method: "PUT", path: "/project/{id}", command: "kaneo project update" },

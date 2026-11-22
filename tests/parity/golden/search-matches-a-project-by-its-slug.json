@@ -1,0 +1,172 @@
+{
+  "steps": [
+    {
+      "args": [
+        "search",
+        "acme-web",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "project  acme-web  Web app\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "acme-web",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"acme-web\",\n  \"totalCount\": 1,\n  \"results\": [\n    {\n      \"id\": \"proj-web\",\n      \"type\": \"project\",\n      \"title\": \"Web app\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-web\",\n      \"projectName\": null,\n      \"projectSlug\": \"acme-web\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": null,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "acme",
+        "-A",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "project  acme-docs  Handbook  (workspace: Other)\nproject  acme-web   Web app  (workspace: Main)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "acme",
+        "--type",
+        "projects",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"acme\",\n  \"totalCount\": 1,\n  \"results\": [\n    {\n      \"id\": \"proj-web\",\n      \"type\": \"project\",\n      \"title\": \"Web app\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-web\",\n      \"projectName\": null,\n      \"projectSlug\": \"acme-web\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": null,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "web",
+        "--type",
+        "projects",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"web\",\n  \"totalCount\": 1,\n  \"results\": [\n    {\n      \"id\": \"proj-web\",\n      \"type\": \"project\",\n      \"title\": \"Web app\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-web\",\n      \"projectName\": null,\n      \"projectSlug\": \"acme-web\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": null,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "acme-docs",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=acme-web&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=acme-web&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=acme&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=50&q=acme&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=acme&type=projects&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=web&type=projects&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=acme-docs&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

@@ -169,6 +169,11 @@
       "query": "?q=Slugless&workspaceId=ws-main"
     },
     {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
       "method": "POST",
       "path": "/comment/task-n1",
       "query": "",

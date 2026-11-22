@@ -25,8 +25,18 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/search",
       "query": "?limit=50&q=er&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
     }
   ],
   "files": {}

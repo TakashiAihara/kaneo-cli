@@ -135,6 +135,11 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/project/BET",
       "query": ""
     },
@@ -162,6 +167,11 @@
       "method": "GET",
       "path": "/search",
       "query": "?projectId=proj-beta&q=first&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
     },
     {
       "method": "GET",
@@ -195,6 +205,11 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/auth/organization/list",
       "query": ""
     },
@@ -215,6 +230,11 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/auth/organization/list",
       "query": ""
     },
@@ -225,6 +245,11 @@
     },
     {
       "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
       "path": "/auth/organization/list",
       "query": ""
     },
@@ -232,6 +257,11 @@
       "method": "GET",
       "path": "/search",
       "query": "?limit=2&q=e&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
     },
     {
       "method": "GET",

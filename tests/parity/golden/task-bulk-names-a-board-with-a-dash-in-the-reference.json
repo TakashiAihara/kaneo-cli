@@ -19,6 +19,20 @@
       "args": [
         "task",
         "bulk",
+        "ALP-2",
+        "BET-1",
+        "--priority",
+        "high",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "--priority high: the server changed 2 of the 2 task(s) named (ALP#2 BET#1)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "bulk",
         "1",
         "NOPE-1",
         "--priority",
@@ -28,6 +42,17 @@
       "exit": 1,
       "stdout": "{\n  \"error\": \"GET /api/task/by-ticket-id/NOPE-1: 404: Task not found\"\n}\n",
       "stderr": "Error: GET /api/task/by-ticket-id/NOPE-1: 404: Task not found\n"
+    },
+    {
+      "args": [
+        "task",
+        "unlink",
+        "BET-1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"one argument is a relation id; to unlink two tasks give both: unlink BET-1 \\u003cother-task\\u003e\"\n}\n",
+      "stderr": "Error: one argument is a relation id; to unlink two tasks give both: unlink BET-1 <other-task>\n"
     }
   ],
   "requests": [
@@ -47,6 +72,11 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
       "method": "PATCH",
       "path": "/task/bulk",
       "query": "",
@@ -58,6 +88,39 @@
         ],
         "operation": "updatePriority",
         "value": "low"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/by-ticket-id/ALP-2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/by-ticket-id/BET-1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "PATCH",
+      "path": "/task/bulk",
+      "query": "",
+      "body": {
+        "taskIds": [
+          "task-a2",
+          "task-b1"
+        ],
+        "operation": "updatePriority",
+        "value": "high"
       }
     },
     {

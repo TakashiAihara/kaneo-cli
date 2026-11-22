@@ -4,9 +4,11 @@ import { holding } from "../session/marker";
 import { apiKey, project, taskProject, workspace, type App } from "./app";
 import {
   bulkUpdate,
+  closedStatuses,
   createExternalLink,
   currentUser,
   deleteExternalLink,
+  deferredMark,
   duplicateTask,
   finalizeTaskImage,
   findDeferredTaskDescriptions,
@@ -205,7 +207,9 @@ export const taskCommand = {
         // same --status and --priority, so it is the tasks --all would add.
         const left = filterTasks(described, status, priority, true).length - tasks.length;
         if (left > 0) console.error(`(${left} done / planned / archived ${left === 1 ? "task" : "tasks"} left out; --all to include them)`);
-        app.out.data(tasks);
+        // A description the listing deferred is marked as such, so JSON readers
+        // can tell it from one that is genuinely empty.
+        app.out.data(tasks.map((task) => ({ ...task, ...deferredMark(task) })));
       },
     },
     {
@@ -385,7 +389,8 @@ export const taskCommand = {
           if (!validSessionId(session)) throw new Error(`--attach: ${BAD_ID}`);
         }
 
-        let open: Task[] = [];
+        let existing: Task[] = [];
+        let closed: ReadonlySet<string> = new Set();
         const task = await withProject(project(app), async (id) => {
           // Before anything is created, so a name that matches nobody leaves no
           // task behind. An empty one is no assignee, as it was before names.
@@ -396,13 +401,15 @@ export const taskCommand = {
           // resolves to. --force skips the read: the caller has said the duplicate
           // is wanted.
           if (!force) {
-            open = projectTasks(await getBoard(id));
-            refuseDuplicate(wanted.title, open);
+            const board = await getBoard(id);
+            existing = projectTasks(board);
+            closed = closedStatuses(board);
+            refuseDuplicate(wanted.title, existing, closed);
           }
           return afterWrite(`created ${JSON.stringify(wanted.title)}`, `\`kaneo task ls -p ${shellWord(id)}\` shows it`, createTask(id, wanted));
         });
         // After the create, since the warning is about a task that now exists.
-        if (!force) warnSimilar(wanted.title, open);
+        if (!force) warnSimilar(wanted.title, existing, closed);
         if (attach) {
           try {
             await attachTask(app, session, task, next);
@@ -1006,7 +1013,13 @@ export const taskCommand = {
         // server, and goes to the delete, which answers not found.
         if (args.length === 1) {
           const word = args[0]!;
-          if (asNumber(word.startsWith("#") ? word.slice(1) : word) !== undefined) {
+          // A lone argument that names a task — a number, `slug#N` or `SLUG-N` —
+          // is a task with its other end left out, not a relation id.
+          if (
+            asNumber(word.startsWith("#") ? word.slice(1) : word) !== undefined ||
+            namedReference(word) !== undefined ||
+            isTicketId(word)
+          ) {
             throw new Error(`one argument is a relation id; to unlink two tasks give both: unlink ${word} <other-task>`);
           }
           if (relationType !== "") throw new Error("--type picks among the links of two tasks; a relation id already names one");
@@ -1212,8 +1225,8 @@ const typeChoices = `${RELATION_TYPES.slice(0, -1).join(", ")} or ${RELATION_TYP
 // A refusal rather than a warning: the second copy is what nobody wanted, and it
 // leaves a number on the board that then has to be closed by hand. --force is
 // there for the duplicate that is wanted.
-const refuseDuplicate = (title: string, open: Task[]): void => {
-  const shared = sharedReference(title, open);
+const refuseDuplicate = (title: string, tasks: Task[], closed: ReadonlySet<string>): void => {
+  const shared = sharedReference(title, tasks, closed);
   if (shared === undefined) return;
   throw new Error(
     `an open task already names ${shared.reference}: ${namedTasks(shared.tasks)}; pass --force to create anyway`,
@@ -1226,8 +1239,8 @@ const refuseDuplicate = (title: string, open: Task[]): void => {
 // A warning and not a refusal, because alike wording cannot tell a second copy
 // from the next piece of work (see SIMILAR_TITLE in src/cli/similar.ts); the
 // reference check above is what refuses.
-const warnSimilar = (title: string, open: Task[]): void => {
-  const alike = similarOpenTasks(title, open);
+const warnSimilar = (title: string, tasks: Task[], closed: ReadonlySet<string>): void => {
+  const alike = similarOpenTasks(title, tasks, closed);
   if (alike.length > 0) console.error(`similar open tasks: ${namedTasks(alike)}`);
 };
 
@@ -1380,7 +1393,15 @@ export const resolveTask = async (app: App, ref: string, slugs?: Map<string, str
     return numberOn(named.project, named.number, "the reference", slugs);
   }
 
-  if (isTicketId(wanted)) return getTaskByTicketId(wanted);
+  if (isTicketId(wanted)) {
+    const task = await getTaskByTicketId(wanted);
+    // The ticket reply names its project by id alone; the slug a report or a
+    // retry hint prints is read once here, the way a board read carries it.
+    if (slugs !== undefined && task.projectId !== "" && !slugs.has(task.projectId)) {
+      slugs.set(task.projectId, (await getProject(task.projectId)).slug);
+    }
+    return task;
+  }
 
   const number = asNumber(wanted.startsWith("#") ? wanted.slice(1) : wanted);
   if (number === undefined) return getTask(wanted);
@@ -1421,10 +1442,12 @@ const namedReference = (wanted: string): { project: string; number: number } | u
 // `<slug>-<number>`: the form the Kaneo server and UI write a task as (`BET-1`),
 // which the server resolves itself (`GET /task/by-ticket-id/{ticketId}`).
 //
-// The last dash splits it, because a slug may hold dashes (`kaneo-cli-3`). That
-// is the server's own split, `^(.+)-(\d+)$`, so a value is a ticket id here
-// exactly when the server would read it as one. A task id is a cuid2 and holds
-// no dash, so a value that fits is never an id.
+// The last dash splits it, because a slug may hold dashes (`kaneo-cli-3`): the
+// same split the server's `^(.+)-(\d+)$` makes, so the value goes to the ticket
+// route exactly when the server would split it the same way. What the server
+// then accepts — its length limit, its number range, its workspace reach — is
+// its own check. A task id is a cuid2 and holds no dash, so a value that fits
+// is never an id.
 const isTicketId = (wanted: string): boolean => {
   const at = wanted.lastIndexOf("-");
   return at >= 1 && /^\d+$/.test(wanted.slice(at + 1));
@@ -1461,7 +1484,7 @@ const numberOn = async (
 // 64 KiB is left out of the listing, and the listing is the only route that
 // carries the labels, so only the description is taken from the task detail.
 // Of the commands that resolve a task, only `task get` prints it, so only it pays
-// the extra request; the listings print such a description as empty (#254).
+// the extra request; the listings mark the description deferred instead (#254).
 const withDescription = async (task: Task): Promise<Task> =>
   descriptionDeferred(task) ? { ...task, description: (await getTask(task.id)).description } : task;
 

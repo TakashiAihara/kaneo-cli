@@ -1128,8 +1128,10 @@ export type Board = {
   // project route as well would be a request the caller already paid for.
   projectSlug: string;
   // The board route reports a column's id as its slug, so this id is a status,
-  // not the opaque id the column routes take.
-  columns: { id: string; name: string; tasks: Task[] }[];
+  // not the opaque id the column routes take. isFinal is the server's own mark
+  // of a column that holds finished work; a server that predates final columns
+  // sends no such field, and it stays unset rather than reading as false.
+  columns: { id: string; name: string; isFinal?: boolean; tasks: Task[] }[];
 };
 
 // The listing answers the tasks that are in no column beside the columns: a
@@ -1334,7 +1336,7 @@ const readPages = async (
         if (at === undefined) {
           at = target.columns.length;
           columnAt.set(column.id, at);
-          target.columns.push({ id: column.id, name: column.name, tasks: [] });
+          target.columns.push({ id: column.id, name: column.name, isFinal: column.isFinal, tasks: [] });
         }
         place(zeroList(column.tasks), target.columns[at]!.tasks);
       }
@@ -1363,6 +1365,24 @@ export const projectTasks = (board: Board): Task[] => byPriority(board.columns);
 // the project's, since neither a planned task nor an archived one is work a
 // board is showing.
 export const boardTasks = (board: Board): Task[] => byPriority(board.columns.filter((c) => !isOffBoard(c)));
+
+// The statuses that hold finished work on one board: the slug of every column
+// the project marked final, plus archived, the pseudo-column the listing files
+// finished work away in. planned is not among them: work nobody has picked up
+// is open backlog, and a task created beside it joins that backlog.
+//
+// The listing carries isFinal on every column of a server that has final
+// columns. One that predates them sends no such field on any column, and there
+// done was the only final column, so it is named instead.
+export const closedStatuses = (board: Board): ReadonlySet<string> => {
+  const predatesFinal = !board.columns.some((column) => column.isFinal !== undefined);
+  const closed = new Set(
+    board.columns.filter((column) => column.isFinal === true).map((column) => column.id),
+  );
+  if (predatesFinal) closed.add("done");
+  closed.add("archived");
+  return closed;
+};
 
 const byPriority = (columns: Board["columns"]): Task[] =>
   columns
@@ -1430,6 +1450,13 @@ const task = (from: TaskFields, extra: Pick<Task, "assigneeId" | "assigneeName" 
 const deferredDescriptions = new WeakSet<Task>();
 
 export const descriptionDeferred = (task: Task): boolean => deferredDescriptions.has(task);
+
+// The deferred flag as a listing's JSON carries it: written only when the
+// listing left the description out, so an empty description and an unread one
+// are two different documents. Absent otherwise, the way the API's own optional
+// field reads.
+export const deferredMark = (task: Task): { descriptionDeferred?: true } =>
+  descriptionDeferred(task) ? { descriptionDeferred: true } : {};
 
 const toTask = (t: BoardTask): Task => {
   const read = task(t, { assigneeId: t.assigneeId, assigneeName: t.assigneeName, labels: labels(t.labels) });

@@ -1,0 +1,94 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "create",
+        "Follow up ccx#9",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task0002\",\n  \"number\": 6,\n  \"title\": \"Follow up ccx#9\",\n  \"description\": \"\",\n  \"status\": \"to-do\",\n  \"priority\": \"medium\",\n  \"position\": 5,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:12.000Z\",\n  \"labels\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "Follow up ccx#8",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"an open task already names ccx#8: #5 Fix ccx#8 crash; pass --force to create anyway\"\n}\n",
+      "stderr": "Error: an open task already names ccx#8: #5 Fix ccx#8 crash; pass --force to create anyway\n"
+    },
+    {
+      "args": [
+        "board",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Alpha (open 5 / done 1)\n- [high] #1 Write the parser (to-do)\n- [medium] #6 Follow up ccx#9 (to-do)\n- [no-priority] #2 Ship it (in-progress)\n- [no-priority] #3 Old news (done)\n- [no-priority] #5 Fix ccx#8 crash (done)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
+      "query": "",
+      "body": {
+        "title": "Follow up ccx#9",
+        "description": "",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a3",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-dn",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: an open task already names ccx#7: #4 Fix ccx#7 crash; pass --force to create anyway\n"
+      "stderr": "Error: an open task already names ccx #7: #4 Fix ccx#7 crash; pass --force to create anyway\n"
     }
   ],
   "requests": [

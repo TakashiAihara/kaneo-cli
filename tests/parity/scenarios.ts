@@ -887,7 +887,15 @@ export const SCENARIOS: Scenario[] = [
       { id: "task-a4", projectId: P1, title: "A long story", description: "x".repeat(64 * 1024 + 1) },
       { id: "task-a5", projectId: P1, title: "A long story in kana", description: "あ".repeat(30_000) },
     ],
-    steps: [["task", "get", "4", "--json"], ["task", "get", "5", "--json"], ["task", "status", "4", "done", "--json"]],
+    // The listings mark a deferred description rather than fetching it, so the
+    // JSON tells it apart from a genuinely empty one.
+    steps: [
+      ["task", "get", "4", "--json"],
+      ["task", "get", "5", "--json"],
+      ["task", "ls", "--json"],
+      ["board", "--json"],
+      ["task", "status", "4", "done", "--json"],
+    ],
   },
   // A number is looked up on the page that holds it, so a board past one page
   // costs the first page rather than all of them.
@@ -1049,6 +1057,35 @@ export const SCENARIOS: Scenario[] = [
     name: "task create with a spaced reference in parentheses",
     steps: [["task", "create", "Fix ccx#7 crash", "--force", "--json"], ["task", "create", "Follow up (ccx #7)", "--human"]],
   },
+  // Every reference inside one pair of parentheses counts, so the second one
+  // is not dropped, and the refusal names it as the title wrote it.
+  {
+    name: "task create with two references in one pair of parentheses",
+    steps: [["task", "create", "Fix ccx#7 crash", "--force", "--json"], ["task", "create", "Follow up (ccx #7 and alp #3)", "--human"]],
+  },
+  // Finished work is the project's own final columns, not a fixed list of
+  // status names: `released` marked final closes the task naming ccx#9, while
+  // `done` not marked final leaves the one naming ccx#8 open and blocking.
+  {
+    name: "task create judges finished work by the project's final columns",
+    seed: {
+      columns: [
+        { slug: "to-do", name: "To Do" },
+        { slug: "in-progress", name: "In Progress" },
+        { slug: "done", name: "Done" },
+        { slug: "released", name: "Released", isFinal: true },
+      ],
+    },
+    extraTasks: [
+      { id: "task-rel", projectId: P1, title: "Fix ccx#9 crash", status: "released" },
+      { id: "task-dn", projectId: P1, title: "Fix ccx#8 crash", status: "done" },
+    ],
+    steps: [
+      ["task", "create", "Follow up ccx#9", "--json"],
+      ["task", "create", "Follow up ccx#8", "--json"],
+      ["board", "--human"],
+    ],
+  },
   {
     name: "task create --attach with a session id the store refuses",
     env: { KANEO_SESSION_ID: "a/b" },
@@ -1206,7 +1243,17 @@ export const SCENARIOS: Scenario[] = [
   { name: "task bulk assigns by name and me", seed: { members: MEMBERS }, steps: [["task", "bulk", "1", "2", "--assign", "ada", "--json"], ["task", "bulk", "1", "--assign", "me", "--human"], ["task", "ls", "--all", "--json"]] },
   { name: "task bulk assigns only members", seed: { members: MEMBERS }, steps: [["task", "bulk", "1", "--assign", "user-nobody", "--json"]] },
   { name: "task bulk names a board three ways", steps: [["task", "bulk", "1", "ALP#2", "proj-alpha#3", "--priority", "low", "--json"]] },
-  { name: "task bulk names a board with a dash in the reference", steps: [["task", "bulk", "1", "ALP-2", "BET-1", "--priority", "low", "--json"], ["task", "bulk", "1", "NOPE-1", "--priority", "low", "--json"]] },
+  {
+    // The human report names each board by its slug, the way the reference was
+    // written, and a lone task reference is not a relation id.
+    name: "task bulk names a board with a dash in the reference",
+    steps: [
+      ["task", "bulk", "1", "ALP-2", "BET-1", "--priority", "low", "--json"],
+      ["task", "bulk", "ALP-2", "BET-1", "--priority", "high", "--human"],
+      ["task", "bulk", "1", "NOPE-1", "--priority", "low", "--json"],
+      ["task", "unlink", "BET-1", "--json"],
+    ],
+  },
   { name: "task get by a reference with a dash", steps: [["task", "get", "BET-1", "--json"], ["task", "get", "bet-1", "--json"], ["task", "get", "ALP-2", "--human"]] },
   { name: "task get by a reference with a dash that is not on the board", steps: [["task", "get", "NOPE-1", "--json"], ["task", "get", "ALP-99", "--json"]] },
   {
@@ -1238,7 +1285,19 @@ export const SCENARIOS: Scenario[] = [
     },
     steps: [["task", "get", "ALP-1", "--json"], ["task", "get", "DUP-1", "--json"]],
   },
-  { name: "task get a dash without a slug is not a reference", steps: [["task", "get", "--json", "--", "-1"], ["task", "get", "BET--1", "--json"], ["task", "get", "BET-x", "--json"]] },
+  // `-1` reads as the number -1, `BET--1` as the ticket id whose slug ends in a
+  // dash, `BET-x` as an id, and `a?b-1` as a ticket id whose reserved character
+  // has to reach the route percent-escaped.
+  {
+    name: "task get a negative number and other dash forms",
+    steps: [
+      ["task", "get", "--json", "--", "-1"],
+      ["task", "get", "BET--1", "--json"],
+      ["task", "get", "BET-x", "--json"],
+      ["task", "get", "a?b-1", "--json"],
+      ["task", "get", "BET-", "--json"],
+    ],
+  },
   { name: "task bulk delete counts each task once", steps: [["task", "bulk", "1", "ALP#1", "--delete", "--json"]] },
   ...both("task export", ["task", "export"]),
   { name: "task export piped", steps: [["task", "export"]] },
@@ -2045,6 +2104,13 @@ export const SCENARIOS: Scenario[] = [
     name: "session close names the attached task",
     env: { KANEO_SESSION_ID: "sess-test" },
     steps: [["session", "attach", "1", "--strict"], ["session", "close", "--task", "1", "--strict"], ["session", "status", "--json"]],
+  },
+  // The dash form the server writes a task as names the held task too, so the
+  // close takes it without a lookup of its own.
+  {
+    name: "session close --task names the held task by its ticket id",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [["session", "attach", "1", "--strict"], ["session", "close", "--task", "ALP-1", "--strict"], ["session", "status", "--json"]],
   },
   {
     name: "session close --task without an attachment",

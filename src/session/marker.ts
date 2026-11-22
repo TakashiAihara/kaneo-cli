@@ -226,3 +226,24 @@ export const holding = (comments: { content: string; createdAt: string }[]): Mar
 // A session id as a line names it: long enough to tell sessions apart in a
 // listing, short enough not to wrap the line it sits on.
 export const shortId = (id: string): string => (id.length > 8 ? id.slice(0, 8) : id);
+
+// Every session id the comments' markers name, once each, in the order they
+// first appear. A comment is written to carry one marker, but nothing stops a
+// second, and a caller collecting the sessions a task names — a migration
+// listing them for re-attachment — has to see them all rather than the first
+// of them, whatever state they were left in.
+const MARKERS = new RegExp(MARKER.source, "g");
+
+export const sessionIds = (comments: { content: string }[]): string[] => {
+  const ids: string[] = [];
+  for (const comment of comments) {
+    for (const found of comment.content.matchAll(MARKERS)) {
+      const fields = parseFields(found[1]!);
+      const raw = fields.get("id");
+      if (raw === undefined) continue;
+      const value = raw === "-" ? "" : fields.get(ENCODED) === "1" ? decodeValue(raw) : raw;
+      if (value !== "" && !ids.includes(value)) ids.push(value);
+    }
+  }
+  return ids;
+};

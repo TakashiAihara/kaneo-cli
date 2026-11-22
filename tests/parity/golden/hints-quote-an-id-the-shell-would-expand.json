@@ -9,7 +9,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: refusing to delete project Odd [ODD] (p q$(x)) in workspace \"Main\" without --yes; `kaneo project archive 'p q$(x)'` keeps it\n"
+      "stderr": "Error: refusing to delete project Odd [ODD] (p q$(x)) without --yes; `kaneo project archive 'p q$(x)'` keeps it\n"
     },
     {
       "args": [
@@ -54,12 +54,12 @@
     },
     {
       "method": "GET",
-      "path": "/auth/organization/list",
+      "path": "/project/p%20q$%28x%29",
       "query": ""
     },
     {
       "method": "GET",
-      "path": "/column/ODD",
+      "path": "/project/ODD",
       "query": ""
     },
     {
@@ -76,6 +76,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/p%20q$%28x%29",
+      "query": ""
     },
     {
       "method": "GET",

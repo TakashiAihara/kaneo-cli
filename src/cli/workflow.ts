@@ -3,7 +3,7 @@ import { deleteWorkflowRule, listWorkflowRules, setWorkflowRule, type WorkflowRu
 import { KaneoApiError } from "../api/http";
 import { minimumArgs, noArgs, rangeArgs, type RunContext } from "./args";
 import { resolveColumn } from "./column";
-import { withProject } from "./lookup";
+import { allowArchivedFlag, guardProject, withProject, writeAccess } from "./lookup";
 
 // The integrations Kaneo ships a plugin for, and the events those plugins look a
 // column up by: upstream's plugins/*/utils/resolve-column.ts is the file their
@@ -34,7 +34,10 @@ export const workflowCommand = {
       args: noArgs("kaneo workflow list"),
       run: async ({ app }: RunContext<App>) => {
         apiKey(app);
-        const rules = await withProject(project(app), (id) => listWorkflowRules(id));
+        const rules = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return listWorkflowRules(id);
+        });
         for (const rule of rules) app.out.human(ruleLine(rule));
         app.out.data(rules);
       },
@@ -54,7 +57,8 @@ export const workflowCommand = {
       // rest is the column, which is the one name here that may be written in
       // several words (`column create Waiting on review`).
       args: minimumArgs(3),
-      run: async ({ args, app }: RunContext<App>) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: RunContext<App>) => {
         apiKey(app);
         const integrationType = args[0]!.trim();
         const eventType = args[1]!.trim();
@@ -63,10 +67,10 @@ export const workflowCommand = {
         if (integrationType === "" || eventType === "") {
           throw new Error("an integration and an event are both needed");
         }
-        const { projectId, column } = await withProject(project(app), async (projectId) => ({
-          projectId,
-          column: await resolveColumn(projectId, args.slice(2).join(" ")),
-        }));
+        const { projectId, column } = await withProject(project(app), async (projectId) => {
+          await guardProject(projectId, writeAccess(flags));
+          return { projectId, column: await resolveColumn(projectId, args.slice(2).join(" ")) };
+        });
         // The server's upsert looks for a rule the project already has for the
         // pair and moves its column, so setting a pair again is a move rather
         // than a second rule.
@@ -94,13 +98,17 @@ export const workflowCommand = {
       // Unlike `column rm` there is no --yes: nothing refers to a rule's id, and
       // `workflow set` with the same pair puts the rule back as it was.
       args: rangeArgs(1, 2),
-      run: async ({ args, app }: RunContext<App>) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: RunContext<App>) => {
         apiKey(app);
         const [first, second] = args;
         if (second !== undefined) {
           const integrationType = first!.trim();
           const eventType = second.trim();
-          const rule = await withProject(project(app), (id) => ruleFor(id, integrationType, eventType));
+          const rule = await withProject(project(app), async (id) => {
+            await guardProject(id, writeAccess(flags));
+            return ruleFor(id, integrationType, eventType);
+          });
           const deleted = await deleteWorkflowRule(rule.id);
           // The pair this branch was given, which is what named the rule; the
           // reply carries the same two words.

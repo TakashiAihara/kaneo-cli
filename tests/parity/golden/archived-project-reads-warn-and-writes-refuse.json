@@ -1,0 +1,347 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "get",
+        "proj-old#1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1  Old work\nstatus    to-do\npriority  no-priority\n",
+      "stderr": "project OLD (proj-old) is archived; reads still work, writes need --allow-archived\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "-p",
+        "proj-old",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1    [no-priority] to-do         Old work\n",
+      "stderr": "project OLD (proj-old) is archived; reads still work, writes need --allow-archived\n"
+    },
+    {
+      "args": [
+        "column",
+        "ls",
+        "-p",
+        "proj-old",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "to-do        To Do\nin-progress  In Progress\ndone         Done  (final)\n",
+      "stderr": "project OLD (proj-old) is archived; reads still work, writes need --allow-archived\n"
+    },
+    {
+      "args": [
+        "task",
+        "status",
+        "proj-old#1",
+        "done",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: project OLD (proj-old) is archived; pass --allow-archived to write to it anyway\n"
+    },
+    {
+      "args": [
+        "comment",
+        "add",
+        "proj-old#1",
+        "still here",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: project OLD (proj-old) is archived; pass --allow-archived to write to it anyway\n"
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "new one",
+        "-p",
+        "proj-old",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: project OLD (proj-old) is archived; pass --allow-archived to write to it anyway\n"
+    },
+    {
+      "args": [
+        "session",
+        "attach",
+        "proj-old#1",
+        "--strict"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"project OLD (proj-old) is archived; pass --allow-archived to write to it anyway\"\n}\n",
+      "stderr": "Error: project OLD (proj-old) is archived; pass --allow-archived to write to it anyway\n"
+    },
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "OLD",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: project OLD (proj-old) is archived; pass --allow-archived to write to it anyway\n"
+    },
+    {
+      "args": [
+        "task",
+        "status",
+        "proj-old#1",
+        "done",
+        "--allow-archived",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1 -> done\n",
+      "stderr": "project OLD (proj-old) is archived; reads still work, writes need --allow-archived\n"
+    },
+    {
+      "args": [
+        "comment",
+        "add",
+        "proj-old#1",
+        "still here",
+        "--allow-archived",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "commented on #1\n",
+      "stderr": "project OLD (proj-old) is archived; reads still work, writes need --allow-archived\n"
+    },
+    {
+      "args": [
+        "task",
+        "create",
+        "new one",
+        "-p",
+        "proj-old",
+        "--allow-archived",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "created #2 new one\n",
+      "stderr": "project OLD (proj-old) is archived; reads still work, writes need --allow-archived\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "-p",
+        "proj-gone",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/project/proj-gone: 400: Workspace ID could not be determined: no project has the id, slug or name \"proj-gone\" (kaneo project find <text> searches names and slugs)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-o1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-o1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/OLD",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/status/task-o1",
+      "query": "",
+      "body": {
+        "status": "done"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-o1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-o1",
+      "query": "",
+      "body": {
+        "content": "still here"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-old",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-old",
+      "query": "",
+      "body": {
+        "title": "new one",
+        "description": "",
+        "priority": "medium",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-gone",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    }
+  ],
+  "files": {}
+}

@@ -44,6 +44,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/column/proj-alpha",
       "query": "",
@@ -53,6 +58,11 @@
         "icon": "Clock",
         "color": "#f00"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",
@@ -66,6 +76,11 @@
       "body": {
         "name": "Waiting on review"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

@@ -1,0 +1,188 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "GAM",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1 -> Other / GAM#1 Write the parser\nsessions in the old comments: none\n",
+      "stderr": "assignee user-1 is not a member of the destination workspace; the copy is unassigned\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "GAM#1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task0002\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"description\": \"移行元: Main / ALP#1\\n\\nmulti\\nline\",\n  \"status\": \"to-do\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-gamma\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n  \"labels\": [],\n  \"relations\": [],\n  \"sessions\": []\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/GAM",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/GAM",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/workspace/ws-other/members",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-gamma",
+      "query": "",
+      "body": {
+        "title": "Write the parser",
+        "description": "移行元: Main / ALP#1\n\nmulti\nline",
+        "priority": "high",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task0002",
+      "query": "",
+      "body": {
+        "content": "Comments moved from Main / ALP#1:\n\n--- Self 2026-01-01T00:00:09.000Z ---\nfirst comment"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task0002",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "移行先: Other / GAM#1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/GAM",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task0002",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

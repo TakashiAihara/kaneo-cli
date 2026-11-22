@@ -9,7 +9,7 @@ import {
 } from "../api/kaneo";
 import { noArgs, type Command, type Flag, type FlagValues, type RunContext } from "./args";
 import { readInput } from "./input";
-import { withProject } from "./lookup";
+import { allowArchivedFlag, guardProject, withProject, writeAccess } from "./lookup";
 import type { Json } from "../output/json";
 
 // The machinery the chat integration providers — slack, discord and telegram,
@@ -182,7 +182,10 @@ export const chatProvider = <T extends Json, C extends object, U extends object>
       args: noArgs(`kaneo integration ${spec.name} get`),
       run: async ({ app }: RunContext<App>) => {
         apiKey(app);
-        const found = await withProject(project(app), (id) => spec.api.get(id));
+        const found = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return spec.api.get(id);
+        });
         if (found === null) {
           app.out.human(`no ${spec.name} integration on this project`);
           app.out.data(null);
@@ -197,7 +200,7 @@ export const chatProvider = <T extends Json, C extends object, U extends object>
       short: `Create or change the ${spec.name} integration; only what is passed changes`,
       long: spec.setLong,
       args: noArgs(`kaneo integration ${spec.name} set`),
-      flags: spec.flags,
+      flags: [...spec.flags, allowArchivedFlag],
       run: async ({ flags, changed, app }: RunContext<App>) => {
         apiKey(app);
         // The secret is read before the lookup's first request rather than
@@ -216,6 +219,7 @@ export const chatProvider = <T extends Json, C extends object, U extends object>
         // the first request, the one withProject needs to carry the project —
         // can tell a create from an update.
         const done = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
           const existing = await spec.api.get(id);
           if (existing === null) {
             for (const [flag, reason] of Object.entries(spec.createRefuses ?? {})) {
@@ -246,10 +250,14 @@ export const chatProvider = <T extends Json, C extends object, U extends object>
       aliases: ["delete"],
       short: `Remove the ${spec.name} integration`,
       args: noArgs(`kaneo integration ${spec.name} rm`),
-      flags: [{ name: "yes", type: "bool", usage: "confirm the removal", defaultValue: "false" }],
+      flags: [
+        { name: "yes", type: "bool" as const, usage: "confirm the removal", defaultValue: "false" },
+        allowArchivedFlag,
+      ],
       run: async ({ flags, app }: RunContext<App>) => {
         apiKey(app);
         const result = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
           const found = await spec.api.get(id);
           if (found === null) throw new Error(`no ${spec.name} integration on this project`);
           // The webhook URL or bot token and the event settings go with it.

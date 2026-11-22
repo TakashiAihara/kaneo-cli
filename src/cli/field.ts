@@ -11,7 +11,7 @@ import {
   type CustomFieldValue,
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
-import { withProject } from "./lookup";
+import { allowArchivedFlag, guardProject, withProject, writeAccess } from "./lookup";
 import { shellWord } from "../output/output";
 
 // The field a reference names, if any.
@@ -26,9 +26,7 @@ const findField = (fields: CustomField[], ref: string): CustomField | undefined 
   if (byId !== undefined) return byId;
   const named = fields.filter((f) => f.name === wanted);
   if (named.length > 1) {
-    throw new Error(
-      `${named.length} fields are named ${JSON.stringify(wanted)}; name one by its id (${named.map((f) => f.id).join(", ")})`,
-    );
+    throw new Error(`${named.length} fields are named ${JSON.stringify(wanted)}; name one by its id (${named.map((f) => f.id).join(", ")})`);
   }
   return named[0];
 };
@@ -42,26 +40,18 @@ const findField = (fields: CustomField[], ref: string): CustomField | undefined 
 export const resolveField = async (projectId: string, ref: string, where = "in this project"): Promise<CustomField> => {
   const found = findField(await listCustomFields(projectId), ref);
   if (found !== undefined) return found;
-  throw new Error(
-    `no field ${JSON.stringify(ref.trim())} ${where}; \`kaneo field ls -p ${shellWord(projectId)}\` lists them`,
-  );
+  throw new Error(`no field ${JSON.stringify(ref.trim())} ${where}; \`kaneo field ls -p ${shellWord(projectId)}\` lists them`);
 };
 
 // The same, for the filter-values listing, whose rows carry id and name but
 // are not definitions.
-const pickFilter = (
-  filters: CustomFieldFilter[],
-  ref: string,
-  where = "in this project; `kaneo field ls` lists them",
-): CustomFieldFilter => {
+const pickFilter = (filters: CustomFieldFilter[], ref: string, where = "in this project; `kaneo field ls` lists them"): CustomFieldFilter => {
   const wanted = ref.trim();
   const byId = filters.find((f) => f.fieldId === wanted);
   if (byId !== undefined) return byId;
   const named = filters.filter((f) => f.fieldName === wanted);
   if (named.length > 1) {
-    throw new Error(
-      `${named.length} fields are named ${JSON.stringify(wanted)}; name one by its id (${named.map((f) => f.fieldId).join(", ")})`,
-    );
+    throw new Error(`${named.length} fields are named ${JSON.stringify(wanted)}; name one by its id (${named.map((f) => f.fieldId).join(", ")})`);
   }
   const found = named[0];
   if (found === undefined) throw new Error(`no field ${JSON.stringify(wanted)} ${where}`);
@@ -124,7 +114,10 @@ export const fieldCommand = {
       args: noArgs("kaneo field list"),
       run: async ({ app }: { app: App }) => {
         apiKey(app);
-        const fields = await withProject(project(app), (id) => listCustomFields(id));
+        const fields = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return listCustomFields(id);
+        });
         for (const field of fields) app.out.human(fieldLine(field));
         app.out.data(fields);
       },
@@ -157,18 +150,9 @@ export const fieldCommand = {
           usage: "the choices of a dropdown or multiselect field, comma-separated",
           defaultValue: "",
         },
+        allowArchivedFlag,
       ],
-      run: async ({
-        args,
-        flags,
-        changed,
-        app,
-      }: {
-        args: string[];
-        flags: FlagValues;
-        changed: ReadonlySet<string>;
-        app: App;
-      }) => {
+      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
         const name = args.join(" ").trim();
         if (name === "") throw new Error("a field name cannot be blank");
         const type = String(flags.type ?? "").trim();
@@ -183,15 +167,16 @@ export const fieldCommand = {
               .filter((o) => o !== "")
           : undefined;
         const defaultValue = changed.has("default") ? String(flags.default ?? "") : undefined;
-        const field = await withProject(project(app), (id) =>
-          createCustomField(id, {
+        const field = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return createCustomField(id, {
             name,
             type,
             required: flags.required === true,
             ...(defaultValue === undefined || defaultValue.trim() === "" ? {} : { defaultValue }),
             ...(options === undefined ? {} : { options }),
-          }),
-        );
+          });
+        });
         app.out.human(`created ${fieldLine(field)}`);
         app.out.data(field);
       },
@@ -202,16 +187,20 @@ export const fieldCommand = {
       use: "rm <field>",
       short: "Delete a custom field and the values tasks hold for it",
       args: exactArgs(1),
-      flags: [{ name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" }],
+      flags: [
+        { name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" },
+        allowArchivedFlag,
+      ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const field = await withProject(project(app), async (id) => resolveField(id, args[0]!));
+        const field = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return resolveField(id, args[0]!);
+        });
         // The values every task holds for the field go with it, and there is
         // no undo: they are deleted, not unset.
         if (flags.yes !== true) {
-          throw new Error(
-            `refusing to delete field ${JSON.stringify(field.name)} without --yes; the values tasks hold for it are deleted too`,
-          );
+          throw new Error(`refusing to delete field ${JSON.stringify(field.name)} without --yes; the values tasks hold for it are deleted too`);
         }
         const deleted = await deleteCustomField(field.id);
         app.out.human(`deleted field ${deleted.name}`);
@@ -228,12 +217,13 @@ export const fieldCommand = {
         "moves the fields it is sent, so a field left out would keep its old\n" +
         "position and share it with whichever field took that place.",
       args: minimumArgs(1),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const { projectId, fields } = await withProject(project(app), async (id) => ({
-          projectId: id,
-          fields: await listCustomFields(id),
-        }));
+        const { projectId, fields } = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return { projectId: id, fields: await listCustomFields(id) };
+        });
         const order = newOrder(fields, args);
         const reordered = await reorderCustomFields(
           projectId,
@@ -257,17 +247,19 @@ export const fieldCommand = {
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
         if (args[0] === undefined) {
-          const values = await withProject(project(app), (id) => listProjectFieldValues(id));
-          const ordered = [...values].sort(
-            (a, b) => a.fieldPosition - b.fieldPosition || a.taskId.localeCompare(b.taskId),
-          );
+          const values = await withProject(project(app), async (id) => {
+            await guardProject(id);
+            return listProjectFieldValues(id);
+          });
+          const ordered = [...values].sort((a, b) => a.fieldPosition - b.fieldPosition || a.taskId.localeCompare(b.taskId));
           for (const value of ordered) app.out.human(`${value.taskId}  ${valueLine(value)}`);
           app.out.data(ordered);
           return;
         }
-        const filter = await withProject(project(app), async (id) =>
-          pickFilter(await listFieldFilterValues(id), args[0]!),
-        );
+        const filter = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return pickFilter(await listFieldFilterValues(id), args[0]!);
+        });
         for (const value of filter.values) app.out.human(value);
         app.out.data(filter);
       },

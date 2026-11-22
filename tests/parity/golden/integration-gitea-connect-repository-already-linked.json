@@ -35,6 +35,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitea-integration/project/proj-beta",
       "query": "",
@@ -44,6 +49,11 @@
         "repositoryName": "app",
         "accessToken": "fake-gitea-token"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",

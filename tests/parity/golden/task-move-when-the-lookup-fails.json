@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: PUT /api/task/move/task-a1: 404: Project not found; looking it up failed: GET /api/auth/organization/list: 500: injected failure\n"
+      "stderr": "Error: GET /api/project/BET: 400: Workspace ID could not be determined; looking it up failed: GET /api/auth/organization/list: 500: injected failure\n"
     }
   ],
   "requests": [
@@ -21,12 +21,24 @@
       "query": ""
     },
     {
-      "method": "PUT",
-      "path": "/task/move/task-a1",
-      "query": "",
-      "body": {
-        "destinationProjectId": "BET"
-      }
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/BET",
+      "query": ""
     },
     {
       "method": "GET",

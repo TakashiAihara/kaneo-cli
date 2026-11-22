@@ -1,0 +1,31 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "-A",
+        "--mine",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--all-workspaces cannot be combined with --mine\"\n}\n",
+      "stderr": "Error: --all-workspaces cannot be combined with --mine\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "-A",
+        "--workspace",
+        "ws-main",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--all-workspaces lists every workspace, so it cannot be narrowed with --workspace\"\n}\n",
+      "stderr": "Error: --all-workspaces lists every workspace, so it cannot be narrowed with --workspace\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

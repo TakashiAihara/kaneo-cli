@@ -2,6 +2,7 @@ import { apiKey, type App } from "./app";
 import { addActivity, listActivities, type Activity } from "../api/kaneo";
 import { exactArgs, minimumArgs, type RunContext } from "./args";
 import { resolveTask } from "./task";
+import { allowArchivedFlag, writeAccess } from "./lookup";
 
 // An event's details are in eventData, shown after its message. The server
 // writes {} for events with nothing to add, which says nothing either.
@@ -51,14 +52,17 @@ export const activityCommand = {
       // route removes an event once written.
       short: "Record an entry in a task's history (does not change the task; cannot be removed on its own)",
       args: minimumArgs(2),
-      flags: [{ name: "data", type: "string" as const, usage: "event details as a JSON object", defaultValue: "" }],
+      flags: [
+        { name: "data", type: "string" as const, usage: "event details as a JSON object", defaultValue: "" },
+        allowArchivedFlag,
+      ],
       run: async ({ args, flags, app }: RunContext<App>) => {
         apiKey(app);
         // Comments have their own route, which checks what this one does not,
         // and from Kaneo 2.27.0 the server refuses them here.
         if (args[1] === "comment") throw new Error("type comment is a comment: use `kaneo comment add`");
         const data = eventData(String(flags.data ?? ""));
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         const a = await addActivity(task.id, args[1]!, args.slice(2).join(" "), data);
         app.out.human(`recorded ${a.type} on #${task.number}`);
         app.out.data(a);

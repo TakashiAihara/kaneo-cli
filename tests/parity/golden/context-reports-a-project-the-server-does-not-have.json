@@ -1,0 +1,21 @@
+{
+  "steps": [
+    {
+      "args": [
+        "context",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-gone\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-gone\",\n      \"error\": \"GET /api/project/proj-gone: 400: Workspace ID could not be determined\"\n    }\n  ],\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"env\"\n  }\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-gone",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

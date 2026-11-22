@@ -16,6 +16,11 @@
   "requests": [
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/column/proj-alpha",
       "query": ""
     }

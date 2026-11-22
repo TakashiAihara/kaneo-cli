@@ -6,7 +6,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-alpha\"\n  ],\n  \"profile\": \"self\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"env\"\n  }\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-alpha\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-alpha\",\n      \"archived\": false\n    }\n  ],\n  \"profile\": \"self\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"env\"\n  }\n}\n",
       "stderr": ""
     },
     {
@@ -17,11 +17,22 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-old\"\n  ],\n  \"profile\": \"self\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"flag\",\n    \"workspace\": \"env\"\n  }\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-old\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-old\",\n      \"archived\": true\n    }\n  ],\n  \"profile\": \"self\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"flag\",\n    \"workspace\": \"env\"\n  }\n}\n",
       "stderr": ""
     }
   ],
-  "requests": [],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old",
+      "query": ""
+    }
+  ],
   "files": {
     ".config/kaneo/config.json": "{\"default_profile\":\"self\",\"profiles\":{\"self\":{\"workspace_id\":\"ws-other\",\"project_id\":\"proj-beta\"}}}"
   }

@@ -27,6 +27,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "PATCH",
       "path": "/gitlab-integration/project/proj-alpha",
       "query": "",

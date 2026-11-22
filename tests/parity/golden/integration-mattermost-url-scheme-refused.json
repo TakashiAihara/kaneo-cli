@@ -28,6 +28,11 @@
   "requests": [
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/mattermost-integration/project/proj-alpha",
       "query": ""
     },
@@ -38,6 +43,11 @@
       "body": {
         "webhookUrl": "http://insecure.example/mm"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

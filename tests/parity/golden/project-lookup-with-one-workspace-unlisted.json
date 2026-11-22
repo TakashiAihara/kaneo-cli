@@ -22,7 +22,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: GET /api/task/tasks/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs) in the workspaces that could be listed; could not list the projects of workspace \"Other\" (403: injected failure)\n"
+      "stderr": "Error: GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs) in the workspaces that could be listed; could not list the projects of workspace \"Other\" (403: injected failure)\n"
     },
     {
       "args": [
@@ -52,7 +52,7 @@
   "requests": [
     {
       "method": "GET",
-      "path": "/task/tasks/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -72,7 +72,7 @@
     },
     {
       "method": "GET",
-      "path": "/task/tasks/nope",
+      "path": "/project/nope",
       "query": ""
     },
     {
@@ -92,7 +92,7 @@
     },
     {
       "method": "GET",
-      "path": "/task/tasks/Beta",
+      "path": "/project/Beta",
       "query": ""
     },
     {
@@ -109,6 +109,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",

@@ -187,6 +187,11 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "PUT",
       "path": "/project/proj-alpha",
       "query": "",
@@ -197,6 +202,11 @@
         "description": "",
         "isPublic": false
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",
@@ -220,6 +230,11 @@
       "path": "/project/proj-old/unarchive",
       "query": "",
       "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-old2",
+      "query": ""
     },
     {
       "method": "GET",

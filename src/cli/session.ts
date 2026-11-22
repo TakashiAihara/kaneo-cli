@@ -9,7 +9,7 @@ import * as store from "../session/store";
 import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
 import { shellWord } from "../output/output";
-import { placesNothing, taskRef } from "./lookup";
+import { allowArchivedFlag, guardProject, placesNothing, taskRef, writeAccess, type ProjectAccess } from "./lookup";
 
 const requireSessionId = (): string => {
   const id = store.currentId(env);
@@ -33,11 +33,11 @@ export const sessionCommand = {
       use: "attach <task> [next step...]",
       short: "Record that this session is working on a task",
       args: minimumArgs(1),
-      flags: [strictFlag],
-      run: failOpen(async ({ args, app }: RunContext<App>) => {
+      flags: [strictFlag, allowArchivedFlag],
+      run: failOpen(async ({ args, flags, app }: RunContext<App>) => {
         const sessionId = requireSessionId();
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         const attachment = await attachTask(app, sessionId, task, args.slice(1).join(" "));
         app.out.human(
           `attached: ${taskRef(attachment.projectSlug, attachment.number, attachment.projectId, attachment.taskId)} ${attachment.title}`,
@@ -63,10 +63,11 @@ export const sessionCommand = {
           defaultValue: "",
         },
         strictFlag,
+        allowArchivedFlag,
       ],
       run: failOpen(async ({ args, flags, app }: RunContext<App>) => {
         apiKey(app);
-        const { taskId, number, reference } = await targetTask(app, String(flags.task ?? ""));
+        const { taskId, number, reference } = await targetTask(app, String(flags.task ?? ""), writeAccess(flags));
         const step = args.join(" ").trim();
         if (step === "") throw new Error("no next step given");
 
@@ -127,6 +128,7 @@ export const sessionCommand = {
           defaultValue: "",
         },
         strictFlag,
+        allowArchivedFlag,
       ],
       run: failOpen(async ({ flags, changed, app }: RunContext<App>) => {
         const releasing = String(flags.session ?? "").trim();
@@ -150,7 +152,7 @@ export const sessionCommand = {
         // without a lookup, which a task the server no longer has would fail.
         const namesHeld = attached !== undefined && heldAs(app, attached, named);
         const slugs = new Map<string, string>();
-        const task = named === "" || namesHeld ? undefined : await resolveTask(app, named, slugs);
+        const task = named === "" || namesHeld ? undefined : await resolveTask(app, named, slugs, writeAccess(flags));
         // What the marker is written against and what the attachment holds can
         // differ once one of several tasks is named, so the attachment is only
         // dropped for the task it actually names.
@@ -158,6 +160,12 @@ export const sessionCommand = {
         // The close line is written from the attachment's record when the named
         // task is the one held, so it carries the board as an unnamed close does.
         const closed = holds ? attached! : attachmentOf(task!);
+        // A marker is a comment write, so the project it lands on is checked
+        // the way a named task's is: an archived one refuses without
+        // --allow-archived. A record that never learned its project has none
+        // to check.
+        const projectId = task?.projectId ?? closed.projectId;
+        if (projectId !== undefined && projectId !== "") await guardProject(projectId, writeAccess(flags));
         // The reference the retry hint names: the attachment's record for a
         // held task, the lookup's for one named without it. --task is part of
         // it, since a bare `session close` would close what is attached rather
@@ -362,10 +370,10 @@ export const releaseRef = (held: store.Attachment | undefined, named: string): s
 // this session attached to. reference is the task written the way a task
 // reference writes it — board and number — so a hint that asks the reader to
 // look at it or to run again names the board the write went to.
-const targetTask = async (app: App, ref: string): Promise<{ taskId: string; number: number; reference: string }> => {
+const targetTask = async (app: App, ref: string, access: ProjectAccess = {}): Promise<{ taskId: string; number: number; reference: string }> => {
   if (ref.trim() !== "") {
     const slugs = new Map<string, string>();
-    const named = await resolveTask(app, ref, slugs);
+    const named = await resolveTask(app, ref, slugs, access);
     return {
       taskId: named.id,
       number: named.number,
@@ -377,6 +385,10 @@ const targetTask = async (app: App, ref: string): Promise<{ taskId: string; numb
   if (attached === undefined) {
     throw new Error("this session is not attached to a task; name one, or run 'kaneo session attach' first");
   }
+  // The marker this command posts is a comment write, so the project the
+  // attachment names is checked the way a named task's is. A record that
+  // never learned its project has none to check.
+  if (attached.projectId !== undefined && attached.projectId !== "") await guardProject(attached.projectId, access);
   return {
     taskId: attached.taskId,
     number: attached.number,

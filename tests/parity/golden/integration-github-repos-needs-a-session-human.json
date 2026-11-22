@@ -15,6 +15,11 @@
   "requests": [
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/github-integration/repositories/proj-alpha",
       "query": ""
     }

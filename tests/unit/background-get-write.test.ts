@@ -54,7 +54,16 @@ const serve = () => {
   const s = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
-    fetch: () => new Response(IMAGE.slice(), { headers: { "content-type": "image/png" } }),
+    fetch: (req) => {
+      // The archived check reads the project before the image is asked for;
+      // the real server answers both routes. The id is this file's own: the
+      // lookup caches live for the process, so a shared one would leak.
+      const path = new URL(req.url).pathname;
+      if (path === "/api/project/p-bg") {
+        return Response.json({ id: "p-bg", name: "P", slug: "p", workspaceId: "w1" });
+      }
+      return new Response(IMAGE.slice(), { headers: { "content-type": "image/png" } });
+    },
   });
   servers.push(s);
   configureClient({ baseUrl: `http://127.0.0.1:${s.port}`, apiKey: "test-key" });
@@ -65,7 +74,7 @@ const invoke = () => {
     cfg: { apiKey: "test-key" },
     out: new Writer({ json: true, color: false }, undefined, false),
   } as unknown as App;
-  return getRun()({ args: ["p1"], changed: new Set(), app });
+  return getRun()({ args: ["p-bg"], changed: new Set(), app });
 };
 
 const failure = async (p: Promise<unknown>) => {

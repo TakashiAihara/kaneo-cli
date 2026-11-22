@@ -15,6 +15,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "PATCH",
       "path": "/gitea-integration/project/proj-alpha",
       "query": "",

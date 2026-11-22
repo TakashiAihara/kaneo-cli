@@ -16,7 +16,7 @@
   "requests": [
     {
       "method": "GET",
-      "path": "/task/tasks/Beta",
+      "path": "/project/Beta",
       "query": ""
     },
     {
@@ -33,6 +33,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",

@@ -136,6 +136,9 @@ describe("task list --description", () => {
     const url = serve(async (req) => {
       const u = new URL(req.url);
       requests.push(`${req.method} ${u.pathname}${u.search}`);
+      if (u.pathname === "/api/project/p1") {
+        return Response.json({ id: "p1", name: "P", slug: "p", workspaceId: "w1" });
+      }
       if (u.pathname === "/api/task/tasks/p1") {
         return Response.json({
           data: {
@@ -213,6 +216,7 @@ describe("task list --description", () => {
     // Only the deferred tasks the search did not return are read back: the
     // matched one and the plain one cost no detail request.
     expect(requests).toEqual([
+      "GET /api/project/p1",
       "GET /api/task/tasks/p1",
       "GET /api/task/description-matches/p1?query=needle",
       "GET /api/task/task-big",

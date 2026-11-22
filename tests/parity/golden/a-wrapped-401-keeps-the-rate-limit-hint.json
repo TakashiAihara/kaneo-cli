@@ -10,7 +10,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: reading project proj-alpha, the project of task #1, to find its workspace: GET /api/project/proj-alpha: 401: injected failure; Kaneo also answers 401 to a key that hit its rate limit (by default 100 requests with no 60-second pause), so if the key worked a moment ago, wait a minute and retry\n"
+      "stderr": "Error: GET /api/project/proj-alpha: 401: injected failure; Kaneo also answers 401 to a key that hit its rate limit (by default 100 requests with no 60-second pause), so if the key worked a moment ago, wait a minute and retry\n"
     }
   ],
   "requests": [

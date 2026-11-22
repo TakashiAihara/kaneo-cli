@@ -20,6 +20,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/activity/task-a1",
       "query": ""
     }

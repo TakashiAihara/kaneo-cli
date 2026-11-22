@@ -34,6 +34,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitea-integration/repositories",
       "query": "",
@@ -42,6 +47,11 @@
         "baseUrl": "https://gitea.example.com",
         "accessToken": "fake-gitea-token"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "POST",

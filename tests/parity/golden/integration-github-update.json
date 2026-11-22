@@ -27,6 +27,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "PATCH",
       "path": "/github-integration/project/proj-alpha",
       "query": "",
@@ -34,6 +39,11 @@
         "isActive": false,
         "commentTaskLinkOnGitHubIssue": false
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

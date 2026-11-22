@@ -47,12 +47,12 @@
     },
     {
       "method": "GET",
-      "path": "/task/tasks/proj-alpha",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
       "method": "GET",
-      "path": "/project/proj-alpha",
+      "path": "/task/tasks/proj-alpha",
       "query": ""
     },
     {
@@ -80,6 +80,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/user/me",
       "query": ""
     },
@@ -94,6 +99,11 @@
         "operation": "updateAssignee",
         "value": "user-self"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

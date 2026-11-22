@@ -1,5 +1,6 @@
 import { parseRepo } from "../config/repo";
 import { resolveForRepo, type Resolved } from "../config/resolve";
+import { archived, getProject } from "../api/kaneo";
 import type { RunContext } from "./args";
 import type { App } from "./app";
 
@@ -15,6 +16,11 @@ type Report = {
   // null when no layer named a project, which is what the Go build printed for
   // a nil slice: the field is always there and its emptiness is the answer.
   projects: string[] | null;
+  // What the server says about each resolved project: archived, or why that
+  // could not be read — a project the key cannot reach and one that does not
+  // exist fail the same way here as they do for the commands that write to it.
+  // Absent when no project was resolved: there is nothing to ask about.
+  project_state?: ({ id: string; archived: boolean } | { id: string; error: string })[];
   repo?: string;
   profile?: string;
   local_file?: string;
@@ -39,6 +45,26 @@ const forRepo = (value: string, app: App): Resolved => {
   return resolveForRepo(app.flags, app.global, repo);
 };
 
+// The archived state of each project the settings resolved to, asked of the
+// server rather than guessed from the configuration: an archived project still
+// resolves here, and this is where a reader finds out before a write refuses.
+// A project that cannot be read is reported with the server's answer, since
+// "missing" and "unreachable" call for different things and neither may read
+// as "active".
+const projectStates = async (ids: string[]): Promise<Report["project_state"]> => {
+  if (ids.length === 0) return undefined;
+  return Promise.all(
+    ids.map(async (id) => {
+      try {
+        const project = await getProject(id);
+        return { id, archived: archived(project) };
+      } catch (e) {
+        return { id, error: e instanceof Error ? e.message : String(e) };
+      }
+    }),
+  );
+};
+
 export const contextCommand = {
   name: "context",
   short: "Show the resolved settings and where each value came from",
@@ -56,7 +82,7 @@ export const contextCommand = {
       defaultValue: "",
     },
   ],
-  run: ({ changed, flags, app }: RunContext<App>) => {
+  run: async ({ changed, flags, app }: RunContext<App>) => {
     const cfg = changed.has("repo") ? forRepo(String(flags.repo ?? ""), app) : app.cfg;
     const origin = {
       api_key: cfg.origin.api_key ?? "unset",
@@ -73,6 +99,14 @@ export const contextCommand = {
     app.out.human(`api key    ${hasKey ? "set" : "not set"}  (${origin.api_key})`);
     app.out.human(`workspace  ${or(cfg.workspaceId, "-")}  (${origin.workspace})`);
     app.out.human(`project    ${or(cfg.projectIds?.join(", ") ?? "", "-")}  (${origin.project})`);
+    const states = await projectStates(cfg.projectIds ?? []);
+    for (const state of states ?? []) {
+      app.out.human(
+        "archived" in state
+          ? `           ${state.id}: ${state.archived ? "archived" : "active"}`
+          : `           ${state.id}: ${state.error}`,
+      );
+    }
     app.out.human("");
     app.out.human(`repo       ${or(cfg.repo, "-")}`);
     app.out.human(`profile    ${or(cfg.profileName, "-")}`);
@@ -83,6 +117,7 @@ export const contextCommand = {
       api_url: cfg.apiUrl,
       workspace: cfg.workspaceId,
       projects: cfg.projectIds,
+      project_state: states,
       repo: omitted(cfg.repo),
       profile: omitted(cfg.profileName),
       local_file: omitted(cfg.localPath),

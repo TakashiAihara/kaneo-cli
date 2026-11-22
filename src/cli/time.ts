@@ -11,6 +11,7 @@ import {
 } from "../api/kaneo";
 import { exactArgs, type RunContext } from "./args";
 import { resolveTask } from "./task";
+import { allowArchivedFlag, writeAccess } from "./lookup";
 
 // Whole minutes are what a person reads a log in; the seconds are in --json.
 const elapsed = (seconds: number): string =>
@@ -84,6 +85,7 @@ export const timeCommand = {
         { ...TIME_FLAGS[0]!, usage: "start time, ISO 8601 with an offset (default now)" },
         { ...TIME_FLAGS[1]!, usage: "end time, ISO 8601 with an offset; leave out to start a running timer" },
         TIME_FLAGS[2]!,
+        allowArchivedFlag,
       ],
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
         // Read before the board is fetched, so the start is when it was typed.
@@ -97,7 +99,7 @@ export const timeCommand = {
         if (changed.has("start")) checkTimestamp("start", String(flags.start ?? ""));
         if (changed.has("end")) checkTimestamp("end", String(flags.end ?? ""));
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         const entry = await addTimeEntry(task.id, {
           startTime: changed.has("start") ? String(flags.start ?? "") : now,
           ...(changed.has("end") ? { endTime: String(flags.end ?? "") } : {}),

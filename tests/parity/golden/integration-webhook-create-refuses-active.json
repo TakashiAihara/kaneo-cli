@@ -43,12 +43,27 @@
   "requests": [
     {
       "method": "GET",
-      "path": "/generic-webhook-integration/project/proj-alpha",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
       "method": "GET",
       "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

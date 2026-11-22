@@ -1,0 +1,43 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "-A",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "ALP#1    [high       ] to-do         Write the parser  Alpha (Main)\nALP#2    [no-priority] in-progress   Ship it  Alpha (Main)\nBET#1    [urgent     ] to-do         Beta first  Beta (Main)\n",
+      "stderr": "(1 done / planned / archived task left out; --all to include them)\nError: the tasks listed above are incomplete: could not list the projects of workspace \"Other\" (500: injected failure)\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -21,6 +21,11 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "PATCH",
       "path": "/task/bulk",
       "query": "",

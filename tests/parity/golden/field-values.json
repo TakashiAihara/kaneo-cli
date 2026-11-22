@@ -57,7 +57,7 @@
   "requests": [
     {
       "method": "GET",
-      "path": "/custom-field/project/proj-alpha/values",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -67,12 +67,37 @@
     },
     {
       "method": "GET",
-      "path": "/custom-field/project/proj-alpha/filter-values",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
       "method": "GET",
       "path": "/custom-field/project/proj-alpha/filter-values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/filter-values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

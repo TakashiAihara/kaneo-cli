@@ -13,6 +13,7 @@ import {
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, type FlagValues } from "./args";
 import { resolveTask } from "./task";
+import { allowArchivedFlag, writeAccess } from "./lookup";
 import { shellWord } from "../output/output";
 
 const labelLine = (label: LabelRecord): string =>
@@ -210,9 +211,10 @@ export const labelCommand = {
       use: "attach <task> <label>",
       short: "Put a workspace label on a task",
       args: exactArgs(2),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         const label = await resolveWorkspaceLabel(app, args[1]!);
         const copy = await attachLabel(label.id, task.id);
         app.out.human(`labeled #${task.number} ${label.name}`);
@@ -224,9 +226,10 @@ export const labelCommand = {
       use: "detach <task> <label>",
       short: "Take a label off a task",
       args: exactArgs(2),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         // The server detaches by the copy's id, so the label is looked up on the
         // task itself: a copy on another task would otherwise be taken off that
         // task. Ids come before names here as everywhere: a copy's id, then the

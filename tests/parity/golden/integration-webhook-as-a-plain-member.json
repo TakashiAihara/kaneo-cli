@@ -67,7 +67,17 @@
   "requests": [
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/generic-webhook-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -85,6 +95,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/generic-webhook-integration/project/proj-alpha",
       "query": ""
     },
@@ -98,6 +113,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/generic-webhook-integration/project/proj-alpha",
       "query": ""
     },
@@ -108,7 +128,7 @@
     },
     {
       "method": "GET",
-      "path": "/generic-webhook-integration/project/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -125,6 +145,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",

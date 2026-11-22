@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: PUT /api/task/move/task-a1: 404: Project not found: no project has the id, slug or name \"NOPE\" (kaneo project find <text> searches names and slugs)\n"
+      "stderr": "Error: GET /api/project/NOPE: 400: Workspace ID could not be determined: no project has the id, slug or name \"NOPE\" (kaneo project find <text> searches names and slugs) in the workspaces that could be listed; could not list the projects of workspace \"Other\" (500: injected failure)\n"
     }
   ],
   "requests": [
@@ -21,12 +21,34 @@
       "query": ""
     },
     {
-      "method": "PUT",
-      "path": "/task/move/task-a1",
-      "query": "",
-      "body": {
-        "destinationProjectId": "NOPE"
-      }
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/NOPE",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/NOPE",
+      "query": ""
     },
     {
       "method": "GET",

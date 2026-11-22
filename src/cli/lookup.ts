@@ -1,5 +1,6 @@
 import { KaneoApiError } from "../api/http";
-import { lastTaskNumbers, listProjectsIn, listWorkspaces, type Project, type Workspace } from "../api/kaneo";
+import { archived, getProject, lastTaskNumbers, listProjectsIn, listWorkspaces, type Project, type Workspace } from "../api/kaneo";
+import type { Flag, FlagValues } from "./args";
 
 // Turning a value somebody typed into the id the API takes, so a slug or a name
 // works wherever an id does. A slug is what people and agents type: it is the
@@ -311,3 +312,65 @@ const severalWorkspaces = (value: string, found: Workspace[]): string =>
   `${JSON.stringify(value)} matches several workspaces: ${found
     .map((w) => (w.slug === "" ? w.id : `${w.slug} (${w.id})`))
     .join(", ")}; pass the id`;
+
+// What a command may do with the project it resolved to. Reads only warn; a
+// write is refused while the project is archived unless the caller passed
+// --allow-archived, because the server still accepts writes there and a board
+// nobody looks at any more is where they quietly pile up.
+export type ProjectAccess = { write?: boolean; allowArchived?: boolean };
+
+// The flag every command that can write to a project takes, declared once so
+// the name and the wording cannot drift between them.
+export const allowArchivedFlag: Flag = {
+  name: "allow-archived",
+  type: "bool",
+  usage: "write to the resolved project even though it is archived",
+  defaultValue: "false",
+};
+
+// The access a write command passes down: refuse an archived project unless
+// the flag says otherwise.
+export const writeAccess = (flags: FlagValues): ProjectAccess => ({
+  write: true,
+  allowArchived: flags["allow-archived"] === true,
+});
+
+// The projects this run has already fetched, so a command that resolves the
+// same project twice (`task bulk` over several of its tasks) asks the server
+// once. Only successes are kept: a failure is reported each time it happens.
+const seen = new Map<string, Project>();
+
+// The project record behind an id, fetched once per run.
+export const seenProject = async (projectId: string): Promise<Project> => {
+  const known = seen.get(projectId);
+  if (known !== undefined) return known;
+  const project = await getProject(projectId);
+  seen.set(projectId, project);
+  return project;
+};
+
+// Projects already warned about this run, so `task bulk` over five tasks of
+// one archived project says so once rather than five times.
+const warned = new Set<string>();
+
+// The one wording for an archived project, shared by the stderr warning reads
+// print and the refusal writes throw.
+export const archivedNote = (project: Project): string => {
+  const named = slugOr(project.slug === "" ? project.name : project.slug, project.id);
+  return `project ${named} (${project.id}) is archived`;
+};
+
+// Checks the project a resolved task or board belongs to. Reads get a stderr
+// warning; writes throw unless --allow-archived was passed. A project the key
+// cannot read at all fails the same way it always did — the guard only adds
+// the archived check on top of a successful read.
+export const guardProject = async (projectId: string, access: ProjectAccess = {}): Promise<void> => {
+  const project = await seenProject(projectId);
+  if (!archived(project)) return;
+  if (access.write === true && access.allowArchived !== true) {
+    throw new Error(`${archivedNote(project)}; pass --allow-archived to write to it anyway`);
+  }
+  if (warned.has(project.id)) return;
+  warned.add(project.id);
+  console.error(`${archivedNote(project)}; reads still work, writes need --allow-archived`);
+};

@@ -45,8 +45,8 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-alpha\"\n  ],\n  \"profile\": \"self\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"command\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"env\"\n  }\n}\n",
-      "stderr": ""
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-alpha\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-alpha\",\n      \"error\": \"api_key_command failed (exit 3)\"\n    }\n  ],\n  \"profile\": \"self\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"command\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"env\"\n  }\n}\n",
+      "stderr": "ran\n"
     },
     {
       "args": [
@@ -54,8 +54,8 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "api url    <URL>  (env)\napi key    set  (command)\nworkspace  ws-main  (env)\nproject    proj-alpha  (env)\n\nrepo       -\nprofile    self\nlocal file -\nconfig     <HOME>/.config/kaneo/config.json\n",
-      "stderr": ""
+      "stdout": "api url    <URL>  (env)\napi key    set  (command)\nworkspace  ws-main  (env)\nproject    proj-alpha  (env)\n           proj-alpha: api_key_command failed (exit 3)\n\nrepo       -\nprofile    self\nlocal file -\nconfig     <HOME>/.config/kaneo/config.json\n",
+      "stderr": "ran\n"
     },
     {
       "args": [

@@ -1,7 +1,7 @@
 import { apiKey, project, type App } from "./app";
 import { noArgs, type Command, type Flag, type FlagValues, type RunContext } from "./args";
 import { readCredential, sourceName } from "./input";
-import { withProject } from "./lookup";
+import { allowArchivedFlag, guardProject, withProject, writeAccess } from "./lookup";
 import type { IntegrationRemoved } from "../api/kaneo";
 import type { Json } from "../output/json";
 
@@ -256,7 +256,10 @@ export const providerCommand = <R extends Json, C extends object, U extends obje
       args: noArgs(`kaneo integration ${spec.name} get`),
       run: async ({ app }: RunContext<App>) => {
         apiKey(app);
-        const found = await withProject(project(app), (id) => spec.api.get(id));
+        const found = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return spec.api.get(id);
+        });
         if (found === null) {
           app.out.human(`no ${spec.name} integration on this project`);
           app.out.data(null);
@@ -271,13 +274,13 @@ export const providerCommand = <R extends Json, C extends object, U extends obje
       short: spec.setShort,
       long: spec.setLong,
       args: noArgs(`kaneo integration ${spec.name} set`),
-      flags: spec.flags,
+      flags: [...spec.flags, allowArchivedFlag],
       run: async ({ flags, changed, app }: RunContext<App>) => {
         apiKey(app);
-        const { projectId, current } = await withProject(project(app), async (id) => ({
-          projectId: id,
-          current: await spec.api.get(id),
-        }));
+        const { projectId, current } = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return { projectId: id, current: await spec.api.get(id) };
+        });
         if (current === null) {
           for (const [flag, reason] of Object.entries(spec.createRefuses ?? {})) {
             if (changed.has(flag)) throw new Error(`--${flag} ${reason}`);
@@ -309,10 +312,11 @@ export const providerCommand = <R extends Json, C extends object, U extends obje
       aliases: ["delete"],
       short: `Remove the ${spec.name} integration`,
       args: noArgs(`kaneo integration ${spec.name} rm`),
-      flags: [boolFlag("yes", "confirm the removal")],
+      flags: [boolFlag("yes", "confirm the removal"), allowArchivedFlag],
       run: async ({ flags, app }: RunContext<App>) => {
         apiKey(app);
         const removed = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
           const found = await spec.api.get(id);
           if (found === null) throw new Error(`no ${spec.name} integration on this project`);
           // The webhook URL, the signing secret and the event settings go with it.

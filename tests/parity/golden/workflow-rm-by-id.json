@@ -35,12 +35,22 @@
   "requests": [
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/workflow-rule/proj-alpha",
       "query": ""
     },
     {
       "method": "DELETE",
       "path": "/workflow-rule/rule0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

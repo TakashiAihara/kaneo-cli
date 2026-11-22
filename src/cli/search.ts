@@ -208,7 +208,11 @@ const searchEverywhere = async (wanted: SearchQuery, limit: number) => {
       seen.add(key);
       merged.push(r);
     }
-    for (const p of slugCandidates(listed, merged, wanted.query)) merged.push(projectResult(p, w.name));
+    for (const p of slugCandidates(listed, merged, wanted.query)) {
+      const r = projectResult(p, w.name);
+      seen.add(`${r.type} ${r.id}`);
+      merged.push(r);
+    }
   }
   merged.sort(byRank);
   // totalCount counts the distinct matches before the cut, out of pages the

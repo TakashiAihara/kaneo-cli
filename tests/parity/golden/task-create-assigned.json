@@ -74,6 +74,11 @@
       "method": "GET",
       "path": "/comment/task0002",
       "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
     }
   ],
   "files": {}

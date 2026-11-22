@@ -10,7 +10,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "#1 -> Other / GAM#1 Write the parser\nsessions in the old comments: none\n",
+      "stdout": "#1 -> Other / GAM#1 Write the parser\nsessions the old task held: none\n",
       "stderr": ""
     },
     {
@@ -36,7 +36,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "#1 -> Main / ALP#4 Write the parser\nsessions in the old comments: none\n",
+      "stdout": "#1 -> Main / ALP#4 Write the parser\nsessions the old task held: none\n",
       "stderr": ""
     }
   ],
@@ -104,6 +104,11 @@
     {
       "method": "GET",
       "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
       "query": ""
     },
     {
@@ -296,6 +301,11 @@
     {
       "method": "GET",
       "path": "/task/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-gamma",
       "query": ""
     },
     {

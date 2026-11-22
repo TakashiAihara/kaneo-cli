@@ -1,0 +1,200 @@
+{
+  "steps": [
+    {
+      "args": [
+        "board",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Alpha (open 2 / done 1)\n- [high] #1 Write the parser (to-do)\n- [no-priority] #2 Ship it (in-progress)\n\n### Sessions holding a task\n- #1 Write the parser — session sess-fie @fieldhost branch=fb\n  - next: field step\n- #1 Write the parser — session sess-mar @markerhost branch=mb\n  - next: marker step\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"description\": \"multi\\nline\",\n  \"status\": \"to-do\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n  \"labels\": [],\n  \"relations\": [],\n  \"sessions\": [\n    {\n      \"sessionId\": \"sess-field\",\n      \"host\": \"fieldhost\",\n      \"branch\": \"fb\",\n      \"cwd\": \"/work/field\",\n      \"updatedAt\": \"2026-01-01T00:00:00Z\",\n      \"nextStep\": \"field step\"\n    },\n    {\n      \"sessionId\": \"sess-marker\",\n      \"host\": \"markerhost\",\n      \"branch\": \"mb\",\n      \"cwd\": \"/work/marker\",\n      \"updatedAt\": \"2026-01-01T00:00:08.000Z\",\n      \"nextStep\": \"marker step\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "close",
+        "--session",
+        "sess-field",
+        "--task",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "released: session sess-fie on ALP#1 Write the parser\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "board",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Alpha (open 2 / done 1)\n- [high] #1 Write the parser (to-do)\n- [no-priority] #2 Ship it (in-progress)\n\n### Sessions holding a task\n- #1 Write the parser — session sess-mar @markerhost branch=mb\n  - next: marker step\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a3",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "fieldId": "fld0001",
+        "value": "[]"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a3",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

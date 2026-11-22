@@ -142,6 +142,10 @@ export type Scenario = {
   failOnQuery?: string;
   failStatus?: number;
   failMessage?: string;
+  // Several routes failing at once, each with its own status, message and
+  // skip count — for a scenario that needs one route's refusal beside
+  // another's, which failOn's single status cannot say.
+  failures?: { match: string; status?: number; message?: string; skip?: number }[];
   plainMember?: boolean;
   // The fake refuses a project move into this workspace with the bare 403 the
   // destination-side permission check gives, while the source check passes.
@@ -208,6 +212,13 @@ const both = (name: string, args: string[]): Scenario[] => [
   { name: `${name} (json)`, steps: [[...args, "--json"]] },
   { name: `${name} (human)`, steps: [[...args, "--human"]] },
 ];
+
+// The fake answering every custom-field route the way a server that predates
+// them does: the router's own 404, which no field handler produces. A session
+// command then takes the comment-marker path it always had.
+const NO_FIELDS = {
+  failures: [{ match: "custom-field", status: 404, message: "404 Not Found" }],
+};
 
 // The integrations' credential flags, named through constants so the
 // credential-shaped literals stay out of this file's argv lists the way the
@@ -1687,7 +1698,7 @@ export const SCENARIOS: Scenario[] = [
     stdin: "from stdin\n",
     steps: [["task", "create", "Piped", "-d", "-", "--json"]],
   },
-  // The marker, the attachment and the hook are `session attach`'s, reached in the
+  // The hold, the attachment and the hook are `session attach`'s, reached in the
   // same command: the new number never has to be carried by hand to the next one.
   {
     name: "task create --attach",
@@ -1729,11 +1740,24 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   // The attach fails once the task exists, so the message has to name what is
-  // already on the board to close.
+  // already on the board to close. The custom-field routes answer as a server
+  // that predates them does, so the marker post is what fails.
   {
     name: "task create --attach when the attach fails",
     env: { KANEO_SESSION_ID: "sess-create" },
+    ...NO_FIELDS,
     failOn: "^POST /comment/",
+    steps: [
+      ["task", "create", "Brand new", "--attach", "--json"],
+      ["task", "ls", "--all", "--json"],
+    ],
+  },
+  // The same failure on a server with custom fields: the field write is what
+  // the attach cannot land, and the created task is named the same way.
+  {
+    name: "task create --attach when the field write fails",
+    env: { KANEO_SESSION_ID: "sess-create" },
+    failOn: "^PUT /custom-field/value",
     steps: [
       ["task", "create", "Brand new", "--attach", "--json"],
       ["task", "ls", "--all", "--json"],
@@ -2018,11 +2042,21 @@ export const SCENARIOS: Scenario[] = [
   // A project in another workspace cannot take the server's move, so the task
   // is recreated there: the fields carry over, the comments become one comment
   // on the copy, the old task is left pointing at it, and the session ids the
-  // old comments named are listed for re-attaching by hand.
+  // old task held — in its comments and its session field — are listed for
+  // re-attaching by hand.
   {
     name: "task move across workspaces",
     seed: {
       projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
+      customFields: [{ projectId: P1, name: "kaneo-session", type: "text" }],
+      customFieldValues: [
+        {
+          taskId: "task-a1",
+          field: "kaneo-session",
+          value:
+            '[{"sessionId":"sess-field1","host":"h","cwd":"/w","branch":"b","nextStep":"next","at":"2026-01-01T00:00:00Z"}]',
+        },
+      ],
       comments: [
         ...(SEED.comments ?? []),
         {
@@ -3652,10 +3686,12 @@ export const SCENARIOS: Scenario[] = [
   },
   // The server takes the marker and its listing does not hold it. Reported without
   // --strict, like the local record that could not be written: the session has a
-  // marker on a board nothing here can read.
+  // marker on a board nothing here can read. The custom-field routes answer as a
+  // server that predates them does, so the marker is what gets posted.
   {
     name: "marker not among the comments",
     env: { KANEO_SESSION_ID: "sess-lost" },
+    ...NO_FIELDS,
     dropCommentsMatching: "kn:session",
     steps: [["session", "attach", "1"]],
   },
@@ -3664,6 +3700,7 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "marker that could not be confirmed",
     env: { KANEO_SESSION_ID: "sess-lost" },
+    ...NO_FIELDS,
     failOn: "^GET /comment/task-a1$",
     steps: [["session", "attach", "1"]],
   },
@@ -3672,6 +3709,7 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "marker reply without an id",
     env: { KANEO_SESSION_ID: "sess-lost" },
+    ...NO_FIELDS,
     commentReplyWithoutId: true,
     steps: [["session", "attach", "1"]],
   },
@@ -3679,6 +3717,7 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "session next marker not among the comments",
     env: { KANEO_SESSION_ID: "sess-lost" },
+    ...NO_FIELDS,
     dropCommentsMatching: "kn:session",
     steps: [["session", "next", "--task", "1", "step"]],
   },
@@ -3687,6 +3726,7 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "session next when the listing fails",
     env: { KANEO_SESSION_ID: "sess-lost" },
+    ...NO_FIELDS,
     failOn: "^GET /comment/task-a1$",
     steps: [["session", "next", "--task", "1", "step"]],
   },
@@ -3754,10 +3794,13 @@ export const SCENARIOS: Scenario[] = [
   },
   // A close whose marker the server did not keep still clears the attachment
   // here: the local record is brought up to date before the marker is confirmed,
-  // so a machine never says it holds a task the server has let go of.
+  // so a machine never says it holds a task the server has let go of. The
+  // custom-field routes answer as a server that predates them does, so the
+  // marker is what gets posted and dropped.
   {
     name: "session close keeps the local record when the marker is not confirmed",
     env: { KANEO_SESSION_ID: "sess-test" },
+    ...NO_FIELDS,
     // The closed marker alone, so the attach above it is confirmed as usual.
     dropCommentsMatching: "state=closed",
     steps: [
@@ -3824,8 +3867,9 @@ export const SCENARIOS: Scenario[] = [
       ["session", "status", "--json"],
     ],
   },
-  // `session next` on the same gone project reports the marker post's own
-  // refusal rather than the project read's, and keeps the attachment.
+  // `session next` on the same gone project reads the task for the project
+  // its field lives on, and that read's refusal is what --strict reports;
+  // the attachment stays either way.
   {
     name: "session next on a task whose project is gone",
     env: { KANEO_SESSION_ID: "sess-test" },
@@ -3837,10 +3881,12 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   // Any other failure of the marker keeps the attachment, so the close can be
-  // run again once the server answers.
+  // run again once the server answers. The custom-field routes answer as a
+  // server that predates them does, so the marker is what gets posted.
   {
     name: "session close keeps the attachment when the marker post fails",
     env: { KANEO_SESSION_ID: "sess-test" },
+    ...NO_FIELDS,
     failOn: "^POST /comment/task-a1$",
     failOnSkip: 1,
     steps: [
@@ -4033,9 +4079,96 @@ export const SCENARIOS: Scenario[] = [
       ["board", "-p", "BET", "--human"],
     ],
   },
+  // The whole flow on a server whose custom-field routes answer as they did
+  // before the routes existed: the hold is the comment marker it always was.
+  {
+    name: "session attach, next, close on a server without custom fields",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    ...NO_FIELDS,
+    steps: [
+      ["session", "attach", "1", "write", "tests", "--strict"],
+      ["session", "next", "ship", "--strict"],
+      ["board", "--json"],
+      ["session", "close", "--strict"],
+      ["board", "--json"],
+    ],
+  },
+  // A hold written before the field existed is a comment marker, and one
+  // written after is the field's: the board and task get show both, the field
+  // winning where a session is named in each, and releasing the field's hold
+  // leaves the marker's alone.
+  {
+    name: "session holds live in the field beside old markers",
+    env: { KANEO_SESSION_ID: "sess-here" },
+    seed: {
+      customFields: [{ projectId: P1, name: "kaneo-session", type: "text" }],
+      customFieldValues: [
+        {
+          taskId: "task-a1",
+          field: "kaneo-session",
+          value:
+            '[{"sessionId":"sess-field","host":"fieldhost","cwd":"/work/field","branch":"fb","nextStep":"field step","at":"2026-01-01T00:00:00Z"}]',
+        },
+      ],
+      comments: [
+        {
+          taskId: "task-a1",
+          content:
+            "<!-- kn:session id=sess-marker host=markerhost cwd=/work/marker branch=mb state=running enc=1 -->\nmarker step",
+        },
+      ],
+    },
+    steps: [
+      ["board", "--human"],
+      ["task", "get", "1", "--json"],
+      ["session", "close", "--session", "sess-field", "--task", "1", "--human"],
+      ["board", "--human"],
+    ],
+  },
+  // A value that is not the JSON holds are written as is refused rather than
+  // read as "no sessions": the board and task get would otherwise report a
+  // held task as free.
+  {
+    name: "session field value that is not JSON fails the readers",
+    seed: {
+      customFields: [{ projectId: P1, name: "kaneo-session", type: "text" }],
+      customFieldValues: [{ taskId: "task-a1", field: "kaneo-session", value: "not json" }],
+    },
+    steps: [
+      ["board", "--json"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  // The session field is a project's own: attaching on two projects makes one
+  // field in each rather than sharing a single definition.
+  {
+    name: "session attach creates a field per project",
+    env: { KANEO_SESSION_ID: "sess-xproj" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "attach", "BET#1", "--strict"],
+      ["board", "-p", "ALP", "--human"],
+      ["board", "-p", "BET", "--human"],
+    ],
+  },
+  // A field a person made under the session field's name but of another type
+  // cannot keep the JSON holds, so the attach refuses rather than overwrite it.
+  {
+    name: "session attach refuses a non-text session field",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    seed: {
+      customFields: [{ projectId: P1, name: "kaneo-session", type: "number" }],
+    },
+    steps: [
+      ["session", "attach", "1"],
+      ["session", "attach", "1", "--strict"],
+    ],
+  },
   // A task that moves keeps its id, and the session's attachment is a snapshot
   // from attach time: the move rewrites it, so status names the board and
-  // number the task has now rather than the ones it had then.
+  // number the task has now rather than the ones it had then. The hold moves
+  // with it: the field it lived in belonged to the old project, so the boards
+  // show the session on the new one alone.
   {
     name: "task move updates the session attachment",
     env: { KANEO_SESSION_ID: "sess-move" },
@@ -4044,6 +4177,8 @@ export const SCENARIOS: Scenario[] = [
       ["task", "move", "1", "--to", "BET", "--json"],
       ["session", "status", "--json"],
       ["session", "status", "--human"],
+      ["board", "-p", "ALP", "--human"],
+      ["board", "-p", "BET", "--human"],
     ],
   },
   // A record the Python implementation left in its own directory is migrated
@@ -4393,6 +4528,9 @@ export const SCENARIOS: Scenario[] = [
     name: "whitespace reply to the marker post",
     whitespaceOn: "^POST /comment/",
     env: { KANEO_SESSION_ID: "sess-ws" },
+    // The custom-field routes answer as a server that predates them does, so
+    // the marker post is what the whitespace reply breaks.
+    ...NO_FIELDS,
     config: { hooks: { attach: 'echo ran > "$HOME/hook-ran"' } },
     steps: [
       ["session", "attach", "1", "--strict"],

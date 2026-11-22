@@ -10,7 +10,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "#1 -> Main / ALP#4 Gamma first\nsessions in the old comments: none\n",
+      "stdout": "#1 -> Main / ALP#4 Gamma first\nsessions the old task held: none\n",
       "stderr": ""
     },
     {
@@ -91,6 +91,11 @@
     {
       "method": "GET",
       "path": "/task/task-g1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-gamma",
       "query": ""
     },
     {
@@ -178,6 +183,11 @@
     {
       "method": "GET",
       "path": "/task/task-g1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-gamma",
       "query": ""
     }
   ],

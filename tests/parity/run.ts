@@ -49,6 +49,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     assignedLimit: s.assignedLimit,
     failOn: s.failOn,
     failMessage: s.failMessage,
+    failures: s.failures,
     failOnQuery: s.failOnQuery,
     failStatus: s.failStatus,
     plainMember: s.plainMember,
@@ -113,7 +114,10 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
 
     // The host name is replaced only where the CLI writes it, a marker's host=
     // field and a stored attachment's "host", so a short name such as "ci"
-    // cannot rewrite the same letters inside an id or a title.
+    // cannot rewrite the same letters inside an id or a title. A request body
+    // is recorded inside the requests' own JSON, so a "host" inside one — the
+    // session field's hold list — arrives with its quotes escaped, and the
+    // escaped spellings are replaced the same way.
     const host = hostname();
     const normalize = (text: string) =>
       text
@@ -123,6 +127,8 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
         .replaceAll(`@${host} `, "@<HOST> ")
         .replaceAll(`"host": "${host}"`, `"host": "<HOST>"`)
         .replaceAll(`"host":"${host}"`, `"host":"<HOST>"`)
+        .replaceAll(`\\"host\\": \\"${host}\\"`, `\\"host\\": \\"<HOST>\\"`)
+        .replaceAll(`\\"host\\":\\"${host}\\"`, `\\"host\\":\\"<HOST>\\"`)
         // The CLI stamps its hook log and the attach history with the wall
         // clock, and `session status` prints the history back out. Only the
         // moment varies between runs; the zone is kept, because whether a stamp

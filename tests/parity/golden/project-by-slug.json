@@ -182,6 +182,11 @@
     },
     {
       "method": "GET",
+      "path": "/custom-field/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/comment/task-b1",
       "query": ""
     },

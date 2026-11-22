@@ -29,8 +29,8 @@
         "close"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"released ALP#1 Write the parser here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written\"\n}\n",
-      "stderr": "Error: released ALP#1 Write the parser here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written\n"
+      "stdout": "{\n  \"error\": \"released ALP#1 Write the parser here, but the server can no longer place its task (deleted, or out of this key's reach), so its hold was not ended there\"\n}\n",
+      "stderr": "Error: released ALP#1 Write the parser here, but the server can no longer place its task (deleted, or out of this key's reach), so its hold was not ended there\n"
     },
     {
       "args": [
@@ -65,16 +65,39 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
-      "path": "/comment/task-a1",
+      "path": "/custom-field",
       "query": "",
       "body": {
-        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+        "projectId": "proj-alpha",
+        "name": "kaneo-session",
+        "type": "text",
+        "required": false
       }
     },
     {
       "method": "GET",
-      "path": "/comment/task-a1",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "fieldId": "fld0001",
+        "value": "[{\"sessionId\":\"sess-test\",\"host\":\"<HOST>\",\"cwd\":\"<HOME>/work\",\"branch\":\"\",\"nextStep\":\"\",\"at\":\"<TIME>Z\"}]"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
       "query": ""
     },
     {
@@ -118,12 +141,9 @@
       "query": ""
     },
     {
-      "method": "POST",
-      "path": "/comment/task-a1",
-      "query": "",
-      "body": {
-        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-test`."
-      }
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
     }
   ],
   "files": {

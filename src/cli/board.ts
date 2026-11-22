@@ -7,12 +7,14 @@ import {
   getBoard,
   getProject,
   listComments,
+  listProjectFieldValues,
   projectTasks,
   type Task,
 } from "../api/kaneo";
 import { noArgs, type RunContext } from "./args";
 import { withProject } from "./lookup";
-import { holding, shortId } from "../session/marker";
+import { shortId } from "../session/marker";
+import { decodeHolds, mergeHolds, pickSessionField, projectFields, type SessionHold } from "../session/holds";
 
 // One session's record on a task, as the board reports it. nextStep is left out
 // when there is none, the way an attachment leaves out what it does not know.
@@ -123,7 +125,7 @@ const buildBoard = async (id: string): Promise<Report> => {
   // session holding one is still holding a task. The board's own open/done
   // split above stays the columns' view — an off-board task is reported under
   // Sessions, not as an open task.
-  const sessions = await collectSessions(projectTasks(board));
+  const sessions = await collectSessions(projectTasks(board), id);
   return { project: board.projectName, open, doneCount: done, sessions };
 };
 
@@ -143,14 +145,35 @@ const printBoard = (app: App, report: Report): void => {
   }
 };
 
-// Reads every listed task's comments for session markers: one listing per
-// task the board answered, done and archived ones included. A marker lives in
-// a task's comments and the listing carries no word of them, so there is no
-// cheaper way to learn which tasks sessions hold — and a done task can still
-// carry a stale hold, which is the one worth reporting. A task whose comments
-// cannot be read fails the board: skipping it would report the session holding
-// that task as not attached anywhere.
-const collectSessions = async (tasks: Task[]): Promise<BoardSession[]> => {
+// Reads every listed task's sessions: the project's session field is asked
+// for once for the whole board — its holds are the new storage — and each
+// task's comments for the markers written before the field existed. A hold
+// lives in a task's field or comments and the listing carries no word of
+// either, so there is no cheaper way to learn which tasks sessions hold — and
+// a done task can still carry a stale hold, which is the one worth reporting.
+// A task whose comments cannot be read, or a field value that is not the JSON
+// holds are written as, fails the board: skipping it would report the session
+// holding that task as not attached anywhere.
+const collectSessions = async (tasks: Task[], projectId: string): Promise<BoardSession[]> => {
+  // The session field's holds for every task at once, keyed by task id. A
+  // project with no field — or a server without custom fields — has none to
+  // read, and the markers alone answer.
+  const holdsByTask = new Map<string, SessionHold[]>();
+  const fields = await projectFields(projectId);
+  const field = fields === undefined ? undefined : pickSessionField(fields, projectId);
+  if (field !== undefined) {
+    for (const value of await listProjectFieldValues(projectId)) {
+      if (value.fieldId !== field.id || value.value === null || value.value.trim() === "") continue;
+      let holds;
+      try {
+        holds = decodeHolds(value.value);
+      } catch (e) {
+        throw new Error(`session field on task ${value.taskId}: ${(e as Error).message}`);
+      }
+      if (holds.length > 0) holdsByTask.set(value.taskId, holds);
+    }
+  }
+
   const out: BoardSession[] = [];
   for (const task of tasks) {
     let comments;
@@ -159,7 +182,7 @@ const collectSessions = async (tasks: Task[]): Promise<BoardSession[]> => {
     } catch (e) {
       throw new Error(`comments for #${task.number}: ${(e as Error).message}`);
     }
-    for (const marker of holding(comments)) {
+    for (const marker of mergeHolds(holdsByTask.get(task.id) ?? [], comments)) {
       out.push({
         taskNumber: task.number,
         taskTitle: task.title,

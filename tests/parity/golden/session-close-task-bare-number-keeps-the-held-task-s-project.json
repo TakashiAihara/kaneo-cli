@@ -76,16 +76,39 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/custom-field/project/proj-beta",
+      "query": ""
+    },
+    {
       "method": "POST",
-      "path": "/comment/task-b1",
+      "path": "/custom-field",
       "query": "",
       "body": {
-        "content": "<!-- kn:session id=sess-xproj host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+        "projectId": "proj-beta",
+        "name": "kaneo-session",
+        "type": "text",
+        "required": false
       }
     },
     {
       "method": "GET",
-      "path": "/comment/task-b1",
+      "path": "/custom-field/task/task-b1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-b1",
+        "fieldId": "fld0001",
+        "value": "[{\"sessionId\":\"sess-xproj\",\"host\":\"<HOST>\",\"cwd\":\"<HOME>/work\",\"branch\":\"\",\"nextStep\":\"\",\"at\":\"<TIME>Z\"}]"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-b1",
       "query": ""
     },
     {
@@ -94,16 +117,38 @@
       "query": ""
     },
     {
-      "method": "POST",
-      "path": "/comment/task-b1",
-      "query": "",
-      "body": {
-        "content": "<!-- kn:session id=sess-xproj host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-xproj`."
-      }
+      "method": "GET",
+      "path": "/task/task-b1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-b1",
+      "query": ""
     },
     {
       "method": "GET",
       "path": "/comment/task-b1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-b1",
+        "fieldId": "fld0001",
+        "value": "[]"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-b1",
       "query": ""
     }
   ],

@@ -134,7 +134,9 @@ export const upgrade = async (opts: UpgradeOptions): Promise<UpgradeResult> => {
   const name = archiveName(opts.os ?? process.platform, opts.arch ?? process.arch);
   const pin = (opts.version ?? "").trim();
   const tag = pin === "" ? await latestTag(opts.latestUrl ?? LATEST_URL, fetchFn) : pin;
-  const base = (opts.releaseBase ?? RELEASE_BASE).replace(/\/+$/, "");
+  // "" means unset the way install.sh's ${KANEO_RELEASE_BASE:-...} does; ??
+  // alone would keep it and fetch a relative URL.
+  const base = (opts.releaseBase || RELEASE_BASE).replace(/\/+$/, "");
 
   // The tag carries the release's v prefix and the binary does not, so the
   // comparison strips it rather than comparing the two spellings.
@@ -213,7 +215,7 @@ export const upgradeCommand = {
       // elsewhere) updates the file every link points at, not the link.
       target: realpathSync(process.execPath),
       version: process.env.KANEO_VERSION ?? "",
-      releaseBase: process.env.KANEO_RELEASE_BASE ?? "",
+      releaseBase: process.env.KANEO_RELEASE_BASE || undefined,
       log: (line) => app.out.status(line),
     });
     const data: Json = result.upgraded

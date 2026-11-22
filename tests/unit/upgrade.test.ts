@@ -133,6 +133,32 @@ describe("upgrade", () => {
     expect(versionOf(target)).toBe("kaneo version 9.9.9");
   });
 
+  test("an empty releaseBase uses the default download URL", async () => {
+    const dir = scratch();
+    const target = fakeBinary(dir, "1.0.0");
+    const { archive, sums } = fixtureRelease(dir);
+    // An empty releaseBase means unset, the way install.sh's
+    // ${KANEO_RELEASE_BASE:-...} treats it; the default must be the GitHub
+    // releases base, not a relative URL.
+    const urls: string[] = [];
+    const fetchFn = (async (input: string | URL | Request): Promise<Response> => {
+      const url = String(input);
+      urls.push(url);
+      if (url.endsWith(".tar.gz")) return new Response(archive.bytes);
+      if (url.endsWith("checksums.txt")) return new Response(sums);
+      return new Response("not found", { status: 404 });
+    }) as typeof fetch;
+
+    const result = await upgrade({ ...OPTS, target, version: "v9.9.9", releaseBase: "", fetchFn });
+
+    expect(result.upgraded).toBe(true);
+    expect(urls).toEqual([
+      "https://github.com/TakashiAihara/kaneo-cli/releases/download/v9.9.9/kaneo_linux_amd64.tar.gz",
+      "https://github.com/TakashiAihara/kaneo-cli/releases/download/v9.9.9/checksums.txt",
+    ]);
+    expect(versionOf(target)).toBe("kaneo version 9.9.9");
+  });
+
   test("does nothing when the binary already runs the resolved release", async () => {
     const dir = scratch();
     const target = fakeBinary(dir, "9.9.9");

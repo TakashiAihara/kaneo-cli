@@ -1,0 +1,95 @@
+{
+  "steps": [
+    {
+      "args": [
+        "board",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"project\": \"Alpha\",\n    \"open\": [\n      {\n        \"id\": \"task-a1\",\n        \"number\": 1,\n        \"title\": \"Write the parser\",\n        \"description\": \"multi\\nline\",\n        \"status\": \"to-do\",\n        \"priority\": \"high\",\n        \"position\": 0,\n        \"projectId\": \"proj-alpha\",\n        \"assigneeId\": null,\n        \"assigneeName\": null,\n        \"startDate\": null,\n        \"dueDate\": null,\n        \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n        \"labels\": []\n      },\n      {\n        \"id\": \"task-a2\",\n        \"number\": 2,\n        \"title\": \"Ship it\",\n        \"description\": \"\",\n        \"status\": \"in-progress\",\n        \"priority\": \"no-priority\",\n        \"position\": 1,\n        \"projectId\": \"proj-alpha\",\n        \"assigneeId\": \"user-1\",\n        \"assigneeName\": \"Ada\",\n        \"startDate\": null,\n        \"dueDate\": null,\n        \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n        \"labels\": []\n      }\n    ],\n    \"doneCount\": 1,\n    \"sessions\": [\n      {\n        \"taskNumber\": 4,\n        \"taskTitle\": \"Planned held\",\n        \"sessionId\": \"sess-planned\",\n        \"host\": \"h1\",\n        \"branch\": \"b\",\n        \"cwd\": \"/w\",\n        \"nextStep\": \"next\"\n      },\n      {\n        \"taskNumber\": 5,\n        \"taskTitle\": \"Archived held\",\n        \"sessionId\": \"sess-arch\",\n        \"host\": \"h2\",\n        \"branch\": \"b\",\n        \"cwd\": \"/w\",\n        \"nextStep\": \"next\"\n      }\n    ]\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "board",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Alpha (open 2 / done 1)\n- [high] #1 Write the parser (to-do)\n- [no-priority] #2 Ship it (in-progress)\n\n### Sessions holding a task\n- #4 Planned held — session sess-pla @h1 branch=b\n  - next: next\n- #5 Archived held — session sess-arc @h2 branch=b\n  - next: next\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a3",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-p1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-arch1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a3",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-p1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-arch1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

@@ -222,3 +222,7 @@ export const holding = (comments: { content: string; createdAt: string }[]): Mar
   running(
     latestPerSession(comments.map((c) => parse(c.content, c.createdAt)).filter((marker) => marker !== undefined)),
   );
+
+// A session id as a line names it: long enough to tell sessions apart in a
+// listing, short enough not to wrap the line it sits on.
+export const shortId = (id: string): string => (id.length > 8 ? id.slice(0, 8) : id);

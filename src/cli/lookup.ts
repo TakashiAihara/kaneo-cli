@@ -242,10 +242,16 @@ export const slugOr = (slug: string, fallback: string): string => (slug === "" ?
 // A task named the way a task reference writes it: <slug>#<number>, or the
 // project's id in the slug's place when no lookup found one. Either names the
 // board the task is on, so a command a hint suggests resolves there rather
-// than in whatever project the reader has configured — which is all a bare
-// number can say, and what this still is when neither is known.
-export const taskRef = (slug: string | undefined, number: number, projectId?: string): string =>
-  `${slugOr(slug ?? "", projectId ?? "")}#${number}`;
+// than in whatever project the reader has configured.
+//
+// When neither is known — a record written before the board fields existed —
+// the task's id is the only name that still resolves: a bare #N would read as
+// the current project's task, which is how a close hint once closed the wrong
+// board's task of the same number. Callers without the id keep the bare #N.
+export const taskRef = (slug: string | undefined, number: number | string, projectId?: string, taskId?: string): string => {
+  const board = slugOr(slug ?? "", projectId ?? "");
+  return board === "" ? (taskId ?? `#${number}`) : `${board}#${number}`;
+};
 
 // For a task number whose project is named by a workspace's name, in a
 // reference (`Private#6`) or by -p with a bare number: task numbers are per

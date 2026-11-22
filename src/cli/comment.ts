@@ -77,7 +77,7 @@ export const commentCommand = {
         const task = await resolveTask(app, args[0]!, slugs);
         const comment = await afterWrite(
           `commented on #${task.number}`,
-          `\`kaneo comment ls ${shellWord(taskRef(slugs.get(task.projectId), task.number, task.projectId))}\` shows it`,
+          `\`kaneo comment ls ${shellWord(taskRef(slugs.get(task.projectId), task.number, task.projectId, task.id))}\` shows it`,
           addComment(task.id, content),
         );
         app.out.human(`commented on #${task.number}`);

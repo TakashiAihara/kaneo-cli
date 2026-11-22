@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { appendFileSync, closeSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { devinSessionId } from "./devin";
@@ -116,7 +116,16 @@ const read = (file: string): Read => {
     return (e as { code?: string }).code === "ENOENT" ? { kind: "missing" } : { kind: "unusable" };
   }
   try {
-    return { kind: "read", attachment: JSON.parse(text) as Attachment };
+    const parsed: unknown = JSON.parse(text);
+    // Valid JSON that is not an attachment is as unusable as a broken file:
+    // "null" or "3" would be reported as a held task that is not one. The one
+    // field every reader indexes the record by is the task id, so a record
+    // without it cannot be acted on either — the same bar readHistory sets for
+    // a line it cannot use.
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return { kind: "unusable" };
+    const attachment = parsed as Attachment;
+    if (typeof attachment.taskId !== "string" || attachment.taskId === "") return { kind: "unusable" };
+    return { kind: "read", attachment };
   } catch {
     return { kind: "unusable" };
   }
@@ -142,6 +151,61 @@ export const load = (store: Store, sessionId: string): Attachment | undefined =>
 export const clear = (store: Store, sessionId: string): void => {
   if (!validSessionId(sessionId)) return;
   for (const dir of [store.dir, ...store.legacyDirs]) rmSync(at(dir, sessionId), { force: true });
+};
+
+// Runs update against every stored attachment that names taskId, in this
+// store and the legacy ones, and answers how many were rewritten.
+//
+// The attachment is a snapshot taken at attach time, so a fact the task
+// carries now — its number and project after a move — is stale in it until
+// something writes the new one back. This is that write, for the one caller
+// that knows the task changed: `task move`. History lines are left alone,
+// being the record of what was known then rather than what is held now.
+//
+// A record found only in a legacy directory is moved here by the rewrite —
+// save writes this store — and its legacy copy is removed: left behind, it
+// would keep the pre-move snapshot for the implementation that reads that
+// directory, and its close would remove only its own copy while this one went
+// on reporting a hold that had ended. A record already here has the same
+// stale copy removed, the current record being the authoritative one.
+//
+// A record that cannot be read is skipped rather than failing the sweep: it
+// names no task this can act on, and load() already refuses it everywhere
+// else. A save that fails propagates, since the caller decides whether the
+// sweep it ran is worth reporting.
+export const updateForTask = async (
+  store: Store,
+  taskId: string,
+  update: (attachment: Attachment) => void | Promise<void>,
+): Promise<number> => {
+  const ids = new Set<string>();
+  for (const dir of [store.dir, ...store.legacyDirs]) {
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      // "*.json" is the attachment; ".history.jsonl" and the ".tmp" files a
+      // save writes aside do not end in it.
+      if (name.endsWith(".json")) ids.add(name.slice(0, -".json".length));
+    }
+  }
+  let updated = 0;
+  for (const id of ids) {
+    const held = load(store, id);
+    if (held === undefined || held.taskId !== taskId) continue;
+    await update(held);
+    save(store, id, held);
+    for (const dir of store.legacyDirs) {
+      // A legacy dir that is the store's own is not another copy.
+      if (dir === store.dir) continue;
+      rmSync(at(dir, id), { force: true });
+    }
+    updated++;
+  }
+  return updated;
 };
 
 const historyAt = (dir: string, sessionId: string): string => join(dir, `${sessionId}.history.jsonl`);

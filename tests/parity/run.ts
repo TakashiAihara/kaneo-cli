@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { startFake, type Recorded } from "./fake";
 import { P1, SEED, WS, type Scenario } from "./scenarios";
 
@@ -33,6 +33,9 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     whitespaceOn: s.whitespaceOn,
     growOnPage: s.growOnPage,
     growTimes: s.growTimes,
+    promoteOnPage: s.promoteOnPage,
+    promoteTaskId: s.promoteTaskId,
+    promoteTimes: s.promoteTimes,
     ignoreFilters: s.ignoreFilters,
     assignedLimit: s.assignedLimit,
     failOn: s.failOn,
@@ -61,6 +64,12 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     const cwd = join(home, "work");
     mkdirSync(cwd);
     for (const [name, data] of Object.entries(s.files ?? {})) writeFileSync(join(cwd, name), data);
+    for (const dir of s.homeDirs ?? []) mkdirSync(join(home, dir), { recursive: true });
+    for (const [name, data] of Object.entries(s.homeFiles ?? {})) {
+      const path = join(home, name);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, data);
+    }
     if (s.local !== undefined) writeFileSync(join(home, ".kaneo.json"), JSON.stringify(s.local));
     if (s.repo !== undefined) {
       for (const args of [["init", "-q"], ["remote", "add", "origin", `git@github.com:${s.repo}.git`]]) {

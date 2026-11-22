@@ -168,7 +168,10 @@ const columns = (todo: unknown[]) => [
 // The board is paged twice over: task pages, and within each, related pages
 // that repeat the same tasks with the next labels. Every page of both is read,
 // a task repeated on a related page gains its labels, and a task repeated on a
-// later task page is kept once.
+// later task page is kept once — and marks the board as moved, since the
+// listing's pages are disjoint slices of one order, so the read is taken again.
+// This board never settles, so the listing is reported on stderr and the last
+// read's board, deduplicated, is what the caller gets.
 test("TestGetBoardReadsEveryPage", async () => {
   const queries: string[] = [];
   newServer((req) => {
@@ -192,10 +195,21 @@ test("TestGetBoardReadsEveryPage", async () => {
     return new Response(reply, { headers: { "content-type": "application/json" } });
   });
 
-  const b = await api.getBoard("p1");
-  // The first request asks for no page: a pre-v2.26.0 server starts paging,
-  // unstably, as soon as one is named.
-  expect(queries.join("|")).toBe("|relatedPage=2|page=2");
+  const stderr = spyOn(console, "error").mockImplementation(() => {});
+  let lines: string[];
+  let b: api.Board;
+  try {
+    b = await api.getBoard("p1");
+    lines = stderr.mock.calls.map((c) => String(c[0]));
+  } finally {
+    stderr.mockRestore();
+  }
+  // Each pass asks for no page first: a pre-v2.26.0 server starts paging,
+  // unstably, as soon as one is named. The repeat on page 2 marks every pass
+  // as a board that moved, so the read is taken again until the rereads run
+  // out — three passes in all.
+  expect(queries.join("|")).toBe("|relatedPage=2|page=2||relatedPage=2|page=2||relatedPage=2|page=2");
+  expect(lines).toEqual(["kaneo: the board of project p1 changed while it was read; the listing may be incomplete"]);
   expect(b.columns.map((c) => c.id)).toEqual(["to-do", "done"]);
   const todo = b.columns[0]!.tasks;
   expect(todo.map((t) => t.id)).toEqual(["t1", "t2", "t3"]);
@@ -2687,7 +2701,9 @@ test("authSession answers null for a signed-out reply and drops the token", asyn
   expect(JSON.stringify(session)).not.toContain("sekrit");
 });
 
-const publicPage = (tasks: unknown[], page: number, totalPages: number) =>
+// total is the whole board's count, not the page's: the listing reports it on
+// every page, and a read compares the distinct tasks it met against it.
+const publicPage = (tasks: unknown[], page: number, totalPages: number, total: number) =>
   JSON.stringify({
     id: "proj-pub",
     name: "Pub",
@@ -2701,7 +2717,7 @@ const publicPage = (tasks: unknown[], page: number, totalPages: number) =>
     archivedTasks: [],
     plannedTasks: [],
     pagination: {
-      total: tasks.length,
+      total,
       page,
       pageSize: 1,
       totalPages,
@@ -2740,7 +2756,7 @@ test("getPublicBoard reads every page and merges the tasks in order", async () =
     queries.push(url.search);
     const page = Number(url.searchParams.get("page") ?? "1");
     const tasks = page === 1 ? [pubTask("t1", 1, "first")] : [pubTask("t2", 2, "second")];
-    return Response.json(JSON.parse(publicPage(tasks, page, 2)));
+    return Response.json(JSON.parse(publicPage(tasks, page, 2, 2)));
   });
   const board = await api.getPublicBoard("proj-pub", { limit: 1 });
   expect(queries).toEqual(["?page=1&relatedPage=1&limit=1", "?page=2&relatedPage=1&limit=1"]);
@@ -2837,7 +2853,7 @@ test("getPublicBoard rereads when relatedRevision moves between related pages", 
     const url = new URL(req.url);
     const related = Number(url.searchParams.get("relatedPage") ?? "1");
     reads.push(`related=${related}`);
-    const body = JSON.parse(publicPage([pubTask("t1", 1, "first")], 1, 1));
+    const body = JSON.parse(publicPage([pubTask("t1", 1, "first")], 1, 1, 1));
     body.pagination.relatedTotalPages = 2;
     // The first read sees the related rows change under it; the reread finds
     // them still, which is what ends the loop.
@@ -2859,7 +2875,7 @@ test("getPublicBoard does not reread when relatedRevision differs between task p
     const url = new URL(req.url);
     const page = Number(url.searchParams.get("page") ?? "1");
     reads.push(`page=${page}`);
-    const body = JSON.parse(publicPage([pubTask(`t${page}`, page, `task ${page}`)], page, 2));
+    const body = JSON.parse(publicPage([pubTask(`t${page}`, page, `task ${page}`)], page, 2, 2));
     body.pagination.relatedRevision = `rel-${page}`;
     return Response.json(body);
   });
@@ -2878,7 +2894,7 @@ test("getPublicBoard rereads when revision moves between task pages", async () =
     const url = new URL(req.url);
     const page = Number(url.searchParams.get("page") ?? "1");
     reads.push(`page=${page}`);
-    const body = JSON.parse(publicPage([pubTask(`t${page}`, page, `task ${page}`)], page, 2));
+    const body = JSON.parse(publicPage([pubTask(`t${page}`, page, `task ${page}`)], page, 2, 2));
     // The first read sees the board's revision move between its pages; the
     // reread finds it still, which is what ends the loop.
     body.pagination.revision = settled ? "r2" : `rev-${page}`;
@@ -2900,7 +2916,7 @@ test("getPublicBoard rereads when revision moves between related pages", async (
     const url = new URL(req.url);
     const related = Number(url.searchParams.get("relatedPage") ?? "1");
     reads.push(`related=${related}`);
-    const body = JSON.parse(publicPage([pubTask("t1", 1, "first")], 1, 1));
+    const body = JSON.parse(publicPage([pubTask("t1", 1, "first")], 1, 1, 1));
     body.pagination.relatedTotalPages = 2;
     body.pagination.revision = settled ? "r2" : related === 1 ? "r1" : "r2";
     if (related === 2) settled = true;
@@ -2929,7 +2945,7 @@ test("the anonymous reads never ask for or send the key", async () => {
       if (path === "/api/public-project/p1/description" || path === "/api/public-project/p1/task/t1/description") {
         return Response.json({ content: "", version: "1", nextOffset: null });
       }
-      if (path === "/api/public-project/p1") return Response.json(JSON.parse(publicPage([], 1, 1)));
+      if (path === "/api/public-project/p1") return Response.json(JSON.parse(publicPage([], 1, 1, 0)));
       if (path === "/api/user/avatar/av1") {
         return new Response(new Uint8Array([1, 2]), { headers: { "content-type": "image/webp" } });
       }
@@ -2959,7 +2975,7 @@ test("getPublicBoard sends every filter under its query name", async () => {
   const queries: string[] = [];
   newServer(async (req) => {
     queries.push(new URL(req.url).search);
-    return Response.json(JSON.parse(publicPage([], 1, 1)));
+    return Response.json(JSON.parse(publicPage([], 1, 1, 0)));
   });
   await api.getPublicBoard("proj-pub", {
     status: "done",

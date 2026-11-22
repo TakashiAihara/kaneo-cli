@@ -1,8 +1,8 @@
 import { apiKey, projects, type App } from "./app";
-import { archived, boardTasks, closedStatuses, deferredMark, getBoard, getProject, listComments, type Task } from "../api/kaneo";
+import { archived, boardTasks, closedStatuses, deferredMark, getBoard, getProject, listComments, projectTasks, type Task } from "../api/kaneo";
 import { noArgs, type RunContext } from "./args";
 import { withProject } from "./lookup";
-import { holding } from "../session/marker";
+import { holding, shortId } from "../session/marker";
 
 // One session's record on a task, as the board reports it. nextStep is left out
 // when there is none, the way an attachment leaves out what it does not know.
@@ -108,9 +108,12 @@ const buildBoard = async (id: string): Promise<Report> => {
     open.push({ ...task, ...deferredMark(task) });
   }
 
-  // An empty board still owes a script its document, so it becomes a report with
-  // nothing in it rather than no report at all.
-  const sessions = open.length > 0 ? await collectSessions(open) : [];
+  // Sessions are read off every task the listing answered, the planned and
+  // archived ones included: `session attach` resolves those numbers too, so a
+  // session holding one is still holding a task. The board's own open/done
+  // split above stays the columns' view — an off-board task is reported under
+  // Sessions, not as an open task.
+  const sessions = await collectSessions(projectTasks(board));
   return { project: board.projectName, open, doneCount: done, sessions };
 };
 
@@ -124,13 +127,17 @@ const printBoard = (app: App, report: Report): void => {
   app.out.human("### Sessions holding a task");
   for (const session of report.sessions) {
     app.out.human(
-      `- #${session.taskNumber} ${session.taskTitle} — session ${short(session.sessionId)} @${session.host} branch=${session.branch}`,
+      `- #${session.taskNumber} ${session.taskTitle} — session ${shortId(session.sessionId)} @${session.host} branch=${session.branch}`,
     );
     if (session.nextStep !== undefined) app.out.human(`  - next: ${session.nextStep}`);
   }
 };
 
-// Reads each open task's comments for session markers. A task whose comments
+// Reads every listed task's comments for session markers: one listing per
+// task the board answered, done and archived ones included. A marker lives in
+// a task's comments and the listing carries no word of them, so there is no
+// cheaper way to learn which tasks sessions hold — and a done task can still
+// carry a stale hold, which is the one worth reporting. A task whose comments
 // cannot be read fails the board: skipping it would report the session holding
 // that task as not attached anywhere.
 const collectSessions = async (tasks: Task[]): Promise<BoardSession[]> => {
@@ -156,7 +163,3 @@ const collectSessions = async (tasks: Task[]): Promise<BoardSession[]> => {
   }
   return out;
 };
-
-// A session id is long and only its start is recognisable, which is what a
-// reader needs to tell two apart on one line.
-const short = (id: string): string => (id.length > 8 ? id.slice(0, 8) : id);

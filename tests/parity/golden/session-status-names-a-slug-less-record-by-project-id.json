@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "status",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "attached: proj-alpha#1 Write the parser\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "status",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"sessionId\": \"sess-old\",\n  \"attached\": {\n    \"taskId\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"projectId\": \"proj-alpha\"\n  },\n  \"history\": []\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [],
+  "files": {
+    ".config/kaneo/sessions/sess-old.json": "{\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\"}"
+  }
+}

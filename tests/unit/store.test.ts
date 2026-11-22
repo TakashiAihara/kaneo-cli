@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { appendHistory, clear, currentId, load, readHistory, save, type Attachment, type Store } from "../../src/session/store";
+import { appendHistory, clear, currentId, load, readHistory, save, updateForTask, type Attachment, type Store } from "../../src/session/store";
 
 // Ported from the Go build's internal/session/store_test.go.
 
@@ -119,12 +119,85 @@ describe("store", () => {
     expect(load(store, "s1")).toBeUndefined();
   });
 
+  // Valid JSON that is not an attachment is as unusable as a broken file:
+  // "null" or "3" would be reported as a held task that is not one, and a
+  // record with no task id names nothing a close could act on.
+  test("TestLoadRefusesJSONThatIsNotAnAttachment", () => {
+    const root = tmp();
+    const store: Store = { dir: join(root, "store"), legacyDirs: [] };
+    mkdirSync(store.dir, { recursive: true });
+    for (const [name, body] of [
+      ["nil", "null"],
+      ["num", "3"],
+      ["arr", "[]"],
+      ["str", '"task"'],
+      ["noTask", '{"number":1,"title":"x"}'],
+      ["emptyTask", '{"taskId":""}'],
+    ] as const) {
+      writeFileSync(join(store.dir, `${name}.json`), body);
+      expect(load(store, name), `${name} loaded`).toBeUndefined();
+    }
+  });
+
   test("TestLoadFallsBackToLegacyWhenNothingIsRecorded", () => {
     const root = tmp();
     const store: Store = { dir: join(root, "current"), legacyDirs: [join(root, "legacy")] };
     mkdirSync(store.legacyDirs[0]!, { recursive: true });
     writeFileSync(join(store.legacyDirs[0]!, "s1.json"), '{"taskId":"from-legacy","number":7}');
     expect(load(store, "s1")?.taskId).toBe("from-legacy");
+  });
+
+  // The attachment is a snapshot from attach time; a task move is what makes
+  // its project and number stale, and every record naming the task is rewritten
+  // where it is read — this store and the legacy ones.
+  test("TestUpdateForTaskRewritesOnlyRecordsNamingTheTask", async () => {
+    const root = tmp();
+    const store: Store = { dir: join(root, "store"), legacyDirs: [join(root, "legacy")] };
+    mkdirSync(store.legacyDirs[0]!, { recursive: true });
+    save(store, "s1", { taskId: "t1", number: 1, title: "x" });
+    save(store, "s2", { taskId: "t2", number: 2, title: "y" });
+    writeFileSync(join(store.legacyDirs[0]!, "s3.json"), '{"taskId":"t1","number":9,"title":"old"}');
+    writeFileSync(join(store.dir, "bad.json"), "null");
+
+    const updated = await updateForTask(store, "t1", (held) => {
+      held.number = 5;
+      held.projectId = "p2";
+    });
+
+    expect(updated).toBe(2);
+    expect(load(store, "s1")).toEqual({ taskId: "t1", number: 5, title: "x", projectId: "p2" });
+    expect(load(store, "s3")).toEqual({ taskId: "t1", number: 5, title: "old", projectId: "p2" });
+    expect(load(store, "s2")).toEqual({ taskId: "t2", number: 2, title: "y" });
+    expect(load(store, "bad")).toBeUndefined();
+  });
+
+  // The sweep migrates a legacy-only record into this store, so the legacy
+  // copy has to go with it: left behind, it keeps the pre-move snapshot for
+  // the implementation that owns that directory, and its close removes only
+  // its own copy while the migrated one goes on reporting the hold. A record
+  // already here loses its legacy shadow the same way — the current record is
+  // the authoritative one — while a legacy record naming another task is not
+  // the sweep's to touch.
+  test("TestUpdateForTaskRemovesTheLegacyCopyItMigrates", async () => {
+    const root = tmp();
+    const store: Store = { dir: join(root, "store"), legacyDirs: [join(root, "legacy")] };
+    mkdirSync(store.legacyDirs[0]!, { recursive: true });
+    writeFileSync(join(store.legacyDirs[0]!, "s1.json"), '{"taskId":"t1","number":9,"title":"old"}');
+    save(store, "s2", { taskId: "t1", number: 1, title: "x" });
+    writeFileSync(join(store.legacyDirs[0]!, "s2.json"), '{"taskId":"t1","number":8,"title":"stale"}');
+    writeFileSync(join(store.legacyDirs[0]!, "s3.json"), '{"taskId":"t2","number":3,"title":"other"}');
+
+    const updated = await updateForTask(store, "t1", (held) => {
+      held.number = 5;
+    });
+
+    expect(updated).toBe(2);
+    expect(load(store, "s1")).toEqual({ taskId: "t1", number: 5, title: "old" });
+    expect(load(store, "s2")).toEqual({ taskId: "t1", number: 5, title: "x" });
+    expect(existsSync(join(store.legacyDirs[0]!, "s1.json")), "legacy-only record was not migrated out").toBe(false);
+    expect(existsSync(join(store.legacyDirs[0]!, "s2.json")), "stale legacy shadow was left behind").toBe(false);
+    expect(existsSync(join(store.legacyDirs[0]!, "s3.json")), "a record naming another task was removed").toBe(true);
+    expect(load(store, "s3")).toEqual({ taskId: "t2", number: 3, title: "other" });
   });
 
   // Files written before the project fields existed must still load, and a

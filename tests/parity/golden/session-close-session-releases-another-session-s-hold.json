@@ -1,0 +1,169 @@
+{
+  "steps": [
+    {
+      "args": [
+        "board",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Alpha (open 2 / done 1)\n- [high] #1 Write the parser (to-do)\n- [no-priority] #2 Ship it (in-progress)\n\n### Sessions holding a task\n- #1 Write the parser — session sess-gon @oldhost branch=main\n  - next: next step\n- #2 Ship it — session sess-gon @oldhost branch=main\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "close",
+        "--session",
+        "sess-gone",
+        "--task",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "released: session sess-gon on ALP#1 Write the parser\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "close",
+        "--session",
+        "sess-gone2",
+        "--task",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"number\": 2,\n  \"session\": \"sess-gone2\",\n  \"taskId\": \"task-a2\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "board",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Alpha (open 2 / done 1)\n- [high] #1 Write the parser (to-do)\n- [no-priority] #2 Ship it (in-progress)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a3",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-gone host=- cwd=- branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-gone`."
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a2",
+      "query": "",
+      "body": {
+        "content": "<!-- kn:session id=sess-gone2 host=- cwd=- branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-gone2`."
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a3",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

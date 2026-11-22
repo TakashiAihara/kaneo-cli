@@ -171,6 +171,35 @@ describe("store", () => {
     expect(load(store, "bad")).toBeUndefined();
   });
 
+  // The sweep migrates a legacy-only record into this store, so the legacy
+  // copy has to go with it: left behind, it keeps the pre-move snapshot for
+  // the implementation that owns that directory, and its close removes only
+  // its own copy while the migrated one goes on reporting the hold. A record
+  // already here loses its legacy shadow the same way — the current record is
+  // the authoritative one — while a legacy record naming another task is not
+  // the sweep's to touch.
+  test("TestUpdateForTaskRemovesTheLegacyCopyItMigrates", async () => {
+    const root = tmp();
+    const store: Store = { dir: join(root, "store"), legacyDirs: [join(root, "legacy")] };
+    mkdirSync(store.legacyDirs[0]!, { recursive: true });
+    writeFileSync(join(store.legacyDirs[0]!, "s1.json"), '{"taskId":"t1","number":9,"title":"old"}');
+    save(store, "s2", { taskId: "t1", number: 1, title: "x" });
+    writeFileSync(join(store.legacyDirs[0]!, "s2.json"), '{"taskId":"t1","number":8,"title":"stale"}');
+    writeFileSync(join(store.legacyDirs[0]!, "s3.json"), '{"taskId":"t2","number":3,"title":"other"}');
+
+    const updated = await updateForTask(store, "t1", (held) => {
+      held.number = 5;
+    });
+
+    expect(updated).toBe(2);
+    expect(load(store, "s1")).toEqual({ taskId: "t1", number: 5, title: "old" });
+    expect(load(store, "s2")).toEqual({ taskId: "t1", number: 5, title: "x" });
+    expect(existsSync(join(store.legacyDirs[0]!, "s1.json")), "legacy-only record was not migrated out").toBe(false);
+    expect(existsSync(join(store.legacyDirs[0]!, "s2.json")), "stale legacy shadow was left behind").toBe(false);
+    expect(existsSync(join(store.legacyDirs[0]!, "s3.json")), "a record naming another task was removed").toBe(true);
+    expect(load(store, "s3")).toEqual({ taskId: "t2", number: 3, title: "other" });
+  });
+
   // Files written before the project fields existed must still load, and a
   // record without a project must serialise exactly as it did before.
   test("TestStoreProjectFieldsAreAdditive", () => {

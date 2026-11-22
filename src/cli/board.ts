@@ -133,7 +133,11 @@ const printBoard = (app: App, report: Report): void => {
   }
 };
 
-// Reads each open task's comments for session markers. A task whose comments
+// Reads every listed task's comments for session markers: one listing per
+// task the board answered, done and archived ones included. A marker lives in
+// a task's comments and the listing carries no word of them, so there is no
+// cheaper way to learn which tasks sessions hold — and a done task can still
+// carry a stale hold, which is the one worth reporting. A task whose comments
 // cannot be read fails the board: skipping it would report the session holding
 // that task as not attached anywhere.
 const collectSessions = async (tasks: Task[]): Promise<BoardSession[]> => {

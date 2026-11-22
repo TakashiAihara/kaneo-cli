@@ -162,6 +162,13 @@ export const clear = (store: Store, sessionId: string): void => {
 // that knows the task changed: `task move`. History lines are left alone,
 // being the record of what was known then rather than what is held now.
 //
+// A record found only in a legacy directory is moved here by the rewrite —
+// save writes this store — and its legacy copy is removed: left behind, it
+// would keep the pre-move snapshot for the implementation that reads that
+// directory, and its close would remove only its own copy while this one went
+// on reporting a hold that had ended. A record already here has the same
+// stale copy removed, the current record being the authoritative one.
+//
 // A record that cannot be read is skipped rather than failing the sweep: it
 // names no task this can act on, and load() already refuses it everywhere
 // else. A save that fails propagates, since the caller decides whether the
@@ -191,6 +198,11 @@ export const updateForTask = async (
     if (held === undefined || held.taskId !== taskId) continue;
     await update(held);
     save(store, id, held);
+    for (const dir of store.legacyDirs) {
+      // A legacy dir that is the store's own is not another copy.
+      if (dir === store.dir) continue;
+      rmSync(at(dir, id), { force: true });
+    }
     updated++;
   }
   return updated;

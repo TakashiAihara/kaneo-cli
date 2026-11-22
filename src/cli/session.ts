@@ -97,11 +97,14 @@ export const sessionCommand = {
         "Without --task or --session, the task in this session's attachment is\n" +
         "closed: the one a plain `session attach` took, and the one whose\n" +
         "attachment file is then removed. With --task, that task is closed\n" +
-        "instead, as slug#number (the form `session status` prints), a number in\n" +
-        "the current project, or an id. That releases one of several a session\n" +
-        "may hold. The attachment is only removed when it is that task, so a\n" +
-        "session attached elsewhere stays attached there, and a task this\n" +
-        "session attached earlier can be closed with no attachment at all.\n\n" +
+        "instead, as slug#number (the form `session status` prints), a number,\n" +
+        "or an id. A bare number names the held task when the attachment\n" +
+        "carries its project — it wins over the current project's task of\n" +
+        "that number — and is read in the current project otherwise. That\n" +
+        "releases one of several a session may hold. The attachment is only\n" +
+        "removed when it is that task, so a session attached elsewhere stays\n" +
+        "attached there, and a task this session attached earlier can be\n" +
+        "closed with no attachment at all.\n\n" +
         "With --session <id>, the hold of another session is released instead:\n" +
         "a closed marker is posted for that session id on the task --task names.\n" +
         "This is the way to let go of a session whose host can no longer run the\n" +
@@ -273,13 +276,16 @@ export const sessionCommand = {
 // would then show the real hold as closed.
 const releaseHold = async (app: App, releasing: string, named: string): Promise<void> => {
   apiKey(app);
+  // The refusals here are hard errors rather than fail-open ones: --session is
+  // an explicitly manual release that no hook invokes, and a refusal that
+  // exited 0 would report a release that never ran.
   if (named === "") {
-    throw new Error("--session releases another session's hold, which this machine has no record of; name the task with --task");
+    throw hard("--session releases another session's hold, which this machine has no record of; name the task with --task");
   }
   // This session's own hold is what a plain close is for; releasing it by name
   // here would post a second marker for a hold about to be let go anyway.
   if (releasing === store.currentId(env)) {
-    throw new Error("--session names another session; this session's own hold is closed by a plain 'kaneo session close'");
+    throw hard("--session names another session; this session's own hold is closed by a plain 'kaneo session close'");
   }
   const slugs = new Map<string, string>();
   const task = await resolveTask(app, named, slugs);
@@ -289,7 +295,7 @@ const releaseHold = async (app: App, releasing: string, named: string): Promise<
 
   const comments = await listComments(task.id);
   if (!holding(comments).some((marker) => marker.sessionId === releasing)) {
-    throw new Error(`session ${releasing} is not holding ${reference}`);
+    throw hard(`session ${releasing} is not holding ${reference}`);
   }
 
   const marker: Marker = {
@@ -346,9 +352,10 @@ const targetTask = async (app: App, ref: string): Promise<{ taskId: string; numb
 
 // Whether a --task value names the held task in a form close can recognise
 // without asking the server: its id, its slug#number or slug-number (any case,
-// as the slug lookup reads it), or a bare number when it can only mean the held
-// task. Without a slug on record, `#N` is not matched: it would read as the
-// current project's task.
+// as the slug lookup reads it), or a bare number equal to the held one, which
+// the held task wins over the current project's task of that number. Without a
+// slug on record, `#N` is not matched: it would read as the current project's
+// task.
 const heldAs = (app: App, held: store.Attachment, named: string): boolean => {
   if (named === held.taskId) return true;
   const slug = held.projectSlug ?? "";
@@ -359,11 +366,12 @@ const heldAs = (app: App, held: store.Attachment, named: string): boolean => {
     if (lower === `${slug}-${held.number}`.toLowerCase()) return true;
   }
   if (!/^\d+$/.test(named) || Number(named) !== held.number) return false;
-  // A bare number names the held task whenever the attachment's project is
-  // known: resolving it would pick the current project's task of that number,
-  // a different task whenever the session works in another project. With no
-  // project on record the bare number can only mean the held one when no
-  // single project is configured to resolve it against.
+  // A bare number is ambiguous — the current project can hold a task of the
+  // same number — and the held task wins it whenever the attachment's project
+  // is known: resolving would pick the current project's task, a different
+  // one whenever the session works in another project. With no project on
+  // record the bare number means the held one only when no single project is
+  // configured to resolve it against.
   const pid = held.projectId ?? "";
   return pid !== "" || taskProject(app) === pid;
 };

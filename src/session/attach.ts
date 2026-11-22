@@ -63,7 +63,7 @@ export const attachTask = async (
     marker,
     task.number,
     "nothing is recorded here for it",
-    `\`kaneo session attach ${shellWord(taskRef(attachment.projectSlug, task.number, attachment.projectId))}\` records it here, and posts a second marker; \`kaneo session status\` shows what is held here`,
+    `\`kaneo session attach ${shellWord(taskRef(attachment.projectSlug, task.number, attachment.projectId, attachment.taskId))}\` records it here, and posts a second marker; \`kaneo session status\` shows what is held here`,
   );
   await confirmMarker(task.id, task.number, posted, format(marker), "hard");
   try {

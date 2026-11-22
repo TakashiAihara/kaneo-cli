@@ -2281,7 +2281,9 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   // The hold has to be there: a closed marker for a session that is not
-  // holding the task records an ending that never began.
+  // holding the task records an ending that never began. The refusal is
+  // reported without --strict too: --session is a manual release, and a
+  // refusal that exited 0 would report one that never ran.
   {
     name: "session close --session refuses a session not holding the task",
     env: { KANEO_SESSION_ID: "sess-here" },
@@ -2290,14 +2292,20 @@ export const SCENARIOS: Scenario[] = [
         { taskId: "task-a1", content: "<!-- kn:session id=sess-live host=h cwd=/w branch=b state=running enc=1 -->" },
       ],
     },
-    steps: [["session", "close", "--session", "sess-ghost", "--task", "1", "--strict"]],
+    steps: [
+      ["session", "close", "--session", "sess-ghost", "--task", "1"],
+      ["session", "close", "--session", "sess-ghost", "--task", "1", "--strict"],
+    ],
   },
   // --task names the task the hold is on; there is no attachment here to
   // default to.
   {
     name: "session close --session needs --task",
     env: { KANEO_SESSION_ID: "sess-here" },
-    steps: [["session", "close", "--session", "sess-gone", "--strict"]],
+    steps: [
+      ["session", "close", "--session", "sess-gone"],
+      ["session", "close", "--session", "sess-gone", "--strict"],
+    ],
   },
   // This session's own hold is a plain close's job; releasing it by name here
   // would post a second marker for a hold about to be let go anyway.
@@ -2306,6 +2314,7 @@ export const SCENARIOS: Scenario[] = [
     env: { KANEO_SESSION_ID: "sess-here" },
     steps: [
       ["session", "attach", "1", "--strict"],
+      ["session", "close", "--session", "sess-here", "--task", "1"],
       ["session", "close", "--session", "sess-here", "--task", "1", "--strict"],
       ["session", "status", "--json"],
     ],
@@ -2321,6 +2330,23 @@ export const SCENARIOS: Scenario[] = [
       ["task", "move", "1", "--to", "BET", "--json"],
       ["session", "status", "--json"],
       ["session", "status", "--human"],
+    ],
+  },
+  // A record the Python implementation left in its own directory is migrated
+  // by the move's rewrite: the attachment is saved where this CLI keeps
+  // records and the legacy copy is removed, since left behind it would keep
+  // the pre-move snapshot — and a close there would remove only its own copy
+  // while this one went on reporting the hold.
+  {
+    name: "task move migrates a legacy session record",
+    env: { KANEO_SESSION_ID: "sess-legacy" },
+    homeFiles: {
+      ".config/kn/sessions/sess-legacy.json": '{"taskId":"task-a1","number":1,"title":"Write the parser"}',
+    },
+    steps: [
+      ["session", "status", "--json"],
+      ["task", "move", "1", "--to", "BET", "--json"],
+      ["session", "status", "--json"],
     ],
   },
   ...both("board", ["board"]),
@@ -2392,6 +2418,8 @@ export const SCENARIOS: Scenario[] = [
     ["integration", "gitea"],
     ["integration", "gitea", "connect", "--help"],
     ["integration", "gitea", "import", "--help"],
+    // The close help is where the --task reference forms are written down.
+    ["session", "close", "--help"],
   ].map((args, i): Scenario => ({ name: `help ${i + 1}: ${args.join(" ")}`, steps: [args] })),
   { name: "unknown flag", steps: [["task", "ls", "--bogus"], ["task", "ls", "-x"], ["--bogus"]] },
   { name: "control characters in an unknown command", steps: [["\u0001"], ["a\u007fb"], ["tab\there"]] },

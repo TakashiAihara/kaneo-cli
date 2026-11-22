@@ -18,6 +18,19 @@
         "--session",
         "sess-here",
         "--task",
+        "1"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--session names another session; this session's own hold is closed by a plain 'kaneo session close'\"\n}\n",
+      "stderr": "Error: --session names another session; this session's own hold is closed by a plain 'kaneo session close'\n"
+    },
+    {
+      "args": [
+        "session",
+        "close",
+        "--session",
+        "sess-here",
+        "--task",
         "1",
         "--strict"
       ],

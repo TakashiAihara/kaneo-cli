@@ -4,11 +4,24 @@ import { nextTag } from "../../scripts/next-tag";
 import { decode, parse, STRING, stringMap } from "../../src/config/json";
 import { compact, type Json, line } from "../../src/output/json";
 
-// Built from code points: a raw U+2028 in this file would end the line for a
-// JavaScript parser.
+// Built from code points: no-irregular-whitespace refuses a raw U+2028 or
+// U+2029 in this file, inside a string too.
 const ESCAPED = ["<", ">", "&", String.fromCharCode(0x2028), String.fromCharCode(0x2029)];
 
-const hostile = fc.string({ unit: fc.constantFrom(...ESCAPED, '"', "\\", "\n", "\u0001", "a") });
+const CONTROLS = [0, 1, 8, 11, 12, 31, 127].map((code) => String.fromCharCode(code));
+
+const hostile = fc.string({ unit: fc.constantFrom(...ESCAPED, ...CONTROLS, '"', "\\", "\n", "a") });
+
+// What a hand-edited document is made of, valid or not.
+const SYNTAX = [...'{}[]",:\\ \n\t0123456789.-+eEtrufalsn/bx'];
+
+const outcome = (read: (text: string) => unknown, text: string): unknown => {
+  try {
+    return { value: read(text) };
+  } catch {
+    return "refused";
+  }
+};
 
 const json = fc.jsonValue() as fc.Arbitrary<Json>;
 
@@ -20,6 +33,20 @@ describe("config JSON parser", () => {
 
         expect(parse(text)).toEqual(JSON.parse(text));
       }),
+    );
+  });
+
+  test("accepts and refuses the same texts JSON.parse does", () => {
+    const damaged = fc
+      .jsonValue()
+      .map((value) => JSON.stringify(value))
+      .chain((text) => fc.nat(text.length).map((at) => text.slice(0, at) + text.slice(at + 1)));
+
+    fc.assert(
+      fc.property(fc.oneof(fc.string({ unit: fc.constantFrom(...SYNTAX) }), damaged), (text) => {
+        expect(outcome(parse, text)).toEqual(outcome(JSON.parse, text));
+      }),
+      { numRuns: 2000 },
     );
   });
 
@@ -76,8 +103,9 @@ describe("output JSON encoder", () => {
     expect(compact("a\nb\rc\td")).toBe('"a\\nb\\rc\\td"');
   });
 
-  test("indents nested values by two spaces and ends with one newline", () => {
+  test("indents nested values by two spaces, and writes no whitespace at all when compact", () => {
     expect(line({ a: [1, {}], b: [] })).toBe('{\n  "a": [\n    1,\n    {}\n  ],\n  "b": []\n}\n');
+    expect(compact({ a: [1, {}], b: [] })).toBe('{"a":[1,{}],"b":[]}');
   });
 
   test("a string keeps its content and never prints an HTML or line-terminator character raw", () => {

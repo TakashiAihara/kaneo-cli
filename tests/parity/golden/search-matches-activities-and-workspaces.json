@@ -1,0 +1,139 @@
+{
+  "steps": [
+    {
+      "args": [
+        "search",
+        "in-progress",
+        "--type",
+        "activities",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"in-progress\",\n  \"totalCount\": 1,\n  \"results\": [\n    {\n      \"id\": \"act0002\",\n      \"type\": \"activity\",\n      \"title\": \"status_changed on Write the parser\",\n      \"description\": null,\n      \"content\": \"changed status from To Do to In Progress\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"Self\",\n      \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "in-progress",
+        "--type",
+        "comments",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"in-progress\",\n  \"totalCount\": 0,\n  \"results\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "Write the parser",
+        "--type",
+        "activities",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"Write the parser\",\n  \"totalCount\": 3,\n  \"results\": [\n    {\n      \"id\": \"act0003\",\n      \"type\": \"activity\",\n      \"title\": \"task on Write the parser\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"Self\",\n      \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n      \"relevanceScore\": 1,\n      \"taskNumber\": 1,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    },\n    {\n      \"id\": \"act0002\",\n      \"type\": \"activity\",\n      \"title\": \"status_changed on Write the parser\",\n      \"description\": null,\n      \"content\": \"changed status from To Do to In Progress\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"Self\",\n      \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n      \"relevanceScore\": 1,\n      \"taskNumber\": 1,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    },\n    {\n      \"id\": \"cmt0001\",\n      \"type\": \"comment\",\n      \"title\": \"Comment on Write the parser\",\n      \"description\": null,\n      \"content\": \"first comment\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"Self\",\n      \"createdAt\": \"2026-01-01T00:00:08.000Z\",\n      \"relevanceScore\": 1,\n      \"taskNumber\": 1,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "other",
+        "--type",
+        "workspaces",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"other\",\n  \"totalCount\": 2,\n  \"results\": [\n    {\n      \"id\": \"ws-other\",\n      \"type\": \"workspace\",\n      \"title\": \"Other\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": null,\n      \"projectName\": null,\n      \"projectSlug\": null,\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": null,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "other",
+        "--type",
+        "workspaces",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace    Other\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "main",
+        "--type",
+        "workspaces",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"main\",\n  \"totalCount\": 2,\n  \"results\": [\n    {\n      \"id\": \"ws-main\",\n      \"type\": \"workspace\",\n      \"title\": \"Main\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": null,\n      \"projectName\": null,\n      \"projectSlug\": null,\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": null,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=in-progress&type=activities&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=in-progress&type=comments&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=Write+the+parser&type=activities&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=other&type=workspaces&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=other&type=workspaces&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?q=main&type=workspaces&workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

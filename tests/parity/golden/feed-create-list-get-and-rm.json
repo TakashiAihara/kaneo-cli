@@ -88,8 +88,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"POST /api/calendar-feed/project/proj-alpha: 400: Invalid key: timeZone: Invalid time zone\"\n}\n",
-      "stderr": "Error: POST /api/calendar-feed/project/proj-alpha: 400: Invalid key: timeZone: Invalid time zone\n"
+      "stdout": "{\n  \"error\": \"POST /api/calendar-feed/project/proj-alpha: 400: timeZone: Invalid time zone\"\n}\n",
+      "stderr": "Error: POST /api/calendar-feed/project/proj-alpha: 400: timeZone: Invalid time zone\n"
     },
     {
       "args": [

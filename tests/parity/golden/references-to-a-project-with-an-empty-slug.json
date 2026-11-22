@@ -41,7 +41,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "task  proj-noslug#1  Slugless  (to-do)\n",
+      "stdout": "task       Slugless  (to-do)\ncomment    Comment on Slugless\n",
       "stderr": ""
     },
     {

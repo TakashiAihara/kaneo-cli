@@ -1092,8 +1092,78 @@ export const SCENARIOS: Scenario[] = [
       ["search", "e", "--limit", "50", "--human"],
       ["search", "beta", "--type", "projects", "--human"],
       ["search", "e", "--limit", "2", "--human"],
+      // The server bounds limit to an integer 1–50 and answers a bad one
+      // with its validation text, which --all-workspaces never reaches
+      // because the CLI checks the bound itself first. --type tasks keeps the
+      // project listing out of these steps: the search's rejection ends the
+      // run while that listing is still in flight, so whether the fake saw it
+      // would be a race the golden cannot pin.
+      ["search", "x", "--limit", "0", "--type", "tasks", "--json"],
+      ["search", "x", "--limit", "1.5", "--type", "tasks", "--human"],
+      ["search", "x", "--limit", "51", "--type", "tasks", "--json"],
+      ["search", "x", "--limit", "abc", "--type", "tasks", "--human"],
       ["search", "x", "--type", "bogus", "--json"],
       ["search", " ", "--json"],
+    ],
+  },
+  {
+    // The server's one activity query covers comments and the other activity
+    // rows: a row matches on its own text — content, or the eventData cast to
+    // text — or on its task's title, "comments" narrows to comment rows alone,
+    // and "activities" leaves both kinds in. Workspace matches come from every
+    // workspace the key reaches and repeat once per member.
+    name: "search matches activities and workspaces",
+    seed: {
+      members: MEMBERS,
+      activities: [
+        {
+          taskId: "task-a1",
+          type: "status_changed",
+          eventData: { oldStatus: "to-do", newStatus: "in-progress" },
+        },
+        { taskId: "task-a1", type: "task" },
+        {
+          taskId: "task-b1",
+          type: "priority_changed",
+          eventData: { oldPriority: "no-priority", newPriority: "high" },
+          userId: "user-1",
+        },
+      ],
+    },
+    steps: [
+      ["search", "in-progress", "--type", "activities", "--json"],
+      ["search", "in-progress", "--type", "comments", "--json"],
+      ["search", "Write the parser", "--type", "activities", "--json"],
+      ["search", "other", "--type", "workspaces", "--json"],
+      ["search", "other", "--type", "workspaces", "--human"],
+      ["search", "main", "--type", "workspaces", "--json"],
+    ],
+  },
+  {
+    // Each kind's query is ordered and cut to --limit on its own before the
+    // merge, so totalCount counts what those queries returned — repeats and
+    // all — while results is the merged list cut to --limit once more.
+    name: "search limits each kind before the merge",
+    seed: {
+      projects: [
+        ...SEED.projects,
+        { id: "proj-gamma", workspaceId: WS, name: "Gamma", slug: "GAM", description: "match inside" },
+      ],
+      tasks: [
+        ...SEED.tasks,
+        ...Array.from({ length: 4 }, (_, i) => ({ id: `task-x${i}`, projectId: P1, title: `match task ${i}` })),
+      ],
+      comments: [
+        ...(SEED.comments ?? []),
+        ...Array.from({ length: 3 }, (_, i) => ({ taskId: `task-x${i}`, content: `match note ${i}` })),
+      ],
+    },
+    steps: [
+      ["search", "match", "--limit", "2", "--json"],
+      ["search", "match", "--type", "tasks", "--limit", "2", "--json"],
+      ["search", "match", "--type", "projects", "--limit", "1", "--json"],
+      ["search", "match", "--type", "comments", "--limit", "2", "--json"],
+      ["search", "match", "--limit", "1", "--human"],
     ],
   },
   {
@@ -4899,6 +4969,37 @@ export const SCENARIOS: Scenario[] = [
     name: "task reference with a workspace name and one workspace unlisted",
     failOn: "^GET /project$",
     failOnQuery: "workspaceId=ws-other",
+    failStatus: 403,
+    steps: [["task", "get", "Main#3", "--human"]],
+  },
+  {
+    // The hint's own branches: a value naming several workspaces gets the
+    // plain message rather than a hint picked from named[0]; a slugless
+    // project in the named workspace is listed by its id; and a workspace
+    // whose projects cannot be listed at all gets no hint either.
+    name: "task reference workspace hint branches",
+    seed: {
+      workspaces: [
+        ...SEED.workspaces,
+        { id: "ws-twin", name: "Twin", slug: "twn" },
+        { id: "ws-twin2", name: "Twin", slug: "tw2" },
+      ],
+      projects: [...SEED.projects, { id: "proj-other", workspaceId: "ws-other", name: "Other board", slug: "" }],
+      tasks: [...SEED.tasks, { id: "task-o1", projectId: "proj-other", title: "Elsewhere" }],
+    },
+    steps: [
+      ["task", "get", "Twin#1", "--human"],
+      ["task", "get", "other#1", "--human"],
+      ["task", "get", "twn#1", "--human"],
+    ],
+  },
+  {
+    // The named workspace's own project listing is what the hint reads, so
+    // its failure — after the workspace listing succeeded — drops the hint
+    // and leaves the plain miss.
+    name: "task reference workspace hint with its listing failing",
+    failOn: "^GET /project$",
+    failOnQuery: "workspaceId=ws-main",
     failStatus: 403,
     steps: [["task", "get", "Main#3", "--human"]],
   },

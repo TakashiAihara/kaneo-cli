@@ -8,7 +8,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "workspace    Other\n1 shown; there may be more (--limit up to 50)\n",
+      "stdout": "task       ALP#1  Write the parser  (to-do)  (workspace: Main)\nworkspace         Other\n2 shown; there may be more (--limit up to 50)\n",
       "stderr": ""
     }
   ],

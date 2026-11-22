@@ -218,6 +218,12 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     }
 
     const requests = settle(JSON.parse(normalize(JSON.stringify(fake.requests))) as Recorded[]);
+    // A reply whose content type the document does not declare for its status
+    // is the fake drifting from the server it imitates; the run fails on it
+    // rather than recording it.
+    if (fake.specViolations.length > 0) {
+      throw new Error(`the fake answered off-spec:\n${fake.specViolations.join("\n")}`);
+    }
     return { steps, requests, files };
   } finally {
     fake.stop();

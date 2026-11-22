@@ -8,4 +8,8 @@
   // REMOVE WHEN knip no longer reports scripts/build.ts as unresolved with this
   // line gone.
   "ignoreUnresolved": ["scripts/build.ts"],
+  // Stryker is run through node_modules/.bin from scripts/mutate.ts, and its
+  // "command" test runner is built into @stryker-mutator/core — the
+  // command-runner name knip reads out of stryker.conf.json is not a package.
+  "ignoreDependencies": ["@stryker-mutator/core", "@stryker-mutator/command-runner"],
 }

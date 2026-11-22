@@ -29,7 +29,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"query\": \"first\",\n  \"totalCount\": 3,\n  \"results\": [\n    {\n      \"id\": \"task-g1\",\n      \"type\": \"task\",\n      \"title\": \"Filed elsewhere first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-gamma\",\n      \"projectName\": \"Gamma\",\n      \"projectSlug\": \"GAM\",\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"number\": 1,\n      \"priority\": \"low\",\n      \"status\": \"to-do\"\n    },\n    {\n      \"id\": \"task-b1\",\n      \"type\": \"task\",\n      \"title\": \"Beta first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-beta\",\n      \"projectName\": \"Beta\",\n      \"projectSlug\": \"BET\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:08.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"number\": 1,\n      \"priority\": \"urgent\",\n      \"status\": \"to-do\"\n    },\n    {\n      \"id\": \"cmt0001\",\n      \"type\": \"comment\",\n      \"title\": \"Comment on Write the parser\",\n      \"description\": null,\n      \"content\": \"first comment\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"\",\n      \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n      \"relevanceScore\": 1,\n      \"taskNumber\": 1,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stdout": "{\n  \"query\": \"first\",\n  \"totalCount\": 3,\n  \"results\": [\n    {\n      \"id\": \"task-g1\",\n      \"type\": \"task\",\n      \"title\": \"Filed elsewhere first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-gamma\",\n      \"projectName\": \"Gamma\",\n      \"projectSlug\": \"GAM\",\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": 1,\n      \"number\": 1,\n      \"priority\": \"low\",\n      \"status\": \"to-do\"\n    },\n    {\n      \"id\": \"task-b1\",\n      \"type\": \"task\",\n      \"title\": \"Beta first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-beta\",\n      \"projectName\": \"Beta\",\n      \"projectSlug\": \"BET\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:08.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": 1,\n      \"number\": 1,\n      \"priority\": \"urgent\",\n      \"status\": \"to-do\"\n    },\n    {\n      \"id\": \"cmt0001\",\n      \"type\": \"comment\",\n      \"title\": \"Comment on Write the parser\",\n      \"description\": null,\n      \"content\": \"first comment\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"Self\",\n      \"createdAt\": \"2026-01-01T00:00:10.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
       "stderr": ""
     },
     {
@@ -119,7 +119,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "workspace         Other\ntask       GAM#1  Filed elsewhere first  (to-do)  (workspace: Other)\n2 shown; there may be more (--limit up to 50)\n",
+      "stdout": "task  GAM#1  Filed elsewhere first  (to-do)  (workspace: Other)\ntask  ALP#1  Write the parser  (to-do)  (workspace: Main)\n2 shown; there may be more (--limit up to 50)\n",
       "stderr": ""
     },
     {
@@ -132,7 +132,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"query\": \"first\",\n  \"totalCount\": 3,\n  \"results\": [\n    {\n      \"id\": \"task-g1\",\n      \"type\": \"task\",\n      \"title\": \"Filed elsewhere first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-gamma\",\n      \"projectName\": \"Gamma\",\n      \"projectSlug\": \"GAM\",\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"number\": 1,\n      \"priority\": \"low\",\n      \"status\": \"to-do\"\n    }\n  ]\n}\n",
+      "stdout": "{\n  \"query\": \"first\",\n  \"totalCount\": 3,\n  \"results\": [\n    {\n      \"id\": \"task-g1\",\n      \"type\": \"task\",\n      \"title\": \"Filed elsewhere first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-gamma\",\n      \"projectName\": \"Gamma\",\n      \"projectSlug\": \"GAM\",\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": 1,\n      \"number\": 1,\n      \"priority\": \"low\",\n      \"status\": \"to-do\"\n    }\n  ]\n}\n",
       "stderr": ""
     },
     {
@@ -196,7 +196,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "workspace         Other\ntask       ALP#1  Write the parser  (to-do)\n2 shown; there may be more (--limit up to 50)\n",
+      "stdout": "task       ALP#1  Write the parser  (to-do)\nworkspace         Other\n2 shown; there may be more (--limit up to 50)\n",
       "stderr": ""
     },
     {
@@ -208,7 +208,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"query\": \"er\",\n  \"totalCount\": 3,\n  \"results\": [\n    {\n      \"id\": \"ws-other\",\n      \"type\": \"workspace\",\n      \"title\": \"Other\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": null,\n      \"projectName\": null,\n      \"projectSlug\": null,\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": null,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stdout": "{\n  \"query\": \"er\",\n  \"totalCount\": 4,\n  \"results\": [\n    {\n      \"id\": \"task-a1\",\n      \"type\": \"task\",\n      \"title\": \"Write the parser\",\n      \"description\": \"multi\\nline\",\n      \"content\": null,\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": 1,\n      \"number\": 1,\n      \"priority\": \"high\",\n      \"status\": \"to-do\"\n    },\n    {\n      \"id\": \"ws-other\",\n      \"type\": \"workspace\",\n      \"title\": \"Other\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": null,\n      \"projectName\": null,\n      \"projectSlug\": null,\n      \"workspaceId\": \"ws-other\",\n      \"workspaceName\": \"Other\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": null,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
       "stderr": ""
     }
   ],

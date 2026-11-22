@@ -15,7 +15,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: POST /api/gitlab-integration/project/proj-alpha: 400: Invalid key: baseUrl: Invalid URL\n"
+      "stderr": "Error: POST /api/gitlab-integration/project/proj-alpha: 400: baseUrl: Invalid URL\n"
     },
     {
       "args": [

@@ -165,7 +165,7 @@ export const sessionCommand = {
         // --allow-archived. A record that never learned its project has none
         // to check.
         const projectId = task?.projectId ?? closed.projectId;
-        if (projectId !== undefined && projectId !== "") await guardProject(projectId, writeAccess(flags));
+        if (projectId !== undefined && projectId !== "") await guardProjectForMarker(projectId, writeAccess(flags));
         // The reference the retry hint names: the attachment's record for a
         // held task, the lookup's for one named without it. --task is part of
         // it, since a bare `session close` would close what is attached rather
@@ -392,12 +392,27 @@ const targetTask = async (
   // The marker this command posts is a comment write, so the project the
   // attachment names is checked the way a named task's is. A record that
   // never learned its project has none to check.
-  if (attached.projectId !== undefined && attached.projectId !== "") await guardProject(attached.projectId, access);
+  if (attached.projectId !== undefined && attached.projectId !== "")
+    await guardProjectForMarker(attached.projectId, access);
   return {
     taskId: attached.taskId,
     number: attached.number,
     reference: taskRef(attached.projectSlug, attached.number, attached.projectId, attached.taskId),
   };
+};
+
+// The archived check guardProject makes reads the project first, and a project
+// the server can no longer place fails that read before the marker post is
+// ever tried. A gone project has no archived state to check, and the post is
+// what knows how to report that its task cannot take the marker — for a held
+// task it is also what releases the attachment — so the read's "nothing here"
+// answer is left to it. Every other failure still stops the command here.
+const guardProjectForMarker = async (projectId: string, access: ProjectAccess): Promise<void> => {
+  try {
+    await guardProject(projectId, access);
+  } catch (e) {
+    if (!placesNothing(e)) throw e;
+  }
 };
 
 // Whether a --task value names the held task in a form close can recognise

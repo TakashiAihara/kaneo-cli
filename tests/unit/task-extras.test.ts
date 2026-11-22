@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { configureClient, putUpload } from "../../src/api/http";
 import type { App } from "../../src/cli/app";
 import type { FlagValues } from "../../src/cli/args";
-import { taskCommand } from "../../src/cli/task";
+import { foldedComments, taskCommand } from "../../src/cli/task";
 import {
   createExternalLink,
   deleteExternalLink,
@@ -222,6 +222,30 @@ describe("task list --description", () => {
       "GET /api/task/task-big",
       "GET /api/task/task-other",
     ]);
+  });
+});
+
+// foldedComments cuts on UTF-16 units, so a fold boundary inside a surrogate
+// pair must retreat to the pair's head: a comment carrying half of an emoji
+// is not the comment that was written. The "x" run and the "y" run are sized
+// so the pair straddles the 10,000-character cap's cut with sourceRef "S".
+describe("foldedComments", () => {
+  test("a fold that would split an emoji keeps the pair whole", () => {
+    const bodies = foldedComments(
+      [
+        {
+          id: "c1",
+          content: `${"x".repeat(9963)}😀${"y".repeat(20)}`,
+          userId: "u1",
+          userName: "u",
+          createdAt: "d",
+        },
+      ],
+      "S",
+    );
+    expect(bodies.length).toBe(2);
+    for (const body of bodies) expect(body.isWellFormed()).toBe(true);
+    expect(bodies.join("\n").includes("😀")).toBe(true);
   });
 });
 

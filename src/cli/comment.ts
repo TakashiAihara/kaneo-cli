@@ -118,8 +118,16 @@ export const commentCommand = {
               `#${task.number} was moved to ${JSON.stringify(status)}, but the comment failed: ${e instanceof Error ? e.message : String(e)}`,
             );
           }
-          const after = await taskAfterWrite(task, "status was set");
-          readBack("status", after.status, status);
+          let after: Task;
+          try {
+            after = await taskAfterWrite(task, "status was set");
+            readBack("status", after.status, status);
+          } catch (e) {
+            // The comment is already on the server, so the failure has to say
+            // so: reported bare it reads as a failed add, and a retry posts
+            // the comment twice.
+            throw new Error(`comment ${comment.id} was added, but ${e instanceof Error ? e.message : String(e)}`);
+          }
           app.out.human(`#${after.number} -> ${after.status}`);
           app.out.human(`commented on #${task.number}`);
           app.out.data({ comment, task: after });

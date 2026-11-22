@@ -3054,6 +3054,16 @@ export const SCENARIOS: Scenario[] = [
       ["task", "get", "1", "--json"],
     ],
   },
+  // The comment lands before the read-back, so a read-back that fails says the
+  // comment was added: a retry reading the bare failure would post it twice.
+  {
+    name: "comment add status read-back fails after the comment lands",
+    failOn: "^GET /task/task-a1$",
+    steps: [
+      ["comment", "add", "1", "text", "--status", "done", "--json"],
+      ["comment", "ls", "1", "--human"],
+    ],
+  },
 
   ...both("activity list", ["activity", "list", "1"]),
   {
@@ -3798,6 +3808,31 @@ export const SCENARIOS: Scenario[] = [
       ["session", "attach", "3", "--strict"],
       ["task", "rm", "3", "--yes", "--json"],
       ["session", "close", "--task", "3"],
+      ["session", "status", "--json"],
+    ],
+  },
+  // The project itself is gone, so the guard's project read fails before the
+  // marker post is tried; the close still reaches the post, which cannot
+  // place the task, and releases the attachment the same way.
+  {
+    name: "session close releases a task whose project is gone",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["project", "rm", "ALP", "--yes", "--human"],
+      ["session", "close"],
+      ["session", "status", "--json"],
+    ],
+  },
+  // `session next` on the same gone project reports the marker post's own
+  // refusal rather than the project read's, and keeps the attachment.
+  {
+    name: "session next on a task whose project is gone",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["project", "rm", "ALP", "--yes", "--human"],
+      ["session", "next", "onward", "--strict"],
       ["session", "status", "--json"],
     ],
   },

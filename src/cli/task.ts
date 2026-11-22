@@ -1565,7 +1565,7 @@ const MOVED_POINTER = "移行先:";
 // long for a comment alone is cut mid-text, since losing it is worse.
 const COMMENT_LIMIT = 10_000;
 
-const foldedComments = (comments: Comment[], sourceRef: string): string[] => {
+export const foldedComments = (comments: Comment[], sourceRef: string): string[] => {
   if (comments.length === 0) return [];
   const header = `Comments moved from ${sourceRef}:\n\n`;
   const room = Math.max(1, COMMENT_LIMIT - header.length);
@@ -1578,7 +1578,13 @@ const foldedComments = (comments: Comment[], sourceRef: string): string[] => {
     .join("\n\n");
   while (rest.length > room) {
     const cut = rest.lastIndexOf("\n\n", room);
-    const at = cut > 0 ? cut : room;
+    // `room` counts UTF-16 units, so a cut with no blank line to prefer can
+    // land between the halves of a surrogate pair; step back to the pair's
+    // head rather than splitting it across two comments. at stays above 0 —
+    // rest opens on a comment's "---" — so the slice always shrinks it.
+    let at = cut > 0 ? cut : room;
+    const lead = rest.charCodeAt(at - 1);
+    if (cut <= 0 && at > 1 && lead >= 0xd800 && lead <= 0xdbff) at -= 1;
     bodies.push(`${header}${rest.slice(0, at)}`);
     rest = rest.slice(at);
     if (rest.startsWith("\n\n")) rest = rest.slice(2);
@@ -2185,7 +2191,17 @@ const listEverywhere = async (flags: FlagValues, app: App): Promise<void> => {
     // stderr line below as the single-project listing counts them.
     left += filterTasks(described, status, priority, true).length - tasks.length;
     for (const task of tasks) {
-      rows.push({ ...task, projectSlug: p.slug, projectName: p.name, workspaceName });
+      // A board row can carry no projectId of its own, and a deferred
+      // description is marked the way the single-project listing marks it,
+      // so `task ls -A --json` rows read like `task ls --json` ones.
+      rows.push({
+        ...task,
+        ...deferredMark(task),
+        projectId: p.id,
+        projectSlug: p.slug,
+        projectName: p.name,
+        workspaceName,
+      });
     }
   }
   for (const row of rows) app.out.human(everywhereLine(row));

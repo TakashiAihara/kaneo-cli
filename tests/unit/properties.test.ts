@@ -23,19 +23,21 @@ describe("config JSON parser", () => {
     );
   });
 
-  // Names an object already answers to, which an assignment would resolve on
-  // the prototype instead of storing.
+  // Assigning `__proto__` sets the prototype instead of storing a member. The
+  // other names are stored either way and show the order is kept around it.
   const inherited = fc.constantFrom("__proto__", "constructor", "toString", "a");
 
   test("keeps a key that names something on Object.prototype as a member", () => {
     fc.assert(
-      fc.property(fc.dictionary(inherited, fc.jsonValue(), { minKeys: 1 }), (members) => {
-        const text = `{${Object.entries(members)
-          .map(([key, value]) => `${JSON.stringify(key)}:${JSON.stringify(value)}`)
-          .join(",")}}`;
+      fc.property(
+        fc.uniqueArray(fc.tuple(inherited, fc.jsonValue()), { minLength: 1, selector: ([key]) => key }),
+        (members) => {
+          const text = `{${members.map(([key, value]) => `${JSON.stringify(key)}:${JSON.stringify(value)}`).join(",")}}`;
 
-        expect(Object.entries(parse(text) as object)).toEqual(Object.entries(JSON.parse(text)));
-      }),
+          expect(Object.entries(parse(text) as object)).toEqual(Object.entries(JSON.parse(text)));
+          expect(Object.keys(parse(text) as object)).toEqual(members.map(([key]) => key));
+        },
+      ),
     );
   });
 
@@ -74,6 +76,10 @@ describe("output JSON encoder", () => {
     expect(compact("a\nb\rc\td")).toBe('"a\\nb\\rc\\td"');
   });
 
+  test("indents nested values by two spaces and ends with one newline", () => {
+    expect(line({ a: [1, {}], b: [] })).toBe('{\n  "a": [\n    1,\n    {}\n  ],\n  "b": []\n}\n');
+  });
+
   test("a string keeps its content and never prints an HTML or line-terminator character raw", () => {
     fc.assert(
       fc.property(hostile, (value) => {
@@ -88,24 +94,28 @@ describe("output JSON encoder", () => {
 
 describe("nextTag", () => {
   const tag = fc
-    .tuple(fc.nat(3), fc.nat(3), fc.nat(3), fc.option(fc.nat(3)))
+    .tuple(fc.nat(12), fc.nat(12), fc.nat(12), fc.option(fc.nat(12)))
     .map(([major, minor, patch, rc]) => `v${major}.${minor}.${patch}${rc === null ? "" : `-rc.${rc}`}`);
   const tags = fc.array(tag, { minLength: 1 });
+  const reordered = (list: string[]) => fc.shuffledSubarray(list, { minLength: list.length });
 
   test("does not depend on the order the tags are listed in", () => {
     fc.assert(
-      fc.property(tags, (list) => {
-        expect(nextTag([...list].reverse())).toBe(nextTag(list));
-      }),
+      fc.property(
+        tags.chain((list) => fc.tuple(fc.constant(list), reordered(list))),
+        ([list, other]) => {
+          expect(nextTag(other)).toBe(nextTag(list));
+        },
+      ),
     );
   });
 
   test("counts a final version as newer than its own candidates", () => {
     fc.assert(
-      fc.property(fc.nat(3), fc.nat(3), fc.nat(3), fc.array(fc.nat(9)), (major, minor, patch, candidates) => {
+      fc.property(fc.nat(12), fc.nat(12), fc.nat(12), fc.array(fc.nat(12)), (major, minor, patch, candidates) => {
         const version = `v${major}.${minor}.${patch}`;
 
-        expect(nextTag([...candidates.map((rc) => `${version}-rc.${rc}`), version])).toBe(
+        expect(nextTag([version, ...candidates.map((rc) => `${version}-rc.${rc}`)])).toBe(
           `v${major}.${minor}.${patch + 1}-rc.1`,
         );
       }),
@@ -118,7 +128,7 @@ describe("nextTag", () => {
         const next = nextTag(list);
 
         expect(list).not.toContain(next);
-        expect(nextTag([...list, next])).toBe(nextTag([next]));
+        expect(nextTag([next, ...list])).toBe(nextTag([next]));
       }),
     );
   });

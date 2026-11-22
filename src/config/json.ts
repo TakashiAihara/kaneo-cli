@@ -56,6 +56,12 @@ export const parse = (text: string): Value => new Parser(text).document();
 export const decode = (value: Value, type: GoType, at: Where = { struct: "", fields: [] }): unknown =>
   decodeValue(value, type, at);
 
+// A key a document chose is data: assigning `__proto__` would replace the
+// object's prototype instead of adding a member.
+const put = <T>(out: { [key: string]: T }, key: string, value: T): void => {
+  Object.defineProperty(out, key, { value, enumerable: true, writable: true, configurable: true });
+};
+
 class Parser {
   private at = 0;
 
@@ -122,7 +128,7 @@ class Parser {
       if (this.done) return unexpectedEnd();
       if (this.peek() !== ":") return invalid(this.peek(), "after object key");
       this.at += 1;
-      out[key] = this.value();
+      put(out, key, this.value());
       this.skipSpace();
       if (this.done) return unexpectedEnd();
       const after = this.peek();
@@ -351,7 +357,7 @@ const decodeValue = (value: Value, type: GoType, at: Where): unknown => {
       for (const [key, entry] of Object.entries(value)) {
         // A map key is part of the path a type error names, because it is the
         // only way to say which entry of the map was wrong.
-        out[key] = decodeValue(entry, type.value, { struct: at.struct, fields: [...at.fields, key] });
+        put(out, key, decodeValue(entry, type.value, { struct: at.struct, fields: [...at.fields, key] }));
       }
       return out;
     }

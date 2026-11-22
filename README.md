@@ -429,7 +429,7 @@ With `--jq`, a failure exits with jq's own status — 3 for an expression that d
 ```bash
 bun install
 bun test              # unit tests and the parity suite
-bun run e2e           # the CLI against a real Kaneo server; needs docker
+bun run e2e           # the CLI against a real Kaneo server; needs docker compose
 bun run typecheck
 bun run knip          # unused exports, files and dependencies
 bun run generate      # regenerate the API client from the pinned document

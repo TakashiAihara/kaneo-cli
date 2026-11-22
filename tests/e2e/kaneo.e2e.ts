@@ -8,7 +8,7 @@ import { SPEC_VERSION } from "../../openapi/spec";
 // The CLI against a real Kaneo server, started for this run by docker compose.
 //
 // The parity suite answers from a fake, which is only as right as its author's
-// reading of the server. Every act here goes in through the CLI and every
+// reading of the server. Every act of a scenario goes in through the CLI and every
 // check reads back through it, so the path under test is the one a user's
 // command takes: flags, client, HTTP, the server's own routes and its database.
 //
@@ -18,7 +18,12 @@ import { SPEC_VERSION } from "../../openapi/spec";
 const ROOT = join(import.meta.dir, "../..");
 const COMPOSE = join(import.meta.dir, "compose.yml");
 const IMAGES = ["postgres:16-alpine", `ghcr.io/usekaneo/kaneo:${SPEC_VERSION}`];
-const START_TIMEOUT_MS = 240_000;
+// A child that never returns would hold the event loop, and with it every
+// timeout the test runner keeps: each one is given a deadline of its own.
+const DOCKER_TIMEOUT_MS = 180_000;
+const CLI_TIMEOUT_MS = 30_000;
+// Two pulls, the wait for the containers and the wait for the first answer.
+const START_TIMEOUT_MS = 2 * DOCKER_TIMEOUT_MS + DOCKER_TIMEOUT_MS + 120_000;
 
 const scratch = mkdtempSync(join(tmpdir(), "kaneo-e2e-"));
 const project = `kaneo-e2e-${process.pid}`;
@@ -45,7 +50,12 @@ const freePort = (): Promise<number> =>
   });
 
 const docker = (args: string[], env: Record<string, string>): string => {
-  const run = Bun.spawnSync(["docker", ...args], { env: { ...process.env, ...env }, stdout: "pipe", stderr: "pipe" });
+  const run = Bun.spawnSync(["docker", ...args], {
+    env: { ...process.env, ...env },
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: DOCKER_TIMEOUT_MS,
+  });
   const output = run.stdout.toString() + run.stderr.toString();
   if (run.exitCode !== 0) throw new Error(`docker ${args.join(" ")} exited ${run.exitCode}:\n${output}`);
   return output;
@@ -66,13 +76,15 @@ const post = async (path: string, body: unknown, cookie = ""): Promise<Response>
 };
 
 const kaneo = (...args: string[]): { exitCode: number; stdout: string; stderr: string } => {
-  const run = Bun.spawnSync(["bun", join(ROOT, "src/index.ts"), ...args], {
+  const run = Bun.spawnSync([process.execPath, join(ROOT, "src/index.ts"), ...args], {
     // Inside HOME, where the walk up for a project's .kaneo.json stops.
     cwd: cliEnv.HOME,
     env: cliEnv,
     stdout: "pipe",
     stderr: "pipe",
+    timeout: CLI_TIMEOUT_MS,
   });
+  if (run.exitCode === null) throw new Error(`kaneo ${args.join(" ")} did not finish in ${CLI_TIMEOUT_MS}ms`);
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };
 };
 
@@ -146,13 +158,13 @@ const start = async (): Promise<void> => {
 
   const home = join(scratch, "home");
   mkdirSync(home);
-  // Nothing of the developer's own: no config, no session, no proxy between
-  // the CLI and the loopback port.
+  // Nothing of the developer's own: this is the whole environment, so no
+  // config, no session and no proxy setting reaches the CLI.
   cliEnv = {
     PATH: process.env.PATH ?? "",
     HOME: home,
     XDG_CONFIG_HOME: join(home, ".config"),
-    NO_PROXY: "*",
+
     KANEO_API_URL: `${base}/api`,
     KANEO_WORKSPACE: workspace.id,
   };
@@ -196,6 +208,7 @@ describe("against a real server", () => {
   });
 
   test("a project that was created is listed and found by its slug", () => {
+    json<unknown>("project", "create", "Another Plan");
     const created = json<{ id: string; slug: string }>("project", "create", "Launch Plan");
 
     const listed = json<{ id: string; name: string }[]>("project", "list");
@@ -206,6 +219,8 @@ describe("against a real server", () => {
   });
 
   test("a task keeps what create and update gave it", () => {
+    const elsewhere = json<{ slug: string }>("project", "create", "Other Board").slug;
+    json<Task>("task", "create", "-p", elsewhere, "Somebody else's task");
     const slug = json<{ slug: string }>("project", "create", "Task Flow").slug;
     const created = json<Task>("task", "create", "-p", slug, "--priority", "high", "Write the announcement");
 
@@ -223,6 +238,8 @@ describe("against a real server", () => {
     const slug = json<{ slug: string }>("project", "create", "Discussion").slug;
     const task = json<Task>("task", "create", "-p", slug, "Agree on a date");
 
+    const other = json<Task>("task", "create", "-p", slug, "Book the room");
+    json<unknown>("comment", "add", "-p", slug, String(other.number), "Room 4 is free");
     json<unknown>("comment", "add", "-p", slug, String(task.number), "Thursday works <for> me & you");
     const comments = json<{ content: string }[]>("comment", "list", "-p", slug, String(task.number));
 
@@ -241,6 +258,12 @@ describe("against a real server", () => {
     expect(kept.map((entry) => entry.id)).toEqual([task.id]);
     expect(json<Task[]>("task", "list", "-p", slug)).toEqual([]);
     expect(refusal("task", "get", "-p", slug, String(task.number))).toContain("#1");
+  });
+
+  test("a key the server does not know is refused", () => {
+    cliEnv = { ...cliEnv, KANEO_API_KEY: "not-a-key-this-server-issued" };
+
+    expect(refusal("project", "list")).toContain("401");
   });
 
   test("a project that does not exist is refused, not answered with an empty list", () => {

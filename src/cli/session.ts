@@ -288,7 +288,13 @@ const releaseHold = async (app: App, releasing: string, named: string): Promise<
     throw hard("--session names another session; this session's own hold is closed by a plain 'kaneo session close'");
   }
   const slugs = new Map<string, string>();
-  const task = await resolveTask(app, named, slugs);
+  // The hold being released is the named session's, so a bare --task number is
+  // read on the board that session's record names: this machine can hold the
+  // record of a session that ran here and is gone now. With no record — the
+  // usual case — or no project on it, the number is read in the current
+  // project, as a plain --task is.
+  const held = store.load(store.sessionStore(), releasing);
+  const task = await resolveTask(app, releaseRef(held, named), slugs);
   const closed = attachmentOf(task);
   await describeBoard(task, closed, "close");
   const reference = taskRef(closed.projectSlug ?? slugs.get(task.projectId), closed.number, closed.projectId, closed.taskId);
@@ -320,6 +326,17 @@ const releaseHold = async (app: App, releasing: string, named: string): Promise<
 
   app.out.human(`released: session ${shortId(releasing)} on ${reference} ${task.title}`);
   app.out.data({ number: task.number, session: releasing, taskId: task.id });
+};
+
+// The reference a --task value resolves to when releasing another session's
+// hold. A bare number names a task on the board the releasing session's
+// record carries — the hold is that session's, so its project is the one the
+// number means there — and is left as typed when there is no record, the
+// record carries no project, or the value names a board, a ticket id or a
+// task id itself.
+export const releaseRef = (held: store.Attachment | undefined, named: string): string => {
+  const projectId = held?.projectId ?? "";
+  return projectId !== "" && /^\d+$/.test(named) ? `${projectId}#${named}` : named;
 };
 
 // Picks the task a command acts on: the one named explicitly, otherwise the one

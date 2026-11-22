@@ -2319,6 +2319,30 @@ export const SCENARIOS: Scenario[] = [
       ["session", "status", "--json"],
     ],
   },
+  // A bare --task number is read on the board the releasing session's record
+  // names: the hold being released is that session's. The record says ALP
+  // while the configured project is BET, and the session holds #1 on both —
+  // the release must land on ALP#1, not the BET#1 a bare number would
+  // otherwise resolve to.
+  {
+    name: "session close --session bare number keeps the releasing session's project",
+    env: { KANEO_SESSION_ID: "sess-here", KANEO_PROJECT: P2 },
+    homeFiles: {
+      ".config/kaneo/sessions/sess-gone.json":
+        '{"taskId":"task-a1","number":1,"title":"Write the parser","projectId":"proj-alpha","projectName":"Alpha","projectSlug":"ALP","workspaceId":"ws-main","workspaceName":"Main"}',
+    },
+    seed: {
+      comments: [
+        { taskId: "task-a1", content: "<!-- kn:session id=sess-gone host=oldhost cwd=/old branch=main state=running enc=1 -->\nnext step" },
+        { taskId: "task-b1", content: "<!-- kn:session id=sess-gone host=oldhost cwd=/old branch=main state=running enc=1 -->\nnext step" },
+      ],
+    },
+    steps: [
+      ["session", "close", "--session", "sess-gone", "--task", "1", "--human"],
+      ["board", "-p", "ALP", "--human"],
+      ["board", "-p", "BET", "--human"],
+    ],
+  },
   // A task that moves keeps its id, and the session's attachment is a snapshot
   // from attach time: the move rewrites it, so status names the board and
   // number the task has now rather than the ones it had then.

@@ -15,8 +15,10 @@ import { join } from "node:path";
 // and is merged forward instead, so it does not need a force push it was
 // avoiding. Conflicts in the generated paths are taken from main's side and
 // rebuilt; any other conflict stops the run with the list, and re-running the
-// command resumes wherever it stopped. The push is --force-with-lease, which
-// is safe right after a rebase of your own branch.
+// command resumes wherever it stopped. Before rewriting, the remote tip the
+// fetch saw must already be in local history, and the push leases on that
+// exact tip with --force-if-includes, so a coworker's push to the same branch
+// is refused rather than overwritten.
 //
 // Exit codes: 0 done, 1 error, 3 conflicts left for a human.
 
@@ -90,15 +92,23 @@ const takeMainSide = (path: string) => {
   }
 };
 
+// True while the operation is still running and left conflicts behind: the
+// only non-zero stop that is not an error, because the loop resolves what is
+// left and calls continue again.
+const stoppedOnConflicts = (): boolean => inProgress() && unmerged().length > 0;
+
 // Runs `continue` for the operation in progress. A commit the rebase emptied
 // stops the same way a conflict does, and --continue refuses it; --skip drops
 // it, which is right when every change is already on main.
 const continueOperation = (mode: "rebase" | "merge") => {
   const args = mode === "rebase" ? ["-c", "core.editor=true", "rebase", "--continue"] : ["merge", "--continue"];
-  if (stream(["git", ...args]) === 0) return;
+  // --continue exits non-zero when it stops on the NEXT commit's conflicts,
+  // not only on errors; the unmerged paths it leaves are the loop's work.
+  if (stream(["git", ...args]) === 0 || stoppedOnConflicts()) return;
   if (mode === "rebase" && gitOut(["status", "--porcelain"]) === "" && inProgress()) {
-    must(["rebase", "--skip"], "rebase --skip");
-    return;
+    // --skip can itself stop on the next commit's conflicts the same way.
+    if (stream(["git", "rebase", "--skip"]) === 0 || stoppedOnConflicts()) return;
+    fail("rebase --skip failed (git rebase --skip)");
   }
   fail(`could not continue the ${mode} (see output above)`);
 };
@@ -133,6 +143,9 @@ const main = () => {
   gitOut(["remote", "get-url", "origin"]);
 
   let mode: "rebase" | "merge";
+  // The remote tip the push is allowed to replace, fixed at fetch time; null
+  // on a resumed run, where there is no fresh fetch to take it from.
+  let remoteTip: string | null = null;
   if (inProgress()) {
     // Resuming: the mode is whichever operation left its state behind.
     const dir = gitDir();
@@ -148,6 +161,20 @@ const main = () => {
     const branch = gitOut(["rev-parse", "--abbrev-ref", "HEAD"]);
     if (branch === "HEAD" || branch === "main" || branch === "master") {
       fail(`refusing to rebase ${branch}; check out the branch to update`);
+    }
+
+    // fetch just moved origin/<branch> to the remote's tip. If that tip has
+    // commits this branch does not, the rewrite below would drop them: the
+    // push's lease compares the remote against the same tracking ref, so it
+    // would pass. Refuse before rewriting; --force-if-includes repeats the
+    // check at push time.
+    remoteTip = "";
+    const tracking = capture(["git", "rev-parse", "--verify", `refs/remotes/origin/${branch}`]);
+    if (tracking.code === 0) {
+      remoteTip = tracking.stdout.trim();
+      if (capture(["git", "merge-base", "--is-ancestor", remoteTip, "HEAD"]).code !== 0) {
+        fail(`origin/${branch} has commits this branch does not (${remoteTip}); merge or rebase them in first`);
+      }
     }
 
     const merges = Number(gitOut(["rev-list", "--merges", "--count", "origin/main..HEAD"]));
@@ -208,7 +235,25 @@ const main = () => {
   bun(["run", "typecheck"], "typecheck");
 
   const branch = gitOut(["rev-parse", "--abbrev-ref", "HEAD"]);
-  must(["push", "--force-with-lease", "-u", "origin", `HEAD:refs/heads/${branch}`], "push");
+  // remoteTip is the remote tip verified against local history right after
+  // the fetch; on a resumed run there was no fetch, so the tracking ref is
+  // the same value a bare lease would compare. "" expects the remote to have
+  // no such branch. --force-if-includes additionally refuses a tracking tip
+  // that was never integrated locally — a coworker's push fetch moved
+  // origin/<branch> to without this branch containing it.
+  const tracked = capture(["git", "rev-parse", "--verify", `refs/remotes/origin/${branch}`]);
+  const expected = remoteTip ?? (tracked.code === 0 ? tracked.stdout.trim() : "");
+  must(
+    [
+      "push",
+      `--force-with-lease=refs/heads/${branch}:${expected}`,
+      "--force-if-includes",
+      "-u",
+      "origin",
+      `HEAD:refs/heads/${branch}`,
+    ],
+    "push",
+  );
 
   // DIRTY means GitHub never starts CI on the pushed head, so it is worth one
   // look right after the push rather than a confused wait later.

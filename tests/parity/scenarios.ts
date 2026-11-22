@@ -3845,11 +3845,38 @@ export const SCENARIOS: Scenario[] = [
       ["session", "status", "--json"],
     ],
   },
+  // The same release on Kaneo v2.50, whose workspace middleware answers the
+  // gone project's read with a 404 "Project not found" rather than the older
+  // 400 — the guard lets it through to the post the same way.
+  {
+    name: "session close releases a task whose project is gone on v2.50",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    notFoundV250: true,
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["project", "rm", "ALP", "--yes", "--human"],
+      ["session", "close"],
+      ["session", "status", "--json"],
+    ],
+  },
   // `session next` on the same gone project reports the marker post's own
   // refusal rather than the project read's, and keeps the attachment.
   {
     name: "session next on a task whose project is gone",
     env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["project", "rm", "ALP", "--yes", "--human"],
+      ["session", "next", "onward", "--strict"],
+      ["session", "status", "--json"],
+    ],
+  },
+  // The same on Kaneo v2.50: the guard's read answers 404 "Project not
+  // found", which is let through to the post's own 404 "Task not found".
+  {
+    name: "session next on a task whose project is gone on v2.50",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    notFoundV250: true,
     steps: [
       ["session", "attach", "1", "--strict"],
       ["project", "rm", "ALP", "--yes", "--human"],

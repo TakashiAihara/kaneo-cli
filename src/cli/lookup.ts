@@ -218,15 +218,17 @@ const NO_PLACE = "Workspace ID could not be determined";
 // Whether a failure says the value named no project, rather than the server
 // refusing the request for some other reason.
 //
-// A project in the path is checked before the route runs, and the server answers
-// 400 with the complaint above when it cannot find it. A 400 is also what the
-// server says about a body it will not accept, so the message decides. A project
-// in a body (`task move`'s destination) is looked up by the route itself, which
-// answers 404 `Project not found`.
+// A project in the path is checked before the route runs, and the server
+// answers when it cannot find it — 400 with the complaint above on an older
+// server, 404 "Project not found" from Kaneo v2.50's workspace middleware,
+// which answers the lookup itself rather than letting the route report it. A
+// project in a body (`task move`'s destination) is looked up by the route
+// itself, which answers the 404. A 400 is also what the server says about a
+// body it will not accept, so the message decides.
 //
 // A 403 is a different answer — the key cannot reach the project — and a lookup
 // would not change that.
-const unknownProject = (e: unknown): e is KaneoApiError =>
+export const unknownProject = (e: unknown): e is KaneoApiError =>
   placesNothing(e) || (e instanceof KaneoApiError && e.statusCode === 404 && e.messages.includes("Project not found"));
 
 // Whether the server could not place the id in the path in any workspace: it

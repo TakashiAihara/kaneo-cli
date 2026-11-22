@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { configureClient, kaneoFetch, KaneoApiError } from "../../src/api/http";
-import { allProjects, withProject } from "../../src/cli/lookup";
+import { allProjects, unknownProject, withProject } from "../../src/cli/lookup";
 
 const servers: { stop: (force?: boolean) => void }[] = [];
 afterEach(() => {
@@ -188,4 +188,18 @@ test.each([
     return id;
   };
   expect(await withProject(`JSON${status}`, op)).toBe("p-w1");
+});
+
+// A gone project arrives in two spellings — the older server's 400 and Kaneo
+// v2.50's 404 — and both are the same "nothing here" answer. Anything else is
+// a different failure: a 403 the key cannot pass, a 5xx, a 404 for another
+// resource, or no API error at all.
+test("unknownProject reads only the two spellings of a project the server cannot place", () => {
+  const api = (status: number, messages: string[]) => new KaneoApiError("GET", "/api/project/p", status, messages);
+  expect(unknownProject(api(400, ["Workspace ID could not be determined"]))).toBe(true);
+  expect(unknownProject(api(404, ["Project not found"]))).toBe(true);
+  expect(unknownProject(api(403, ["Project not found"]))).toBe(false);
+  expect(unknownProject(api(404, ["Task not found"]))).toBe(false);
+  expect(unknownProject(api(500, ["Project not found"]))).toBe(false);
+  expect(unknownProject(new Error("socket hangup"))).toBe(false);
 });

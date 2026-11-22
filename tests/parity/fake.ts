@@ -2141,8 +2141,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if ((p = m(/^\/project\/([^/]+)(\/(archive|unarchive))?$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       // Checked by the server's workspace middleware before the route runs, as on
-      // the task routes below.
-      if (!proj) return failText(400, "Workspace ID could not be determined");
+      // the task routes below: its 400 as text on an older server, a 404
+      // "Project not found" on Kaneo v2.50.
+      if (!proj) return opts.notFoundV250 ? notFound("Project") : failText(400, "Workspace ID could not be determined");
       if (req.method === "GET" && !p[2]) return projectReply(proj, opts.readAs);
       if (opts.plainMember) return failText(403, "Insufficient permissions");
       if (req.method === "PUT" && !p[2]) {

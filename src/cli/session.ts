@@ -15,6 +15,7 @@ import {
   placesNothing,
   resourceNotFound,
   taskRef,
+  unknownProject,
   writeAccess,
   type ProjectAccess,
 } from "./lookup";
@@ -413,15 +414,17 @@ const targetTask = async (
 
 // The archived check guardProject makes reads the project first, and a project
 // the server can no longer place fails that read before the marker post is
-// ever tried. A gone project has no archived state to check, and the post is
-// what knows how to report that its task cannot take the marker — for a held
-// task it is also what releases the attachment — so the read's "nothing here"
-// answer is left to it. Every other failure still stops the command here.
+// ever tried — the 400 an older server answers, or the 404 "Project not found"
+// Kaneo v2.50's does. A gone project has no archived state to check, and the
+// post is what knows how to report that its task cannot take the marker — for
+// a held task it is also what releases the attachment — so the read's
+// "nothing here" answer is left to it. Every other failure still stops the
+// command here.
 const guardProjectForMarker = async (projectId: string, access: ProjectAccess): Promise<void> => {
   try {
     await guardProject(projectId, access);
   } catch (e) {
-    if (!placesNothing(e)) throw e;
+    if (!unknownProject(e)) throw e;
   }
 };
 

@@ -6,8 +6,10 @@
   "ignorePatterns": ["src/api/gen/**"],
   "rules": {
     // A switch over a union names every member, and `default` does not count:
-    // a member added later is then a lint error at each place that has to
-    // decide what it means, instead of falling into whatever came last.
+    // a member added later is then a lint error at each switch that has to
+    // decide what it means, instead of falling into whatever came last. An
+    // if chain is not checked, so a dispatch over a union is written as a
+    // switch.
     "typescript/switch-exhaustiveness-check": ["error", { "considerDefaultExhaustiveForUnions": false }],
     // --type-aware turns these on with it. Each still reports in the tree
     // (60 findings between them) and is switched on once its findings are

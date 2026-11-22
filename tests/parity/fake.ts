@@ -2524,8 +2524,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           }
           break;
         }
-        // The fake keeps no labels, so every label id is one the server would not
-        // find.
+        // The bulk route does not look labels up, so every label id is answered
+        // as one the server would not find.
         case "addLabel":
         case "removeLabel":
           return fail(404, "Label not found");

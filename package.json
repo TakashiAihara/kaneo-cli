@@ -17,6 +17,7 @@
   "scripts": {
     "generate": "orval --config orval.config.ts && bun scripts/request-shapes.ts",
     "test": "bun test",
+    "e2e": "bun test ./tests/e2e/kaneo.e2e.ts",
     "typecheck": "tsc --noEmit",
     "knip": "knip",
     "lint": "oxlint --type-aware --deny-warnings",

@@ -9,7 +9,7 @@ import * as store from "../session/store";
 import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
 import { shellWord } from "../output/output";
-import { allowArchivedFlag, guardProject, placesNothing, taskRef, writeAccess, type ProjectAccess } from "./lookup";
+import { allowArchivedFlag, guardProject, placesNothing, resourceNotFound, taskRef, writeAccess, type ProjectAccess } from "./lookup";
 
 const requireSessionId = (): string => {
   const id = store.currentId(env);
@@ -192,7 +192,9 @@ export const sessionCommand = {
           "the attachment and history here are unchanged",
           `\`kaneo session close --task ${shellWord(closing)}\` again finishes closing here, and posts a second close marker`,
         ).catch((e: unknown) => {
-          if (holds && placesNothing(e)) return undefined;
+          // The marker's task is what the workspace middleware places: an older
+          // server answers its 400, Kaneo v2.50 a 404 "Task not found".
+          if (holds && (placesNothing(e) || resourceNotFound(e, "Task"))) return undefined;
           throw e;
         });
         // A task closed by name that the attachment does not hold has no board on

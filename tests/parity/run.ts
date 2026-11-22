@@ -65,6 +65,7 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     commentReplyWithoutId: s.commentReplyWithoutId,
     gitlabImportErrors: s.gitlabImportErrors,
     gitlabVerify: s.gitlabVerify,
+    notFoundV250: s.notFoundV250,
     driftedSpec: s.driftedSpec,
     specWithoutOperation: s.specWithoutOperation,
   });

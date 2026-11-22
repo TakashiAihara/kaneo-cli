@@ -182,8 +182,20 @@ const describeFailure = (method: string, path: string, status: number, messages:
   // The body comes trimmed as Go's TrimSpace trims it; trimming it again here
   // would drop a byte order mark Go kept in its Error.Body.
   if (body === "") return `${method} ${path}: ${status}`;
-  const shown = body.length > BODY_LIMIT ? `${body.slice(0, BODY_LIMIT)}...` : body;
-  return `${method} ${path}: ${status}: ${shown}`;
+  return `${method} ${path}: ${status}: ${goBody(body)}`;
+};
+
+// Go's Error.Error() keeps the first 200 bytes of the body and appends "...",
+// where a JavaScript string would count UTF-16 units: a body of multibyte
+// characters is longer in bytes than it is in units, so it is measured and cut
+// as Go cut it. A cut through a character reports the partial bytes as U+FFFD,
+// where Go's string kept them raw.
+const goBody = (body: string): string => {
+  const bytes = new TextEncoder().encode(body);
+  if (bytes.length <= BODY_LIMIT) return body;
+  // ignoreBOM keeps a leading byte order mark the way Go's body[:200] kept the
+  // bytes; the default would drop it here even though goTrimSpace kept it.
+  return `${new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes.subarray(0, BODY_LIMIT))}...`;
 };
 
 export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T> => {
@@ -267,18 +279,32 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       } catch (e) {
         throw new Error(`${called} ${served}: ${urlError(called, target, e)}`, { cause: e });
       }
-      const next = redirectTarget(response, target);
-      if (!next) break;
+      const red = redirectTarget(response, target);
+      if (red === undefined) break;
+      if ("bad" in red) {
+        // The way Go's client reports a Location it cannot parse: the call, the
+        // request that answered it, and url.Parse's own account of the refusal.
+        throw new Error(
+          `${called} ${served}: ${goOp(called)} ${JSON.stringify(shownHref(target, credentialInUrl === true))}: failed to parse Location header ${JSON.stringify(red.bad.location)}: parse ${JSON.stringify(red.bad.at)}: ${red.bad.why}`,
+        );
+      }
+      if ("unreachable" in red) {
+        // The way Go's client reports a request that failed below the parse:
+        // the call, then the resolved URL and the transport's reason for it.
+        throw new Error(
+          `${called} ${served}: ${goOp(called)} ${JSON.stringify(red.unreachable.url)}: ${red.unreachable.why}`,
+        );
+      }
       // A credential carried in the URL cannot be stripped the way the key's
       // header can, so an insecure hop is refused rather than followed bare.
-      if (credentialInUrl === true && !keepsCredential(next.href)) {
-        throw new InsecureCredentialError(`${next.protocol}//${next.host}`);
+      if (credentialInUrl === true && !keepsCredential(red.to.href)) {
+        throw new InsecureCredentialError(`${red.to.protocol}//${red.to.host}`);
       }
-      location = response.headers.get("location") ?? "";
+      location = red.location;
       // The key stays only where it would still be protected and where it was
       // already meant to go; a hop to an insecure host, or to another one, goes
       // on without it and the server decides.
-      headers = withoutCredential(headers, target, next);
+      headers = withoutCredential(headers, target, red.to);
       // 301, 302 and 303 turn a write into a GET the way every other client
       // does, or the write would be replayed against a route that does not take
       // it. 307 and 308 keep the method and body, which is why the body has to
@@ -295,12 +321,12 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       // scheme — is refused rather than followed, because the request was
       // meant for the origin it was first sent to and the body cannot be
       // redacted the way the key can.
-      if (body !== null && next.origin !== start.target.origin) {
+      if (body !== null && red.to.origin !== start.target.origin) {
         throw new KaneoApiError(called, served, response.status, [
-          `refusing to follow the redirect to ${next.href}: the request body may carry a credential`,
+          `refusing to follow the redirect to ${red.to.href}: the request body may carry a credential`,
         ]);
       }
-      target = next;
+      target = red.to;
     }
 
     try {
@@ -310,7 +336,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       // string of the same reply would measure.
       bytes = await response.arrayBuffer();
     } catch (e) {
-      throw new Error(`${called} ${served}: read body: ${reason(e)}`, { cause: e });
+      throw new Error(`${called} ${served}: read body: ${bodyReason(e)}`, { cause: e });
     }
     const wait = response.status === 429 ? tryAgainIn(bytes) : undefined;
     if (
@@ -424,6 +450,18 @@ export const originOf = (node: object): string | undefined => origins.get(node);
 
 const reason = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
+// What went wrong reading a reply's body, in the words Go's io.ReadAll failure
+// carried. The only abort this transport passes in is the cap --timeout sets,
+// which Go reported as a deadline exceeded — bare, with no "(Client.Timeout ...)"
+// parenthetical: Go appends those only when its per-request deadline was the
+// one that fired, and the command context every request carries always expires
+// first (it is made with the same --timeout before the request is sent), so
+// didTimeout was never true. Anything else is passed on as it came.
+const bodyReason = (e: unknown): string => {
+  const code = (e as { code?: unknown } | null)?.code;
+  return code === 20 || code === 23 ? "context deadline exceeded" : reason(e);
+};
+
 // What Go's strings.TrimSpace removes: Unicode's White_Space. That is what
 // JavaScript's trim() removes except for two characters: it also counts the byte
 // order mark, which would turn a reply holding nothing else into the empty one
@@ -521,7 +559,10 @@ const dialReason = (target: URL, code: unknown, e: unknown): string => {
     case "ENOTFOUND":
       return `dial tcp: lookup ${target.hostname}: no such host`;
     // Both aborts are a timeout: the only signal this CLI passes in is the cap
-    // --timeout sets, and Go reports that as a deadline exceeded.
+    // --timeout sets, and Go reports that as a deadline exceeded — bare, for
+    // the same reason bodyReason gives: the request's own context always
+    // expires before Client.Timeout's deadline, so Go never appended its
+    // "(Client.Timeout exceeded while awaiting headers)" here either.
     case 23:
     case 20:
       return "context deadline exceeded";
@@ -538,18 +579,545 @@ const reportMismatch = <T>(method: string, path: string, error: ZodError<T>): vo
   console.error(`kaneo: ${method} ${path}: response does not match the schema, returned as sent: ${fields}`);
 };
 
-const redirectTarget = (response: Response, from: URL): URL | undefined => {
+// What a 3xx's Location came to: a URL to follow, the way Go's url.Parse
+// refused it, or — for a reference Go accepted but this runtime's URL cannot
+// hold — the transport failure Go's send would have reported.
+type Redirect =
+  | { to: URL; location: string }
+  | { bad: { location: string; at: string; why: string } }
+  | { unreachable: { url: string; why: string } };
+
+// Go's client reads the first of several Location headers; fetch's Headers
+// joins them into one value separated by ", ", so the first of those is what is
+// followed. A single Location holding ", " itself is read as two here where Go
+// read it whole, which no URL a server writes has reason to contain.
+const firstLocation = (header: string | null): string | null => {
+  if (header === null) return null;
+  const comma = header.indexOf(", ");
+  return comma === -1 ? header : header.slice(0, comma);
+};
+
+// The URL a failed request names the way Go's url.Error printed it: a set
+// password is *** and the rest is the URL as it was written. On a route whose
+// path is itself the credential there is no path to show — the scheme and
+// host are what the message keeps, since the path is the secret.
+const shownHref = (target: URL, credentialInUrl: boolean): string => {
+  const u = new URL(target.href);
+  const user = u.username === "" && u.password === "" ? "" : `${u.username}${u.password === "" ? "" : ":***"}@`;
+  if (u.password !== "") u.password = "***";
+  if (!credentialInUrl) return u.href;
+  return `${u.protocol}//${user}${u.host}`;
+};
+
+const redirectTarget = (response: Response, from: URL): Redirect | undefined => {
   if (!REDIRECT_STATUSES.includes(response.status)) return undefined;
-  const location = response.headers.get("location");
+  const location = firstLocation(response.headers.get("location"));
+  // Go reads an absent or empty Location as none and hands the 3xx back.
   if (!location) return undefined;
-  // Resolved against the URL that answered it, the way any other client would.
-  // A Location that is not a URL counts as no redirect, leaving the 3xx to be
-  // reported as the failure it is.
-  try {
-    return new URL(location, from);
-  } catch {
-    return undefined;
+  // Go's client parses the Location with url.Parse before resolving it, and a
+  // Location it refuses fails the call rather than being reported as the 3xx.
+  // WHATWG's URL accepts some of what Go refuses (a % escape that is not two
+  // hex digits, a space in the host is one both refuse but for different
+  // reasons), so the parse is judged by Go's rules first.
+  const bad = goLocationError(location);
+  if (bad !== undefined) return { bad: { location, ...bad } };
+  // Go's parse decides what the reference names before WHATWG's URL reads it:
+  // a reference with no authority of its own (a ///path, a bare relative one)
+  // or a scheme this client cannot carry is a path or a refusal there, where
+  // URL would take the segment after the slashes for a host — or hand fetch a
+  // file: it can read. Those go through the Go resolution below.
+  const ref = goParseRef(location);
+  if (
+    ref !== undefined &&
+    (ref.host === "" || (ref.scheme !== "" && ref.scheme !== "http" && ref.scheme !== "https"))
+  ) {
+    const miss = goLocationMiss(location, from);
+    if (miss !== undefined) return miss;
   }
+  // Resolved against the URL that answered it, the way any other client would.
+  try {
+    return { to: new URL(location, from), location };
+  } catch {
+    // Go's parse accepted this but WHATWG's URL cannot hold it; Go resolves
+    // and sends it anyway, so the outcome is the transport's, not a refusal.
+    const miss = goLocationMiss(location, from);
+    if (miss !== undefined) return miss;
+    return { bad: { location, at: location, why: "Invalid URL" } };
+  }
+};
+
+// Go's url.Parse of a Location, returning the error text it would report, or
+// undefined when it accepts the reference. Only the checks that can fail are
+// reproduced; a reference Go accepts is resolved by URL, which reads the same
+// grammar closely enough for the targets a redirect names.
+const goLocationError = (location: string): { at: string; why: string } | undefined => {
+  // Parse cuts the fragment off first and parses what is left; a fragment is
+  // checked after, and its failure is reported against the whole reference.
+  const hash = location.indexOf("#");
+  const main = hash === -1 ? location : location.slice(0, hash);
+  const frag = hash === -1 ? "" : location.slice(hash + 1);
+  const why = goParseError(main);
+  if (why !== undefined) return { at: main, why };
+  if (frag !== "") {
+    const fwhy = goUnescapeError(frag, "fragment");
+    if (fwhy !== undefined) return { at: location, why: fwhy };
+  }
+  return undefined;
+};
+
+// The errors net/url's parse reports for the part before the fragment: the
+// control-byte check, the scheme, the first-segment-colon rule for a relative
+// reference, the authority and the path's escapes. Query escapes are not
+// checked, as RawQuery keeps them as written.
+const goParseError = (u: string): string | undefined => {
+  for (let i = 0; i < u.length; i++) {
+    const c = u.charCodeAt(i);
+    if (c < 0x20 || c === 0x7f) return "net/url: invalid control character in URL";
+  }
+  const scheme = goScheme(u);
+  if ("error" in scheme) return scheme.error;
+  let rest = scheme.rest;
+  const query = rest.indexOf("?");
+  rest = query === -1 ? rest : rest.slice(0, query);
+  if (!rest.startsWith("/")) {
+    if (scheme.scheme !== "") return undefined;
+    const slash = rest.indexOf("/");
+    const first = slash === -1 ? rest : rest.slice(0, slash);
+    if (first.includes(":")) return "first path segment in URL cannot contain colon";
+  }
+  if (rest.startsWith("//") && (scheme.scheme !== "" || !rest.startsWith("///"))) {
+    const after = rest.slice(2);
+    const slash = after.indexOf("/");
+    const authority = slash === -1 ? after : after.slice(0, slash);
+    rest = slash === -1 ? "" : after.slice(slash);
+    const aerr = goAuthorityError(authority);
+    if (aerr !== undefined) return aerr;
+  }
+  return goUnescapeError(rest, "path");
+};
+
+// getScheme: a leading scheme is letters then letters, digits, +, - or . up to
+// a colon; anything else means there is no scheme and the whole string is the
+// reference.
+const goScheme = (s: string): { scheme: string; rest: string } | { error: string } => {
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    const ch = s[i]!;
+    if ((c >= 97 && c <= 122) || (c >= 65 && c <= 90)) continue;
+    if ((c >= 48 && c <= 57) || ch === "+" || ch === "-" || ch === ".") {
+      if (i === 0) return { scheme: "", rest: s };
+      continue;
+    }
+    if (ch === ":") {
+      if (i === 0) return { error: "missing protocol scheme" };
+      return { scheme: s.slice(0, i), rest: s.slice(i + 1) };
+    }
+    return { scheme: "", rest: s };
+  }
+  return { scheme: "", rest: s };
+};
+
+// parseAuthority: the host is read before the userinfo, so a bad host is
+// reported first; the userinfo then has to be made of the characters
+// validUserinfo allows before its escapes are checked.
+const goAuthorityError = (authority: string): string | undefined => {
+  const at = authority.lastIndexOf("@");
+  const host = at === -1 ? authority : authority.slice(at + 1);
+  const herr = goHostError(host);
+  if (herr !== undefined) return herr;
+  if (at === -1) return undefined;
+  const userinfo = authority.slice(0, at);
+  if (![...userinfo].every((c) => GO_USERINFO.test(c))) return "net/url: invalid userinfo";
+  return goUnescapeError(userinfo, "user");
+};
+
+const GO_USERINFO = /[A-Za-z0-9\-._:~!$&'()*+,;=%@]/;
+
+// parseHost: an bracketed host needs its closing bracket and a port of digits
+// or nothing; any other host takes the port after its last colon the same
+// way. The host itself is then unescaped with the host rules — except that a
+// %25 inside the brackets introduces an RFC 6874 zone identifier, which
+// unescapes under the zone's own, looser rules while the address and port
+// around it keep the host's.
+const goHostError = (host: string): string | undefined => {
+  if (host.startsWith("[")) {
+    const i = host.lastIndexOf("]");
+    if (i < 0) return "missing ']' in host";
+    const colonPort = host.slice(i + 1);
+    if (!goValidPort(colonPort)) return `invalid port ${JSON.stringify(colonPort)} after host`;
+    const zone = host.slice(0, i).indexOf("%25");
+    if (zone === -1) return goUnescapeError(host, "host");
+    const head = goUnescapeError(host.slice(0, zone), "host");
+    if (head !== undefined) return head;
+    const zoned = goUnescapeError(host.slice(zone, i), "zone");
+    if (zoned !== undefined) return zoned;
+    return goUnescapeError(host.slice(i), "host");
+  }
+  const i = host.lastIndexOf(":");
+  if (i !== -1) {
+    const colonPort = host.slice(i);
+    if (!goValidPort(colonPort)) return `invalid port ${JSON.stringify(colonPort)} after host`;
+  }
+  return goUnescapeError(host, "host");
+};
+
+// validOptionalPort: empty, or a colon and digits only — the count is not
+// checked, so :99999 parses.
+const goValidPort = (port: string): boolean => port === "" || /^:\d*$/.test(port);
+
+const goIsHex = (c: string): boolean => (c >= "0" && c <= "9") || (c >= "a" && c <= "f") || (c >= "A" && c <= "F");
+const goUnhex = (c: string): number => {
+  const code = c.charCodeAt(0);
+  if (code >= 48 && code <= 57) return code - 48;
+  if (code >= 97 && code <= 102) return code - 87;
+  return code - 55;
+};
+
+// The first n bytes of s as Go's byte-slice would take them, decoded back. A
+// cut through a multi-byte character reports U+FFFD where Go's string kept
+// the partial bytes raw.
+const goByteSlice = (s: string, n: number): string =>
+  new TextDecoder().decode(new TextEncoder().encode(s).subarray(0, n));
+
+// The characters a host may hold unescaped: what shouldEscape leaves alone for
+// encodeHost, which is the unreserved set plus the sub-delims and : [ ] < > ".
+const GO_HOST_LITERAL = /[A-Za-z0-9\-_.~!$&'()*+,;=:[\]<>"']/;
+
+// unescape's failure cases for one section of the URL. A % not followed by two
+// hex digits is an EscapeError showing the % and up to two bytes after it; the
+// host additionally refuses escapes of ASCII bytes below 8 other than %25, and
+// any ASCII character that should be escaped. The zone an IPv6 literal's %25
+// introduces is looser still: it also takes %25 itself, a space, and any
+// escape whose byte the host rules would leave alone.
+const goUnescapeError = (s: string, mode: "path" | "fragment" | "user" | "host" | "zone"): string | undefined => {
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]!;
+    if (ch === "%") {
+      if (i + 2 >= s.length || !goIsHex(s[i + 1]!) || !goIsHex(s[i + 2]!)) {
+        // Go slices the bad escape as bytes, not characters: "%é" is three of
+        // them where "%éx" would be three UTF-16 units.
+        return `invalid URL escape ${JSON.stringify(goByteSlice(s.slice(i), 3))}`;
+      }
+      const hex = s.slice(i, i + 3);
+      if (mode === "host" && goUnhex(s[i + 1]!) < 8 && hex !== "%25") {
+        return `invalid URL escape ${JSON.stringify(hex)}`;
+      }
+      if (mode === "zone") {
+        const v = (goUnhex(s[i + 1]!) << 4) | goUnhex(s[i + 2]!);
+        if (hex !== "%25" && v !== 0x20 && goShouldEscape(v, "host")) {
+          return `invalid URL escape ${JSON.stringify(hex)}`;
+        }
+      }
+      i += 2;
+      continue;
+    }
+    if ((mode === "host" || mode === "zone") && s.charCodeAt(i) < 0x80 && !GO_HOST_LITERAL.test(ch)) {
+      return `invalid character ${JSON.stringify(ch)} in host name`;
+    }
+  }
+  return undefined;
+};
+
+// A Location that goLocationError passed but WHATWG's URL cannot hold — a port
+// above 65535, an empty host on a special scheme, an invalid IP literal. Go's
+// url.Parse accepted it, so the client resolved it and the send failed in the
+// transport; the error reported is the transport's, not a parse refusal.
+//
+// net/url keeps a URL as bytes and the Location arrives as UTF-16, so the
+// pieces below are read as the UTF-8 bytes Go's parser saw: one char code per
+// byte, with every check and re-escape done per byte as Go did it.
+const goBytes = (s: string): string => {
+  const bytes = new TextEncoder().encode(s);
+  let out = "";
+  for (const b of bytes) out += String.fromCharCode(b);
+  return out;
+};
+
+const goText = (b: string): string => {
+  const bytes = new Uint8Array(b.length);
+  for (let i = 0; i < b.length; i++) bytes[i] = b.charCodeAt(i);
+  return new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes);
+};
+
+// unescape with the checks already made: each %XX becomes its byte.
+const goUnescapeBytes = (b: string): string => {
+  if (!b.includes("%")) return b;
+  let out = "";
+  for (let i = 0; i < b.length; i++) {
+    if (b[i] === "%" && i + 2 < b.length) {
+      out += String.fromCharCode((goUnhex(b[i + 1]!) << 4) | goUnhex(b[i + 2]!));
+      i += 2;
+    } else {
+      out += b[i];
+    }
+  }
+  return out;
+};
+
+type GoMode = "path" | "host" | "user" | "fragment";
+
+// shouldEscape for the modes a URL's parts are escaped with, per byte.
+const goShouldEscape = (c: number, mode: GoMode): boolean => {
+  if (c > 0x7f) return true;
+  const ch = String.fromCharCode(c);
+  if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122)) return false;
+  if (mode === "host" && "!$&'()*+,;=:[]<>\"".includes(ch)) return false;
+  if ("-_.~".includes(ch)) return false;
+  if ("$&+,/:;=?@".includes(ch)) {
+    if (mode === "path") return ch === "?";
+    if (mode === "user") return ch === "@" || ch === "/" || ch === "?" || ch === ":";
+    if (mode === "fragment") return false;
+    return true;
+  }
+  if (mode === "fragment" && "!()*".includes(ch)) return false;
+  return true;
+};
+
+const GO_UPPERHEX = "0123456789ABCDEF";
+const goEscape = (b: string, mode: GoMode): string => {
+  let out = "";
+  for (let i = 0; i < b.length; i++) {
+    const c = b.charCodeAt(i);
+    out += c < 0x80 && !goShouldEscape(c, mode) ? b[i] : `%${GO_UPPERHEX[c >> 4]!}${GO_UPPERHEX[c & 15]!}`;
+  }
+  return out;
+};
+
+// validEncoded: whether a raw escaping needs no further escaping, which is
+// when URL.String keeps it as RawPath/RawFragment did.
+const goValidEncoded = (b: string, mode: GoMode): boolean => {
+  for (let i = 0; i < b.length; i++) {
+    const ch = String.fromCharCode(b.charCodeAt(i));
+    if ("!$&'()*+,;=:@".includes(ch) || ch === "[" || ch === "]" || ch === "%") continue;
+    if (goShouldEscape(b.charCodeAt(i), mode)) return false;
+  }
+  return true;
+};
+
+// EscapedPath/EscapedFragment: the raw escaping is kept when it is already
+// canonical, otherwise the decoded value is escaped afresh.
+const goEscaped = (raw: string, decoded: string, mode: GoMode): string =>
+  goValidEncoded(raw, mode) ? raw : goEscape(decoded, mode);
+
+// The pieces of a Location in the form net/url's parse produced them.
+type GoRef = {
+  scheme: string;
+  opaque: string;
+  omitHost: boolean;
+  user: { name: string; passSet: boolean } | undefined;
+  host: string;
+  path: string;
+  query: string;
+  forceQuery: boolean;
+  fragment: string;
+};
+
+// parse for a reference already known to be Go-valid: the scheme, the query
+// cut, the authority, and the path and fragment in their escaped forms.
+const goParseRef = (location: string): GoRef | undefined => {
+  const loc = goBytes(location);
+  const hash = loc.indexOf("#");
+  const main = hash === -1 ? loc : loc.slice(0, hash);
+  const fragRaw = hash === -1 ? "" : loc.slice(hash + 1);
+  const scheme = goScheme(main);
+  if ("error" in scheme) return undefined;
+  const name = scheme.scheme.toLowerCase();
+  let rest = scheme.rest;
+  let query = "";
+  let forceQuery = false;
+  if (rest.endsWith("?") && rest.split("?").length === 2) {
+    forceQuery = true;
+    rest = rest.slice(0, -1);
+  } else {
+    const q = rest.indexOf("?");
+    if (q !== -1) {
+      query = rest.slice(q + 1);
+      rest = rest.slice(0, q);
+    }
+  }
+  let opaque = "";
+  let omitHost = false;
+  let path = "";
+  let userinfoRaw: string | undefined;
+  let host = "";
+  if (!rest.startsWith("/")) {
+    if (name !== "") {
+      opaque = rest;
+    } else {
+      path = rest;
+    }
+  } else if (rest.startsWith("//") && (name !== "" || !rest.startsWith("///"))) {
+    const body = rest.slice(2);
+    const slash = body.indexOf("/");
+    const authority = slash === -1 ? body : body.slice(0, slash);
+    path = slash === -1 ? "" : body.slice(slash);
+    const at = authority.lastIndexOf("@");
+    const hostPart = at === -1 ? authority : authority.slice(at + 1);
+    if (at !== -1) userinfoRaw = authority.slice(0, at);
+    host = goUnescapeBytes(hostPart);
+  } else if (name !== "" && rest.startsWith("/")) {
+    omitHost = true;
+    path = rest;
+  } else {
+    path = rest;
+  }
+  const pathDecoded = goUnescapeBytes(path);
+  const fragDecoded = goUnescapeBytes(fragRaw);
+  let user: GoRef["user"];
+  if (userinfoRaw !== undefined) {
+    const colon = userinfoRaw.indexOf(":");
+    user =
+      colon === -1
+        ? { name: goUnescapeBytes(userinfoRaw), passSet: false }
+        : { name: goUnescapeBytes(userinfoRaw.slice(0, colon)), passSet: true };
+  }
+  return {
+    scheme: name,
+    opaque,
+    omitHost,
+    user,
+    host,
+    path: goEscaped(path, pathDecoded, "path"),
+    query,
+    forceQuery,
+    fragment: goEscaped(fragRaw, fragDecoded, "fragment"),
+  };
+};
+
+// resolvePath: the reference's escaped path resolved against the base's —
+// a reference path that does not start with / is joined to the base's last
+// segment, and an empty one takes the base's whole. What an absolute or
+// authority reference gets is the base-less call.
+const goResolvePath = (base: string, ref: string): string => {
+  let full = ref;
+  if (ref === "") {
+    full = base;
+  } else if (!ref.startsWith("/")) {
+    full = `${base.slice(0, base.lastIndexOf("/") + 1)}${ref}`;
+  }
+  if (full === "") return "";
+  let dst = "/";
+  let first = true;
+  let remaining = full;
+  let elem = "";
+  let found = true;
+  while (found) {
+    const cut = remaining.indexOf("/");
+    if (cut === -1) {
+      elem = remaining;
+      remaining = "";
+      found = false;
+    } else {
+      elem = remaining.slice(0, cut);
+      remaining = remaining.slice(cut + 1);
+      found = true;
+    }
+    if (elem === ".") {
+      first = false;
+      continue;
+    }
+    if (elem === "..") {
+      const str = dst.slice(1);
+      const index = str.lastIndexOf("/");
+      dst = "/";
+      if (index === -1) {
+        first = true;
+      } else {
+        dst += str.slice(0, index);
+      }
+    } else {
+      if (!first) dst += "/";
+      dst += elem;
+      first = false;
+    }
+  }
+  if (elem === "." || elem === "..") dst += "/";
+  return dst.length > 1 && dst[1] === "/" ? dst.slice(1) : dst;
+};
+
+// URL.String with stripPassword's rule: a set password prints as *** and the
+// rest is the escaped form. Returned as the same byte string it was built
+// from; the caller decodes it once.
+const goRefText = (u: GoRef): string => {
+  let out = u.scheme === "" ? "" : `${u.scheme}:`;
+  if (u.opaque !== "") {
+    out += u.opaque;
+  } else {
+    const hasUser = u.user !== undefined;
+    if (u.scheme !== "" || u.host !== "" || hasUser) {
+      if (!(u.omitHost && u.host === "" && !hasUser)) {
+        if (u.host !== "" || u.path !== "" || hasUser) out += "//";
+        if (u.user !== undefined) {
+          out += u.user.passSet ? `${u.user.name}:***@` : `${goEscape(u.user.name, "user")}@`;
+        }
+        if (u.host !== "") out += goEscape(u.host, "host");
+      }
+    }
+    if (u.path !== "" && !u.path.startsWith("/") && u.host !== "") out += "/";
+    if (out === "" && u.path !== "" && u.path.split("/")[0]!.includes(":")) out += "./";
+    out += u.path;
+  }
+  if (u.forceQuery || u.query !== "") out += `?${u.query}`;
+  if (u.fragment !== "") out += `#${u.fragment}`;
+  return goText(out);
+};
+
+// splitHostPort: the port after the last colon when it is all digits, and the
+// brackets off an IP literal.
+const goSplitHost = (host: string): { hostname: string; port: string } => {
+  let h = host;
+  let port = "";
+  const colon = host.lastIndexOf(":");
+  if (colon !== -1 && goValidPort(host.slice(colon))) {
+    h = host.slice(0, colon);
+    port = host.slice(colon + 1);
+  }
+  if (h.startsWith("[") && h.endsWith("]")) h = h.slice(1, -1);
+  return { hostname: h, port };
+};
+
+// What the transport reports for a resolved reference it cannot use, in the
+// order it checks: the scheme, the host, then the port inside the dial. A host
+// that only fails at the lookup is reported the way dialReason reports one.
+const goMissReason = (u: GoRef): string => {
+  if (u.scheme !== "http" && u.scheme !== "https") {
+    return `unsupported protocol scheme ${JSON.stringify(goText(u.scheme))}`;
+  }
+  if (u.host === "") return "http: no Host in request URL";
+  const { hostname, port } = goSplitHost(u.host);
+  if (port !== "" && Number(port) > 65535) return `dial tcp: address ${port}: invalid port`;
+  return `dial tcp: lookup ${goText(hostname)}: no such host`;
+};
+
+// The way Go's client treats a Location url.Parse accepted but WHATWG's URL
+// cannot hold: it resolves the reference against the URL that answered, and
+// either the resolution is a URL this runtime can still fetch (an empty
+// authority inherits the base) or the send fails in the transport.
+const goLocationMiss = (location: string, from: URL): Redirect | undefined => {
+  const ref = goParseRef(location);
+  if (ref === undefined) return undefined;
+  if (ref.scheme !== "" || ref.host !== "" || ref.user !== undefined) {
+    const resolved: GoRef = {
+      ...ref,
+      scheme: ref.scheme === "" ? from.protocol.slice(0, -1) : ref.scheme,
+      path: goResolvePath(ref.path, ""),
+    };
+    return { unreachable: { url: goRefText(resolved), why: goMissReason(resolved) } };
+  }
+  // An empty network-path reference inherits the base: // is the base itself,
+  // and //?query, //#fragment or ///path differ from it only there. Resolve-
+  // Reference still resolves the path against the base's and inherits the
+  // base's query and fragment only when the reference carries none of its own.
+  const u = new URL(from.href);
+  const inheritsAll = ref.path === "" && !ref.forceQuery && ref.query === "";
+  if (!inheritsAll) {
+    u.pathname = goText(goResolvePath(goBytes(from.pathname), ref.path));
+    u.search = ref.forceQuery ? "?" : ref.query === "" ? "" : `?${goText(ref.query)}`;
+    u.hash = ref.fragment === "" ? "" : `#${goText(ref.fragment)}`;
+  } else if (ref.fragment !== "") {
+    u.hash = `#${goText(ref.fragment)}`;
+  }
+  return { to: u, location };
 };
 
 // Whether the key goes with a hop from one URL to another.
@@ -641,14 +1209,123 @@ const codedMessage = (text: string): string[] | undefined => {
 // envelope (a 500's `{"message": ...}`, once codedMessage has declined it), a
 // stack or a long body is reported as a body, not matched as a message.
 const plainMessage = (text: string): string[] =>
-  text === "" || /^[<{[]/.test(text) || text.includes("\n") || text.length > BODY_LIMIT ? [] : [text];
+  text === "" || /^[<{[]/.test(text) || text.includes("\n") || new TextEncoder().encode(text).length > BODY_LIMIT
+    ? []
+    : [text];
 
 // The server's failure shape. The payload is read as raw JSON because the shape
 // it arrives in is the server's choice, not this client's: fixed as an array,
 // anything else would fail to decode and the server's message would be lost
-// behind a complaint about types.
-type Envelope = { error?: unknown };
+// behind a complaint about types. The error member is kept as its raw text so
+// the message decode can walk its own members in order the same way.
+type Envelope = { error?: string };
 
+// A JSON object's members in the order they arrived, duplicates kept, each
+// value as its raw text: encoding/json applies every member in order — a later
+// duplicate, whatever its case, overwrites the earlier — where JSON.parse
+// merges each exact spelling into one and loses the order of the rest. The
+// document is already known to parse, so the walk only has to find where each
+// value ends.
+const jsonMembers = (text: string): { key: string; value: string }[] | undefined => {
+  let i = skipJsonSpace(text, 0);
+  if (text[i] !== "{") return undefined;
+  i++;
+  const members: { key: string; value: string }[] = [];
+  i = skipJsonSpace(text, i);
+  if (text[i] === "}") return members;
+  for (;;) {
+    i = skipJsonSpace(text, i);
+    if (text[i] !== '"') return undefined;
+    const keyEnd = skipJsonString(text, i);
+    let key: unknown;
+    try {
+      key = JSON.parse(text.slice(i, keyEnd));
+    } catch {
+      return undefined;
+    }
+    i = skipJsonSpace(text, keyEnd);
+    if (text[i] !== ":") return undefined;
+    const valueStart = skipJsonSpace(text, i + 1);
+    const valueEnd = skipJsonValue(text, valueStart);
+    members.push({ key: String(key), value: text.slice(valueStart, valueEnd) });
+    i = skipJsonSpace(text, valueEnd);
+    if (text[i] === ",") {
+      i = skipJsonSpace(text, i + 1);
+      continue;
+    }
+    if (text[i] === "}") return members;
+    return undefined;
+  }
+};
+
+// A JSON array's elements as raw texts, or undefined when the text is not one.
+const jsonList = (text: string): string[] | undefined => {
+  if (text[0] !== "[") return undefined;
+  let i = skipJsonSpace(text, 1);
+  const elements: string[] = [];
+  if (text[i] === "]") return elements;
+  for (;;) {
+    const start = i;
+    i = skipJsonValue(text, i);
+    elements.push(text.slice(start, i));
+    i = skipJsonSpace(text, i);
+    if (text[i] === ",") {
+      i = skipJsonSpace(text, i + 1);
+      continue;
+    }
+    if (text[i] === "]") return elements;
+    return undefined;
+  }
+};
+
+const skipJsonSpace = (text: string, i: number): number => {
+  while (i < text.length && (text[i] === " " || text[i] === "\t" || text[i] === "\n" || text[i] === "\r")) i++;
+  return i;
+};
+
+// The index just past the JSON string starting at i.
+const skipJsonString = (text: string, i: number): number => {
+  for (i++; i < text.length; i++) {
+    if (text[i] === "\\") {
+      i++;
+      continue;
+    }
+    if (text[i] === '"') return i + 1;
+  }
+  return i;
+};
+
+// The index just past the JSON value starting at i.
+const skipJsonValue = (text: string, i: number): number => {
+  const c = text[i]!;
+  if (c === '"') return skipJsonString(text, i);
+  if (c === "{" || c === "[") {
+    let depth = 0;
+    for (; i < text.length; i++) {
+      const ch = text[i]!;
+      if (ch === '"') {
+        i = skipJsonString(text, i) - 1;
+        continue;
+      }
+      if (ch === "{" || ch === "[") depth++;
+      else if (ch === "}" || ch === "]") {
+        depth--;
+        if (depth === 0) return i + 1;
+      }
+    }
+    return i;
+  }
+  while (i < text.length && !",}] \t\n\r".includes(text[i]!)) i++;
+  return i;
+};
+
+// Go unmarshals the body into {Success *bool `json:"success"`; Error
+// json.RawMessage `json:"error"`}: a key matches its field case-insensitively,
+// every member is applied in the order it arrived so a later duplicate wins,
+// `success` has to be a boolean (or null, which leaves it unset) and `error`
+// accepts any JSON value. A `success` of another type — the string "false", a
+// number, an object — fails the whole decode, which here means the body is not
+// an envelope at all and is reported as a body.
 const decodeEnvelope = (text: string): Envelope | undefined => {
   // Spare the parser the plain text and the markup an error status carries.
   if (!/^[ \t\n\r]*\{/.test(text)) return undefined;
@@ -658,28 +1335,101 @@ const decodeEnvelope = (text: string): Envelope | undefined => {
   } catch {
     return undefined;
   }
-  if (parsed === null || typeof parsed !== "object") return undefined;
-  const envelope = parsed as { success?: unknown; error?: unknown };
-  return envelope.success === false ? { error: envelope.error } : undefined;
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+  const members = jsonMembers(text);
+  if (members === undefined) return undefined;
+  let success: boolean | undefined;
+  let error: string | undefined;
+  for (const { key, value } of members) {
+    const lower = key.toLowerCase();
+    if (lower === "success") {
+      let v: unknown;
+      try {
+        v = JSON.parse(value);
+      } catch {
+        return undefined;
+      }
+      if (v === null) {
+        success = undefined;
+        continue;
+      }
+      if (typeof v !== "boolean") return undefined;
+      success = v;
+    } else if (lower === "error") {
+      error = value;
+    }
+  }
+  if (success !== false) return undefined;
+  return { error };
 };
 
 // Whatever human-readable text the failure carries, whichever shape it came in.
+// Go tries the error as an array of {message} objects, then as one object, then
+// as a string, and the first decode that succeeds answers — an array whose any
+// element cannot be a {message} object fails as a whole rather than keeping the
+// elements that could.
 const messagesOf = (envelope: Envelope): string[] => {
   const { error } = envelope;
-  if (error === undefined || error === null) return [];
-  if (Array.isArray(error)) {
-    return error.map(messageOf).filter((m) => m !== "");
+  if (error === undefined) return [];
+  const first = error[0]!;
+  if (first === "[") {
+    const elements = jsonList(error);
+    if (elements !== undefined) {
+      const list: string[] = [];
+      let decodes = true;
+      for (const element of elements) {
+        const message = structMessage(element);
+        if (message === undefined) {
+          decodes = false;
+          break;
+        }
+        if (message !== "") list.push(message);
+      }
+      if (decodes) return list;
+    }
+    // An array that is not a list of {message} objects decodes as neither the
+    // struct nor the string, so nothing is left to try.
+    return [];
   }
-  const single = messageOf(error);
-  if (single !== "") return [single];
-  if (typeof error === "string" && error !== "") return [error];
+  if (first === "{") {
+    const single = structMessage(error);
+    return single !== undefined && single !== "" ? [single] : [];
+  }
+  if (first === '"') {
+    try {
+      const s: unknown = JSON.parse(error);
+      return typeof s === "string" && s !== "" ? [s] : [];
+    } catch {
+      return [];
+    }
+  }
+  // null decodes as an empty list of messages; a number or a boolean decodes
+  // as nothing at all.
   return [];
 };
 
-const messageOf = (value: unknown): string => {
-  if (value === null || typeof value !== "object") return "";
-  const { message } = value as { message?: unknown };
-  return typeof message === "string" ? message : "";
+// One {Message string `json:"message"`} decode over a raw JSON text: the key
+// matches case-insensitively and every member is applied in the order it
+// arrived, a value that is not a string fails the decode (which for an array
+// element fails the whole array), and null leaves the field as it was — so an
+// absent or only-null message decodes to the empty string. Null itself decodes
+// to the zero struct.
+const structMessage = (text: string): string | undefined => {
+  if (text === "null") return "";
+  const members = jsonMembers(text);
+  if (members === undefined) return undefined;
+  let message: string | undefined;
+  for (const { key, value } of members) {
+    if (key.toLowerCase() !== "message") continue;
+    if (value === "null") continue;
+    if (value[0] !== '"') return undefined;
+    try {
+      message = JSON.parse(value) as string;
+    } catch {
+      return undefined;
+    }
+  }
+  return message ?? "";
 };
 // PUTs the bytes of a staged upload to the presigned URL the server issued.
 //

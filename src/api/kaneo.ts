@@ -287,9 +287,13 @@ export const isoTime = (owner: object, field: string): string => {
   if (request === undefined) {
     throw new TimestampError(`${field} is not a timestamp, and no request is recorded for the object that holds it`);
   }
-  throw new TimestampError(
-    `${request}: ${field} ${shown.length > VALUE_LIMIT ? `${shown.slice(0, VALUE_LIMIT).join("")}...` : shown.join("")} is not a timestamp`,
-  );
+  const detail = `${field} ${shown.length > VALUE_LIMIT ? `${shown.slice(0, VALUE_LIMIT).join("")}...` : shown.join("")} is not a timestamp`;
+  const timestamp = new TimestampError(`${request}: ${detail}`);
+  // A write's reply is read only after the server has done what was asked, so
+  // its unreadable time is reported as the write it belongs to: running it
+  // again would repeat the write. A read's is the plain timestamp error.
+  if (isWriteRequest(request)) throw new WriteReplyError(timestamp, request, detail);
+  throw timestamp;
 };
 
 // A reply whose time cannot be read. It is its own type because the call it
@@ -297,22 +301,99 @@ export const isoTime = (owner: object, field: string): string => {
 // so has to tell this apart from a request that never got through.
 export class TimestampError extends Error {}
 
+// Whether the `METHOD /api/path` a reply's objects remember was a write. The
+// transport records the method the call was made with; anything but a read
+// (GET, HEAD) is a write whose reply is read after the server has acted.
+const isWriteRequest = (request: string): boolean => {
+  const method = request.slice(0, request.indexOf(" "));
+  return method !== "GET" && method !== "HEAD" && method !== "";
+};
+
+// A reply to a write whose time cannot be read. By the time the reply is read
+// the server has already done what was asked, so — unlike a read's
+// TimestampError — this says the write happened, warns that running it again
+// repeats it, and names a command that shows what it left. afterWrite and
+// postMarker wrap the writes they can say more about and read `timestamp` for
+// the failure the reply's mapping hit; every other write reports this message
+// as it is.
+export class WriteReplyError extends TimestampError {
+  constructor(
+    // The failure the reply's mapping hit (`METHOD /api/path: field "v" is not
+    // a timestamp`), which a wrapper that knows the write reads to say what it
+    // left behind.
+    public readonly timestamp: TimestampError,
+    request: string,
+    detail: string,
+  ) {
+    super(
+      `${request}: the write already happened on the server, but its reply could not be read (${detail}); do not run it again, that would repeat the write; ${inspectHint(request)}`,
+      { cause: timestamp },
+    );
+  }
+}
+
+// Where to look for what a write left, for the writes no command wraps with a
+// more specific pointer. The request's path names the resource; its first
+// segment after /api is what a reader lists, and the command is the one that
+// reads that resource. A resource with no entry is reported as left on the
+// server rather than pointed at a command that may not exist.
+const INSPECT: Record<string, string> = {
+  task: "kaneo task ls",
+  "task-relation": "kaneo task links",
+  "external-link": "kaneo task external-links",
+  activity: "kaneo activity ls",
+  "time-entry": "kaneo time ls",
+  label: "kaneo label ls",
+  notification: "kaneo notification ls",
+  "notification-preferences": "kaneo notification preferences get",
+  project: "kaneo project ls",
+  column: "kaneo column ls",
+  "workflow-rule": "kaneo workflow ls",
+  invitation: "kaneo invitation get",
+  search: "kaneo search",
+  user: "kaneo whoami",
+  workspace: "kaneo workspace ls",
+  auth: "kaneo whoami",
+};
+
+const inspectHint = (request: string): string => {
+  const path = request.slice(request.indexOf(" ") + 1);
+  const segments = path.split("/");
+  const resource = segments[2] ?? "";
+  // `comment ls` takes the task whose comments to list, and only the add's
+  // path names it — an edit's or a delete's names the comment, whose task the
+  // path does not carry, so those keep the generic pointer rather than a
+  // command that cannot run.
+  if (resource === "comment") {
+    const task = request.startsWith("POST ") ? segments[3] : undefined;
+    return task === undefined || task === ""
+      ? "the result it left is on the server"
+      : `kaneo comment ls ${shellWord(task)} shows what it left`;
+  }
+  const command = INSPECT[resource];
+  return command === undefined ? "the result it left is on the server" : `${command} shows what it left`;
+};
+
 // Runs a write whose reply is mapped here, and says so when the mapping fails:
 // the server has already done what was asked, so a caller who runs it again
 // repeats the write. `look` says where to see what was written.
 //
-// Only task create and comment add are wrapped so far. The other writes whose
-// reply is mapped (addActivity, addTimeEntry, createLabel, createProject,
-// createColumn, linkTasks, createNotification, setWorkflowRule, ...) still report
-// the bare timestamp error, which does not say the write happened.
+// Only the writes whose way out differs per call are wrapped. Every other
+// write's unreadable reply is a WriteReplyError, which already says the write
+// happened and names a command that shows what it left; this replaces that
+// generic pointer with the specific one the caller has.
 export const afterWrite = async <T>(done: string, look: string, write: Promise<T>): Promise<T> => {
   try {
     return await write;
   } catch (e) {
     if (e instanceof TimestampError) {
+      // A WriteReplyError already says the write happened in its own words;
+      // this replaces them with the caller's more specific ones, keeping the
+      // timestamp failure the reply's mapping hit as the cause either way.
+      const timestamp = e instanceof WriteReplyError ? e.timestamp : e;
       throw new TimestampError(
-        `${done} on the server, but its reply could not be read (${e.message}); do not run it again, that would repeat the write; ${look}`,
-        { cause: e },
+        `${done} on the server, but its reply could not be read (${timestamp.message}); do not run it again, that would repeat the write; ${look}`,
+        { cause: timestamp },
       );
     }
     throw e;

@@ -4,6 +4,7 @@ import {
   listComments,
   listWorkspaces,
   TimestampError,
+  WriteReplyError,
   type Comment,
   type Task,
 } from "../api/kaneo";
@@ -125,8 +126,9 @@ export const postMarker = async (
     // fail-open command does for a failed request, would leave a retry to post
     // a second one.
     if (e instanceof TimestampError) {
+      const inner = e instanceof WriteReplyError ? e.timestamp.message : e.message;
       throw hard(
-        `posted the marker on #${number} on the server, but could not read its reply (${e.message}); ${held}; ${wayOut}`,
+        `posted the marker on #${number} on the server, but could not read its reply (${inner}); ${held}; ${wayOut}`,
       );
     }
     throw e;

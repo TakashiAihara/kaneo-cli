@@ -63,3 +63,22 @@ jobs:
       # runs last: an outage there should not hide the other results.
       - name: pinned spec matches the Kaneo release
         run: bun run spec --check
+
+  # The CLI against the Kaneo release its client was generated from. A job of
+  # its own: it pulls two images and starts a server, and none of that should
+  # sit between a push and the result of the checks above.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.0"
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run e2e

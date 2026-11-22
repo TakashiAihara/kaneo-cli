@@ -1,0 +1,32 @@
+# The server the end-to-end suite runs against. Every value comes from the
+# suite (tests/e2e/kaneo.e2e.ts): the version is the one the client was
+# generated from, and the port and secrets are made up per run.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kaneo
+      POSTGRES_DB: kaneo
+      POSTGRES_PASSWORD: ${E2E_POSTGRES_PASSWORD:?}
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kaneo -d kaneo"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  kaneo:
+    image: ghcr.io/usekaneo/kaneo:${E2E_KANEO_VERSION:?}
+    # Loopback only: the server answers sign-up to anyone who can reach it.
+    ports:
+      - "127.0.0.1:${E2E_PORT:?}:5173"
+    environment:
+      KANEO_CLIENT_URL: http://127.0.0.1:${E2E_PORT:?}
+      POSTGRES_USER: kaneo
+      POSTGRES_DB: kaneo
+      POSTGRES_PASSWORD: ${E2E_POSTGRES_PASSWORD:?}
+      AUTH_SECRET: ${E2E_AUTH_SECRET:?}
+    depends_on:
+      postgres:
+        condition: service_healthy

@@ -67,7 +67,8 @@ const post = async (path: string, body: unknown, cookie = ""): Promise<Response>
 
 const kaneo = (...args: string[]): { exitCode: number; stdout: string; stderr: string } => {
   const run = Bun.spawnSync(["bun", join(ROOT, "src/index.ts"), ...args], {
-    cwd: scratch,
+    // Inside HOME, where the walk up for a project's .kaneo.json stops.
+    cwd: cliEnv.HOME,
     env: cliEnv,
     stdout: "pipe",
     stderr: "pipe",
@@ -92,7 +93,7 @@ const refusal = (...args: string[]): string => {
 
 type Task = { id: string; number: number; title: string; status: string; priority: string };
 
-beforeAll(async () => {
+const start = async (): Promise<void> => {
   const port = await freePort();
   base = `http://127.0.0.1:${port}`;
   composeEnv = {
@@ -107,7 +108,15 @@ beforeAll(async () => {
   // anyone.
   const anonymous = join(scratch, "docker");
   mkdirSync(anonymous);
-  for (const image of IMAGES) docker(["pull", "--quiet", image], { DOCKER_CONFIG: anonymous });
+  // The logins live in the same directory as the selected context, so the
+  // daemon that context names is read first and named outright: the images
+  // have to land where compose will look for them.
+  const daemon = docker(["context", "inspect", "--format", "{{.Endpoints.docker.Host}}"], {}).trim();
+  // Only what the daemon lacks, so a second run needs no network.
+  for (const image of IMAGES) {
+    if (docker(["image", "ls", "--quiet", image], {}).trim() !== "") continue;
+    docker(["pull", "--quiet", image], { DOCKER_CONFIG: anonymous, DOCKER_HOST: daemon });
+  }
   compose("up", "--detach", "--pull", "never", "--wait", "--wait-timeout", "120");
 
   const deadline = Date.now() + 120_000;
@@ -147,22 +156,36 @@ beforeAll(async () => {
     KANEO_API_URL: `${base}/api`,
     KANEO_WORKSPACE: workspace.id,
   };
-}, START_TIMEOUT_MS);
+};
 
-// A key of its own for every scenario: the server stops answering a key after
-// 100 requests in its window, and the suite as a whole sends more than that.
-beforeEach(async () => {
-  const key = (await (await post("api-key/create", { name: "e2e" }, cookie)).json()) as { key: string };
-  cliEnv = { ...cliEnv, KANEO_API_KEY: key.key };
-});
-
-afterAll(() => {
+const stop = (): void => {
   try {
     if (Object.keys(composeEnv).length > 0) compose("down", "--volumes", "--timeout", "5");
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
-}, 60_000);
+};
+
+// afterAll is not run for a beforeAll that threw, and by then the containers
+// may already be up.
+beforeAll(async () => {
+  try {
+    await start();
+  } catch (e) {
+    stop();
+    throw e;
+  }
+}, START_TIMEOUT_MS);
+
+// A key of its own for every scenario: the server answers 401 to a key after
+// 100 requests in its window, and with one key for the whole suite the later
+// scenarios were refused that way.
+beforeEach(async () => {
+  const key = (await (await post("api-key/create", { name: "e2e" }, cookie)).json()) as { key: string };
+  cliEnv = { ...cliEnv, KANEO_API_KEY: key.key };
+});
+
+afterAll(stop, 60_000);
 
 describe("against a real server", () => {
   test("whoami names the account behind the key and its workspace", () => {
@@ -179,7 +202,7 @@ describe("against a real server", () => {
     const found = json<{ id: string }>("project", "get", created.slug);
 
     expect(listed).toContainEqual(expect.objectContaining({ id: created.id, name: "Launch Plan" }));
-    expect(found.id).toBe(created.id);
+    expect(found).toMatchObject({ id: created.id, slug: created.slug, name: "Launch Plan" });
   });
 
   test("a task keeps what create and update gave it", () => {
@@ -191,9 +214,9 @@ describe("against a real server", () => {
     const read = json<Task>("task", "get", "-p", slug, String(created.number));
     const listed = json<Task[]>("task", "list", "-p", slug);
 
-    expect(created.number).toBe(1);
+    expect(created).toMatchObject({ number: 1, title: "Write the announcement", status: "to-do", priority: "high" });
     expect(read).toMatchObject({ title: "Publish the announcement", status: "in-progress", priority: "high" });
-    expect(listed.map((task) => task.id)).toEqual([created.id]);
+    expect(listed).toEqual([expect.objectContaining({ id: created.id, title: "Publish the announcement", number: 1 })]);
   });
 
   test("a comment added to a task is the one listed on it", () => {

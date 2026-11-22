@@ -10,17 +10,18 @@ import { P1, SEED, WS } from "../parity/scenarios";
 // here, so every test drives the real CLI (`bun src/index.ts`) against the
 // parity fake behind a small proxy that can fail or observe the marker post.
 //
-// Every hook that sleeps uses a distinct `sleep 29.x<run>`, so a leftover can be
-// counted by its argument and none outlives the 30s bound. The run suffix keeps
-// two copies of this file running at once (several checkouts on one host) from
-// counting, or killing, each other's sleepers.
+// Every sleeper a hook leaves gets a distinct `sleep <base><run>` argument, so
+// a leftover is counted by it, and the run suffix keeps two copies of this file
+// running at once (several checkouts on one host) from counting, or killing,
+// each other's. Most sleep ~29s and are gone inside their test's bound; the one
+// whose test may run the full 60s sleeps ~120s and is killed by afterEach.
 
 const INDEX = join(import.meta.dir, "../../src/index.ts");
 // The whole pid: two runs share a pid namespace, so no two live at once share
 // it, where a slice of it (pid % 10000) could collide.
 const RUN = String(process.pid);
-const sleepArg = (base: "29.5" | "29.4" | "29.3" | "29.2" | "29.1"): string => `${base}${RUN}`;
-const SLEEPS = [sleepArg("29.5"), sleepArg("29.4"), sleepArg("29.3"), sleepArg("29.2"), sleepArg("29.1")];
+const sleepArg = (base: "120.0" | "29.5" | "29.4" | "29.3" | "29.2" | "29.1"): string => `${base}${RUN}`;
+const SLEEPS = [sleepArg("120.0"), sleepArg("29.5"), sleepArg("29.4"), sleepArg("29.3"), sleepArg("29.2"), sleepArg("29.1")];
 
 type Run = { exit: number | null; signal: string | null; stdout: string; stderr: string; ms: number };
 
@@ -35,7 +36,7 @@ const sleepersLeft = (): { pid: number; arg: string }[] => {
   const ps = Bun.spawnSync(["ps", "-eo", "pid=,args="]).stdout.toString();
   return ps
     .split("\n")
-    .map((l) => l.trim().match(/^(\d+)\s+sleep\s+(29\.\d+)$/))
+    .map((l) => l.trim().match(/^(\d+)\s+sleep\s+(\d+\.\d+)$/))
     .filter((m): m is RegExpMatchArray => m !== null && SLEEPS.includes(m[2]!))
     .map((m) => ({ pid: Number(m[1]), arg: m[2]! }));
 };
@@ -335,7 +336,7 @@ describe("signals around the hook's lifetime", () => {
   // signal" and the leftover was killed with it (#247). kaneo still dies of
   // the signal, since a caught one is always re-sent.
   test("a signal the hook sends as it exits is not kaneo's", async () => {
-    writeConfig({ attach: `(sleep ${sleepArg("29.1")}) & sleep 0.1; kill -TERM $PPID; exit 3` });
+    writeConfig({ attach: `(sleep ${sleepArg("120.0")}) & sleep 0.1; kill -TERM $PPID; exit 3` });
     for (let run = 1; run <= 10; run++) {
       const r = await kaneo("session", "attach", "1", "--strict");
       expect(r.signal, `run ${run}: ended with exit ${r.exit}, want killed by SIGTERM`).toBe("SIGTERM");
@@ -344,7 +345,15 @@ describe("signals around the hook's lifetime", () => {
     expect(failures.length).toBe(10);
     for (const line of failures) expect(line).toContain("exit status 3");
     expect(hooksLog()).not.toContain("killed: kaneo received a signal");
-    expect(sleepersLeft().filter((s) => s.arg === sleepArg("29.1")), "the leftovers were killed").toHaveLength(10);
+    // A sleeper counts only once it has exec'd, and the hook's `sleep 0.1` does
+    // not order that before kaneo exits — the #51 startup race — so the count
+    // is polled to ten rather than read once.
+    let left = 0;
+    for (let waited = 0; waited < 5000 && left < 10; waited += 100) {
+      left = sleepersLeft().filter((s) => s.arg === sleepArg("120.0")).length;
+      if (left < 10) await Bun.sleep(100);
+    }
+    expect(left, "the leftovers were killed").toBe(10);
   }, 60_000);
 
   // hooks.log is where a failure goes when stderr is lost, so a stderr that

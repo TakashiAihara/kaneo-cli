@@ -82,16 +82,19 @@ export const inoKey = (st: { dev: number; ino: number }): string => {
   return `${hex(major)}:${hex(minor)}:${st.ino}`;
 };
 
-// pids of this process's ancestors, nearest first. /proc/<pid>/stat's comm
-// field can hold spaces and parentheses, so the fields after the last ")" are
-// the ones read: state, then ppid.
-const ancestorPids = (): number[] => {
+// pids of this process's ancestors, nearest first, PID 1 last: the top of the
+// chain, whose parent is none — or itself where a namespace reports one — is
+// where the walk ends. /proc/<pid>/stat's comm field can hold spaces and
+// parentheses, so the fields after the last ")" are the ones read: state, then
+// ppid.
+export const ancestorPids = (): number[] => {
   const pids: number[] = [];
   let pid = process.ppid;
-  for (let i = 0; i < 64 && pid > 1; i++) {
+  for (let i = 0; i < 64 && pid > 0; i++) {
     const ppid = procPpid(pid);
     if (ppid === undefined) break;
     pids.push(pid);
+    if (ppid <= 0 || ppid === pid) break;
     pid = ppid;
   }
   return pids;

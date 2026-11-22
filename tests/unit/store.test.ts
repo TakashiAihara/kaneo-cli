@@ -292,7 +292,10 @@ describe("currentId", () => {
     return dir;
   };
 
-  test("a Devin session resolves from the lock an ancestor holds", async () => {
+  // Holding a lock takes flock(1), and the lookup seeing it takes /proc —
+  // both Linux's. Everywhere else the held-lock tests are skipped; the
+  // unheld-lock test needs neither, since "" is the right answer off Linux too.
+  test.skipIf(process.platform !== "linux")("a Devin session resolves from the lock an ancestor holds", async () => {
     const dataHome = join(tmp(), "data");
     const lock = join(devinLocks(dataHome), "flint-otter.lock");
     writeFileSync(lock, "");
@@ -336,7 +339,7 @@ describe("currentId", () => {
   // The lock being held is not enough either: it has to be an ancestor of
   // this process holding it. A lock held by an unrelated process — here a
   // flock sibling of the resolver, not a parent — resolves to nothing.
-  test("a Devin lock held by a non-ancestor resolves to empty", async () => {
+  test.skipIf(process.platform !== "linux")("a Devin lock held by a non-ancestor resolves to empty", async () => {
     const dataHome = join(tmp(), "data");
     const lock = join(devinLocks(dataHome), "flint-otter.lock");
     writeFileSync(lock, "");
@@ -374,7 +377,7 @@ describe("currentId", () => {
 
   // An explicit variable still wins over the lock: KANEO_SESSION_ID is how the
   // CLI is pinned to a session by hand.
-  test("a session variable wins over the Devin lock", async () => {
+  test.skipIf(process.platform !== "linux")("a session variable wins over the Devin lock", async () => {
     const dataHome = join(tmp(), "data");
     const lock = join(devinLocks(dataHome), "flint-otter.lock");
     writeFileSync(lock, "");

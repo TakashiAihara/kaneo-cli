@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { inoKey } from "../../src/session/devin";
+import { ancestorPids, inoKey } from "../../src/session/devin";
 
 // dev_t in the encoding glibc's sysmacros.h defines, written out from its
 // makedev() so the decode under test is checked against the spec rather than
@@ -35,5 +35,16 @@ describe("inoKey", () => {
   test("keeps major bits 12 and up out of the minor", () => {
     expect(key(5000n, 6n)).toBe("1388:06:424242");
     expect(key(0x12345n, 0x12345n)).toBe("12345:12345:424242");
+  });
+});
+
+// The walk reads the real /proc, so it can only be checked where /proc exists.
+// PID 1 ends the chain — a lock it holds is still an ancestor's — so it must
+// be the last pid the walk returns.
+describe("ancestorPids", () => {
+  test.skipIf(process.platform !== "linux")("the walk reaches PID 1", () => {
+    const pids = ancestorPids();
+    expect(pids.length).toBeGreaterThan(0);
+    expect(pids.at(-1)).toBe(1);
   });
 });

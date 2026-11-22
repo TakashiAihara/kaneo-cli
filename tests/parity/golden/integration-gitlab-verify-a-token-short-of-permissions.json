@@ -20,6 +20,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitlab-integration/verify",
       "query": "",

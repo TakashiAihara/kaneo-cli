@@ -53,8 +53,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/task/tasks/proj-beta: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-beta\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
-      "stderr": "Error: GET /api/task/tasks/proj-beta: 400: Workspace ID could not be determined: no project has the id, slug or name \"proj-beta\" (kaneo project find <text> searches names and slugs)\n"
+      "stdout": "{\n  \"error\": \"GET /api/project/proj-beta: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-beta\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/project/proj-beta: 400: Workspace ID could not be determined: no project has the id, slug or name \"proj-beta\" (kaneo project find <text> searches names and slugs)\n"
     },
     {
       "args": [
@@ -64,12 +64,17 @@
         "--yes",
         "--human"
       ],
-      "exit": 0,
-      "stdout": "deleted proj-old  Old\n",
-      "stderr": ""
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: project OLD (proj-old) is archived; pass --allow-archived to write to it anyway\n"
     }
   ],
   "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
     {
       "method": "GET",
       "path": "/project/proj-beta",
@@ -106,6 +111,11 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
       "method": "DELETE",
       "path": "/project/proj-beta",
       "query": ""
@@ -132,7 +142,7 @@
     },
     {
       "method": "GET",
-      "path": "/task/tasks/proj-beta",
+      "path": "/project/proj-beta",
       "query": ""
     },
     {
@@ -172,11 +182,6 @@
     },
     {
       "method": "GET",
-      "path": "/project/proj-old",
-      "query": ""
-    },
-    {
-      "method": "DELETE",
       "path": "/project/proj-old",
       "query": ""
     }

@@ -21,6 +21,11 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-noslug",
+      "query": ""
+    },
+    {
       "method": "PUT",
       "path": "/project/proj-noslug",
       "query": "",

@@ -21,6 +21,11 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "PUT",
       "path": "/project/proj-alpha/move",
       "query": "",

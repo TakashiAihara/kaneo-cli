@@ -68,6 +68,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/user/me",
       "query": ""
     },
@@ -87,6 +92,11 @@
         "status": "to-do",
         "userId": "user-self"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

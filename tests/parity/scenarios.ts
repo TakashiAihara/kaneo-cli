@@ -1333,6 +1333,60 @@ export const SCENARIOS: Scenario[] = [
       ["task", "ls", "--priority", "high", "--json"],
     ],
   },
+  // -A is the listing `project ls -A` gives tasks: the open tasks of every
+  // project of every workspace, each row naming its project and workspace.
+  // Archived projects are left out, and --status, --priority, --all and
+  // --description apply to each board.
+  {
+    name: "task list all workspaces",
+    seed: {
+      projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
+      tasks: [
+        ...SEED.tasks,
+        { id: "task-g1", projectId: "proj-gamma", title: "Gamma first", priority: "low" },
+        { id: "task-g2", projectId: "proj-gamma", title: "Gamma done", status: "done" },
+      ],
+    },
+    steps: [
+      ["task", "ls", "-A", "--human"],
+      ["task", "list", "--all-workspaces", "--json"],
+      ["task", "ls", "-A", "--all", "--human"],
+      ["task", "ls", "-A", "--status", "to-do", "--priority", "high", "--human"],
+      ["task", "ls", "-A", "--description", "multi", "--human"],
+    ],
+  },
+  // --mine and --workspace each name a narrower scope than -A's, so they are
+  // refused rather than silently ignored.
+  {
+    name: "task list all workspaces refuses a narrower scope",
+    steps: [
+      ["task", "ls", "-A", "--mine", "--json"],
+      ["task", "ls", "-A", "--workspace", WS, "--json"],
+    ],
+  },
+  // A workspace whose projects cannot be listed is reported after what could
+  // be read, the way `project ls -A` reports it: the listing goes ahead
+  // without it and the exit status says it is not all there is.
+  {
+    name: "task list all workspaces with a workspace that cannot be listed",
+    failOn: "^GET /project$",
+    failOnQuery: "workspaceId=ws-other",
+    seed: {
+      projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
+      tasks: [...SEED.tasks, { id: "task-g1", projectId: "proj-gamma", title: "Gamma first" }],
+    },
+    steps: [["task", "ls", "-A", "--human"]],
+  },
+  // A project whose board cannot be read is reported the same way.
+  {
+    name: "task list all workspaces with a board that cannot be read",
+    failOn: "^GET /task/tasks/proj-beta$",
+    seed: {
+      projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
+      tasks: [...SEED.tasks, { id: "task-g1", projectId: "proj-gamma", title: "Gamma first" }],
+    },
+    steps: [["task", "ls", "-A", "--human"]],
+  },
   ...both("task get by number", ["task", "get", "1"]),
   // A description above 64 KiB is left out of the listing, so resolving the task
   // by number reads it from the task detail.
@@ -1961,8 +2015,109 @@ export const SCENARIOS: Scenario[] = [
   // than the id behind it.
   { name: "task move human", steps: [["task", "move", "1", "--to", "BET", "--human"]] },
   { name: "task move without --to", steps: [["task", "move", "1", "--json"]] },
+  // A project in another workspace cannot take the server's move, so the task
+  // is recreated there: the fields carry over, the comments become one comment
+  // on the copy, the old task is left pointing at it, and the session ids the
+  // old comments named are listed for re-attaching by hand.
+  {
+    name: "task move across workspaces",
+    seed: {
+      projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
+      comments: [
+        ...(SEED.comments ?? []),
+        {
+          taskId: "task-a1",
+          content: "a note\n<!-- kn:session id=sess-old1 host=h cwd=/w branch=b state=running enc=1 -->",
+        },
+        {
+          taskId: "task-a1",
+          content: "and another\n<!-- kn:session id=sess-old2 host=h cwd=/w branch=b state=closed enc=1 -->",
+        },
+      ],
+    },
+    steps: [
+      ["task", "move", "1", "--to", "GAM", "--human"],
+      ["task", "ls", "-p", "proj-gamma", "--human"],
+      ["comment", "ls", "1", "--human"],
+      ["comment", "ls", "GAM#1", "--human"],
+      ["task", "move", "1", "--to", "proj-gamma", "--json"],
+    ],
+  },
+  // The destination's columns are its own: a status it lacks is refused before
+  // the copy exists. The column is made in the source project first, since
+  // every seeded project starts with the same columns.
+  {
+    name: "task move across workspaces to a project without the column",
+    seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
+    steps: [
+      ["column", "create", "QA", "--json"],
+      ["task", "status", "1", "qa", "--json"],
+      ["task", "move", "1", "--to", "GAM", "--human"],
+      ["task", "ls", "-p", "proj-gamma", "--human"],
+    ],
+  },
+  // An assignee is a member of a workspace, and the destination's is not the
+  // source's: one the destination does not know is dropped with a word on
+  // stderr rather than failing the create.
+  {
+    name: "task move across workspaces drops an assignee from another workspace",
+    seed: {
+      projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
+      tasks: SEED.tasks.map((t) => (t.id === "task-a1" ? { ...t, userId: "user-1" } : t)),
+      members: [
+        { id: "user-self", name: "Self", email: "self@example.com", role: "owner", workspaceId: WS },
+        { id: "user-1", name: "Ada", email: "ada@example.com", role: "reviewer", workspaceId: WS },
+      ],
+    },
+    steps: [
+      ["task", "move", "1", "--to", "GAM", "--human"],
+      ["task", "get", "GAM#1", "--json"],
+    ],
+  },
+  // A move that fails after the copy exists says which task now stands for the
+  // old one, so a retry does not create a second copy. The first task read is
+  // the migration's own; the second is the copy's read-back. The pattern keeps
+  // the board listing (/task/tasks/...) out of the count.
+  {
+    name: "task move across workspaces when the copy cannot be verified",
+    failOn: "^GET /task/task[^s/]",
+    failOnSkip: 1,
+    seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
+    steps: [["task", "move", "1", "--to", "GAM", "--human"]],
+  },
+  // A task that already carries the 移行先 pointer was migrated once: moving it
+  // again is refused with where the first copy went, rather than leaving a
+  // second live one. The copy itself moves like any task.
+  {
+    name: "task move across workspaces is not repeated",
+    seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
+    steps: [
+      ["task", "move", "1", "--to", "GAM", "--human"],
+      ["task", "move", "1", "--to", "GAM", "--human"],
+      ["task", "move", "GAM#1", "--to", "ALP", "--human"],
+    ],
+  },
+  // The folded comments are posted under the server's 10,000-character comment
+  // cap: comments that would not fit in one are split into as many comments as
+  // it takes rather than failing after the copy exists.
+  {
+    name: "task move across workspaces folds comments past the comment limit",
+    seed: {
+      projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }],
+      comments: [
+        ...(SEED.comments ?? []),
+        { taskId: "task-a1", content: "x".repeat(6000) },
+        { taskId: "task-a1", content: "y".repeat(6000) },
+        { taskId: "task-a1", content: "z".repeat(9950) },
+      ],
+    },
+    steps: [
+      ["task", "move", "1", "--to", "GAM", "--human"],
+      ["comment", "ls", "GAM#1", "--human"],
+    ],
+  },
   // The server moves a task only within its own workspace, so a slug found only
-  // in another one is said to be there rather than left as a bare 404.
+  // in another one is migrated there rather than left as a bare 404.
   {
     name: "task move to a project in another workspace",
     seed: { projects: [...SEED.projects, { id: "proj-gamma", workspaceId: "ws-other", name: "Gamma", slug: "GAM" }] },
@@ -2007,8 +2162,9 @@ export const SCENARIOS: Scenario[] = [
     seed: { projects: [...SEED.projects, { id: "proj-beta2", workspaceId: "ws-other", name: "Beta", slug: "BT2" }] },
     steps: [["task", "move", "1", "--to", "Beta", "--human"]],
   },
-  // The task's own workspace cannot be listed, so its workspace is unknown and
-  // the lookup stops rather than searching every workspace.
+  // The task's own workspace cannot be listed, so a slug that might live there
+  // too is not safe to act on: the lookup refuses rather than guessing which
+  // workspace's project the word meant.
   {
     name: "task move when the task's workspace cannot be listed",
     failOn: "^GET /project$",
@@ -2016,7 +2172,8 @@ export const SCENARIOS: Scenario[] = [
     steps: [["task", "move", "1", "--to", "GAM", "--human"]],
   },
   // Another workspace that cannot be listed could not hold the destination, so
-  // a miss is a miss and does not hedge about it.
+  // a miss is a miss and does not hedge about it — but it does say which
+  // workspace went unlisted.
   {
     name: "task move to a missing project while another workspace cannot be listed",
     failOn: "^GET /project$",
@@ -2037,6 +2194,60 @@ export const SCENARIOS: Scenario[] = [
     failStatus: 404,
     failMessage: "Workspace not found",
     steps: [["task", "move", "1", "--to", "BET", "--human"]],
+  },
+  // An archived project still resolves — that is what archiving is for — but
+  // reads say so on stderr, writes refuse unless --allow-archived is passed,
+  // and a destination that is archived refuses the move the same way. proj-old
+  // is the seed's archived project.
+  {
+    name: "archived project reads warn and writes refuse",
+    env: { KANEO_SESSION_ID: "sess-arch" },
+    extraTasks: [{ id: "task-o1", projectId: "proj-old", title: "Old work" }],
+    steps: [
+      ["task", "get", "proj-old#1", "--human"],
+      ["task", "ls", "-p", "proj-old", "--human"],
+      ["column", "ls", "-p", "proj-old", "--human"],
+      ["task", "status", "proj-old#1", "done", "--human"],
+      ["comment", "add", "proj-old#1", "still here", "--human"],
+      ["task", "create", "new one", "-p", "proj-old", "--human"],
+      // Fail-open does not hide this refusal: a session hook that stayed
+      // quiet would leave the attach silently not happening.
+      ["session", "attach", "proj-old#1"],
+      ["session", "attach", "proj-old#1", "--strict"],
+      ["task", "move", "1", "--to", "OLD", "--human"],
+      ["task", "status", "proj-old#1", "done", "--allow-archived", "--human"],
+      ["comment", "add", "proj-old#1", "still here", "--allow-archived", "--human"],
+      ["task", "create", "new one", "-p", "proj-old", "--allow-archived", "--human"],
+      ["task", "ls", "-p", "proj-gone", "--human"],
+    ],
+  },
+  // context is where a reader finds out the project the settings resolved to
+  // is archived — or that the server does not have it at all — before a write
+  // refuses or silently lands somewhere nobody lists.
+  {
+    name: "context reports the resolved project's state",
+    env: { KANEO_PROJECT: "proj-old" },
+    steps: [
+      ["context", "--json"],
+      ["context", "--human"],
+    ],
+  },
+  {
+    name: "context reports a project the server does not have",
+    env: { KANEO_PROJECT: "proj-gone" },
+    steps: [["context", "--json"]],
+  },
+  // A project configured by slug or name resolves the way every command
+  // resolves it: GET /project/:id answers ids only, so the value goes through
+  // the same lookup first and the state reported is the resolved project's.
+  {
+    name: "context reports the state of a project configured by slug or name",
+    env: { KANEO_PROJECT: "OLD" },
+    steps: [
+      ["context", "--json"],
+      ["context", "-p", "Alpha", "--json"],
+      ["context", "-p", "old", "--human"],
+    ],
   },
   {
     name: "task due set and clear",
@@ -2810,6 +3021,49 @@ export const SCENARIOS: Scenario[] = [
       ["comment", "ls", "1", "--human"],
     ],
   },
+  // `update` is the verb `task update` already uses; `edit` stays as its alias.
+  {
+    name: "comment update",
+    steps: [
+      ["comment", "update", "1", "cmt0001", "rewritten", "by", "update", "--json"],
+      ["comment", "edit", "1", "cmt0001", "rewritten", "by", "edit", "--human"],
+      ["comment", "update", "1", "nope", "x", "--json"],
+      ["comment", "update", "3", "cmt-other", "x", "--json"],
+      ["comment", "ls", "1", "--human"],
+    ],
+  },
+  // --status writes the column before the comment, so a column the project
+  // does not have fails with no comment behind it.
+  {
+    name: "comment add with status",
+    steps: [
+      ["comment", "add", "1", "moving", "this", "--status", "in-progress", "--json"],
+      ["comment", "add", "1", "bad", "status", "--status", "no-such-column", "--json"],
+      ["comment", "add", "1", "empty", "--status", "", "--json"],
+      ["task", "get", "1", "--json"],
+      ["comment", "ls", "1", "--human"],
+    ],
+  },
+  // The status lands first, so a comment the server never keeps is reported
+  // with the move it followed rather than as a comment that never happened.
+  {
+    name: "comment add status lands when the comment fails",
+    failOn: "^POST /comment/task-a1$",
+    steps: [
+      ["comment", "add", "1", "text", "--status", "done", "--json"],
+      ["task", "get", "1", "--json"],
+    ],
+  },
+  // The comment lands before the read-back, so a read-back that fails says the
+  // comment was added: a retry reading the bare failure would post it twice.
+  {
+    name: "comment add status read-back fails after the comment lands",
+    failOn: "^GET /task/task-a1$",
+    steps: [
+      ["comment", "add", "1", "text", "--status", "done", "--json"],
+      ["comment", "ls", "1", "--human"],
+    ],
+  },
 
   ...both("activity list", ["activity", "list", "1"]),
   {
@@ -3557,6 +3811,31 @@ export const SCENARIOS: Scenario[] = [
       ["session", "status", "--json"],
     ],
   },
+  // The project itself is gone, so the guard's project read fails before the
+  // marker post is tried; the close still reaches the post, which cannot
+  // place the task, and releases the attachment the same way.
+  {
+    name: "session close releases a task whose project is gone",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["project", "rm", "ALP", "--yes", "--human"],
+      ["session", "close"],
+      ["session", "status", "--json"],
+    ],
+  },
+  // `session next` on the same gone project reports the marker post's own
+  // refusal rather than the project read's, and keeps the attachment.
+  {
+    name: "session next on a task whose project is gone",
+    env: { KANEO_SESSION_ID: "sess-test" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["project", "rm", "ALP", "--yes", "--human"],
+      ["session", "next", "onward", "--strict"],
+      ["session", "status", "--json"],
+    ],
+  },
   // Any other failure of the marker keeps the attachment, so the close can be
   // run again once the server answers.
   {
@@ -4269,6 +4548,9 @@ export const SCENARIOS: Scenario[] = [
     config: { profiles: { self: { api_key_command: "echo ran >&2; exit 3" } } },
     // The calendar route declares security: [], so `feed get` is one of the
     // commands that send no key; the seeded feed's empty labels still serve.
+    // `context` is the exception that proves the rule's edge: with a project
+    // resolved it does ask the server (for the archived state), the command
+    // fails, and context still exits 0 with the failure in project_state.
     seed: {
       calendarFeeds: [{ projectId: P1 }],
       projects: [

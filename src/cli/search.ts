@@ -9,7 +9,7 @@ import {
   type SearchResult,
 } from "../api/kaneo";
 import { minimumArgs, type FlagValues } from "./args";
-import { resolveWorkspaceIn, slugOr, withProject } from "./lookup";
+import { guardProject, resolveWorkspaceIn, slugOr, withProject } from "./lookup";
 
 // The server's own bounds on limit (v2.29.2 search/schema.ts), which the
 // document does not state.
@@ -80,7 +80,12 @@ export const searchCommand = {
     if (acrossAll) {
       ({ found, more } = await searchEverywhere({ query, workspaceId: "", projectId: "", type, limit }, wanted));
     } else {
-      const inProject = narrow ? await withProject(project(app), (id) => getProject(id)) : undefined;
+      const inProject = narrow
+        ? await withProject(project(app), async (id) => {
+            await guardProject(id);
+            return getProject(id);
+          })
+        : undefined;
       // The workspace's name comes free with the resolution when the search is
       // not narrowed; narrowed to a project it is only needed if a slug match
       // is added below, and is looked up then.

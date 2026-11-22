@@ -133,8 +133,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
-      "stderr": "Error: GET /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
+      "stdout": "{\n  \"error\": \"GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
     },
     {
       "args": [
@@ -146,8 +146,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"POST /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
-      "stderr": "Error: POST /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
+      "stdout": "{\n  \"error\": \"GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
     },
     {
       "args": [
@@ -158,8 +158,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/workflow-rule/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
-      "stderr": "Error: GET /api/workflow-rule/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
+      "stdout": "{\n  \"error\": \"GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
     },
     {
       "args": [
@@ -173,14 +173,14 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
-      "stderr": "Error: GET /api/column/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
+      "stdout": "{\n  \"error\": \"GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
     }
   ],
   "requests": [
     {
       "method": "GET",
-      "path": "/column/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -200,12 +200,42 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/column/proj-beta",
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/bet",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
       "method": "POST",
-      "path": "/column/bet",
+      "path": "/column/proj-beta",
       "query": "",
       "body": {
         "name": "Waiting",
@@ -214,31 +244,7 @@
     },
     {
       "method": "GET",
-      "path": "/auth/organization/list",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-main"
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-other"
-    },
-    {
-      "method": "POST",
-      "path": "/column/proj-beta",
-      "query": "",
-      "body": {
-        "name": "Waiting",
-        "isFinal": false
-      }
-    },
-    {
-      "method": "GET",
-      "path": "/column/Beta",
+      "path": "/project/Beta",
       "query": ""
     },
     {
@@ -255,6 +261,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -271,7 +282,7 @@
     },
     {
       "method": "GET",
-      "path": "/column/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -288,6 +299,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -321,7 +337,7 @@
     },
     {
       "method": "GET",
-      "path": "/column/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -338,6 +354,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -356,7 +377,7 @@
     },
     {
       "method": "GET",
-      "path": "/workflow-rule/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -373,6 +394,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -381,7 +407,7 @@
     },
     {
       "method": "GET",
-      "path": "/workflow-rule/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -398,6 +424,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -411,7 +442,7 @@
     },
     {
       "method": "GET",
-      "path": "/column/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -428,6 +459,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -441,7 +477,7 @@
     },
     {
       "method": "GET",
-      "path": "/column/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -458,6 +494,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -471,51 +512,7 @@
     },
     {
       "method": "GET",
-      "path": "/column/nope",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/auth/organization/list",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-main"
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-other"
-    },
-    {
-      "method": "POST",
-      "path": "/column/nope",
-      "query": "",
-      "body": {
-        "name": "Waiting",
-        "isFinal": false
-      }
-    },
-    {
-      "method": "GET",
-      "path": "/auth/organization/list",
-      "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-main"
-    },
-    {
-      "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-other"
-    },
-    {
-      "method": "GET",
-      "path": "/workflow-rule/nope",
+      "path": "/project/nope",
       "query": ""
     },
     {
@@ -535,7 +532,47 @@
     },
     {
       "method": "GET",
-      "path": "/column/nope",
+      "path": "/project/nope",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/nope",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/nope",
       "query": ""
     },
     {

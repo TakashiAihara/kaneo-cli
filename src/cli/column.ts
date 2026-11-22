@@ -11,7 +11,7 @@ import {
 } from "../api/kaneo";
 import { KaneoApiError } from "../api/http";
 import { exactArgs, minimumArgs, noArgs, type FlagValues } from "./args";
-import { withProject } from "./lookup";
+import { allowArchivedFlag, guardProject, withProject, writeAccess } from "./lookup";
 import { displayWidth, padCells, shellWord } from "../output/output";
 
 // The columns of the resolved project, and the changes to them.
@@ -27,7 +27,10 @@ export const columnCommand = {
       args: noArgs("kaneo column list"),
       run: async ({ app }: { app: App }) => {
         apiKey(app);
-        const columns = await withProject(project(app), (id) => listColumns(id));
+        const columns = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return listColumns(id);
+        });
         printColumns(app, columns);
         app.out.data(columns);
       },
@@ -52,6 +55,7 @@ export const columnCommand = {
         },
         { name: "icon", type: "string" as const, usage: "icon name", defaultValue: "" },
         { name: "color", type: "string" as const, usage: "color, stored as given", defaultValue: "" },
+        allowArchivedFlag,
       ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
@@ -61,7 +65,10 @@ export const columnCommand = {
           color: String(flags.color ?? ""),
           isFinal: flags.final === true,
         };
-        const created = await withProject(project(app), (id) => createColumn(id, column));
+        const created = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return createColumn(id, column);
+        });
         app.out.human(`created column ${created.slug} ${created.name}`);
         app.out.data(created);
       },
@@ -75,9 +82,13 @@ export const columnCommand = {
         "The slug is derived from the name when the column is created, so a rename\n" +
         "leaves it as it was, and so leaves every task's status in the column.",
       args: minimumArgs(2),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const found = await withProject(project(app), (id) => resolveColumn(id, args[0]!));
+        const found = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return resolveColumn(id, args[0]!);
+        });
         const renamed = await renameColumn(found.id, newName(args.slice(1)));
         app.out.human(`renamed column ${renamed.slug} ${renamed.name}`);
         app.out.data(renamed);
@@ -165,12 +176,13 @@ export const columnCommand = {
         "moves the columns it is sent, so a column left out would keep its old\n" +
         "position and share it with whichever column took that place.",
       args: minimumArgs(1),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const { projectId, current } = await withProject(project(app), async (projectId) => ({
-          projectId,
-          current: await listColumns(projectId),
-        }));
+        const { projectId, current } = await withProject(project(app), async (projectId) => {
+          await guardProject(projectId, writeAccess(flags));
+          return { projectId, current: await listColumns(projectId) };
+        });
         const order = newOrder(current, args);
         const columns = await reorderColumns(
           projectId,
@@ -191,13 +203,16 @@ export const columnCommand = {
         "Deleting one also deletes the workflow rules that send tasks to it, since\n" +
         "a rule cannot point at a column that is not there.",
       args: exactArgs(1),
-      flags: [{ name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" }],
+      flags: [
+        { name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" },
+        allowArchivedFlag,
+      ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const { projectId, found } = await withProject(project(app), async (projectId) => ({
-          projectId,
-          found: await resolveColumn(projectId, args[0]!),
-        }));
+        const { projectId, found } = await withProject(project(app), async (projectId) => {
+          await guardProject(projectId, writeAccess(flags));
+          return { projectId, found: await resolveColumn(projectId, args[0]!) };
+        });
         // Only an empty column can go, but its id and place on the board do not
         // come back: a column created again under the same name gets a new id
         // and the last position.

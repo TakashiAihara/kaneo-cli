@@ -15,8 +15,8 @@
         "ls"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/task/tasks/proj-alpha: Get \\\"http://127.0.0.1:9/api/task/tasks/proj-alpha\\\": dial tcp 127.0.0.1:9: connect: connection refused\"\n}\n",
-      "stderr": "Error: GET /api/task/tasks/proj-alpha: Get \"http://127.0.0.1:9/api/task/tasks/proj-alpha\": dial tcp 127.0.0.1:9: connect: connection refused\n"
+      "stdout": "{\n  \"error\": \"GET /api/project/proj-alpha: Get \\\"http://127.0.0.1:9/api/project/proj-alpha\\\": dial tcp 127.0.0.1:9: connect: connection refused\"\n}\n",
+      "stderr": "Error: GET /api/project/proj-alpha: Get \"http://127.0.0.1:9/api/project/proj-alpha\": dial tcp 127.0.0.1:9: connect: connection refused\n"
     },
     {
       "args": [

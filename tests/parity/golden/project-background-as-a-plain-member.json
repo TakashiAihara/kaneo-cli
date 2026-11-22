@@ -29,6 +29,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "PUT",
       "path": "/project/proj-alpha/background-upload",
       "query": "",
@@ -50,6 +55,11 @@
     {
       "method": "GET",
       "path": "/workspace/ws-main/members",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

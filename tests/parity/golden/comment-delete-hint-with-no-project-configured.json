@@ -63,12 +63,22 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/comment/task-b1",
       "query": ""
     },
     {
       "method": "GET",
       "path": "/task/task-b1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
       "query": ""
     },
     {

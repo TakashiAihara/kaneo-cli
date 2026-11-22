@@ -47,6 +47,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/auth/organization/list",
       "query": ""
     },
@@ -82,6 +87,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

@@ -11,7 +11,7 @@ import {
   type GitHubIntegration,
 } from "../api/kaneo";
 import { exactArgs, noArgs, type FlagValues } from "./args";
-import { withProject } from "./lookup";
+import { allowArchivedFlag, guardProject, withProject, writeAccess } from "./lookup";
 
 // owner and name are each a GitHub path segment the server checks against the
 // installation. Blank is refused here, as is the 100 characters the request
@@ -114,12 +114,13 @@ export const githubCommand = {
         apiKey(app);
         const installationPage = pageArg(flags, changed, "installation-page");
         const repositoryPage = pageArg(flags, changed, "repository-page");
-        const result = await withProject(project(app), (id) =>
-          listGitHubRepositories(id, {
+        const result = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return listGitHubRepositories(id, {
             ...(installationPage === undefined ? {} : { installationPage }),
             ...(repositoryPage === undefined ? {} : { repositoryPage }),
-          }),
-        );
+          });
+        });
         for (const installation of result.installations) {
           const account =
             installation.account === null
@@ -156,7 +157,10 @@ export const githubCommand = {
       run: async ({ args, app }: { args: string[]; app: App }) => {
         const [owner, name] = repoRef(args);
         apiKey(app);
-        const result = await withProject(project(app), (id) => verifyGitHubRepository(id, owner, name));
+        const result = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return verifyGitHubRepository(id, owner, name);
+        });
         // The facts lead so an empty server message cannot hide them: the
         // message is the server's own summary of the same answer.
         app.out.human(`installed    ${result.isInstalled ? "yes" : "no"}`);
@@ -181,7 +185,10 @@ export const githubCommand = {
       args: noArgs("kaneo integration github get"),
       run: async ({ app }: { app: App }) => {
         apiKey(app);
-        const integration = await withProject(project(app), (id) => getGitHubIntegration(id));
+        const integration = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return getGitHubIntegration(id);
+        });
         if (integration === null) {
           app.out.human("no GitHub integration; `kaneo integration github connect <owner> <repo>` links one");
           app.out.data(null);
@@ -202,10 +209,14 @@ export const githubCommand = {
         "when the same repository is already linked, and refuses a different one\n" +
         "with 409 — `kaneo integration github rm` disconnects first.",
       args: exactArgs(2),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         const [owner, name] = repoRef(args);
         apiKey(app);
-        const integration = await withProject(project(app), (id) => connectGitHubRepository(id, owner, name));
+        const integration = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return connectGitHubRepository(id, owner, name);
+        });
         app.out.human(`connected ${integration.repositoryOwner}/${integration.repositoryName}`);
         printIntegration(app, integration);
         app.out.data(integration);
@@ -228,6 +239,7 @@ export const githubCommand = {
           usage: "comment a link back to the task on the GitHub issue (--comment-task-link=false turns it off)",
           defaultValue: "false",
         },
+        allowArchivedFlag,
       ],
       run: async ({ flags, changed, app }: { flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
         apiKey(app);
@@ -238,7 +250,10 @@ export const githubCommand = {
         if (changes.isActive === undefined && changes.commentTaskLinkOnGitHubIssue === undefined) {
           throw new Error("nothing to change: pass --active or --comment-task-link");
         }
-        const integration = await withProject(project(app), (id) => updateGitHubIntegration(id, changes));
+        const integration = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return updateGitHubIntegration(id, changes);
+        });
         app.out.human("updated GitHub integration");
         printIntegration(app, integration);
         app.out.data(integration);
@@ -249,7 +264,10 @@ export const githubCommand = {
       aliases: ["delete"],
       short: "Disconnect the project from its GitHub repository",
       args: noArgs("kaneo integration github rm"),
-      flags: [{ name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" }],
+      flags: [
+        { name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" },
+        allowArchivedFlag,
+      ],
       run: async ({ flags, app }: { flags: FlagValues; app: App }) => {
         apiKey(app);
         // The unlink cannot be undone from here: issue and pull request sync
@@ -259,7 +277,10 @@ export const githubCommand = {
             "refusing to delete the GitHub integration without --yes; the project is unlinked from its repository",
           );
         }
-        const deleted = await withProject(project(app), (id) => deleteGitHubIntegration(id));
+        const deleted = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return deleteGitHubIntegration(id);
+        });
         app.out.human("deleted GitHub integration");
         app.out.data(deleted);
       },
@@ -281,11 +302,15 @@ export const githubCommand = {
           usage: "resume a specific import run rather than the latest",
           defaultValue: "",
         },
+        allowArchivedFlag,
       ],
       run: async ({ flags, changed, app }: { flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
         apiKey(app);
         const runId = runIdArg(flags, changed);
-        const result = await withProject(project(app), (id) => importGitHubIssues(id, runId));
+        const result = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return importGitHubIssues(id, runId);
+        });
         app.out.human(
           `import ${result.runId}: ${result.imported} imported, ${result.updated} updated, ${result.skipped} skipped`,
         );

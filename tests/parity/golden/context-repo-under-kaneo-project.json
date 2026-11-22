@@ -8,7 +8,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-env\"\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-env\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-env\",\n      \"error\": \"GET /api/project/proj-env: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-env\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n    }\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
       "stderr": ""
     },
     {
@@ -19,11 +19,52 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-env\"\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-env\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-env\",\n      \"error\": \"GET /api/project/proj-env: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-env\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n    }\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"env\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
       "stderr": ""
     }
   ],
-  "requests": [],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-env",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-env",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    }
+  ],
   "files": {
     ".config/kaneo/config.json": "{\"owners\":{\"acme\":\"ws-acme\"},\"repos\":{\"acme/thing\":[\"proj-x\"]}}"
   }

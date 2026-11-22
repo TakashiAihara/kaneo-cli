@@ -1,0 +1,350 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "GAM",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1 -> Other / GAM#1 Write the parser\nsessions in the old comments: none\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "GAM",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: #1 was already moved to Other / GAM#1; move the copy it names instead of this task\n"
+    },
+    {
+      "args": [
+        "task",
+        "move",
+        "GAM#1",
+        "--to",
+        "ALP",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "#1 -> Main / ALP#4 Write the parser\nsessions in the old comments: none\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/GAM",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/GAM",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-gamma",
+      "query": "",
+      "body": {
+        "title": "Write the parser",
+        "description": "移行元: Main / ALP#1\n\nmulti\nline",
+        "priority": "high",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task0002",
+      "query": "",
+      "body": {
+        "content": "Comments moved from Main / ALP#1:\n\n--- Self 2026-01-01T00:00:09.000Z ---\nfirst comment"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task0002",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "移行先: Other / GAM#1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/GAM",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/GAM",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/GAM",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
+      "query": "",
+      "body": {
+        "title": "Write the parser",
+        "description": "移行元: Other / GAM#1\n\n移行元: Main / ALP#1\n\nmulti\nline",
+        "priority": "high",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task0005",
+      "query": "",
+      "body": {
+        "content": "Comments moved from Other / GAM#1:\n\n--- Self 2026-01-01T00:00:12.000Z ---\nComments moved from Main / ALP#1:\n\n--- Self 2026-01-01T00:00:09.000Z ---\nfirst comment"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task0005",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task0005",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task0002",
+      "query": "",
+      "body": {
+        "content": "移行先: Main / ALP#4"
+      }
+    }
+  ],
+  "files": {}
+}

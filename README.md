@@ -70,7 +70,7 @@ Not every layer answers every setting:
 | workspace | flag, environment, `.kaneo.json`, profile, `owners`     |
 | project   | flag, environment, `.kaneo.json`, profile, `repos`      |
 
-`kaneo context` prints the resolved values and names the layer each one came from.
+`kaneo context` prints the resolved values and names the layer each one came from, and asks the server about each resolved project: `project_state` says whether it is archived, or why it could not be read — the check a write to an archived project is refused on unless `--allow-archived` is passed.
 
 `kaneo context --repo owner/name` (or a git remote URL) resolves for that repository instead of the one the current directory's remote names, so the maps can be read before a checkout exists.
 
@@ -79,7 +79,7 @@ Not every layer answers every setting:
 
 ### Ids, slugs and names
 
-`--project`, `--workspace` and `task move --to` take an id, a slug or a name (`task move --to` matches only the projects of the task's own workspace, as the server moves a task nowhere else), matched in that order: an id exactly, a slug or a name exactly before ignoring case. A slug or a name matching exactly one is used; several matches are all listed so the id can pick one.
+`--project`, `--workspace` and `task move --to` take an id, a slug or a name (`task move --to` prefers the projects of the task's own workspace, since the server moves a task nowhere else, and only a value that names nothing there widens to the other workspaces, where the task is recreated instead), matched in that order: an id exactly, a slug or a name exactly before ignoring case. A slug or a name matching exactly one is used; several matches are all listed so the id can pick one.
 
 A project is sent as an id first, so an id costs no extra request; only when the server says it does not know the value is it looked up across every workspace the key can reach (one listing per workspace, all asked at once), which a slug kept in `.kaneo.json` or the repo map pays on every command. A workspace whose listing fails does not stop the others: `project ls -A` and `project find` print what was listed, say on stderr which workspace could not be listed and exit 1; a lookup that misses, or that matches only by slug or name, while a workspace is unlisted says so and asks for the id instead of acting on a match that may not be the only one. A workspace is matched against `workspace ls` before it is sent — one request — because an instance admin's key gets an empty project list, not an error, for a workspace that does not exist. That listing holds only the workspaces the key's user is a member of.
 
@@ -127,6 +127,8 @@ kaneo project ls --archived            # find one to bring back
 kaneo board --archived                 # show them anyway
 ```
 
+An archived project still resolves everywhere a project is named — archiving is how a finished board leaves the lists, not how it is deleted — but the commands that act on it say so. A read against the resolved project warns once on stderr (`project OLD (proj-old) is archived; reads still work, writes need --allow-archived`), and a write — `task create`, `task status`, `comment add`, `session attach` and the rest of the task-scoped writes — refuses with the same sentence unless `--allow-archived` is passed. `kaneo context` reports each resolved project's state up front, so a checkout mapped to an archived project is visible before the first write fails.
+
 Written with mode `0600`, since a profile may hold a key.
 
 A profile can name a command that prints the key instead of holding it, so the key stays in a secret manager and reaches only this process:
@@ -135,7 +137,7 @@ A profile can name a command that prints the key instead of holding it, so the k
 { "profiles": { "self": { "api_key_command": "pass show kaneo/api-key | head -n1" } } }
 ```
 
-The command runs through `sh -c` only when `--api-key`, `KANEO_API_KEY` and the profile's `api_key` are all empty and a request is about to be sent (`completion`, `session status` and `context` never run it; `context` reports such a key as `set (command)` without checking that the command works), at most once per run and for up to 30 seconds. Its stdout, trimmed, is the key; its stderr is shown as is, so it must not print the key there. A non-zero exit, empty output, 64 KiB or more, or anything but printable ASCII without spaces stops the command that needed the key without printing the value; a fail-open `session` command still exits 0. `kaneo context` reports the key's origin as `command`. This makes the config file run code on routine commands, so do not sync it from anywhere you would not run a script from.
+The command runs through `sh -c` only when `--api-key`, `KANEO_API_KEY` and the profile's `api_key` are all empty and a request is about to be sent (`completion` and `session status` never run it; `context` runs it only when a project is resolved, to ask the server whether that project is archived, and reports the failure in `project_state` rather than stopping), at most once per run and for up to 30 seconds. Its stdout, trimmed, is the key; its stderr is shown as is, so it must not print the key there. A non-zero exit, empty output, 64 KiB or more, or anything but printable ASCII without spaces stops the command that needed the key without printing the value; a fail-open `session` command still exits 0. `kaneo context` reports the key's origin as `command`. This makes the config file run code on routine commands, so do not sync it from anywhere you would not run a script from.
 
 ### Self-hosted instances
 
@@ -202,8 +204,9 @@ kaneo integration slack get                    # also discord and telegram: the 
 kaneo integration slack set --webhook-url - [--channel-name NAME] < webhook-url.txt
 kaneo integration telegram set --bot-token - --chat-id <chat-id> [--thread-id N] [--chat-label NAME] < token.txt
 kaneo integration slack rm --yes
-kaneo task ls [--status ...] [--priority ...] [--description TEXT] [--all]
+kaneo task ls [--status ...] [--priority ...] [--description TEXT] [--all] [-A | --all-workspaces]
 kaneo task ls --mine       # open tasks assigned to you across the workspace, at most 100
+kaneo task ls -A           # open tasks across every project and workspace, each row naming its project and workspace
 kaneo task get <task-id>                 # also lists the task's relations and the sessions holding it
 kaneo task describe <task>               # the description in full, however long
 kaneo task create <title> [-d TEXT | --description-file PATH] [flags]
@@ -211,6 +214,7 @@ kaneo task create --title <title> [flags]                      # the same, as ta
 kaneo task create <title> --attach [--next <step>] [--force]   # attaches this session to the new task; --force creates beside one naming the same reference
 kaneo task update <task> [--title TEXT] [-d TEXT | --description-file PATH] [--status COL] [--priority P] [--assignee USER] [--start-date DATE] [--position N]   # only what is passed changes; --start-date "" clears
 kaneo task duplicate <task> [--title T] [--to PROJECT]         # a copy of the task; --to moves the copy to another project
+kaneo task move <task> --to <project>                          # moves it; a project in another workspace recreates it there
 kaneo task status <task-id> <status>
 kaneo notification ls [--unread]                             # the newest 50, as the server returns
 kaneo notification read <notification-id>... | --all
@@ -234,8 +238,8 @@ kaneo task link <task> <other> --type <type>    # subtask, blocks or related; th
 kaneo task unlink <relation-id>
 kaneo task unlink <task> <other> [--type <type>]
 kaneo comment ls <task>
-kaneo comment add <task> <text...> | - | -F PATH
-kaneo comment edit <task> <comment-id> <text...>   # only the author may edit
+kaneo comment add <task> <text...> | - | -F PATH [--status COL]   # --status moves the task first, then comments
+kaneo comment update <task> <comment-id> <text...>   # only the author may edit; `comment edit` is the same command
 kaneo activity ls <task>                            # history: comments and events such as status changes
 kaneo activity add <task> <type> [message...] [--data '{"k":"v"}']   # a history entry only; cannot be removed on its own; Kaneo 2.23.0+
 kaneo label ls [task]                # the workspace's labels, or those on a task
@@ -291,13 +295,13 @@ A project's slug is the prefix of its task identifiers. Without `--slug`, `proje
 
 A project's board background is an image the `background` group manages. `background set` uploads `file` (`-` reads the bytes from stdin, which then needs `--content-type`) through the presigned URL the API prepares, the way the web app's upload runs; the content type comes from `--content-type` or the file's extension, and the server accepts only the image types it lists, up to its size limit. `background get` writes the image to stdout exactly as it arrives — it is not JSON, so `--json` and `--jq` are refused, and so is a terminal, since the bytes are the server's to choose; redirect it to a file (`> bg.png`) or pipe it on. `background rm` needs `--yes`, as every delete does.
 
-A task in no column at all — the server answers `planned` and `archived` tasks beside the columns — is read as a column of its own. `task ls` leaves out tasks in `done`, `planned` and `archived` unless `--all` or an explicit `--status` asks for them, and says on stderr, in every output mode, how many it left out. `board` shows neither planned nor archived tasks.
+A task in no column at all — the server answers `planned` and `archived` tasks beside the columns — is read as a column of its own. `task ls` leaves out tasks in `done`, `planned` and `archived` unless `--all` or an explicit `--status` asks for them, and says on stderr, in every output mode, how many it left out. `board` shows neither planned nor archived tasks. `-A` (`--all-workspaces`) lists the open tasks of every non-archived project in every workspace the key reaches, each row naming its project and workspace; `--mine` and `--workspace` name a narrower scope and are refused with it. A workspace whose projects cannot be listed, or a project whose board cannot be read, is reported after what could be read and the command exits 1 — the listing above the error is what there is, not all of it.
 
 Times are ISO 8601 with an offset (`2026-01-02T09:00:00Z`, `2026-01-02T18:00+09:00`); a time without one is refused rather than read in some zone. "Now" is this machine's clock.
 
 `task create` reads the board first and refuses a title that names a reference an open task already names — `ccx#165`, `(ccx #165)` and `TakashiAihara/ccx#165` are one reference, while a bare `#165`, `ccx #165` outside parentheses and two different owners are not — and `--force` creates it anyway. A title merely worded like an open one is created, with the tasks it resembles named on stderr. `--attach` and `--next` are about the attachment rather than the task: `--next` without `--attach` is refused rather than dropped, and a `--attach` with no session id is refused before anything is created.
 
-`task status`, `task priority`, `task assign` and `task move` read the task back after the write and print the state the server holds, rather than the value that was sent; a value that came back different fails the command instead of printing as a write that took.
+`task status`, `task priority`, `task assign` and `task move` read the task back after the write and print the state the server holds, rather than the value that was sent; a value that came back different fails the command instead of printing as a write that took. `comment add --status` is the same move with a comment behind it: the status is written first — a column the project does not have is refused before the comment exists — and a comment that then fails is reported as the move it followed.
 
 Anywhere a task is taken, either its number or its id works — `kaneo task status 7 done` and `kaneo task status <id> done` do the same thing. `<project>#<number>` names a board and a number on it: `kaneo task get kaneo-cli#3` reads the reference written as `kaneo kaneo-cli#3`, which is also what `KANEO_TASK_REF` holds after its `kaneo ` prefix. The project before the `#` is an id, slug or name. `<slug>-<number>` (`kaneo task get BET-1`) is the form the Kaneo server and UI write a task as: the server resolves it in one request, the last dash splits it (so `kaneo-cli-3` is slug `kaneo-cli`), and the slug is matched ignoring case. Its errors are shown as the server wrote them, including a 409 when the slug names more than one project. It needs Kaneo v2.30.0 or later; an older server answers 404.
 
@@ -316,6 +320,8 @@ A workflow rule moves a task with nobody at the board: `kaneo workflow set githu
 `task describe` prints a task's description in full. The listing carries a description only up to 64 KiB and marks a longer one deferred, so `task get` reads those through the task detail; `task describe` reads any description through the route that pages large ones, which is the way to see a deferred one without the rest of the task. In `task ls --json` and `board --json` a deferred description is marked `"descriptionDeferred": true` beside the empty `description`, so it reads differently from one that is genuinely empty. `task ls --description TEXT` filters on description text case-insensitively, asking the server about the deferred ones and matching the rest locally; the query is at most 256 characters and cannot be combined with `--mine`.
 
 `task duplicate` copies a task inside its project: the copy keeps the source's column, priority, assignee, dates, labels and description, but not its comments, time entries or subtasks. `--title` gives the copy a different title and `--to` moves it to another project afterwards — the destination is resolved before the copy is made, must be in the task's own workspace as the server moves a task nowhere else, and a move that fails leaves the copy where it was, which the error says.
+
+`task move` to a project in the task's own workspace is the server's move, unchanged. To a project in another workspace the server has no move, so the task is recreated there instead: the copy keeps the title, description, status, priority, dates and assignee where the destination can hold them — a status the destination has no column for fails the move before anything is written, and an assignee who is no member of its workspace is dropped with a note on stderr — and the old task's comments become comments on the copy, folded to fit the server's comment limit, with any `<!-- kn:session ... -->` markers escaped so they are not read as live sessions. The old task stays where it is with a comment pointing at the copy (`移行先: <workspace> / <slug>#N`), the copy's description opens with where it came from (`移行元: ...`), and the answer names both references plus the session ids the old comments carried, for re-attaching by hand. A failure after the copy exists names it, and a task that already carries the `移行先:` pointer is refused rather than copied again, so a retry does not make a second one.
 
 `task upload` stores an image a task's description or a comment can embed: the file is staged, PUT to the storage the server presigns and finalized, and the answer is the asset's URL. `--surface` says where the image will be used (`description` by default, `comment` for one a comment embeds) and chooses the folder its object key is issued under. The image is stored and nothing is written into the task; embedding the URL is the caller's step.
 

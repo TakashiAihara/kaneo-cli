@@ -39,12 +39,17 @@
   "requests": [
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/github-integration/project/proj-alpha",
       "query": ""
     },
     {
       "method": "GET",
-      "path": "/github-integration/project/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -64,7 +69,17 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/github-integration/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

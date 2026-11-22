@@ -1,0 +1,172 @@
+{
+  "steps": [
+    {
+      "args": [
+        "column",
+        "create",
+        "QA",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"col0013\",\n  \"slug\": \"qa\",\n  \"name\": \"QA\",\n  \"position\": 3,\n  \"isFinal\": false,\n  \"icon\": null,\n  \"color\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "status",
+        "1",
+        "qa",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"description\": \"multi\\nline\",\n  \"status\": \"qa\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n  \"labels\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "move",
+        "1",
+        "--to",
+        "GAM",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: project GAM has no column \"qa\" for #1's status; its columns are to-do, in-progress, done\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "-p",
+        "proj-gamma",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/column/proj-alpha",
+      "query": "",
+      "body": {
+        "name": "QA",
+        "isFinal": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/status/task-a1",
+      "query": "",
+      "body": {
+        "status": "qa"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/GAM",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/GAM",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-gamma",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

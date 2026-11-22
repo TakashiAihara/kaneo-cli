@@ -24,11 +24,14 @@ import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./
 import { sourceName } from "./input";
 import {
   allProjects,
+  allowArchivedFlag,
   firstMatch,
+  guardProject,
   resolveWorkspace,
   slugOr,
   unlistedMessage,
   withProject,
+  writeAccess,
   type ProjectIn,
   type Unlisted,
 } from "./lookup";
@@ -269,7 +272,10 @@ export const projectCommand = {
       args: maximumArgs(1),
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
-        const found = await withProject(args[0] ?? project(app), (id) => getProject(id));
+        const found = await withProject(args[0] ?? project(app), async (id) => {
+          await guardProject(id);
+          return getProject(id);
+        });
         app.out.human(`${found.id}  ${found.name}`);
         if (found.description !== "") app.out.human(found.description);
         app.out.data(found);
@@ -383,6 +389,7 @@ export const projectCommand = {
           defaultValue: "",
         },
         { name: "icon", type: "string" as const, usage: "new icon name", defaultValue: "" },
+        allowArchivedFlag,
       ],
       run: async ({
         args,
@@ -409,9 +416,10 @@ export const projectCommand = {
         // The read of the project comes first inside updateProject, so a value the
         // server does not know is retried before anything is written rather than
         // after.
-        const { before, after, unread, nulled } = await withProject(args[0]!, (id) =>
-          updateProject(id, changes).catch(refused("updating a project", "update", () => projectWorkspace(id))),
-        );
+        const { before, after, unread, nulled } = await withProject(args[0]!, async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return updateProject(id, changes).catch(refused("updating a project", "update", () => projectWorkspace(id)));
+        });
         app.out.human(`updated ${after.id}`);
         for (const [field, from, to] of [
           ["name", before.name, after.name],
@@ -457,6 +465,7 @@ export const projectCommand = {
       args: exactArgs(1),
       flags: [
         { name: "to", type: "string" as const, usage: "destination workspace id, slug or name", defaultValue: "" },
+        allowArchivedFlag,
       ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         const target = String(flags.to ?? "");
@@ -466,9 +475,10 @@ export const projectCommand = {
         // is reported without a project lookup, and the workspace listing is
         // one small request either way.
         const workspaceId = await resolveWorkspace(target);
-        const moved = await withProject(args[0]!, (id) =>
-          moveProject(id, workspaceId).catch(moveRefused(id, workspaceId)),
-        );
+        const moved = await withProject(args[0]!, async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return moveProject(id, workspaceId).catch(moveRefused(id, workspaceId));
+        });
         app.out.human(
           `moved ${moved.id}  ${moved.name}${moved.slug === "" ? "" : ` [${moved.slug}]`}  to ${workspaceId}`,
         );
@@ -498,10 +508,16 @@ export const projectCommand = {
       // project — by id, slug or name across the workspaces the key can reach —
       // so the refusal has to name the project that was read.
       args: exactArgs(1),
-      flags: [{ name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" }],
+      flags: [
+        { name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" },
+        allowArchivedFlag,
+      ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const found = await withProject(args[0]!, (id) => getProject(id));
+        const found = await withProject(args[0]!, async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return getProject(id);
+        });
         // Everything in the project goes with it — its tasks, their comments and
         // links, its columns, its workflow rules — and the server keeps no copy,
         // so there is nothing to restore from; archive is the reversible way off
@@ -616,7 +632,10 @@ export const projectCommand = {
             // stderr-only from here on.
             app.out.dataOnly();
             apiKey(app);
-            const blob = await withProject(args[0] ?? project(app), (id) => getProjectBackground(id));
+            const blob = await withProject(args[0] ?? project(app), async (id) => {
+              await guardProject(id);
+              return getProjectBackground(id);
+            });
             // The bytes go out as they arrived: an image is not text, so
             // nothing here may decode or re-encode it. writeSync reports the
             // bytes it took, which on a pipe can be fewer than it was given,
@@ -654,6 +673,7 @@ export const projectCommand = {
               usage: "MIME type of the image (default: the file's, from its extension)",
               defaultValue: "",
             },
+            allowArchivedFlag,
           ],
           run: async ({
             args,
@@ -702,12 +722,15 @@ export const projectCommand = {
             const detected = fileType === "application/octet-stream" ? "" : fileType;
             const contentType = contentTypeFlag ?? detected;
             if (contentType === "") throw new Error(`${named} gives no usable content type; pass --content-type`);
-            const done = await withProject(ref, async (id) => ({
-              project: id,
-              ...(await setProjectBackground(id, contentType, bytes).catch(
-                refused("setting a project background", "update", () => projectWorkspace(id)),
-              )),
-            }));
+            const done = await withProject(ref, async (id) => {
+              await guardProject(id, writeAccess(flags));
+              return {
+                project: id,
+                ...(await setProjectBackground(id, contentType, bytes).catch(
+                  refused("setting a project background", "update", () => projectWorkspace(id)),
+                )),
+              };
+            });
             app.out.human(
               `set the background of ${done.project} from ${named} (${contentType}, ${bytes.byteLength} bytes)`,
             );
@@ -734,10 +757,16 @@ export const projectCommand = {
             "than resolved from the settings — and --yes confirms, as every\n" +
             "delete asks.",
           args: exactArgs(1),
-          flags: [{ name: "yes", type: "bool" as const, usage: "confirm the removal", defaultValue: "false" }],
+          flags: [
+            { name: "yes", type: "bool" as const, usage: "confirm the removal", defaultValue: "false" },
+            allowArchivedFlag,
+          ],
           run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
             apiKey(app);
-            const found = await withProject(args[0]!, (id) => getProject(id));
+            const found = await withProject(args[0]!, async (id) => {
+              await guardProject(id, writeAccess(flags));
+              return getProject(id);
+            });
             // The image is gone for good — there is no trash to restore it
             // from — so the confirmation is asked for the way every other
             // delete asks for it.

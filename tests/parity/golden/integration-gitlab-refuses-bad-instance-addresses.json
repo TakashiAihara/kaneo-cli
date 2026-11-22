@@ -86,6 +86,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitlab-integration/project/proj-alpha",
       "query": "",
@@ -96,6 +101,11 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitlab-integration/project/proj-alpha",
       "query": "",
@@ -104,6 +114,11 @@
         "projectPath": "acme/web-app",
         "accessToken": "addr-token-0123456789abcdef"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "POST",
@@ -117,6 +132,11 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitlab-integration/projects",
       "query": "",
@@ -125,6 +145,11 @@
         "baseUrl": "http://gitlab.example.com",
         "accessToken": "addr-token-0123456789abcdef"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "POST",

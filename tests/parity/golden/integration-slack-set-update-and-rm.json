@@ -140,12 +140,27 @@
   "requests": [
     {
       "method": "GET",
-      "path": "/slack-integration/project/proj-alpha",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
       "method": "GET",
       "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -164,7 +179,17 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -179,6 +204,11 @@
       "body": {
         "webhookUrl": "https://hooks.slack.com/services/T00000000/B00000000/abcdefghijklmnop"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",
@@ -199,12 +229,27 @@
     },
     {
       "method": "GET",
-      "path": "/slack-integration/project/proj-alpha",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
       "method": "GET",
       "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -224,7 +269,17 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/slack-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

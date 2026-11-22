@@ -11,7 +11,7 @@ import {
 } from "../api/kaneo";
 import { normalizeBaseUrl } from "../api/http";
 import { exactArgs, minimumArgs, noArgs, type RunContext } from "./args";
-import { resolveWorkspace, withProject } from "./lookup";
+import { resolveWorkspace, allowArchivedFlag, guardProject, withProject, writeAccess } from "./lookup";
 import { sanitizeDocument } from "../output/output";
 
 // The subscribe link a feed's token stands for: the API serves it without a
@@ -103,7 +103,10 @@ export const feedCommand = {
         // The names only decorate the human lines; JSON mode carries the ids
         // themselves, so the extra listing is not made for it.
         const names = app.out.mode.json ? new Map<string, string>() : await feedLabelNames(app);
-        const feeds = await withProject(wanted, (id) => listCalendarFeeds(id));
+        const feeds = await withProject(wanted, async (id) => {
+          await guardProject(id);
+          return listCalendarFeeds(id);
+        });
         for (const feed of feeds) app.out.human(feedLine(app, feed, names));
         app.out.data(feeds);
       },
@@ -126,6 +129,7 @@ export const feedCommand = {
           usage: "time zone all-day dates are read in (server default UTC)",
           defaultValue: "",
         },
+        allowArchivedFlag,
       ],
       run: async ({ args, flags, app }: RunContext<App>) => {
         apiKey(app);
@@ -136,7 +140,10 @@ export const feedCommand = {
         const options = calendarLabelOptions(rows);
         const labelIds = [...new Set(args.map((arg) => resolveFeedLabel(options, arg.trim())))];
         const timeZone = String(flags["time-zone"] ?? "");
-        const feed = await withProject(wanted, (id) => createCalendarFeed(id, labelIds, timeZone));
+        const feed = await withProject(wanted, async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return createCalendarFeed(id, labelIds, timeZone);
+        });
         // The names are read after the write: a label that existed only as a
         // task's copy has a workspace definition by now — the create
         // materialized it — and the rows fetched before it would print the
@@ -158,12 +165,16 @@ export const feedCommand = {
         "subscribe link stops working for good: a feed created again gets a new\n" +
         "token, so anything already subscribed has to be given the new link.",
       args: exactArgs(1),
-      flags: [{ name: "yes", type: "bool" as const, usage: "confirm the revocation", defaultValue: "false" }],
+      flags: [
+        { name: "yes", type: "bool" as const, usage: "confirm the revocation", defaultValue: "false" },
+        allowArchivedFlag,
+      ],
       run: async ({ args, flags, app }: RunContext<App>) => {
         apiKey(app);
         const ref = args[0]!.trim();
         if (ref === "") throw new Error("a feed id or token cannot be blank");
         const { projectId, feed } = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
           const feeds = await listCalendarFeeds(id);
           const found = feeds.find((f) => f.id === ref || f.token === ref);
           if (found === undefined) {

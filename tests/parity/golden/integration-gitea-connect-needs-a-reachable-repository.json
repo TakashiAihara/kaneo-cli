@@ -95,6 +95,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitea-integration/project/proj-alpha",
       "query": "",
@@ -106,6 +111,11 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitea-integration/project/proj-alpha",
       "query": "",
@@ -114,6 +124,11 @@
         "repositoryOwner": "acme",
         "repositoryName": "app"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "POST",
@@ -127,6 +142,11 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitea-integration/project/proj-alpha",
       "query": "",
@@ -135,6 +155,11 @@
         "repositoryOwner": "acme",
         "repositoryName": "app"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "POST",

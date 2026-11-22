@@ -11,7 +11,7 @@ import {
   type CustomFieldValue,
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
-import { withProject } from "./lookup";
+import { allowArchivedFlag, guardProject, withProject, writeAccess } from "./lookup";
 import { shellWord } from "../output/output";
 
 // The field a reference names, if any.
@@ -124,7 +124,10 @@ export const fieldCommand = {
       args: noArgs("kaneo field list"),
       run: async ({ app }: { app: App }) => {
         apiKey(app);
-        const fields = await withProject(project(app), (id) => listCustomFields(id));
+        const fields = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return listCustomFields(id);
+        });
         for (const field of fields) app.out.human(fieldLine(field));
         app.out.data(fields);
       },
@@ -157,6 +160,7 @@ export const fieldCommand = {
           usage: "the choices of a dropdown or multiselect field, comma-separated",
           defaultValue: "",
         },
+        allowArchivedFlag,
       ],
       run: async ({
         args,
@@ -183,15 +187,16 @@ export const fieldCommand = {
               .filter((o) => o !== "")
           : undefined;
         const defaultValue = changed.has("default") ? String(flags.default ?? "") : undefined;
-        const field = await withProject(project(app), (id) =>
-          createCustomField(id, {
+        const field = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return createCustomField(id, {
             name,
             type,
             required: flags.required === true,
             ...(defaultValue === undefined || defaultValue.trim() === "" ? {} : { defaultValue }),
             ...(options === undefined ? {} : { options }),
-          }),
-        );
+          });
+        });
         app.out.human(`created ${fieldLine(field)}`);
         app.out.data(field);
       },
@@ -202,10 +207,16 @@ export const fieldCommand = {
       use: "rm <field>",
       short: "Delete a custom field and the values tasks hold for it",
       args: exactArgs(1),
-      flags: [{ name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" }],
+      flags: [
+        { name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" },
+        allowArchivedFlag,
+      ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const field = await withProject(project(app), async (id) => resolveField(id, args[0]!));
+        const field = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return resolveField(id, args[0]!);
+        });
         // The values every task holds for the field go with it, and there is
         // no undo: they are deleted, not unset.
         if (flags.yes !== true) {
@@ -228,12 +239,13 @@ export const fieldCommand = {
         "moves the fields it is sent, so a field left out would keep its old\n" +
         "position and share it with whichever field took that place.",
       args: minimumArgs(1),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const { projectId, fields } = await withProject(project(app), async (id) => ({
-          projectId: id,
-          fields: await listCustomFields(id),
-        }));
+        const { projectId, fields } = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return { projectId: id, fields: await listCustomFields(id) };
+        });
         const order = newOrder(fields, args);
         const reordered = await reorderCustomFields(
           projectId,
@@ -257,7 +269,10 @@ export const fieldCommand = {
       run: async ({ args, app }: { args: string[]; app: App }) => {
         apiKey(app);
         if (args[0] === undefined) {
-          const values = await withProject(project(app), (id) => listProjectFieldValues(id));
+          const values = await withProject(project(app), async (id) => {
+            await guardProject(id);
+            return listProjectFieldValues(id);
+          });
           const ordered = [...values].sort(
             (a, b) => a.fieldPosition - b.fieldPosition || a.taskId.localeCompare(b.taskId),
           );
@@ -265,9 +280,10 @@ export const fieldCommand = {
           app.out.data(ordered);
           return;
         }
-        const filter = await withProject(project(app), async (id) =>
-          pickFilter(await listFieldFilterValues(id), args[0]!),
-        );
+        const filter = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return pickFilter(await listFieldFilterValues(id), args[0]!);
+        });
         for (const value of filter.values) app.out.human(value);
         app.out.data(filter);
       },

@@ -37,6 +37,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitlab-integration/verify",
       "query": "",
@@ -46,6 +51,11 @@
         "accessToken": "verify-token-0123456789abcdef",
         "projectPath": "acme/web-app"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "POST",

@@ -47,8 +47,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"PUT /api/project/nope/move: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
-      "stderr": "Error: PUT /api/project/nope/move: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
+      "stdout": "{\n  \"error\": \"GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
     },
     {
       "args": [
@@ -71,6 +71,11 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "PUT",
       "path": "/project/proj-alpha/move",
       "query": "",
@@ -89,12 +94,9 @@
       "query": ""
     },
     {
-      "method": "PUT",
-      "path": "/project/nope/move",
-      "query": "",
-      "body": {
-        "workspaceId": "ws-other"
-      }
+      "method": "GET",
+      "path": "/project/nope",
+      "query": ""
     },
     {
       "method": "GET",
@@ -114,6 +116,11 @@
     {
       "method": "GET",
       "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-taken",
       "query": ""
     },
     {

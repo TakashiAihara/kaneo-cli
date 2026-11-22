@@ -92,12 +92,27 @@
   "requests": [
     {
       "method": "GET",
-      "path": "/mattermost-integration/project/proj-alpha",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
       "method": "GET",
       "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -115,7 +130,7 @@
     },
     {
       "method": "GET",
-      "path": "/mattermost-integration/project/proj-alpha",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -125,7 +140,27 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/mattermost-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

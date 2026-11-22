@@ -31,6 +31,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-kcli",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/task-relation/task-k1",
       "query": ""
     },
@@ -42,6 +47,11 @@
     {
       "method": "GET",
       "path": "/task/by-ticket-id/KANEO-CLI-1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-kcli",
       "query": ""
     },
     {

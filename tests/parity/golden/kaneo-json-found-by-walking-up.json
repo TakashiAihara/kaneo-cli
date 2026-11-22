@@ -6,7 +6,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-beta\"\n  ],\n  \"local_file\": \"<HOME>/.kaneo.json\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"local\",\n    \"workspace\": \"local\"\n  }\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-main\",\n  \"projects\": [\n    \"proj-beta\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-beta\",\n      \"archived\": false\n    }\n  ],\n  \"local_file\": \"<HOME>/.kaneo.json\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"local\",\n    \"workspace\": \"local\"\n  }\n}\n",
       "stderr": ""
     },
     {
@@ -21,6 +21,16 @@
     }
   ],
   "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
     {
       "method": "GET",
       "path": "/task/tasks/proj-beta",

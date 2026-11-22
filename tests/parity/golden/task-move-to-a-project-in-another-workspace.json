@@ -9,9 +9,9 @@
         "GAM",
         "--human"
       ],
-      "exit": 1,
-      "stdout": "",
-      "stderr": "Error: PUT /api/task/move/task-a1: 404: Project not found: \"GAM\" names no project in this task's workspace \"Main\", only GAM (proj-gamma) in workspace \"Other\"; the server moves a task only within its own workspace\n"
+      "exit": 0,
+      "stdout": "#1 -> Other / GAM#1 Write the parser\nsessions in the old comments: none\n",
+      "stderr": ""
     },
     {
       "args": [
@@ -24,7 +24,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "Error: PUT /api/task/move/task-a1: 404: Project not found: \"proj-gamma\" names no project in this task's workspace \"Main\", only GAM (proj-gamma) in workspace \"Other\"; the server moves a task only within its own workspace\n"
+      "stderr": "Error: #1 was already moved to Other / GAM#1; move the copy it names instead of this task\n"
     }
   ],
   "requests": [
@@ -34,12 +34,14 @@
       "query": ""
     },
     {
-      "method": "PUT",
-      "path": "/task/move/task-a1",
-      "query": "",
-      "body": {
-        "destinationProjectId": "GAM"
-      }
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/GAM",
+      "query": ""
     },
     {
       "method": "GET",
@@ -55,6 +57,88 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/GAM",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-gamma",
+      "query": "",
+      "body": {
+        "title": "Write the parser",
+        "description": "移行元: Main / ALP#1\n\nmulti\nline",
+        "priority": "high",
+        "status": "to-do"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task0002",
+      "query": "",
+      "body": {
+        "content": "Comments moved from Main / ALP#1:\n\n--- Self 2026-01-01T00:00:09.000Z ---\nfirst comment"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task0002",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "移行先: Other / GAM#1"
+      }
     },
     {
       "method": "GET",
@@ -62,27 +146,19 @@
       "query": ""
     },
     {
-      "method": "PUT",
-      "path": "/task/move/task-a1",
-      "query": "",
-      "body": {
-        "destinationProjectId": "proj-gamma"
-      }
-    },
-    {
       "method": "GET",
-      "path": "/auth/organization/list",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
       "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-main"
+      "path": "/project/proj-gamma",
+      "query": ""
     },
     {
       "method": "GET",
-      "path": "/project",
-      "query": "?includeArchived=true&workspaceId=ws-other"
+      "path": "/comment/task-a1",
+      "query": ""
     }
   ],
   "files": {}

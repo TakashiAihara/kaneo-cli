@@ -41,6 +41,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitlab-integration/project/proj-beta",
       "query": "",
@@ -49,6 +54,11 @@
         "projectPath": "acme/web-app",
         "accessToken": "cli-token-0123456789abcdef"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "POST",

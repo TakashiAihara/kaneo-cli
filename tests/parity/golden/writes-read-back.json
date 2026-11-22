@@ -44,6 +44,11 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "PUT",
       "path": "/task/status/task-a1",
       "query": "",
@@ -59,6 +64,11 @@
     {
       "method": "GET",
       "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

@@ -18,6 +18,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "PUT",
       "path": "/project/proj-alpha/background-upload",
       "query": "",

@@ -72,6 +72,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "PUT",
       "path": "/project/proj-alpha/background-upload",
       "query": "",
@@ -102,7 +107,7 @@
     },
     {
       "method": "GET",
-      "path": "/project/BET/background",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -122,12 +127,17 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/project/proj-beta/background",
       "query": ""
     },
     {
       "method": "GET",
-      "path": "/project/proj-alpha/background",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -141,8 +151,28 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha/background",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "DELETE",
       "path": "/project/proj-alpha/background",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

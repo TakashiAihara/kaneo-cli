@@ -1,8 +1,10 @@
 import { writeSync } from "node:fs";
 import { basename } from "node:path";
-import { holding } from "../session/marker";
+import { holding, sessionIds } from "../session/marker";
 import { apiKey, project, taskProject, workspace, type App } from "./app";
 import {
+  addComment,
+  archived,
   bulkUpdate,
   closedStatuses,
   createExternalLink,
@@ -33,6 +35,7 @@ import {
   listComments,
   listRelations,
   listTaskFieldValues,
+  listWorkspaces,
   moveTask,
   PRIORITIES,
   priorityRank,
@@ -50,11 +53,13 @@ import {
   stageTaskImage,
   taskSummary,
   type AssignedTask,
+  type Comment,
   type ExternalLink,
   type BulkOperation,
   type ImageSurface,
   type ImportedTask,
   type NewTask,
+  type Project,
   type Relation,
   setTaskTitle,
   type Task,
@@ -64,7 +69,21 @@ import { exactArgs, minimumArgs, noArgs, rangeArgs, type FlagValues, type RunCon
 import { readInput, sourceName } from "./input";
 import { shellWord } from "../output/output";
 import { KaneoApiError, putUpload } from "../api/http";
-import { resolveWorkspace, slugOr, withProject, workspaceInReference } from "./lookup";
+import {
+  allProjects,
+  allowArchivedFlag,
+  archivedNote,
+  guardProject,
+  OnlyElsewhereError,
+  resolveWorkspace,
+  seenProject,
+  slugOr,
+  unlistedMessage,
+  withProject,
+  workspaceInReference,
+  writeAccess,
+  type ProjectAccess,
+} from "./lookup";
 import { resolveField } from "./field";
 import { attachTask, currentSessionId, refreshHolders } from "../session/attach";
 import { BAD_ID, validSessionId } from "../session/store";
@@ -101,7 +120,7 @@ const resolveAssigneeIn = async (projectId: string, of: string, given: string): 
       throw new Error("the server did not say which user the API key is; give a member's id or name instead");
     return id;
   }
-  const read = await getProject(projectId).catch((e: unknown) => {
+  const read = await seenProject(projectId).catch((e: unknown) => {
     throw new Error(`reading project ${projectId}, ${of}, to find its workspace: ${(e as Error).message}`);
   });
   const workspaceId = read.workspaceId;
@@ -140,7 +159,12 @@ export const taskCommand = {
         "With --mine the listing is instead the open tasks assigned to you across the\n" +
         "whole workspace: the project setting is not used, the server returns at most\n" +
         "100 (stderr says when it cut the list), and --status, --priority, --all and\n" +
-        "--description are refused because the server takes no filter for it.",
+        "--description are refused because the server takes no filter for it.\n\n" +
+        "With --all-workspaces the listing is the open tasks of every project in\n" +
+        "every workspace the key can reach, each line naming its project and\n" +
+        "workspace, since a task number is only unique inside a project. Archived\n" +
+        "projects are left out, as `project ls` leaves them out; --status,\n" +
+        "--priority, --all and --description apply to each project.",
       args: noArgs("kaneo task list"),
       flags: [
         { name: "status", type: "string" as const, usage: "only tasks in this column", defaultValue: "" },
@@ -149,6 +173,13 @@ export const taskCommand = {
           name: "mine",
           type: "bool" as const,
           usage: "the open tasks assigned to you across the workspace, whatever the project",
+          defaultValue: "false",
+        },
+        {
+          name: "all-workspaces",
+          shorthand: "A",
+          type: "bool" as const,
+          usage: "the open tasks of every project in every workspace the key can reach",
           defaultValue: "false",
         },
         {
@@ -175,6 +206,15 @@ export const taskCommand = {
         // otherwise never see the empty value it was given.
         if (changed.has("description") && String(flags.description ?? "").trim() === "")
           throw new Error("--description is empty");
+        const acrossAll = flags["all-workspaces"] === true;
+        if (acrossAll) {
+          if (flags.mine === true) throw new Error("--all-workspaces cannot be combined with --mine");
+          if (app.flags.workspaceId !== "") {
+            throw new Error("--all-workspaces lists every workspace, so it cannot be narrowed with --workspace");
+          }
+          await listEverywhere(flags, app);
+          return;
+        }
         if (flags.mine === true) {
           // The server lists open tasks only and takes no filter (as of v2.32.0), so a flag that
           // narrows or widens the listing would be accepted and do nothing.
@@ -196,8 +236,12 @@ export const taskCommand = {
         const query = String(flags.description ?? "").trim();
         if (query.length > 256) throw new Error("--description is longer than 256 characters");
         // Asked of the server, which filters before it pages, and of the answer
-        // as well (see TaskFilters).
-        const board = await withProject(project(app), (id) => getBoard(id, { status, priority }));
+        // as well (see TaskFilters). The project is checked first so an archived
+        // one says so on stderr rather than reading as a board that went quiet.
+        const board = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return getBoard(id, { status, priority });
+        });
         const everything = projectTasks(board);
         // A description the listing deferred is not on the task to match, so
         // the deferred ones are asked of the server by id and the rest are
@@ -363,6 +407,7 @@ export const taskCommand = {
           usage: "create the task even when an open task names the same reference",
           defaultValue: "false",
         },
+        allowArchivedFlag,
       ],
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
         if (changed.has("title") && args.length > 0)
@@ -412,6 +457,9 @@ export const taskCommand = {
         let existing: Task[] = [];
         let closed: ReadonlySet<string> = new Set();
         const task = await withProject(project(app), async (id) => {
+          // Before anything is created or read for the board: an archived
+          // project refuses the write unless --allow-archived was passed.
+          await guardProject(id, writeAccess(flags));
           // Before anything is created, so a name that matches nobody leaves no
           // task behind. An empty one is no assignee, as it was before names.
           if (wanted.assigneeId !== "")
@@ -497,6 +545,7 @@ export const taskCommand = {
           usage: "sort key within its column, lower first; other tasks keep theirs",
           defaultValue: "",
         },
+        allowArchivedFlag,
       ],
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
         // Only a flag that was passed is a change: `-d ""` clears the description
@@ -530,7 +579,7 @@ export const taskCommand = {
         const position = pass("position") ? wantedPosition(String(flags.position ?? "")) : undefined;
 
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         // Resolved before the first write, since a name that matches no member
         // has to leave the task as it was.
         const wantedAssignee = String(flags.assignee ?? "");
@@ -650,9 +699,10 @@ export const taskCommand = {
         "A status is a column slug. `kaneo column ls` lists the columns a project has;\n" +
         "the defaults are to-do, in-progress, in-review and done.",
       args: exactArgs(2),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         const status = args[1]!.trim();
         await setTaskStatus(task.id, status);
         const after = await taskAfterWrite(task, "status was set");
@@ -667,9 +717,10 @@ export const taskCommand = {
       short: "Change a task's priority",
       long: `Change a task's priority.\n\nOne of: ${PRIORITIES.join(", ")}.`,
       args: exactArgs(2),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         const priority = knownPriority(args[1]!.trim());
         await setTaskPriority(task.id, priority);
         const after = await taskAfterWrite(task, "priority was set");
@@ -689,9 +740,10 @@ export const taskCommand = {
         "of the task's workspace: an id that is not one of them is refused, as is a\n" +
         "name that matches no member or more than one.",
       args: rangeArgs(1, 2),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         const user = args[1] === undefined ? "" : await resolveAssignee(task, args[1]);
         await setTaskAssignee(task.id, user);
         const after = await taskAfterWrite(task, user === "" ? "assignee was cleared" : "assignee was set");
@@ -715,14 +767,15 @@ export const taskCommand = {
         "The date is a calendar date (2026-10-31, read as midnight UTC) or a date and\n" +
         "time with an offset (2026-10-31T09:00+09:00).",
       args: rangeArgs(1, 2),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         // An empty date is refused rather than read as "clear": `task due 1 "$DATE"`
         // with DATE unset would otherwise wipe the date and exit 0.
         const given = args[1]?.trim();
         if (given === "") throw new Error("the date is empty; leave it out to clear the due date");
         const date = given === undefined ? "" : instant(given, "the due date");
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         const updated = await setTaskDueDate(task.id, date);
         app.out.human(
           updated.dueDate === null ? `#${task.number} no due date` : `#${task.number} due ${updated.dueDate}`,
@@ -770,6 +823,7 @@ export const taskCommand = {
         { name: "remove-label", type: "string" as const, usage: "remove the label with this id", defaultValue: "" },
         { name: "delete", type: "bool" as const, usage: "delete every task (needs --yes)", defaultValue: "false" },
         { name: "yes", type: "bool" as const, usage: "confirm --delete", defaultValue: "false" },
+        allowArchivedFlag,
       ],
       run: async ({
         args,
@@ -787,7 +841,7 @@ export const taskCommand = {
         apiKey(app);
         // The same task named twice is one task to the server, and counting it
         // twice would make the report read as a task it skipped.
-        const { tasks: resolved, slugs } = await resolveTasks(app, args);
+        const { tasks: resolved, slugs } = await resolveTasks(app, args, writeAccess(flags));
         const named = [...new Map(resolved.map((t) => [t.id, t])).values()];
         // A number is only unique on its board, so tasks from several projects
         // are named with the project in front, by slug where a board was read.
@@ -825,7 +879,8 @@ export const taskCommand = {
         apiKey(app);
         // Named by id: two projects can share a name.
         let projectId = "";
-        const exported = await withProject(project(app), (id) => {
+        const exported = await withProject(project(app), async (id) => {
+          await guardProject(id);
           projectId = id;
           return exportProjectTasks(id);
         });
@@ -857,12 +912,14 @@ export const taskCommand = {
         "exits non-zero when any task failed. Running the file again creates every\n" +
         "task again, including the ones that went through.",
       args: exactArgs(1),
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
         // The file is read and checked before anything is sent, so a typo in the
         // path or a broken document creates nothing.
         const { tasks, labelled } = importedTasks(await readInput(args[0]!), args[0]!);
         const result = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
           checkImport(tasks, await listColumns(id), args[0]!);
           return importProjectTasks(id, tasks);
         });
@@ -885,42 +942,80 @@ export const taskCommand = {
       name: "move",
       use: "move <task> --to <project>",
       short: "Move a task to another project",
+      long:
+        "Move a task to another project.\n\n" +
+        "Inside one workspace the server moves the task and it keeps its id.\n" +
+        "Across workspaces the server cannot, so the task is recreated in the\n" +
+        "destination project instead: the fields a task is created with are\n" +
+        "carried over — labels, relations, field values, time entries, links\n" +
+        "and attachments stay on the old task, which the pointer keeps — its\n" +
+        "comments become combined comments on the new task (a `kn:session`\n" +
+        "marker in one is escaped so it is not read as a live attachment\n" +
+        "there), the old task gets a comment pointing at the new one, and the\n" +
+        "session ids the old comments named are printed so they can be\n" +
+        "attached by hand.",
       args: exactArgs(1),
-      flags: [{ name: "to", type: "string" as const, usage: "destination project id, slug or name", defaultValue: "" }],
+      flags: [
+        { name: "to", type: "string" as const, usage: "destination project id, slug or name", defaultValue: "" },
+        allowArchivedFlag,
+      ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         const target = String(flags.to ?? "");
         if (target === "") throw new Error("no destination: pass --to <project>");
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
-        // The destination is resolved before the task is read back, so the two are
-        // compared as what the server was given rather than as what was typed.
-        const projectId = await withProject(
-          target,
-          async (id) => {
-            await moveTask(task.id, id);
-            return id;
-          },
-          { sameWorkspaceAs: task.projectId },
-        );
-        const after = await taskAfterWrite(task, "project was set");
-        readBack("project", after.projectId, projectId);
-        // The session attachments naming this task are snapshots from attach
-        // time; the move makes their project and number stale, so they are
-        // rewritten here — the one place that knows the task changed. A record
-        // that cannot be rewritten leaves `session status` showing the old
-        // board, which is worth a line on stderr rather than a failed move.
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
+        const source = await seenProject(task.projectId);
+        // The destination is resolved to a project before anything is written:
+        // one in the task's own workspace is moved as the server always moved
+        // it, and one in another workspace is a migration, which recreates the
+        // task there. The task's own workspace is asked first so a slug or name
+        // two workspaces carry still means the one here, as it always did; only
+        // a value that names nothing there widens to every workspace.
+        let dest: Project;
         try {
-          await refreshHolders(after);
+          dest = await withProject(target, (id) => getProject(id), { sameWorkspaceAs: task.projectId });
         } catch (e) {
-          app.out.status(
-            `task moved, but the session records naming it could not be updated: ${e instanceof Error ? e.message : String(e)}`,
-          );
+          // Only a value that names a project solely outside the task's
+          // workspace earns the unscoped retry; every other scoped failure
+          // would fail or resolve the same way unscoped, so it is reported
+          // as the scoped lookup said it.
+          if (!(e instanceof OnlyElsewhereError)) throw e;
+          dest = await withProject(target, (id) => getProject(id));
         }
-        // The destination as it was typed: the read-back above has already
-        // confirmed the task sits on the project the value resolved to, so a
-        // reader is shown what they asked for rather than the id behind it.
-        app.out.human(`#${after.number} moved to ${target}`);
-        app.out.data(after);
+        // An archived destination refuses the write the way an archived source
+        // does, unless --allow-archived was passed.
+        if (archived(dest) && flags["allow-archived"] !== true) {
+          throw new Error(`${archivedNote(dest)}; pass --allow-archived to write to it anyway`);
+        }
+        if (dest.workspaceId === source.workspaceId) {
+          await moveTask(task.id, dest.id);
+          const after = await taskAfterWrite(task, "project was set");
+          readBack("project", after.projectId, dest.id);
+          // The session attachments naming this task are snapshots from attach
+          // time; the move makes their project and number stale, so they are
+          // rewritten here — the one place that knows the task changed. A record
+          // that cannot be rewritten leaves `session status` showing the old
+          // board, which is worth a line on stderr rather than a failed move.
+          try {
+            await refreshHolders(after);
+          } catch (e) {
+            app.out.status(
+              `task moved, but the session records naming it could not be updated: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
+          // The destination as it was typed: the read-back above has already
+          // confirmed the task sits on the project the value resolved to, so a
+          // reader is shown what they asked for rather than the id behind it.
+          app.out.human(`#${after.number} moved to ${target}`);
+          app.out.data(after);
+          return;
+        }
+        const migrated = await migrateAcrossWorkspaces(task, source, dest);
+        app.out.human(`#${task.number} -> ${migrated.createdRef} ${migrated.task.title}`);
+        app.out.human(
+          `sessions in the old comments: ${migrated.sessions.length === 0 ? "none" : migrated.sessions.join(", ")}`,
+        );
+        app.out.data(migrated.report);
       },
     },
     {
@@ -946,6 +1041,7 @@ export const taskCommand = {
           usage: "move the copy to this project (id, slug or name)",
           defaultValue: "",
         },
+        allowArchivedFlag,
       ],
       run: async ({
         args,
@@ -965,7 +1061,7 @@ export const taskCommand = {
         const to = String(flags.to ?? "");
         if (changed.has("to") && to.trim() === "") throw new Error("empty --to");
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         // The destination is resolved before the copy is made, so a --to that
         // names no project fails before anything is written. The source's own
         // project is refused for the same reason: the move would fail after
@@ -982,6 +1078,9 @@ export const taskCommand = {
             async (id) => {
               const project = await getProject(id);
               destWorkspace = project.workspaceId;
+              if (archived(project) && flags["allow-archived"] !== true) {
+                throw new Error(`${archivedNote(project)}; pass --allow-archived to write to it anyway`);
+              }
               return id;
             },
             { sameWorkspaceAs: task.projectId },
@@ -989,7 +1088,9 @@ export const taskCommand = {
           if (destId === task.projectId) {
             throw new Error(`--to ${JSON.stringify(to)} is the project the task is already in`);
           }
-          const sourceWorkspace = (await getProject(task.projectId)).workspaceId;
+          // seenProject: the guard that resolved the task already fetched the
+          // source's project this run, so this asks nothing of the server.
+          const sourceWorkspace = (await seenProject(task.projectId)).workspaceId;
           if (destWorkspace !== sourceWorkspace) {
             throw new Error(
               `--to ${JSON.stringify(to)} names a project in another workspace; the server moves a task only within its own workspace`,
@@ -1027,10 +1128,13 @@ export const taskCommand = {
       use: "rm <task>",
       short: "Delete a task",
       args: exactArgs(1),
-      flags: [{ name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" }],
+      flags: [
+        { name: "yes", type: "bool" as const, usage: "confirm the deletion", defaultValue: "false" },
+        allowArchivedFlag,
+      ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         // Deleting a task takes its comments with it, and the session history
         // lives in those. Requiring the flag keeps that from happening by a slip
         // of the hand.
@@ -1061,6 +1165,7 @@ export const taskCommand = {
           usage: `relation type (required): ${RELATION_TYPES.join(", ")}`,
           defaultValue: "",
         },
+        allowArchivedFlag,
       ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         // Refused before anything is asked of the server: a link written with a
@@ -1068,8 +1173,8 @@ export const taskCommand = {
         const relationType = givenType(flags);
         if (relationType === "") throw new Error(`pass --type: ${typeChoices}`);
         apiKey(app);
-        const first = await resolveTask(app, args[0]!);
-        const second = await resolveTask(app, args[1]!);
+        const first = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
+        const second = await resolveTask(app, args[1]!, undefined, writeAccess(flags));
         const relation = await linkTasks(first.id, second.id, relationType);
         app.out.human(`#${first.number} ${relationWord(relationType, true)} #${second.number}`);
         app.out.data({ ...relation, sourceTask: taskSummary(first), targetTask: taskSummary(second) });
@@ -1092,6 +1197,7 @@ export const taskCommand = {
           usage: `relation type: ${RELATION_TYPES.join(", ")}`,
           defaultValue: "",
         },
+        allowArchivedFlag,
       ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         const relationType = givenType(flags);
@@ -1126,8 +1232,8 @@ export const taskCommand = {
           return;
         }
         apiKey(app);
-        const first = await resolveTask(app, args[0]!);
-        const second = await resolveTask(app, args[1]!);
+        const first = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
+        const second = await resolveTask(app, args[1]!, undefined, writeAccess(flags));
         const between = (await listRelations(first.id)).filter(
           (relation) =>
             (relationType === "" || relation.relationType === relationType) &&
@@ -1184,6 +1290,7 @@ export const taskCommand = {
         { name: "add", type: "string" as const, usage: "add an external link with this URL", defaultValue: "" },
         { name: "title", type: "string" as const, usage: "title for the link --add creates", defaultValue: "" },
         { name: "rm", type: "string" as const, usage: "remove the link with this id", defaultValue: "" },
+        allowArchivedFlag,
       ],
       run: async ({
         args,
@@ -1221,7 +1328,9 @@ export const taskCommand = {
           if (title.trim().length > 200) throw new Error("--title is longer than 200 characters");
         }
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        // With --add or --rm this writes, so an archived project refuses; a
+        // plain listing only warns, as every read does.
+        const task = await resolveTask(app, args[0]!, undefined, add !== "" || rm !== "" ? writeAccess(flags) : {});
         // What the write left is named when the follow-up read fails, as
         // taskAfterWrite names it: a bare read failure would read as a write
         // that never happened, and the caller would retry a write that landed.
@@ -1270,9 +1379,12 @@ export const taskCommand = {
           );
         }
       },
-      run: async ({ args, app }: { args: string[]; app: App }) => {
+      flags: [allowArchivedFlag],
+      run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        // With a field and a value this writes, so an archived project refuses;
+        // the task alone only lists, as every read does.
+        const task = await resolveTask(app, args[0]!, undefined, args.length > 1 ? writeAccess(flags) : {});
         if (args.length === 1) {
           const values = (await listTaskFieldValues(task.id)).sort((a, b) => a.fieldPosition - b.fieldPosition);
           for (const value of values)
@@ -1306,6 +1418,7 @@ export const taskCommand = {
           usage: "where the image is used: description or comment",
           defaultValue: "description",
         },
+        allowArchivedFlag,
       ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         const surface = String(flags.surface ?? "description") as ImageSurface;
@@ -1314,7 +1427,7 @@ export const taskCommand = {
         }
         const file = await imageFile(args[1]!);
         apiKey(app);
-        const task = await resolveTask(app, args[0]!);
+        const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         const staged = { filename: file.name, contentType: file.type, size: file.size, surface };
         const upload = await stageTaskImage(task.id, staged);
         await putUpload(upload.uploadUrl, upload.headers, file.bytes);
@@ -1396,7 +1509,7 @@ const heldBy = async (task: Task) => {
 // A read that fails is reported with the write that has already landed, as `task
 // update` words it. Without that a failed read reads as a failed write, and the
 // caller retries a write that landed.
-const taskAfterWrite = async (task: Task, wrote: string): Promise<Task> => {
+export const taskAfterWrite = async (task: Task, wrote: string): Promise<Task> => {
   let after: Task;
   try {
     after = await getTask(task.id);
@@ -1415,12 +1528,208 @@ const taskAfterWrite = async (task: Task, wrote: string): Promise<Task> => {
 // resolves the assignee to somebody else, answers the same way. Printing the
 // value that was sent would report a write that did not happen, so what came
 // back is what is printed and a difference fails.
-const readBack = (field: string, read: string | null, sent: string): void => {
+export const readBack = (field: string, read: string | null, sent: string): void => {
   // A task with nobody on it reads as null, which is what an empty value asks
   // for, so the two are the same answer rather than a difference.
   if ((read ?? "") !== sent) {
     throw new Error(`${field} is ${JSON.stringify(read)} after setting it to ${JSON.stringify(sent)}`);
   }
+};
+
+// `task move` across workspaces: the server moves a task only inside one, so
+// the task is recreated in the destination project and the old one is left
+// pointing at it.
+//
+// What is carried is what a person would carry by hand: the fields the create
+// route takes, the description behind a pointer to where it came from, and the
+// comments folded onto the copy — each still credited to its author and
+// time, with `<!--` escaped so a session marker in one is not read as a live
+// attachment on the new task. The session ids the old comments named come back
+// for the caller to print, since re-attaching them is a choice, not a copy.
+//
+// The writes land in order and each failure names what already did: a create
+// that fails leaves nothing, a comment that fails leaves the created task, a
+// read-back that fails or disagrees leaves it unverified, and a pointer that
+// fails leaves the migration done with the old task unmarked. None of them
+// pretends the whole thing did not happen.
+
+// The comment a migrated task is left carrying, naming where it went. Its
+// presence is also how a repeated `task move` knows the task was already
+// migrated rather than making another copy.
+const MOVED_POINTER = "移行先:";
+
+// The server caps a comment at 10,000 characters (its comment schema), so the
+// comments a migration folds onto the copy are posted as several when they
+// would not fit in one — each under the cap, each opening with where they came
+// from. A `---` block is kept whole where a blank line is near the cut; one too
+// long for a comment alone is cut mid-text, since losing it is worse.
+const COMMENT_LIMIT = 10_000;
+
+export const foldedComments = (comments: Comment[], sourceRef: string): string[] => {
+  if (comments.length === 0) return [];
+  const header = `Comments moved from ${sourceRef}:\n\n`;
+  const room = Math.max(1, COMMENT_LIMIT - header.length);
+  const bodies: string[] = [];
+  let rest = comments
+    .map(
+      (c) =>
+        `--- ${c.userName === "" ? c.userId : c.userName} ${c.createdAt} ---\n${c.content.replaceAll("<!--", "&lt;!--")}`,
+    )
+    .join("\n\n");
+  while (rest.length > room) {
+    const cut = rest.lastIndexOf("\n\n", room);
+    // `room` counts UTF-16 units, so a cut with no blank line to prefer can
+    // land between the halves of a surrogate pair; step back to the pair's
+    // head rather than splitting it across two comments. at stays above 0 —
+    // rest opens on a comment's "---" — so the slice always shrinks it.
+    let at = cut > 0 ? cut : room;
+    const lead = rest.charCodeAt(at - 1);
+    if (cut <= 0 && at > 1 && lead >= 0xd800 && lead <= 0xdbff) at -= 1;
+    bodies.push(`${header}${rest.slice(0, at)}`);
+    rest = rest.slice(at);
+    if (rest.startsWith("\n\n")) rest = rest.slice(2);
+  }
+  bodies.push(`${header}${rest}`);
+  return bodies;
+};
+
+const migrateAcrossWorkspaces = async (
+  task: Task,
+  source: Project,
+  dest: Project,
+): Promise<{ task: Task; sessions: string[]; createdRef: string; report: Json }> => {
+  const comments = await listComments(task.id);
+  // A task that already carries the pointer was migrated once: recreating it
+  // again would leave a second live copy, so the move refuses and names where
+  // the first one went.
+  const prior = comments.findLast((c) => c.content.startsWith(MOVED_POINTER));
+  if (prior !== undefined) {
+    const where = prior.content.slice(MOVED_POINTER.length).trim();
+    throw new Error(
+      `#${task.number} was already moved${where === "" ? "" : ` to ${where}`}; move the copy it names instead of this task`,
+    );
+  }
+  // The whole record, not the board's row of it: the listing can leave a
+  // description out, and a migration that carried half of one would lose it.
+  const full = await getTask(task.id);
+  const sessions = sessionIds(comments);
+  // A status is a column of the project, and the destination's columns are its
+  // own: one it lacks would create a task no column shows, the failure task
+  // import refuses before sending. Checked before anything is written.
+  const columns = await listColumns(dest.id);
+  if (!columns.some((c) => c.slug === full.status) && !VIRTUAL_STATUSES.includes(full.status)) {
+    throw new Error(
+      `project ${slugOr(dest.slug === "" ? dest.name : dest.slug, dest.id)} has no column ${JSON.stringify(full.status)} for #${task.number}'s status; its columns are ${columns.map((c) => c.slug).join(", ")}`,
+    );
+  }
+  // An assignee is a member of a workspace, and the destination's is not the
+  // source's: carried only when the user is a member there, dropped with a
+  // word when not, since the create would otherwise fail or name nobody the
+  // board knows.
+  let assigneeId = full.assigneeId ?? "";
+  if (assigneeId !== "") {
+    const members = await listMembers(dest.workspaceId);
+    if (!members.some((m) => m.id === assigneeId)) {
+      console.error(`assignee ${assigneeId} is not a member of the destination workspace; the copy is unassigned`);
+      assigneeId = "";
+    }
+  }
+  const workspaces = await listWorkspaces();
+  const workspaceName = (id: string) => workspaces.find((w) => w.id === id)?.name ?? id;
+  const projectName = (p: Project) => slugOr(p.slug === "" ? p.name : p.slug, p.id);
+  const sourceRef = `${workspaceName(source.workspaceId)} / ${projectName(source)}#${task.number}`;
+  const destBase = `${workspaceName(dest.workspaceId)} / ${projectName(dest)}`;
+
+  // The pointer goes into the description so the copy says where it came from,
+  // as the procedure this replaces wrote it by hand.
+  const pointer = `移行元: ${sourceRef}`;
+  const description = full.description === "" ? pointer : `${pointer}\n\n${full.description}`;
+  const movedComments = foldedComments(comments, sourceRef);
+  let created: Task;
+  try {
+    created = await createTask(dest.id, {
+      title: full.title,
+      description,
+      priority: full.priority,
+      status: full.status,
+      startDate: full.startDate ?? "",
+      dueDate: full.dueDate ?? "",
+      assigneeId,
+    });
+  } catch (e) {
+    throw new Error(`could not create the copy in ${destBase}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const createdRef = `${destBase}#${created.number}`;
+
+  // The comments become comments on the copy, as many as the server's
+  // 10,000-character cap takes. `<!--` was escaped inside them so a
+  // `kn:session` marker copied over is not read as a live attachment on the
+  // new task; the ids were collected from the originals above.
+  try {
+    for (const body of movedComments) await addComment(created.id, body);
+  } catch (e) {
+    throw new Error(
+      `created ${createdRef} but copying the comments failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  // Read the copy back and compare it with what was sent, as `task update`
+  // does for its fields: a write the server did not keep is not a migration,
+  // and the failure names the task that now exists so a retry does not create
+  // a second one.
+  let after: Task;
+  try {
+    after = await getTask(created.id);
+  } catch (e) {
+    throw new Error(`created ${createdRef} but reading it back failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const mismatched: string[] = [];
+  if (after.title !== full.title) mismatched.push(`title reads back as ${JSON.stringify(after.title)}`);
+  if (after.status !== full.status) mismatched.push(`status reads back as ${JSON.stringify(after.status)}`);
+  if (after.priority !== full.priority) mismatched.push(`priority reads back as ${JSON.stringify(after.priority)}`);
+  if ((after.assigneeId ?? "") !== assigneeId)
+    mismatched.push(`assignee reads back as ${JSON.stringify(after.assigneeId)}`);
+  if ((after.startDate ?? "") !== (full.startDate ?? ""))
+    mismatched.push(`start date reads back as ${JSON.stringify(after.startDate)}`);
+  if ((after.dueDate ?? "") !== (full.dueDate ?? ""))
+    mismatched.push(`due date reads back as ${JSON.stringify(after.dueDate)}`);
+  if (after.description !== description) mismatched.push("description reads back differently from what was sent");
+  let commentCount: number;
+  try {
+    commentCount = (await listComments(created.id)).length;
+  } catch (e) {
+    throw new Error(
+      `created ${createdRef} but counting its comments failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+  const expectedComments = movedComments.length;
+  if (commentCount !== expectedComments) {
+    mismatched.push(`it has ${commentCount} comment(s), expected ${expectedComments}`);
+  }
+  if (mismatched.length > 0) throw new Error(`created ${createdRef} but it does not match: ${mismatched.join("; ")}`);
+
+  // The pointer on the old task is the last write: by the time it lands the
+  // migration is done, so its failure says so rather than reading as a move
+  // that never happened.
+  try {
+    await addComment(task.id, `${MOVED_POINTER} ${createdRef}`);
+  } catch (e) {
+    throw new Error(
+      `migrated #${task.number} to ${createdRef}, but leaving the pointer on the old task failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  return {
+    task: after,
+    sessions,
+    createdRef,
+    report: {
+      task: after,
+      from: { taskId: task.id, projectId: source.id, projectSlug: source.slug, number: task.number },
+      to: { taskId: created.id, projectId: dest.id, projectSlug: dest.slug, number: created.number },
+      sessions,
+    },
+  };
 };
 
 // The type --type asked for, or "" when it was not given. Refused rather than
@@ -1506,7 +1815,21 @@ const relationLine = (relation: Relation, taskId: string, projects: Map<string, 
 //
 // An empty project is not refused here: a reference may be an id, which needs no
 // board, so only a number asks for one.
-export const resolveTask = async (app: App, ref: string, slugs?: Map<string, string>): Promise<Task> => {
+// access says what the caller is about to do with the task's project: reads
+// warn on an archived one, writes are refused unless --allow-archived was
+// passed (see guardProject in src/cli/lookup.ts).
+export const resolveTask = async (
+  app: App,
+  ref: string,
+  slugs?: Map<string, string>,
+  access: ProjectAccess = {},
+): Promise<Task> => {
+  const task = await taskByReference(app, ref, slugs);
+  if (task.projectId !== "") await guardProject(task.projectId, access);
+  return task;
+};
+
+const taskByReference = async (app: App, ref: string, slugs?: Map<string, string>): Promise<Task> => {
   const wanted = ref.trim();
   if (wanted === "") throw new Error("no task given");
 
@@ -1541,10 +1864,14 @@ export const resolveTask = async (app: App, ref: string, slugs?: Map<string, str
 // The slugs of the boards read on the way come back too, so a report can name a
 // project the way a reference does. A task named by id read no board, and its
 // project has no slug here.
-const resolveTasks = async (app: App, refs: string[]): Promise<{ tasks: Task[]; slugs: Map<string, string> }> => {
+const resolveTasks = async (
+  app: App,
+  refs: string[],
+  access: ProjectAccess = {},
+): Promise<{ tasks: Task[]; slugs: Map<string, string> }> => {
   const slugs = new Map<string, string>();
   const tasks: Task[] = [];
-  for (const ref of refs) tasks.push(await resolveTask(app, ref, slugs));
+  for (const ref of refs) tasks.push(await resolveTask(app, ref, slugs, access));
   return { tasks, slugs };
 };
 
@@ -1804,6 +2131,87 @@ const assignedLine = (task: AssignedTask): string =>
 
 export const taskLine = (task: Task): string =>
   `#${String(task.number).padEnd(4)} [${task.priority.padEnd(11)}] ${task.status.padEnd(13)} ${task.title}`;
+
+// A task on the --all-workspaces listing: the board's task plus the project
+// and workspace it was read from, since a bare number names a task on only one
+// of them.
+type EverywhereTask = Task & { projectSlug: string; projectName: string; workspaceName: string };
+
+const everywhereLine = (task: EverywhereTask): string =>
+  `${slugOr(task.projectSlug, task.projectId)}#${String(task.number).padEnd(4)} [${task.priority.padEnd(11)}] ${task.status.padEnd(13)} ${task.title}  ${task.projectName} (${task.workspaceName})`;
+
+// `task list --all-workspaces`: the open tasks of every project in every
+// workspace the key can reach. Archived projects are left out the way `project
+// ls` leaves them out. A workspace whose projects cannot be listed and a
+// project whose board cannot be read are reported after what could be read,
+// the way `project ls -A` reports them: the listing goes ahead without them
+// and the exit status says it is not all there is.
+const listEverywhere = async (flags: FlagValues, app: App): Promise<void> => {
+  const status = String(flags.status ?? "");
+  const priority = String(flags.priority ?? "");
+  const query = String(flags.description ?? "").trim();
+  // The same bound the single-project listing keeps: the deferred-description
+  // search the query is sent to refuses a longer one.
+  if (query.length > 256) throw new Error("--description is longer than 256 characters");
+  const { found, unlisted } = await allProjects(false);
+  const problems: string[] = unlisted.length === 0 ? [] : [unlistedMessage(unlisted)];
+  // Every board is asked at once, and the rows keep the listing's order —
+  // workspace by workspace, project by project — rather than the order the
+  // reads happened to finish in.
+  const boards = await Promise.all(
+    found.map(async ({ project: p, workspaceName }) => {
+      try {
+        const board = await getBoard(p.id, { status, priority });
+        const everything = projectTasks(board);
+        // The same deferred-description matching the single-project listing
+        // does, asked of each board's own project.
+        const described = query === "" ? everything : await describedTasks(board.projectId, everything, query);
+        return { project: p, workspaceName, described, failure: undefined };
+      } catch (e) {
+        return {
+          project: p,
+          workspaceName,
+          described: [] as Task[],
+          failure: e instanceof Error ? e.message : String(e),
+        };
+      }
+    }),
+  );
+  const rows: EverywhereTask[] = [];
+  let left = 0;
+  for (const { project: p, workspaceName, described, failure } of boards) {
+    if (failure !== undefined) {
+      problems.push(
+        `could not read the board of project ${slugOr(p.slug === "" ? p.name : p.slug, p.id)} (${p.id}) in ${JSON.stringify(workspaceName)}: ${failure}`,
+      );
+      continue;
+    }
+    const tasks = filterTasks(described, status, priority, flags.all === true);
+    // The hidden columns left out across every project, counted for the one
+    // stderr line below as the single-project listing counts them.
+    left += filterTasks(described, status, priority, true).length - tasks.length;
+    for (const task of tasks) {
+      // A board row can carry no projectId of its own, and a deferred
+      // description is marked the way the single-project listing marks it,
+      // so `task ls -A --json` rows read like `task ls --json` ones.
+      rows.push({
+        ...task,
+        ...deferredMark(task),
+        projectId: p.id,
+        projectSlug: p.slug,
+        projectName: p.name,
+        workspaceName,
+      });
+    }
+  }
+  for (const row of rows) app.out.human(everywhereLine(row));
+  if (left > 0)
+    console.error(
+      `(${left} done / planned / archived ${left === 1 ? "task" : "tasks"} left out; --all to include them)`,
+    );
+  app.out.data(rows);
+  if (problems.length > 0) throw new Error(`the tasks listed above are incomplete: ${problems.join("; ")}`);
+};
 
 // One external link as a person reads it: the URL, then whatever the provider or
 // the author called it, then the integration it came through when it came through

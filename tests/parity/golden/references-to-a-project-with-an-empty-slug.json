@@ -112,6 +112,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/auth/organization/list",
       "query": ""
     },
@@ -131,6 +136,11 @@
     {
       "method": "GET",
       "path": "/task/task-n1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-noslug",
       "query": ""
     },
     {
@@ -160,6 +170,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/auth/organization/list",
       "query": ""
     },
@@ -172,6 +187,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-noslug",
+      "query": ""
     },
     {
       "method": "POST",
@@ -189,6 +209,11 @@
     {
       "method": "GET",
       "path": "/task/tasks/proj-noslug",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-noslug",
       "query": ""
     },
     {
@@ -220,8 +245,18 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-noslug",
+      "query": ""
+    },
+    {
       "method": "DELETE",
       "path": "/task/task-n1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-noslug",
       "query": ""
     },
     {

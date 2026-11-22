@@ -22,12 +22,12 @@
     },
     {
       "method": "GET",
-      "path": "/project/proj-beta",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
       "method": "GET",
-      "path": "/project/proj-alpha",
+      "path": "/project/proj-beta",
       "query": ""
     },
     {

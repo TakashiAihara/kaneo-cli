@@ -25,12 +25,22 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitlab-integration/import-issues",
       "query": "",
       "body": {
         "projectId": "proj-alpha"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "POST",

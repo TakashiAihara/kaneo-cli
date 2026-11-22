@@ -62,6 +62,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/task/task-a4",
       "query": ""
     },
@@ -82,6 +87,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/task/task-a5",
       "query": ""
     },
@@ -93,6 +103,11 @@
     {
       "method": "GET",
       "path": "/comment/task-a5",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -138,6 +153,11 @@
     {
       "method": "GET",
       "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

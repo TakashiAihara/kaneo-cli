@@ -66,6 +66,11 @@
   "requests": [
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/column/proj-alpha",
       "query": ""
     },
@@ -78,6 +83,11 @@
         "eventType": "pull_request.opened",
         "columnId": "col0003"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",
@@ -96,6 +106,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/column/proj-alpha",
       "query": ""
     },
@@ -111,6 +126,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/column/proj-alpha",
       "query": ""
     },
@@ -123,6 +143,11 @@
         "eventType": "PR_OPENED",
         "columnId": "col0003"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

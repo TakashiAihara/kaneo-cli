@@ -9,14 +9,14 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/task/tasks/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
-      "stderr": "Error: GET /api/task/tasks/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
+      "stdout": "{\n  \"error\": \"GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"nope\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n}\n",
+      "stderr": "Error: GET /api/project/nope: 400: Workspace ID could not be determined: no project has the id, slug or name \"nope\" (kaneo project find <text> searches names and slugs)\n"
     }
   ],
   "requests": [
     {
       "method": "GET",
-      "path": "/task/tasks/nope",
+      "path": "/project/nope",
       "query": ""
     },
     {

@@ -139,6 +139,28 @@ test("explain is added when the value names a project only in another workspace"
   ).rejects.toThrow("only within its own workspace; EXPLAINED");
 });
 
+test("a scoped miss is still hedged by a workspace that could not be listed", async () => {
+  serve((workspaceId) =>
+    workspaceId === "w2"
+      ? json({ success: false, error: "down" }, 500)
+      : json([project(`p-${workspaceId}`, workspaceId)]),
+  );
+  await expect(withProject("SAME3", byId, { sameWorkspaceAs: "p-w1" })).rejects.toThrow(
+    'could not list the projects of workspace "name-w2"',
+  );
+});
+
+test("a scoped match in the task's workspace is not hedged by one that could not be listed", async () => {
+  serve((workspaceId) =>
+    workspaceId === "w2"
+      ? json({ success: false, error: "down" }, 500)
+      : json([
+          { ...project(`p-${workspaceId}`, workspaceId), slug: workspaceId === "w1" ? "SAME4" : `P-${workspaceId}` },
+        ]),
+  );
+  expect(await withProject("SAME4", byId, { sameWorkspaceAs: "p-w1" })).toBe("p-w1");
+});
+
 // Kaneo 2.50 sends every HTTPException as {"message","code"} JSON, where 2.32
 // sent the message as text/plain. The lookup decides on the message, so it has
 // to find it in that shape too: a slug or a name in the path is answered like

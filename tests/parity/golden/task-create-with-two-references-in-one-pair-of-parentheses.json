@@ -26,6 +26,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/task/proj-alpha",
       "query": "",
@@ -35,6 +40,11 @@
         "priority": "medium",
         "status": "to-do"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

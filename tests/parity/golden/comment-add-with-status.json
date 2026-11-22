@@ -1,0 +1,157 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "add",
+        "1",
+        "moving",
+        "this",
+        "--status",
+        "in-progress",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"comment\": {\n    \"id\": \"cmt0002\",\n    \"content\": \"moving this\",\n    \"userId\": \"user-self\",\n    \"userName\": \"\",\n    \"createdAt\": \"2026-01-01T00:00:10.000Z\"\n  },\n  \"task\": {\n    \"id\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"description\": \"multi\\nline\",\n    \"status\": \"in-progress\",\n    \"priority\": \"high\",\n    \"position\": 0,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n    \"labels\": []\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
+        "add",
+        "1",
+        "bad",
+        "status",
+        "--status",
+        "no-such-column",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"PUT /api/task/status/task-a1: 400: Invalid status \\\"no-such-column\\\". Valid statuses for this project: to-do, in-progress, done, planned, archived\"\n}\n",
+      "stderr": "Error: PUT /api/task/status/task-a1: 400: Invalid status \"no-such-column\". Valid statuses for this project: to-do, in-progress, done, planned, archived\n"
+    },
+    {
+      "args": [
+        "comment",
+        "add",
+        "1",
+        "empty",
+        "--status",
+        "",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"--status is empty\"\n}\n",
+      "stderr": "Error: --status is empty\n"
+    },
+    {
+      "args": [
+        "task",
+        "get",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"id\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"description\": \"multi\\nline\",\n  \"status\": \"in-progress\",\n  \"priority\": \"high\",\n  \"position\": 0,\n  \"projectId\": \"proj-alpha\",\n  \"assigneeId\": null,\n  \"assigneeName\": null,\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n  \"labels\": [],\n  \"relations\": [],\n  \"sessions\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "comment",
+        "ls",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "cmt0001  2026-01-01T00:00:08.000Z  first comment\ncmt0002  2026-01-01T00:00:10.000Z  moving this\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/status/task-a1",
+      "query": "",
+      "body": {
+        "status": "in-progress"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-a1",
+      "query": "",
+      "body": {
+        "content": "moving this"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/task/status/task-a1",
+      "query": "",
+      "body": {
+        "status": "no-such-column"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task-relation/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

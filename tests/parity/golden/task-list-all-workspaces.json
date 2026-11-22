@@ -1,0 +1,219 @@
+{
+  "steps": [
+    {
+      "args": [
+        "task",
+        "ls",
+        "-A",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ALP#1    [high       ] to-do         Write the parser  Alpha (Main)\nALP#2    [no-priority] in-progress   Ship it  Alpha (Main)\nBET#1    [urgent     ] to-do         Beta first  Beta (Main)\nGAM#1    [low        ] to-do         Gamma first  Gamma (Other)\n",
+      "stderr": "(2 done / planned / archived tasks left out; --all to include them)\n"
+    },
+    {
+      "args": [
+        "task",
+        "list",
+        "--all-workspaces",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "[\n  {\n    \"id\": \"task-a1\",\n    \"number\": 1,\n    \"title\": \"Write the parser\",\n    \"description\": \"multi\\nline\",\n    \"status\": \"to-do\",\n    \"priority\": \"high\",\n    \"position\": 0,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:05.000Z\",\n    \"labels\": [],\n    \"projectSlug\": \"ALP\",\n    \"projectName\": \"Alpha\",\n    \"workspaceName\": \"Main\"\n  },\n  {\n    \"id\": \"task-a2\",\n    \"number\": 2,\n    \"title\": \"Ship it\",\n    \"description\": \"\",\n    \"status\": \"in-progress\",\n    \"priority\": \"no-priority\",\n    \"position\": 1,\n    \"projectId\": \"proj-alpha\",\n    \"assigneeId\": \"user-1\",\n    \"assigneeName\": \"Ada\",\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:06.000Z\",\n    \"labels\": [],\n    \"projectSlug\": \"ALP\",\n    \"projectName\": \"Alpha\",\n    \"workspaceName\": \"Main\"\n  },\n  {\n    \"id\": \"task-b1\",\n    \"number\": 1,\n    \"title\": \"Beta first\",\n    \"description\": \"\",\n    \"status\": \"to-do\",\n    \"priority\": \"urgent\",\n    \"position\": 0,\n    \"projectId\": \"proj-beta\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:08.000Z\",\n    \"labels\": [],\n    \"projectSlug\": \"BET\",\n    \"projectName\": \"Beta\",\n    \"workspaceName\": \"Main\"\n  },\n  {\n    \"id\": \"task-g1\",\n    \"number\": 1,\n    \"title\": \"Gamma first\",\n    \"description\": \"\",\n    \"status\": \"to-do\",\n    \"priority\": \"low\",\n    \"position\": 0,\n    \"projectId\": \"proj-gamma\",\n    \"assigneeId\": null,\n    \"assigneeName\": null,\n    \"startDate\": null,\n    \"dueDate\": null,\n    \"createdAt\": \"2026-01-01T00:00:09.000Z\",\n    \"labels\": [],\n    \"projectSlug\": \"GAM\",\n    \"projectName\": \"Gamma\",\n    \"workspaceName\": \"Other\"\n  }\n]\n",
+      "stderr": "(2 done / planned / archived tasks left out; --all to include them)\n"
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "-A",
+        "--all",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ALP#1    [high       ] to-do         Write the parser  Alpha (Main)\nALP#2    [no-priority] in-progress   Ship it  Alpha (Main)\nALP#3    [no-priority] done          Old news  Alpha (Main)\nBET#1    [urgent     ] to-do         Beta first  Beta (Main)\nGAM#1    [low        ] to-do         Gamma first  Gamma (Other)\nGAM#2    [no-priority] done          Gamma done  Gamma (Other)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "-A",
+        "--status",
+        "to-do",
+        "--priority",
+        "high",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ALP#1    [high       ] to-do         Write the parser  Alpha (Main)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "task",
+        "ls",
+        "-A",
+        "--description",
+        "multi",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "ALP#1    [high       ] to-do         Write the parser  Alpha (Main)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": "?priority=high&status=to-do"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": "?priority=high&status=to-do"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-gamma",
+      "query": "?priority=high&status=to-do"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-gamma",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

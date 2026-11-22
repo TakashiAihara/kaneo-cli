@@ -8,7 +8,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-x\",\n    \"proj-y\"\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"repo-map\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-x\",\n    \"proj-y\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-x\",\n      \"error\": \"GET /api/project/proj-x: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-x\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n    },\n    {\n      \"id\": \"proj-y\",\n      \"error\": \"GET /api/project/proj-y: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-y\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n    }\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"repo-map\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
       "stderr": ""
     },
     {
@@ -19,7 +19,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "api url    <URL>  (env)\napi key    set  (env)\nworkspace  ws-acme  (owner-map)\nproject    proj-x, proj-y  (repo-map)\n\nrepo       acme/thing\nprofile    -\nlocal file -\nconfig     <HOME>/.config/kaneo/config.json\n",
+      "stdout": "api url    <URL>  (env)\napi key    set  (env)\nworkspace  ws-acme  (owner-map)\nproject    proj-x, proj-y  (repo-map)\n           proj-x: GET /api/project/proj-x: 400: Workspace ID could not be determined: no project has the id, slug or name \"proj-x\" (kaneo project find <text> searches names and slugs)\n           proj-y: GET /api/project/proj-y: 400: Workspace ID could not be determined: no project has the id, slug or name \"proj-y\" (kaneo project find <text> searches names and slugs)\n\nrepo       acme/thing\nprofile    -\nlocal file -\nconfig     <HOME>/.config/kaneo/config.json\n",
       "stderr": ""
     },
     {
@@ -41,7 +41,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-x\",\n    \"proj-y\"\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"repo-map\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-x\",\n    \"proj-y\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-x\",\n      \"error\": \"GET /api/project/proj-x: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-x\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n    },\n    {\n      \"id\": \"proj-y\",\n      \"error\": \"GET /api/project/proj-y: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-y\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n    }\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"repo-map\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
       "stderr": ""
     },
     {
@@ -54,7 +54,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-flag\"\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"flag\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-flag\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-flag\",\n      \"error\": \"GET /api/project/proj-flag: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-flag\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n    }\n  ],\n  \"repo\": \"acme/thing\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"flag\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
       "stderr": ""
     },
     {
@@ -63,11 +63,172 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-local\"\n  ],\n  \"repo\": \"acme/other\",\n  \"local_file\": \"<HOME>/.kaneo.json\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"local\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
+      "stdout": "{\n  \"api_url\": \"<URL>\",\n  \"workspace\": \"ws-acme\",\n  \"projects\": [\n    \"proj-local\"\n  ],\n  \"project_state\": [\n    {\n      \"id\": \"proj-local\",\n      \"error\": \"GET /api/project/proj-local: 400: Workspace ID could not be determined: no project has the id, slug or name \\\"proj-local\\\" (kaneo project find \\u003ctext\\u003e searches names and slugs)\"\n    }\n  ],\n  \"repo\": \"acme/other\",\n  \"local_file\": \"<HOME>/.kaneo.json\",\n  \"config_file\": \"<HOME>/.config/kaneo/config.json\",\n  \"has_api_key\": true,\n  \"origin\": {\n    \"api_key\": \"env\",\n    \"api_url\": \"env\",\n    \"project\": \"local\",\n    \"workspace\": \"owner-map\"\n  }\n}\n",
       "stderr": ""
     }
   ],
-  "requests": [],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/project/proj-x",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-y",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-x",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-y",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-x",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-y",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-flag",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-local",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    }
+  ],
   "files": {
     ".config/kaneo/config.json": "{\"owners\":{\"acme\":\"ws-acme\"},\"repos\":{\"acme/thing\":[\"proj-x\",\"proj-y\"],\"acme/other\":[\"proj-other\"]}}"
   }

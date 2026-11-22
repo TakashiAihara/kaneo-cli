@@ -132,7 +132,7 @@
   "requests": [
     {
       "method": "GET",
-      "path": "/slack-integration/project/ALP",
+      "path": "/project/ALP",
       "query": ""
     },
     {
@@ -149,6 +149,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",
@@ -157,7 +162,7 @@
     },
     {
       "method": "GET",
-      "path": "/slack-integration/project/ALP",
+      "path": "/project/ALP",
       "query": ""
     },
     {
@@ -174,6 +179,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",
@@ -190,7 +200,7 @@
     },
     {
       "method": "GET",
-      "path": "/slack-integration/project/ALP",
+      "path": "/project/ALP",
       "query": ""
     },
     {
@@ -207,6 +217,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",
@@ -215,7 +230,7 @@
     },
     {
       "method": "GET",
-      "path": "/slack-integration/project/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -232,6 +247,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -249,7 +269,7 @@
     },
     {
       "method": "GET",
-      "path": "/telegram-integration/project/Beta",
+      "path": "/project/Beta",
       "query": ""
     },
     {
@@ -266,6 +286,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -274,7 +299,7 @@
     },
     {
       "method": "GET",
-      "path": "/telegram-integration/project/Beta",
+      "path": "/project/Beta",
       "query": ""
     },
     {
@@ -291,6 +316,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -307,7 +337,7 @@
     },
     {
       "method": "GET",
-      "path": "/telegram-integration/project/Beta",
+      "path": "/project/Beta",
       "query": ""
     },
     {
@@ -324,6 +354,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -340,7 +375,7 @@
     },
     {
       "method": "GET",
-      "path": "/telegram-integration/project/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -357,6 +392,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",
@@ -370,7 +410,7 @@
     },
     {
       "method": "GET",
-      "path": "/telegram-integration/project/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -387,6 +427,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "GET",

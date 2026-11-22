@@ -19,8 +19,8 @@
         "300ms"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/task/tasks/proj-alpha: Get \\\"<URL>/api/task/tasks/proj-alpha\\\": context deadline exceeded\"\n}\n",
-      "stderr": "Error: GET /api/task/tasks/proj-alpha: Get \"<URL>/api/task/tasks/proj-alpha\": context deadline exceeded\n"
+      "stdout": "{\n  \"error\": \"GET /api/project/proj-alpha: Get \\\"<URL>/api/project/proj-alpha\\\": context deadline exceeded\"\n}\n",
+      "stderr": "Error: GET /api/project/proj-alpha: Get \"<URL>/api/project/proj-alpha\": context deadline exceeded\n"
     }
   ],
   "requests": [],

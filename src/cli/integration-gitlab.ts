@@ -15,7 +15,7 @@ import {
 } from "../api/kaneo";
 import { noArgs, type Flag, type FlagValues, type RunContext } from "./args";
 import { readInput } from "./input";
-import { withProject } from "./lookup";
+import { allowArchivedFlag, guardProject, withProject, writeAccess } from "./lookup";
 
 const boolFlag = (name: string, usage: string): Flag => ({ name, type: "bool", usage, defaultValue: "false" });
 const stringFlag = (name: string, usage: string): Flag => ({ name, type: "string", usage, defaultValue: "" });
@@ -120,7 +120,10 @@ export const gitlabCommand = {
       args: noArgs("kaneo integration gitlab get"),
       run: async ({ app }: RunContext<App>) => {
         apiKey(app);
-        const found = await withProject(project(app), (id) => getGitlabIntegration(id));
+        const found = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return getGitlabIntegration(id);
+        });
         if (found === null) {
           app.out.human("no GitLab integration is configured for this project");
           app.out.data(null);
@@ -147,6 +150,7 @@ export const gitlabCommand = {
         stringFlag("project-path", "full path of the GitLab project, nested groups included"),
         stringFlag("access-token", "GitLab access token; only - is accepted, which reads it from stdin"),
         stringFlag("token-type", "private or bearer; default private"),
+        allowArchivedFlag,
       ],
       run: async ({ flags, changed, app }: RunContext<App>) => {
         apiKey(app);
@@ -157,7 +161,10 @@ export const gitlabCommand = {
         const body: GitlabLink = { baseUrl, projectPath };
         if (token !== undefined) body.accessToken = token;
         if (type !== undefined) body.tokenType = type;
-        const created = await withProject(project(app), (id) => createGitlabIntegration(id, body));
+        const created = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return createGitlabIntegration(id, body);
+        });
         for (const line of integrationLines(created)) app.out.human(line);
         app.out.data(created);
       },
@@ -173,6 +180,7 @@ export const gitlabCommand = {
       flags: [
         boolFlag("active", "whether the integration is active"),
         boolFlag("comment-task-link", "comment a link back on each issue Kaneo opens in GitLab"),
+        allowArchivedFlag,
       ],
       run: async ({ flags, changed, app }: RunContext<App>) => {
         apiKey(app);
@@ -181,7 +189,10 @@ export const gitlabCommand = {
         if (changed.has("active")) changes.isActive = flags.active === true;
         if (changed.has("comment-task-link"))
           changes.commentTaskLinkOnGitlabIssue = flags["comment-task-link"] === true;
-        const updated = await withProject(project(app), (id) => updateGitlabIntegration(id, changes));
+        const updated = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return updateGitlabIntegration(id, changes);
+        });
         for (const line of integrationLines(updated)) app.out.human(line);
         app.out.data(updated);
       },
@@ -195,7 +206,7 @@ export const gitlabCommand = {
         "The stored token and webhook secret are removed with the link; a webhook\n" +
         "GitLab still calls answers as unknown.",
       args: noArgs("kaneo integration gitlab rm"),
-      flags: [boolFlag("yes", "confirm the deletion")],
+      flags: [boolFlag("yes", "confirm the deletion"), allowArchivedFlag],
       run: async ({ flags, app }: RunContext<App>) => {
         apiKey(app);
         if (flags.yes !== true) {
@@ -203,7 +214,10 @@ export const gitlabCommand = {
             "refusing to unlink the GitLab integration without --yes; the stored token and webhook secret are removed with it",
           );
         }
-        const result = await withProject(project(app), (id) => deleteGitlabIntegration(id));
+        const result = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return deleteGitlabIntegration(id);
+        });
         app.out.human(result.message);
         app.out.data(result);
       },
@@ -234,15 +248,16 @@ export const gitlabCommand = {
         // required above throws when the flag is absent, so this is a string.
         const token = (await accessToken(flags, changed, true))!;
         const type = tokenType(flags);
-        const result = await withProject(project(app), (id) =>
-          verifyGitlabAccess({
+        const result = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return verifyGitlabAccess({
             projectId: id,
             baseUrl,
             accessToken: token,
             projectPath,
             ...(type === undefined ? {} : { tokenType: type }),
-          }),
-        );
+          });
+        });
         for (const line of verificationLines(result)) app.out.human(line);
         app.out.data(result);
       },
@@ -262,14 +277,15 @@ export const gitlabCommand = {
         // required above throws when the flag is absent, so this is a string.
         const token = (await accessToken(flags, changed, true))!;
         const type = tokenType(flags);
-        const projects = await withProject(project(app), (id) =>
-          listGitlabProjects({
+        const projects = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return listGitlabProjects({
             projectId: id,
             baseUrl,
             accessToken: token,
             ...(type === undefined ? {} : { tokenType: type }),
-          }),
-        );
+          });
+        });
         for (const p of projects) app.out.human(projectLine(p));
         app.out.data(projects);
       },
@@ -283,9 +299,13 @@ export const gitlabCommand = {
         "confidential issues are skipped. The command exits non-zero when the server\n" +
         "reports errors for individual issues.",
       args: noArgs("kaneo integration gitlab import"),
-      run: async ({ app }: RunContext<App>) => {
+      flags: [allowArchivedFlag],
+      run: async ({ flags, app }: RunContext<App>) => {
         apiKey(app);
-        const result = await withProject(project(app), (id) => importGitlabIssues(id));
+        const result = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return importGitlabIssues(id);
+        });
         app.out.human(`imported ${result.imported}, updated ${result.updated}, skipped ${result.skipped}`);
         for (const error of result.errors ?? []) app.out.status(`  ${error}`);
         app.out.data(result);

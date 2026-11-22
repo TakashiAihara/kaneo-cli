@@ -88,6 +88,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitea-integration/project/proj-alpha",
       "query": "",
@@ -98,12 +103,22 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitea-integration/import-issues",
       "query": "",
       "body": {
         "projectId": "proj-alpha"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "POST",
@@ -116,12 +131,22 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitea-integration/import-issues",
       "query": "",
       "body": {
         "projectId": "proj-alpha"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "POST",
@@ -134,12 +159,22 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/gitea-integration/import-issues",
       "query": "",
       "body": {
         "projectId": "proj-alpha"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

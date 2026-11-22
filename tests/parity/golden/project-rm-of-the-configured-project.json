@@ -50,6 +50,11 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "DELETE",
       "path": "/project/proj-alpha",
       "query": ""

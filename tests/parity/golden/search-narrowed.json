@@ -130,6 +130,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/search",
       "query": "?projectId=proj-alpha&q=first&workspaceId=ws-main"
     },
@@ -165,6 +170,11 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/search",
       "query": "?projectId=proj-beta&q=first&workspaceId=ws-main"
     },
@@ -192,6 +202,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

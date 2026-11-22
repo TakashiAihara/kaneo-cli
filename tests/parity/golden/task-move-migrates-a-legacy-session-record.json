@@ -41,12 +41,14 @@
       "query": ""
     },
     {
-      "method": "PUT",
-      "path": "/task/move/task-a1",
-      "query": "",
-      "body": {
-        "destinationProjectId": "BET"
-      }
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/BET",
+      "query": ""
     },
     {
       "method": "GET",
@@ -62,6 +64,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
     },
     {
       "method": "PUT",

@@ -27,7 +27,7 @@
   "requests": [
     {
       "method": "GET",
-      "path": "/task/tasks/BET",
+      "path": "/project/BET",
       "query": ""
     },
     {
@@ -64,6 +64,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-lower",
+      "query": ""
     },
     {
       "method": "GET",

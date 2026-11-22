@@ -38,6 +38,11 @@
   ],
   "requests": [
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/github-integration/import-issues",
       "query": "",
@@ -55,6 +60,11 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/github-integration/import-issues",
       "query": "",
@@ -62,6 +72,11 @@
         "projectId": "proj-alpha",
         "runId": "run-0001"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

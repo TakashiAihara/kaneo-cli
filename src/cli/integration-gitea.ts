@@ -13,7 +13,7 @@ import {
 } from "../api/kaneo";
 import { exactArgs, noArgs, type FlagValues, type RunContext } from "./args";
 import { readInput } from "./input";
-import { withProject } from "./lookup";
+import { allowArchivedFlag, guardProject, withProject, writeAccess } from "./lookup";
 import type { Json } from "../output/json";
 
 // A Gitea repository is written owner/name everywhere it appears — in the API,
@@ -120,7 +120,10 @@ export const giteaCommand = {
       args: noArgs("kaneo integration gitea get"),
       run: async ({ app }: RunContext<App>) => {
         apiKey(app);
-        const found = await withProject(project(app), (id) => getGiteaIntegration(id));
+        const found = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return getGiteaIntegration(id);
+        });
         if (found === null) {
           app.out.human("no gitea integration for this project");
         } else {
@@ -144,11 +147,14 @@ export const giteaCommand = {
         "a different repository on the same instance does not. Connecting again\n" +
         "is how the link is moved — update only changes the two settings.",
       args: exactArgs(1),
-      flags: TARGET_FLAGS,
+      flags: [...TARGET_FLAGS, allowArchivedFlag],
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
         apiKey(app);
         const wanted = await target(args[0]!, flags, changed);
-        const created = await withProject(project(app), (id) => createGiteaIntegration(id, wanted));
+        const created = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return createGiteaIntegration(id, wanted);
+        });
         app.out.human(`connected ${created.repositoryOwner}/${created.repositoryName} on ${created.baseUrl}`);
         for (const line of integrationLines(created)) app.out.human(line);
         app.out.data(created as Json);
@@ -168,6 +174,7 @@ export const giteaCommand = {
       flags: [
         boolFlag("active", "whether Kaneo handles this integration (=false turns it off)"),
         boolFlag("comment-task-link", "comment a link back to the task on each Gitea issue (=false turns it off)"),
+        allowArchivedFlag,
       ],
       run: async ({ flags, changed, app }: RunContext<App>) => {
         apiKey(app);
@@ -177,7 +184,10 @@ export const giteaCommand = {
         if (Object.keys(changes).length === 0) {
           throw new Error("nothing to change: pass --active or --comment-task-link");
         }
-        const updated = await withProject(project(app), (id) => updateGiteaIntegration(id, changes));
+        const updated = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return updateGiteaIntegration(id, changes);
+        });
         app.out.human(`updated ${updated.repositoryOwner}/${updated.repositoryName} on ${updated.baseUrl}`);
         for (const line of integrationLines(updated)) app.out.human(line);
         app.out.data(updated as Json);
@@ -193,10 +203,11 @@ export const giteaCommand = {
         "makes a new link. Tasks already imported stay on the board, but the\n" +
         "external links they hold through this integration are deleted with it.",
       args: noArgs("kaneo integration gitea rm"),
-      flags: [boolFlag("yes", "confirm the deletion")],
+      flags: [boolFlag("yes", "confirm the deletion"), allowArchivedFlag],
       run: async ({ flags, app }: RunContext<App>) => {
         apiKey(app);
         const { found, result } = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
           const current = await getGiteaIntegration(id);
           if (current === null) throw new Error("this project has no gitea integration to delete");
           if (flags.yes !== true) {
@@ -229,7 +240,10 @@ export const giteaCommand = {
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
         apiKey(app);
         const wanted = await target(args[0]!, flags, changed);
-        const checked = await withProject(project(app), (id) => verifyGiteaAccess({ projectId: id, ...wanted }));
+        const checked = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return verifyGiteaAccess({ projectId: id, ...wanted });
+        });
         app.out.human(checked.message);
         if (checked.missingPermissions.length > 0) {
           app.out.human(`  missing permissions: ${checked.missingPermissions.join(", ")}`);
@@ -252,9 +266,10 @@ export const giteaCommand = {
         const url = baseUrl(flags);
         const token = await accessToken(flags, changed);
         if (token === undefined) throw new Error("repos needs the token: pass --token - and pipe it");
-        const repos = await withProject(project(app), (id) =>
-          listGiteaRepositories({ projectId: id, baseUrl: url, accessToken: token }),
-        );
+        const repos = await withProject(project(app), async (id) => {
+          await guardProject(id);
+          return listGiteaRepositories({ projectId: id, baseUrl: url, accessToken: token });
+        });
         // fullName is the owner/name connect takes, so a line can be picked and
         // passed on as it is.
         for (const r of repos) app.out.human(`${r.fullName}  ${r.private ? "private" : "public"}  ${r.htmlUrl}`);
@@ -271,9 +286,13 @@ export const giteaCommand = {
         "could not be imported are listed and the command exits non-zero when\n" +
         "any failed. The integration must exist and be active.",
       args: noArgs("kaneo integration gitea import"),
-      run: async ({ app }: RunContext<App>) => {
+      flags: [allowArchivedFlag],
+      run: async ({ flags, app }: RunContext<App>) => {
         apiKey(app);
-        const result = await withProject(project(app), (id) => importGiteaIssues(id));
+        const result = await withProject(project(app), async (id) => {
+          await guardProject(id, writeAccess(flags));
+          return importGiteaIssues(id);
+        });
         for (const e of result.errors) app.out.human(e);
         app.out.human(`imported ${result.imported} issue(s), updated ${result.updated}, skipped ${result.skipped}`);
         app.out.data(result as Json);

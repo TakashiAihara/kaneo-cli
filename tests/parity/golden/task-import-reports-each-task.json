@@ -36,35 +36,8 @@
   "requests": [
     {
       "method": "GET",
-      "path": "/column/proj-alpha",
+      "path": "/project/proj-alpha",
       "query": ""
-    },
-    {
-      "method": "POST",
-      "path": "/task/import/proj-alpha",
-      "query": "",
-      "body": {
-        "tasks": [
-          {
-            "title": "Imported",
-            "status": "in-progress",
-            "description": "from a file",
-            "priority": "high",
-            "startDate": null,
-            "dueDate": "<TIME>Z",
-            "userId": null
-          },
-          {
-            "title": "Planned on purpose",
-            "status": "planned"
-          },
-          {
-            "title": "Stranger",
-            "status": "to-do",
-            "userId": "user-nobody"
-          }
-        ]
-      }
     },
     {
       "method": "GET",
@@ -97,6 +70,48 @@
           }
         ]
       }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/import/proj-alpha",
+      "query": "",
+      "body": {
+        "tasks": [
+          {
+            "title": "Imported",
+            "status": "in-progress",
+            "description": "from a file",
+            "priority": "high",
+            "startDate": null,
+            "dueDate": "<TIME>Z",
+            "userId": null
+          },
+          {
+            "title": "Planned on purpose",
+            "status": "planned"
+          },
+          {
+            "title": "Stranger",
+            "status": "to-do",
+            "userId": "user-nobody"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "GET",

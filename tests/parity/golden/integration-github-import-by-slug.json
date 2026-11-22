@@ -14,12 +14,9 @@
   ],
   "requests": [
     {
-      "method": "POST",
-      "path": "/github-integration/import-issues",
-      "query": "",
-      "body": {
-        "projectId": "ALP"
-      }
+      "method": "GET",
+      "path": "/project/ALP",
+      "query": ""
     },
     {
       "method": "GET",
@@ -35,6 +32,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
     },
     {
       "method": "POST",

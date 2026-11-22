@@ -8,8 +8,8 @@
         "task-a1"
       ],
       "exit": 0,
-      "stdout": "{\n  \"number\": 1,\n  \"taskId\": \"task-a1\"\n}\n",
-      "stderr": "kaneo: close: project proj-alpha lookup failed: GET /api/project/proj-alpha: 500: injected failure\n"
+      "stdout": "",
+      "stderr": "kaneo: GET /api/project/proj-alpha: 500: injected failure\n"
     }
   ],
   "requests": [
@@ -19,25 +19,10 @@
       "query": ""
     },
     {
-      "method": "POST",
-      "path": "/comment/task-a1",
-      "query": "",
-      "body": {
-        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=closed enc=1 -->\nSession ended. Resume with `claude --resume sess-test`."
-      }
-    },
-    {
       "method": "GET",
       "path": "/project/proj-alpha",
       "query": ""
-    },
-    {
-      "method": "GET",
-      "path": "/comment/task-a1",
-      "query": ""
     }
   ],
-  "files": {
-    ".config/kaneo/sessions/sess-test.history.jsonl": "{\"event\":\"close\",\"at\":\"<TIME>Z\",\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\"}\n"
-  }
+  "files": {}
 }

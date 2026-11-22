@@ -202,12 +202,27 @@
   "requests": [
     {
       "method": "GET",
-      "path": "/telegram-integration/project/proj-alpha",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
       "method": "GET",
       "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -228,7 +243,17 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -252,7 +277,7 @@
     },
     {
       "method": "GET",
-      "path": "/telegram-integration/project/proj-alpha",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -262,7 +287,7 @@
     },
     {
       "method": "GET",
-      "path": "/telegram-integration/project/proj-alpha",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -272,12 +297,47 @@
     },
     {
       "method": "GET",
-      "path": "/telegram-integration/project/proj-alpha",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
       "method": "GET",
       "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -295,7 +355,17 @@
     },
     {
       "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {
@@ -306,6 +376,11 @@
     {
       "method": "DELETE",
       "path": "/telegram-integration/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
       "query": ""
     },
     {

@@ -9,9 +9,9 @@
         "ALP",
         "--human"
       ],
-      "exit": 1,
-      "stdout": "",
-      "stderr": "Error: PUT /api/task/move/task-g1: 404: Project not found: \"ALP\" names no project in this task's workspace \"Other\", only ALP (proj-alpha) in workspace \"Main\"; the server moves a task only within its own workspace\n"
+      "exit": 0,
+      "stdout": "#1 -> Main / ALP#4 Gamma first\nsessions in the old comments: none\n",
+      "stderr": ""
     },
     {
       "args": [
@@ -34,12 +34,14 @@
       "query": ""
     },
     {
-      "method": "PUT",
-      "path": "/task/move/task-g1",
-      "query": "",
-      "body": {
-        "destinationProjectId": "ALP"
-      }
+      "method": "GET",
+      "path": "/project/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/ALP",
+      "query": ""
     },
     {
       "method": "GET",
@@ -55,6 +57,36 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-g1",
+      "query": ""
     },
     {
       "method": "GET",
@@ -62,12 +94,58 @@
       "query": ""
     },
     {
-      "method": "PUT",
-      "path": "/task/move/task-g1",
+      "method": "GET",
+      "path": "/column/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/task/proj-alpha",
       "query": "",
       "body": {
-        "destinationProjectId": "DEL"
+        "title": "Gamma first",
+        "description": "移行元: Other / GAM#1",
+        "priority": "no-priority",
+        "status": "to-do"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task0002",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task0002",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/comment/task-g1",
+      "query": "",
+      "body": {
+        "content": "移行先: Main / ALP#4"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/task/task-g1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-gamma",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/DEL",
+      "query": ""
     },
     {
       "method": "GET",
@@ -83,6 +161,11 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-delta",
+      "query": ""
     },
     {
       "method": "PUT",

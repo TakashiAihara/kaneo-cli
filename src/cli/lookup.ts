@@ -1,5 +1,15 @@
 import { KaneoApiError } from "../api/http";
-import { lastTaskNumbers, listProjectsIn, listWorkspaces, type Project, type Workspace } from "../api/kaneo";
+import {
+  archived,
+  getProject,
+  lastTaskNumbers,
+  listProjectsIn,
+  listWorkspaces,
+  type Project,
+  type Workspace,
+} from "../api/kaneo";
+import type { Flag, FlagValues } from "./args";
+import { hard } from "./failopen";
 
 // Turning a value somebody typed into the id the API takes, so a slug or a name
 // works wherever an id does. A slug is what people and agents type: it is the
@@ -13,6 +23,14 @@ export type ProjectIn = { project: Project; workspaceName: string };
 
 // A workspace whose projects could not be listed, with what the server said.
 export type Unlisted = { workspaceName: string; reason: string };
+
+// The one scoped-lookup failure worth retrying unscoped: the value names
+// projects, but only outside the workspace the lookup was scoped to. `task
+// move --to` is why it exists — its destination may live in another workspace —
+// and every other scoped failure (a value that names nothing, an ambiguous
+// one, a workspace that could not be listed) would fail or widen the same way
+// unscoped, so a caller catching this retries only what it means to.
+export class OnlyElsewhereError extends Error {}
 
 // Every project the key can reach, each with the workspace it is in: one listing
 // per workspace, all asked at once. Archived projects are left out unless asked
@@ -115,7 +133,9 @@ export const withProject = async <T>(
       }
       const homeId = home.project.workspaceId;
       candidates = everywhere.found.filter((f) => f.project.workspaceId === homeId);
-      // Only the task's own workspace can hold the destination, and it was listed.
+      // Only the task's own workspace can hold the destination, and it was
+      // listed, so workspaces outside it cannot make a home match ambiguous;
+      // they still qualify a miss below.
       unlisted = [];
     }
     const found = projectsNamed(candidates, value);
@@ -125,16 +145,18 @@ export const withProject = async <T>(
         value,
       );
       if (elsewhere.length > 0)
-        throw new Error(
+        throw new OnlyElsewhereError(
           `${e.message}: ${onlyElsewhere(value, elsewhere, home.workspaceName)}${explain === undefined ? "" : await explain()}`,
         );
     }
     // A miss proves nothing while a workspace could not be listed: the project
     // may be in it. Saying it does not exist would send the reader to look for
-    // a typo that is not there.
-    if (found.length === 0 && unlisted.length > 0) {
+    // a typo that is not there. everywhere.unlisted rather than unlisted: a
+    // scoped lookup clears the latter for matches but a miss is qualified by
+    // every workspace that could not be listed.
+    if (found.length === 0 && everywhere.unlisted.length > 0) {
       throw new Error(
-        `${e.message}: ${noProject(value)} in the workspaces that could be listed; ${unlistedMessage(unlisted)}${explain === undefined ? "" : await explain()}`,
+        `${e.message}: ${noProject(value)} in the workspaces that could be listed; ${unlistedMessage(everywhere.unlisted)}${explain === undefined ? "" : await explain()}`,
       );
     }
     if (found.length === 0)
@@ -311,3 +333,68 @@ const severalWorkspaces = (value: string, found: Workspace[]): string =>
   `${JSON.stringify(value)} matches several workspaces: ${found
     .map((w) => (w.slug === "" ? w.id : `${w.slug} (${w.id})`))
     .join(", ")}; pass the id`;
+
+// What a command may do with the project it resolved to. Reads only warn; a
+// write is refused while the project is archived unless the caller passed
+// --allow-archived, because the server still accepts writes there and a board
+// nobody looks at any more is where they quietly pile up.
+export type ProjectAccess = { write?: boolean; allowArchived?: boolean };
+
+// The flag every command that can write to a project takes, declared once so
+// the name and the wording cannot drift between them.
+export const allowArchivedFlag: Flag = {
+  name: "allow-archived",
+  type: "bool",
+  usage: "write to the resolved project even though it is archived",
+  defaultValue: "false",
+};
+
+// The access a write command passes down: refuse an archived project unless
+// the flag says otherwise.
+export const writeAccess = (flags: FlagValues): ProjectAccess => ({
+  write: true,
+  allowArchived: flags["allow-archived"] === true,
+});
+
+// The projects this run has already fetched, so a command that resolves the
+// same project twice (`task bulk` over several of its tasks) asks the server
+// once. Only successes are kept: a failure is reported each time it happens.
+const seen = new Map<string, Project>();
+
+// The project record behind an id, fetched once per run.
+export const seenProject = async (projectId: string): Promise<Project> => {
+  const known = seen.get(projectId);
+  if (known !== undefined) return known;
+  const project = await getProject(projectId);
+  seen.set(projectId, project);
+  return project;
+};
+
+// Projects already warned about this run, so `task bulk` over five tasks of
+// one archived project says so once rather than five times.
+const warned = new Set<string>();
+
+// The one wording for an archived project, shared by the stderr warning reads
+// print and the refusal writes throw.
+export const archivedNote = (project: Project): string => {
+  const named = slugOr(project.slug === "" ? project.name : project.slug, project.id);
+  return `project ${named} (${project.id}) is archived`;
+};
+
+// Checks the project a resolved task or board belongs to. Reads get a stderr
+// warning; writes throw unless --allow-archived was passed. A project the key
+// cannot read at all fails the same way it always did — the guard only adds
+// the archived check on top of a successful read.
+export const guardProject = async (projectId: string, access: ProjectAccess = {}): Promise<void> => {
+  const project = await seenProject(projectId);
+  if (!archived(project)) return;
+  if (access.write === true && access.allowArchived !== true) {
+    // A refusal rather than a failure: the server is fine and the write is
+    // deliberately not made, so a fail-open caller that stayed quiet would
+    // leave a session hook believing the write landed.
+    throw hard(`${archivedNote(project)}; pass --allow-archived to write to it anyway`);
+  }
+  if (warned.has(project.id)) return;
+  warned.add(project.id);
+  console.error(`${archivedNote(project)}; reads still work, writes need --allow-archived`);
+};

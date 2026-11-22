@@ -2649,6 +2649,10 @@ export const calendarFeedIcs = async (token: string): Promise<string> =>
     anonymous: true,
     text: true,
     credentialInUrl: true,
+    // The token is the credential, so failures name the route by template —
+    // and the template marks the segment whose spelling is masked out of a
+    // Location or message the server echoes back.
+    servedAs: "/api/calendar-feed/{token}/calendar.ics",
     headers: { Accept: "text/calendar" },
   });
 

@@ -373,20 +373,22 @@ describe("redirects", () => {
     );
   });
 
-  // The same dial failure on a credential-in-URL route names scheme and host
-  // only: the path is the credential, so it is not printed even here.
+  // The same dial failure on a credential-in-URL route names the route by
+  // template and scheme and host only: the path is the credential, so it is
+  // not printed even here.
   test("a credential-in-URL route's dial failure keeps scheme and host only", async () => {
     configureClient({ baseUrl: "http://127.0.0.1:9", apiKey: "test-key" });
     const e = (await failure(
-      kaneoFetch<string>("/calendar-feed/t/calendar.ics", {
+      kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", {
         method: "GET",
         anonymous: true,
         text: true,
         credentialInUrl: true,
+        servedAs: "/api/calendar-feed/{token}/calendar.ics",
       }),
     )) as Error;
     expect(e.message).toBe(
-      'GET /api/calendar-feed/t/calendar.ics: Get "http://127.0.0.1:9": dial tcp 127.0.0.1:9: connect: connection refused',
+      'GET /api/calendar-feed/{token}/calendar.ics: Get "http://127.0.0.1:9": dial tcp 127.0.0.1:9: connect: connection refused',
     );
   });
 
@@ -529,16 +531,65 @@ describe("a Location that cannot be parsed", () => {
     const url = serve(() => new Response(null, { status: 302, headers: { location: "http://e.com/%zz" } }));
     configureClient({ baseUrl: url, apiKey: "test-key" });
     const e = (await failure(
-      kaneoFetch<string>("/calendar-feed/t/calendar.ics", {
+      kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", {
         method: "GET",
         anonymous: true,
         text: true,
         credentialInUrl: true,
+        servedAs: "/api/calendar-feed/{token}/calendar.ics",
       }),
     )) as Error;
     expect(e.message).toBe(
-      `GET /api/calendar-feed/t/calendar.ics: Get ${JSON.stringify(url)}: failed to parse Location header "http://e.com/%zz": parse "http://e.com/%zz": invalid URL escape "%zz"`,
+      `GET /api/calendar-feed/{token}/calendar.ics: Get ${JSON.stringify(url)}: failed to parse Location header "http://e.com/%zz": parse "http://e.com/%zz": invalid URL escape "%zz"`,
     );
+  });
+
+  // And when the server's own Location echoes the credential back — here
+  // inside a reference Go's parse then refuses — the diagnostic masks the
+  // token's spelling the way it masks a password.
+  test("a credential-in-URL route masks the token a Location echoes", async () => {
+    const url = serve(
+      () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: "/calendar-feed/feed-token/%zz" },
+        }),
+    );
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(
+      kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", {
+        method: "GET",
+        anonymous: true,
+        text: true,
+        credentialInUrl: true,
+        servedAs: "/api/calendar-feed/{token}/calendar.ics",
+      }),
+    )) as Error;
+    expect(e.message).toContain('failed to parse Location header "/calendar-feed/***/%zz"');
+    expect(e.message).not.toContain("feed-token");
+  });
+
+  // Go's resolvePath keeps an escaped dot segment literal — %2e is not "." to
+  // it — and its client sends the resolved path as resolved. This runtime's
+  // URL parser reads %2e%2e as the ".." it encodes and would fetch /api/b
+  // instead, so the hop is refused naming what Go resolved rather than
+  // silently fetching another path.
+  test("a Location with an escaped dot segment is refused rather than re-normalized", async () => {
+    let fetched = "";
+    const url = serve((req) => {
+      const u = new URL(req.url);
+      if (u.pathname === "/api/x") {
+        return new Response(null, { status: 302, headers: { location: "/api/a/%2e%2e/b" } });
+      }
+      fetched = u.pathname;
+      return new Response("ok");
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch<string>("/x", { method: "GET" }))) as Error;
+    expect(e.message).toBe(
+      `GET /api/x: Get ${JSON.stringify(`${url}/api/a/%2e%2e/b`)}: the resolved path's %2e escapes are re-normalized by this runtime's URL parser`,
+    );
+    expect(fetched).toBe("");
   });
 
   // Go's url.Error prints a set password as *** and keeps the username; the
@@ -865,6 +916,30 @@ describe("failures", () => {
     const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
     expect(e.messages).toEqual(["boom"]);
     expect(e.message).toBe("GET /api/x: 200: boom");
+  });
+
+  // Go 1.23 unmarshals {"ſucceſſ":false,"error":"boom"} as the failure
+  // envelope: encoding/json's foldName folds U+017F (long s) onto S, where
+  // toLowerCase leaves it. The same fold reaches the message key.
+  test("envelope keys fold the way encoding/json's foldName does", async () => {
+    const url = serve(
+      () =>
+        new Response('{"ſucceſſ":false,"error":[{"meſſage":"boom"}]}', {
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual(["boom"]);
+    expect(e.message).toBe("GET /api/x: 200: boom");
+  });
+
+  // A key that only folds to the field's name plus more is not the field:
+  // "ſuccessX" folds to "SUCCESSX", so the body is the reply, not an envelope.
+  test("a key that folds past the field name is not the envelope", async () => {
+    const url = serve(() => Response.json({ ſuccessX: false, error: "boom" }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    expect(await kaneoFetch<unknown>("/x", { method: "GET" })).toEqual({ ſuccessX: false, error: "boom" });
   });
 
   // `success` is a *bool to Go: a boolean or null/absent is the envelope's

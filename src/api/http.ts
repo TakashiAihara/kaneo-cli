@@ -32,6 +32,13 @@ export type KaneoInit<T = unknown> = RequestInit & {
   anonymous?: boolean;
   text?: boolean;
   credentialInUrl?: boolean;
+  // The route as a template for diagnostics, for a route whose path is itself
+  // the credential: the real path is the secret, so failures name
+  // /calendar-feed/{token}/calendar.ics rather than what was dialled. Each
+  // {...} segment also marks a credential whose spelling — escaped and
+  // decoded — is masked out of anything else an error picks up, like a
+  // server's echo of it in a Location or a message.
+  servedAs?: string;
   blob?: boolean;
 };
 
@@ -201,7 +208,7 @@ const goBody = (body: string): string => {
 export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T> => {
   if (settings.baseUrl === "") throw new Error("no API URL configured");
 
-  const { schema, anonymous, text: wantText, credentialInUrl, blob: wantBlob, ...request } = init;
+  const { schema, anonymous, text: wantText, credentialInUrl, servedAs, blob: wantBlob, ...request } = init;
   // The endpoint as the generated client wrote it, query included: the spelling
   // the operation is looked up by, since reading it back first would split an id
   // that needed escaping into two segments of its own.
@@ -213,8 +220,13 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // The route every failure this call reports names: /api in front of it, the
   // query left out and escapes read back, which is what Go's send reported off
   // the request's URL.Path. It is taken before any redirect, as Go's was, so a
-  // failure names the call that was made rather than the hop that failed.
-  const served = servedPath(target);
+  // failure names the call that was made rather than the hop that failed. A
+  // route whose path is the credential names itself by template instead, and
+  // safe masks the credential's spelling out of whatever else an error picks
+  // up — a Location or a message the server wrote can echo it back.
+  const served = servedAs ?? servedPath(target);
+  const mask = credentialMask(servedAs, target.pathname);
+  const safe = (s: string): string => (mask === undefined ? s : mask(s));
   let headers = new Headers(request.headers);
   // A request that names its own document type keeps it — the calendar feed's
   // text/calendar, the project background's image/* — and everything else
@@ -269,7 +281,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       // wrote it rather than resolved. send prefixes the call as for any failure.
       if (hop >= MAX_REDIRECTS) {
         throw new Error(
-          `${called} ${served}: ${goOp(called)} ${JSON.stringify(location)}: stopped after ${MAX_REDIRECTS} redirects`,
+          `${called} ${served}: ${goOp(called)} ${JSON.stringify(safe(location))}: stopped after ${MAX_REDIRECTS} redirects`,
         );
       }
       try {
@@ -277,7 +289,9 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
         // still carry the key, and fetch decides that on its own.
         response = await fetch(target, { method, headers, body, signal, redirect: "manual" });
       } catch (e) {
-        throw new Error(`${called} ${served}: ${urlError(called, target, e, credentialInUrl === true)}`, { cause: e });
+        throw new Error(`${called} ${served}: ${safe(urlError(called, target, e, credentialInUrl === true))}`, {
+          cause: e,
+        });
       }
       const red = redirectTarget(response, target);
       if (red === undefined) break;
@@ -285,14 +299,14 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
         // The way Go's client reports a Location it cannot parse: the call, the
         // request that answered it, and url.Parse's own account of the refusal.
         throw new Error(
-          `${called} ${served}: ${goOp(called)} ${JSON.stringify(shownHref(target, credentialInUrl === true))}: failed to parse Location header ${JSON.stringify(red.bad.location)}: parse ${JSON.stringify(red.bad.at)}: ${red.bad.why}`,
+          `${called} ${served}: ${goOp(called)} ${JSON.stringify(safe(shownHref(target, credentialInUrl === true)))}: failed to parse Location header ${JSON.stringify(safe(red.bad.location))}: parse ${JSON.stringify(safe(red.bad.at))}: ${red.bad.why}`,
         );
       }
       if ("unreachable" in red) {
         // The way Go's client reports a request that failed below the parse:
         // the call, then the resolved URL and the transport's reason for it.
         throw new Error(
-          `${called} ${served}: ${goOp(called)} ${JSON.stringify(red.unreachable.url)}: ${red.unreachable.why}`,
+          `${called} ${served}: ${goOp(called)} ${JSON.stringify(safe(red.unreachable.url))}: ${red.unreachable.why}`,
         );
       }
       // A credential carried in the URL cannot be stripped the way the key's
@@ -323,7 +337,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       // redacted the way the key can.
       if (body !== null && red.to.origin !== start.target.origin) {
         throw new KaneoApiError(called, served, response.status, [
-          `refusing to follow the redirect to ${shownHref(red.to, credentialInUrl === true)}: the request body may carry a credential`,
+          `refusing to follow the redirect to ${safe(shownHref(red.to, credentialInUrl === true))}: the request body may carry a credential`,
         ]);
       }
       target = red.to;
@@ -336,7 +350,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       // string of the same reply would measure.
       bytes = await response.arrayBuffer();
     } catch (e) {
-      throw new Error(`${called} ${served}: read body: ${bodyReason(e)}`, { cause: e });
+      throw new Error(`${called} ${served}: read body: ${safe(bodyReason(e))}`, { cause: e });
     }
     const wait = response.status === 429 ? tryAgainIn(bytes) : undefined;
     if (
@@ -363,7 +377,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
   // A non-2xx status and a 2xx carrying success:false are both failures: the
   // server reports validation problems the second way, so the status alone is
   // not enough to judge the call.
-  const reported = failure(called, served, response.status, text, trimmed, wantBlob === true);
+  const reported = failure(called, served, response.status, text, trimmed, wantBlob === true, safe);
   if (reported) {
     const wait = response.status === 429 ? tryAgainIn(bytes) : undefined;
     if (wait !== undefined && waitOutRateLimits) {
@@ -413,7 +427,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     // reply alone says nothing about which call produced it.
     const what =
       operation === undefined ? `decode response: ${why}` : decodeFailure(response, bytes.byteLength, operation, why);
-    throw new Error(`${called} ${served}: ${what}`, { cause: e });
+    throw new Error(`${called} ${served}: ${safe(what)}`, { cause: e });
   }
   if (schema) {
     const checked = schema.safeParse(decoded);
@@ -423,7 +437,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
     // back as it was sent and the mismatch is only worth mentioning when
     // somebody asked to see it.
     if (!checked.success && settings.debug) {
-      reportMismatch(called, path, checked.error);
+      reportMismatch(called, safe(path), checked.error);
     }
   }
   if (typeof decoded === "object" && decoded !== null) remember(decoded, `${called} ${served}`);
@@ -589,8 +603,10 @@ type Redirect =
 
 // Go's client reads the first of several Location headers; fetch's Headers
 // joins them into one value separated by ", ", so the first of those is what is
-// followed. A single Location holding ", " itself is read as two here where Go
-// read it whole, which no URL a server writes has reason to contain.
+// followed. There is no per-field accessor to do better with — getAll answers
+// only for set-cookie and entries() yields the same joined value — and a
+// single Location holding ", " itself is read as two here where Go read it
+// whole, which no URL a server writes has reason to contain.
 const firstLocation = (header: string | null): string | null => {
   if (header === null) return null;
   const comma = header.indexOf(", ");
@@ -607,6 +623,42 @@ const shownHref = (target: URL, credentialInUrl: boolean): string => {
   if (u.password !== "") u.password = "***";
   if (!credentialInUrl) return u.href;
   return `${u.protocol}//${user}${u.host}`;
+};
+
+// The spellings a credential-in-path route's path credential takes: each
+// {...} segment of the servedAs template, in the URL's escaped form and
+// decoded, so an echo of it — a Location that points back into the route, a
+// message the server wrote — is masked the way a password is. undefined when
+// the route names no template, in which case nothing is masked.
+const credentialMask = (template: string | undefined, encodedPath: string): ((s: string) => string) | undefined => {
+  if (template === undefined) return undefined;
+  const marks = template.split("/");
+  const segs = encodedPath.split("/");
+  const secrets = new Set<string>();
+  for (let i = 0; i < marks.length && i < segs.length; i++) {
+    if (!/^\{[^}/]+\}$/.test(marks[i]!)) continue;
+    const encoded = segs[i]!;
+    if (encoded === "") continue;
+    secrets.add(encoded);
+    try {
+      secrets.add(decodeURIComponent(encoded));
+    } catch {
+      // An escape that does not decode is masked only in the form written.
+    }
+  }
+  if (secrets.size === 0) return undefined;
+  // A credential stands alone in what it is echoed into — a path segment, a
+  // quoted value — so the mask takes it only where it is not part of a longer
+  // token-like run. Without that bound a short credential would be masked out
+  // of ordinary words and the diagnostic would say nothing.
+  const patterns = [...secrets].map(
+    (secret) => new RegExp(`(?<![A-Za-z0-9_-])${secret.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9_-])`, "g"),
+  );
+  return (s: string) => {
+    let out = s;
+    for (const pattern of patterns) out = out.replace(pattern, "***");
+    return out;
+  };
 };
 
 const redirectTarget = (response: Response, from: URL): Redirect | undefined => {
@@ -636,7 +688,19 @@ const redirectTarget = (response: Response, from: URL): Redirect | undefined => 
   }
   // Resolved against the URL that answered it, the way any other client would.
   try {
-    return { to: new URL(location, from), location };
+    const to = new URL(location, from);
+    // Go's client sends the resolved path's escapes literally; this runtime's
+    // URL parser re-normalizes an escaped dot segment (%2e and the spellings
+    // that decode to one) where Go kept it, so a path Go resolved can arrive
+    // here already changed. When they differ the hop cannot be made the way
+    // Go would have made it — refuse rather than fetch another path.
+    if (ref !== undefined) {
+      const resolved = goResolvedRef(ref, from);
+      if (!goPathHeld(to, goText(resolved.path))) {
+        return { unreachable: { url: goRefText(resolved), why: GO_PATH_DIVERGENT } };
+      }
+    }
+    return { to, location };
   } catch {
     // Go's parse accepted this but WHATWG's URL cannot hold it; Go resolves
     // and sends it anyway, so the outcome is the transport's, not a refusal.
@@ -1089,6 +1153,59 @@ const goMissReason = (u: GoRef): string => {
   return `dial tcp: lookup ${goText(hostname)}: no such host`;
 };
 
+// Why a resolved reference is refused when this runtime's URL parser cannot
+// hold the path Go resolved: the parser reads %2e — in any of the spellings
+// that decode to a dot — as the dot segment it encodes and re-normalizes the
+// path around it, where Go's resolvePath kept the escape and its client sent
+// it literally. Following the URL object would fetch a different path than
+// Go's would have, so the hop is a transport refusal naming what Go resolved.
+const GO_PATH_DIVERGENT = "the resolved path's %2e escapes are re-normalized by this runtime's URL parser";
+
+// The userinfo a resolved reference inherits from the URL that answered it,
+// in the form GoRef keeps: the name decoded, passSet when a password was
+// written. goRefText prints a set password as *** either way.
+const goFromUser = (from: URL): GoRef["user"] => {
+  if (from.username === "" && from.password === "") return undefined;
+  let name = from.username;
+  try {
+    name = decodeURIComponent(name);
+  } catch {
+    // A username that is not valid percent-encoding is kept as written.
+  }
+  return { name: goBytes(name), passSet: from.password !== "" };
+};
+
+// The GoRef ResolveReference would produce for a reference Go's parse
+// accepted: a reference that names an authority or scheme resolves its own
+// escaped path alone, a relative one resolves against the answering URL's.
+// The path stays escaped, as Go's URL keeps it.
+const goResolvedRef = (ref: GoRef, from: URL): GoRef => {
+  if (ref.scheme !== "" || ref.host !== "" || ref.user !== undefined) {
+    return {
+      ...ref,
+      scheme: ref.scheme === "" ? from.protocol.slice(0, -1) : ref.scheme,
+      path: goResolvePath(ref.path, ""),
+    };
+  }
+  return {
+    scheme: from.protocol.slice(0, -1),
+    opaque: "",
+    omitHost: false,
+    user: goFromUser(from),
+    host: from.host,
+    path: goResolvePath(goBytes(from.pathname), ref.path),
+    query: ref.query,
+    forceQuery: ref.forceQuery,
+    fragment: ref.fragment,
+  };
+};
+
+// Whether the URL object holds the path Go resolved. resolvedPath is the
+// escaped spelling Go sends; u.pathname is the same spelling sent on the
+// wire. They differ only when the parser re-normalized something — every
+// other byte of an escaped path round-trips through the setter unchanged.
+const goPathHeld = (u: URL, resolvedPath: string): boolean => u.pathname === (resolvedPath === "" ? "/" : resolvedPath);
+
 // The way Go's client treats a Location url.Parse accepted but WHATWG's URL
 // cannot hold: it resolves the reference against the URL that answered, and
 // either the resolution is a URL this runtime can still fetch (an empty
@@ -1111,7 +1228,11 @@ const goLocationMiss = (location: string, from: URL): Redirect | undefined => {
   const u = new URL(from.href);
   const inheritsAll = ref.path === "" && !ref.forceQuery && ref.query === "";
   if (!inheritsAll) {
-    u.pathname = goText(goResolvePath(goBytes(from.pathname), ref.path));
+    const resolvedPath = goText(goResolvePath(goBytes(from.pathname), ref.path));
+    u.pathname = resolvedPath;
+    if (!goPathHeld(u, resolvedPath)) {
+      return { unreachable: { url: goRefText(goResolvedRef(ref, from)), why: GO_PATH_DIVERGENT } };
+    }
     u.search = ref.forceQuery ? "?" : ref.query === "" ? "" : `?${goText(ref.query)}`;
     u.hash = ref.fragment === "" ? "" : `#${goText(ref.fragment)}`;
   } else if (ref.fragment !== "") {
@@ -1164,15 +1285,24 @@ const failure = (
   raw: string,
   trimmed: string,
   blob: boolean,
+  scrub: (s: string) => string,
 ): KaneoApiError | undefined => {
   // A blob route's 2xx body is bytes by definition, so a document shaped
   // like the failure envelope is the file being served — an asset can be a
   // JSON file whose contents say success:false — not a report. The envelope
   // still speaks for a refused call.
   const envelope = blob && status >= 200 && status < 300 ? undefined : decodeEnvelope(raw);
-  if (envelope) return new KaneoApiError(method, path, status, messagesOf(envelope), trimmed);
+  if (envelope) {
+    return new KaneoApiError(method, path, status, messagesOf(envelope).map(scrub), scrub(trimmed));
+  }
   if (status >= 200 && status < 300) return undefined;
-  return new KaneoApiError(method, path, status, codedMessage(trimmed) ?? plainMessage(trimmed), trimmed);
+  return new KaneoApiError(
+    method,
+    path,
+    status,
+    (codedMessage(trimmed) ?? plainMessage(trimmed)).map(scrub),
+    scrub(trimmed),
+  );
 };
 
 // The message of a failure sent as {"message", "code"} JSON, which is how
@@ -1319,6 +1449,27 @@ const skipJsonValue = (text: string, i: number): number => {
   return i;
 };
 
+// encoding/json matches an object key to a field name through foldName: ASCII
+// letters fold to upper case and every other rune to the smallest rune of
+// its unicode.SimpleFold orbit. Against the ASCII literals this file compares
+// keys with ("success", "error", "message"), a key matches exactly when its
+// fold is the literal's own — "SUCCESS", "ERROR", "MESSAGE" — and the only
+// non-ASCII runes that can fold onto an ASCII letter are U+017F (long s, onto
+// S) and U+212A (the Kelvin sign, onto K). Every other rune folds to a
+// non-ASCII value that can never equal them, so the fold leaves it as it is.
+const GO_FOLD_ASCII: Record<string, string> = { "\u017F": "S", "\u212A": "K" };
+
+const goFoldName = (key: string): string => {
+  let out = "";
+  for (const c of key) {
+    const code = c.codePointAt(0)!;
+    if (code >= 0x61 && code <= 0x7a) out += String.fromCharCode(code - 0x20);
+    else if (code < 0x80) out += c;
+    else out += GO_FOLD_ASCII[c] ?? c;
+  }
+  return out;
+};
+
 // Go unmarshals the body into {Success *bool `json:"success"`; Error
 // json.RawMessage `json:"error"`}: a key matches its field case-insensitively,
 // every member is applied in the order it arrived so a later duplicate wins,
@@ -1341,8 +1492,8 @@ const decodeEnvelope = (text: string): Envelope | undefined => {
   let success: boolean | undefined;
   let error: string | undefined;
   for (const { key, value } of members) {
-    const lower = key.toLowerCase();
-    if (lower === "success") {
+    const folded = goFoldName(key);
+    if (folded === "SUCCESS") {
       let v: unknown;
       try {
         v = JSON.parse(value);
@@ -1355,7 +1506,7 @@ const decodeEnvelope = (text: string): Envelope | undefined => {
       }
       if (typeof v !== "boolean") return undefined;
       success = v;
-    } else if (lower === "error") {
+    } else if (folded === "ERROR") {
       error = value;
     }
   }
@@ -1420,7 +1571,7 @@ const structMessage = (text: string): string | undefined => {
   if (members === undefined) return undefined;
   let message: string | undefined;
   for (const { key, value } of members) {
-    if (key.toLowerCase() !== "message") continue;
+    if (goFoldName(key) !== "MESSAGE") continue;
     if (value === "null") continue;
     if (value[0] !== '"') return undefined;
     try {

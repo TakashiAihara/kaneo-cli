@@ -306,16 +306,10 @@ const isRecord = (value: Value): value is { [key: string]: Value } =>
 const kindOf = (value: Value): string => {
   if (value === null) return "null";
   if (Array.isArray(value)) return "array";
-  switch (typeof value) {
-    case "string":
-      return "string";
-    case "number":
-      return "number";
-    case "boolean":
-      return "bool";
-    default:
-      return "object";
-  }
+  if (typeof value === "string") return "string";
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "bool";
+  return "object";
 };
 
 const goName = (type: GoType): string => {
@@ -328,7 +322,8 @@ const goName = (type: GoType): string => {
       return `[]${goName(type.value)}`;
     case "either":
       return `config.${type.name}`;
-    default:
+    case "string":
+    case "bool":
       return type.at;
   }
 };
@@ -408,8 +403,9 @@ const zeroOf = (type: GoType): unknown => {
       return [];
     case "either":
       return zeroOf(type.of[0]!);
-    default:
-      // A map or a struct, both of which every reader here treats as empty.
+    // Both of which every reader here treats as empty.
+    case "map":
+    case "struct":
       return {};
   }
 };

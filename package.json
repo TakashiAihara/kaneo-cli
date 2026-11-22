@@ -19,7 +19,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "knip": "knip",
-    "lint": "oxlint --deny-warnings",
+    "lint": "oxlint --type-aware --deny-warnings",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "build": "bun scripts/build.ts",
@@ -39,6 +39,7 @@
     "orval": "8.39.0",
     "oxfmt": "0.79.0",
     "oxlint": "1.94.0",
+    "oxlint-tsgolint": "7.0.2008",
     "typescript": "^5.9.0"
   }
 }

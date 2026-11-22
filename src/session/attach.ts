@@ -1,4 +1,12 @@
-import { addComment, getProject, listComments, listWorkspaces, TimestampError, type Comment, type Task } from "../api/kaneo";
+import {
+  addComment,
+  getProject,
+  listComments,
+  listWorkspaces,
+  TimestampError,
+  type Comment,
+  type Task,
+} from "../api/kaneo";
 import { debug, type App } from "../cli/app";
 import { hard } from "../cli/failopen";
 import { hookEnv, runHook } from "../cli/hook";
@@ -42,12 +50,7 @@ export const attachmentOf = (task: Task): Attachment => ({ taskId: task.id, numb
 // and `task create --attach` already holds what it made. Failing after the
 // marker is posted is a hard failure: the server has a marker for this session
 // that nothing here knows about.
-export const attachTask = async (
-  app: App,
-  sessionId: string,
-  task: Task,
-  nextStep: string,
-): Promise<Attachment> => {
+export const attachTask = async (app: App, sessionId: string, task: Task, nextStep: string): Promise<Attachment> => {
   // Looked up before the marker is posted, so the lookups do not widen the
   // window where the server has a marker and this host has no record.
   const attachment = attachmentOf(task);
@@ -72,7 +75,9 @@ export const attachTask = async (
     // The marker is already on the server. Reporting success here would
     // leave `session next` believing nothing is attached, and a retry
     // would post a second marker.
-    throw hard(`attached ${taskRef(attachment.projectSlug, attachment.number, attachment.projectId, attachment.taskId)} on the server, but could not record it locally: ${(e as Error).message}`);
+    throw hard(
+      `attached ${taskRef(attachment.projectSlug, attachment.number, attachment.projectId, attachment.taskId)} on the server, but could not record it locally: ${(e as Error).message}`,
+    );
   }
   try {
     // Appended after the attachment is in place: a history line for an
@@ -82,7 +87,9 @@ export const attachTask = async (
   } catch (e) {
     // The attachment is saved, so `session next` works; what is missing is
     // the record a check after close relies on, which is worth failing over.
-    throw hard(`attached ${taskRef(attachment.projectSlug, attachment.number, attachment.projectId, attachment.taskId)}, but could not add it to the session history: ${(e as Error).message}`);
+    throw hard(
+      `attached ${taskRef(attachment.projectSlug, attachment.number, attachment.projectId, attachment.taskId)}, but could not add it to the session history: ${(e as Error).message}`,
+    );
   }
 
   await runHook(app, "attach", hookEnv("attach", sessionId, task.id, task.number, slug));

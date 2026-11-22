@@ -5,7 +5,8 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 // Builds a standalone binary for every release target and packs each one the
 // way install.sh expects: dist/kaneo_<os>_<arch>.tar.gz holding kaneo, README.md,
 // LICENSE and THIRD_PARTY_NOTICES, plus dist/checksums.txt in sha256sum format.
-// The binary embeds jq, whose licences require their notices to travel with it.
+// The binary embeds the Bun runtime, zod and jq, whose licences require their
+// notices to travel with it.
 // The names are the ones the Go releases used, so install.sh and existing
 // installs keep working.
 //
@@ -36,7 +37,11 @@ for (const t of TARGETS) {
   const archive = `kaneo_${t.os}_${t.arch}.tar.gz`;
   await $`tar -czf ${dist}${archive} -C ${stage} kaneo README.md LICENSE THIRD_PARTY_NOTICES`;
   rmSync(stage, { recursive: true });
-  sums.push(`${createHash("sha256").update(readFileSync(`${dist}${archive}`)).digest("hex")}  ${archive}`);
+  sums.push(
+    `${createHash("sha256")
+      .update(readFileSync(`${dist}${archive}`))
+      .digest("hex")}  ${archive}`,
+  );
   console.log(archive);
 }
 // Sorted by archive name, the order goreleaser wrote.

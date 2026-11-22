@@ -77,7 +77,12 @@ const references = (title: string): Reference[] => {
   }
   for (const span of title.matchAll(PARENTHESISED)) {
     for (const match of span[0].matchAll(SPACED_REFERENCE)) {
-      found.push({ at: (span.index ?? 0) + (match.index ?? 0), name: match[1]!, number: match[2]!, written: match[0]! });
+      found.push({
+        at: (span.index ?? 0) + (match.index ?? 0),
+        name: match[1]!,
+        number: match[2]!,
+        written: match[0]!,
+      });
     }
   }
   return found
@@ -207,5 +212,4 @@ const bigrams = (text: string): Map<string, number> => {
   return found;
 };
 
-const total = (counts: Map<string, number>): number =>
-  [...counts.values()].reduce((sum, times) => sum + times, 0);
+const total = (counts: Map<string, number>): number => [...counts.values()].reduce((sum, times) => sum + times, 0);

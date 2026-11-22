@@ -53,7 +53,10 @@ function correctOrganization(doc: Doc) {
     const content = (doc.paths[path] as any)?.[method]?.responses?.["200"]?.content?.["application/json"];
     // Missing means the document changed shape; say where rather than fail on
     // whatever property happened to be undefined.
-    if (!content) throw new Error(`openapi/transformer.ts: ${method.toUpperCase()} ${path} has no JSON 200 response; revisit correctOrganization`);
+    if (!content)
+      throw new Error(
+        `openapi/transformer.ts: ${method.toUpperCase()} ${path} has no JSON 200 response; revisit correctOrganization`,
+      );
     return content;
   };
   json("/auth/organization/list", "get").schema.items = ref;
@@ -68,7 +71,8 @@ function correctLabel(doc: Doc) {
   const field = (doc.components?.schemas?.Label as any)?.properties?.deletionStartedAt;
   // Missing means the document changed shape, and this correction would stop
   // applying without anyone noticing.
-  if (!field) throw new Error("openapi/transformer.ts: Label.deletionStartedAt is gone from the document; revisit correctLabel");
+  if (!field)
+    throw new Error("openapi/transformer.ts: Label.deletionStartedAt is gone from the document; revisit correctLabel");
   field.type = ["string", "null"];
 }
 

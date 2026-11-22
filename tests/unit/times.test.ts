@@ -223,7 +223,9 @@ describe("a time that fails to read in the reply to a write", () => {
       api.afterWrite("did it", "look there", (async () => api.isoTime({ createdAt: "soon" }, "createdAt"))()),
     )) as Error;
     expect(e).toBeInstanceOf(api.TimestampError);
-    expect(e.message).toStartWith("did it on the server, but its reply could not be read (createdAt is not a timestamp");
+    expect(e.message).toStartWith(
+      "did it on the server, but its reply could not be read (createdAt is not a timestamp",
+    );
   });
 });
 
@@ -232,15 +234,69 @@ describe("a time that fails to read in the reply to a write", () => {
 describe("every resource that carries a time names its request when the time is unreadable", () => {
   const BAD = "soon";
   test.each([
-    ["an invitation", "GET /api/invitation/i1", { invitation: { id: "i1", expiresAt: BAD } }, () => api.getInvitation("i1"), "expiresAt"],
-    ["a search result", "GET /api/search", { results: [{ id: "r1", type: "task", createdAt: BAD }] }, () => api.search({ query: "q", workspaceId: "w", projectId: "", type: "", limit: "" }), "createdAt"],
-    ["a workflow rule", "GET /api/workflow-rule/p1", [{ id: "r1", createdAt: TIME, updatedAt: BAD }], () => api.listWorkflowRules("p1"), "updatedAt"],
-    ["a stored workflow rule", "PUT /api/workflow-rule/p1", { id: "r1", createdAt: BAD }, () => api.setWorkflowRule("p1", { integrationType: "github", eventType: "pr", columnId: "c" }), "createdAt"],
-    ["a time entry", "GET /api/time-entry/task/t1", [{ id: "e1", startTime: BAD }], () => api.listTimeEntries("t1"), "startTime"],
-    ["a time entry's end", "GET /api/time-entry/task/t1", [{ id: "e1", startTime: TIME, endTime: BAD }], () => api.listTimeEntries("t1"), "endTime"],
-    ["a notification", "GET /api/notification", [{ id: "n1", createdAt: BAD }], () => api.listNotifications(), "createdAt"],
-    ["a label", "GET /api/label/workspace/w1", [{ id: "l1", createdAt: TIME, updatedAt: TIME, deletionStartedAt: BAD }], () => api.listWorkspaceLabels("w1"), "deletionStartedAt"],
-    ["an external link", "GET /api/external-link/task/t1", [{ id: "x1", createdAt: BAD }], () => api.listExternalLinks("t1"), "createdAt"],
+    [
+      "an invitation",
+      "GET /api/invitation/i1",
+      { invitation: { id: "i1", expiresAt: BAD } },
+      () => api.getInvitation("i1"),
+      "expiresAt",
+    ],
+    [
+      "a search result",
+      "GET /api/search",
+      { results: [{ id: "r1", type: "task", createdAt: BAD }] },
+      () => api.search({ query: "q", workspaceId: "w", projectId: "", type: "", limit: "" }),
+      "createdAt",
+    ],
+    [
+      "a workflow rule",
+      "GET /api/workflow-rule/p1",
+      [{ id: "r1", createdAt: TIME, updatedAt: BAD }],
+      () => api.listWorkflowRules("p1"),
+      "updatedAt",
+    ],
+    [
+      "a stored workflow rule",
+      "PUT /api/workflow-rule/p1",
+      { id: "r1", createdAt: BAD },
+      () => api.setWorkflowRule("p1", { integrationType: "github", eventType: "pr", columnId: "c" }),
+      "createdAt",
+    ],
+    [
+      "a time entry",
+      "GET /api/time-entry/task/t1",
+      [{ id: "e1", startTime: BAD }],
+      () => api.listTimeEntries("t1"),
+      "startTime",
+    ],
+    [
+      "a time entry's end",
+      "GET /api/time-entry/task/t1",
+      [{ id: "e1", startTime: TIME, endTime: BAD }],
+      () => api.listTimeEntries("t1"),
+      "endTime",
+    ],
+    [
+      "a notification",
+      "GET /api/notification",
+      [{ id: "n1", createdAt: BAD }],
+      () => api.listNotifications(),
+      "createdAt",
+    ],
+    [
+      "a label",
+      "GET /api/label/workspace/w1",
+      [{ id: "l1", createdAt: TIME, updatedAt: TIME, deletionStartedAt: BAD }],
+      () => api.listWorkspaceLabels("w1"),
+      "deletionStartedAt",
+    ],
+    [
+      "an external link",
+      "GET /api/external-link/task/t1",
+      [{ id: "x1", createdAt: BAD }],
+      () => api.listExternalLinks("t1"),
+      "createdAt",
+    ],
   ] as const)("%s", async (_what, request, reply, call, field) => {
     answers(JSON.stringify(reply));
     const e = (await failure(call())) as Error;

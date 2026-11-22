@@ -1,6 +1,14 @@
 import { existsSync, statSync } from "node:fs";
 import { apiKey, type App } from "./app";
-import { authSession, currentUser, deleteAvatar, listWorkspaces, uploadAvatar, type User, type Workspace } from "../api/kaneo";
+import {
+  authSession,
+  currentUser,
+  deleteAvatar,
+  listWorkspaces,
+  uploadAvatar,
+  type User,
+  type Workspace,
+} from "../api/kaneo";
 import { KaneoApiError, normalizeBaseUrl } from "../api/http";
 import { uploadUserAvatarBodyDataMax } from "../api/gen/model";
 import { exactArgs, noArgs, type Command, type RunContext } from "./args";
@@ -83,13 +91,17 @@ export const whoamiCommand: Command<App> = {
             // limit is refused without being held in memory whole; the check
             // after the read stays for a file that grew while it was read.
             if (statSync(file).size > uploadUserAvatarBodyDataMax) {
-              throw new Error(`${file} is too large: the server takes at most ${uploadUserAvatarBodyDataMax} base64 characters (~512 KiB of image)`);
+              throw new Error(
+                `${file} is too large: the server takes at most ${uploadUserAvatarBodyDataMax} base64 characters (~512 KiB of image)`,
+              );
             }
             const bytes = await Bun.file(file).bytes();
             if (bytes.byteLength === 0) throw new Error(`${file} is empty`);
             const data = Buffer.from(bytes).toString("base64");
             if (data.length > uploadUserAvatarBodyDataMax) {
-              throw new Error(`${file} is too large: the server takes at most ${uploadUserAvatarBodyDataMax} base64 characters (~512 KiB of image)`);
+              throw new Error(
+                `${file} is too large: the server takes at most ${uploadUserAvatarBodyDataMax} base64 characters (~512 KiB of image)`,
+              );
             }
             const avatar = await uploadAvatar(contentType, data);
             app.out.human(`avatar     ${avatar.id}  ${avatar.url}`);
@@ -117,7 +129,9 @@ export const whoamiCommand: Command<App> = {
       // The route's own 404 is "User not found"; any other means the route is
       // not there.
       if (e instanceof KaneoApiError && e.statusCode === 404 && !e.messages.includes("User not found")) {
-        throw new Error(`the API key was accepted, but this server has no /user/me to say whose it is (Kaneo before v2.28.0): ${e.message}`);
+        throw new Error(
+          `the API key was accepted, but this server has no /user/me to say whose it is (Kaneo before v2.28.0): ${e.message}`,
+        );
       }
       throw e;
     });

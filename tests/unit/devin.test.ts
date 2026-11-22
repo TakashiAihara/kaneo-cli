@@ -6,15 +6,11 @@ import { ancestorPids, inoKey } from "../../src/session/devin";
 // against itself: major's low 12 bits sit at dev bits 8-19 and its high 20 at
 // bits 44-63; minor's low 8 at bits 0-7 and its high 24 at bits 20-43.
 const makedev = (major: bigint, minor: bigint): bigint =>
-  ((major & 0xfffn) << 8n) |
-  ((major & 0xfffff000n) << 32n) |
-  (minor & 0xffn) |
-  ((minor & 0xffffff00n) << 12n);
+  ((major & 0xfffn) << 8n) | ((major & 0xfffff000n) << 32n) | (minor & 0xffn) | ((minor & 0xffffff00n) << 12n);
 
 // The majors used here keep dev under 2^53, so Number() is exact the way
 // stat's st_dev is.
-const key = (major: bigint, minor: bigint): string =>
-  inoKey({ dev: Number(makedev(major, minor)), ino: 424242 });
+const key = (major: bigint, minor: bigint): string => inoKey({ dev: Number(makedev(major, minor)), ino: 424242 });
 
 describe("inoKey", () => {
   // An ordinary device: both fields fit their low bits, so any decode works.

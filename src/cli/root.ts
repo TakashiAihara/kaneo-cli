@@ -36,16 +36,13 @@ import { labelCommand } from "./label";
 import { feedCommand } from "./feed";
 import { timeCommand } from "./time";
 import { apiCheckCommand } from "./apicheck";
+import { upgradeCommand } from "./upgrade";
 import { assetCommand } from "./asset";
 import { avatarCommand } from "./avatar";
 import { instanceCommand } from "./instance";
 import { publicCommand } from "./public";
 import { completeCommand, completionCommand } from "./completion";
-
-// The version is stamped in at build time; an unreleased build calls itself dev,
-// which is what makes it obvious that a report about it belongs to no release.
-declare const KANEO_VERSION: string | undefined;
-const version = typeof KANEO_VERSION === "undefined" ? "dev" : KANEO_VERSION;
+import { version } from "../version";
 
 const DEFAULT_TIMEOUT = "10s";
 
@@ -61,13 +58,30 @@ const GLOBAL_FLAGS: Flag[] = [
   // Both of these take an id, a slug or a name: the value is used as an id first,
   // so the ordinary path costs no extra request, and it is looked up across the
   // workspaces the key can see only when the server does not know it.
-  { name: "workspace", shorthand: "w", type: "string", usage: "workspace id, slug or name (env KANEO_WORKSPACE)", defaultValue: "" },
-  { name: "project", shorthand: "p", type: "string", usage: "project id, slug or name (env KANEO_PROJECT)", defaultValue: "" },
+  {
+    name: "workspace",
+    shorthand: "w",
+    type: "string",
+    usage: "workspace id, slug or name (env KANEO_WORKSPACE)",
+    defaultValue: "",
+  },
+  {
+    name: "project",
+    shorthand: "p",
+    type: "string",
+    usage: "project id, slug or name (env KANEO_PROJECT)",
+    defaultValue: "",
+  },
   { name: "json", type: "bool", usage: "force JSON output", defaultValue: "false" },
   { name: "human", type: "bool", usage: "force human-readable output, even through a pipe", defaultValue: "false" },
   // jq runs inside the binary, so reading one field needs nothing installed.
   { name: "jq", type: "string", usage: "filter JSON output with a jq expression (implies --json)", defaultValue: "" },
-  { name: "timeout", type: "duration", usage: "timeout for each request and each --jq evaluation", defaultValue: DEFAULT_TIMEOUT },
+  {
+    name: "timeout",
+    type: "duration",
+    usage: "timeout for each request and each --jq evaluation",
+    defaultValue: DEFAULT_TIMEOUT,
+  },
 ];
 
 // `help` is a command of its own, the way it is in every cobra-built CLI, and
@@ -125,6 +139,7 @@ export const rootCommand = (): { root: Command<App> } => {
     assetCommand,
     avatarCommand,
     apiCheckCommand,
+    upgradeCommand,
     completionCommand,
     helpCommand,
     // The command the completion scripts call, built against this tree and kept
@@ -150,7 +165,9 @@ const stdoutIsTTY = (): boolean => isTTY(1);
 // nothing left to filter.
 const writerFor = (filter: Filter | undefined, json: boolean, human: boolean): Writer =>
   new Writer(
-    filter === undefined ? resolveMode(json, human, stdoutIsTTY(), noColor()) : resolveMode(true, false, stdoutIsTTY(), noColor()),
+    filter === undefined
+      ? resolveMode(json, human, stdoutIsTTY(), noColor())
+      : resolveMode(true, false, stdoutIsTTY(), noColor()),
     filter,
     stdoutIsTTY(),
   );

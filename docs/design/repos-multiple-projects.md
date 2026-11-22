@@ -31,7 +31,7 @@ There is nothing to read a default out of. The list states no order of precedenc
 
 Only in the repo map. A flag, the environment, a `.kaneo.json` and a profile each hold one id, and each contributes a single-element list, so a caller reads one field whichever layer answered. The chain and its precedence are unchanged.
 
-`.kaneo.json` is unchanged for the same reason it was never the problem: it ties a *directory* to a project, so it switches by where you are rather than covering several at once.
+`.kaneo.json` is unchanged for the same reason it was never the problem: it ties a _directory_ to a project, so it switches by where you are rather than covering several at once.
 
 ## Finished projects
 

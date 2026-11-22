@@ -39,6 +39,12 @@ jobs:
 
       - run: bun run typecheck
 
+      # Formatting and lint are checked here rather than in review: a finding
+      # costs one CI run instead of a review round. --deny-warnings keeps a
+      # warn-level rule from slipping through.
+      - run: bun run lint
+      - run: bun run fmt:check
+
       # Unused exports, files and dependencies fail here rather than in review.
       # tsconfig's noUnusedLocals / noUnusedParameters cover the inside of a file.
       - run: bun run knip

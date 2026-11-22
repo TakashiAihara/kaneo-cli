@@ -1,7 +1,6 @@
 import { defineConfig } from "orval";
 import { SPEC_PATH } from "./openapi/spec";
 
-
 export default defineConfig({
   kaneo: {
     input: {

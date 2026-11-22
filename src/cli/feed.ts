@@ -76,7 +76,8 @@ const calendarLabelOptions = (labels: LabelRecord[]): { id: string; name: string
 // are what listings hand on and a name is what a person types.
 const resolveFeedLabel = (options: { id: string; name: string }[], ref: string): string => {
   const found = options.find((o) => o.id === ref) ?? options.find((o) => o.name === ref);
-  if (found === undefined) throw new Error(`no label ${JSON.stringify(ref)} in this workspace; kaneo label ls lists them`);
+  if (found === undefined)
+    throw new Error(`no label ${JSON.stringify(ref)} in this workspace; kaneo label ls lists them`);
   return found.id;
 };
 
@@ -173,7 +174,9 @@ export const feedCommand = {
         // The revocation cannot be undone and a new feed is a new link, so the
         // confirmation is asked for the way every other delete asks for it.
         if (flags.yes !== true) {
-          throw new Error(`refusing to revoke calendar feed ${feed.id} without --yes; its subscribe link stops working and a new feed gets a new one`);
+          throw new Error(
+            `refusing to revoke calendar feed ${feed.id} without --yes; its subscribe link stops working and a new feed gets a new one`,
+          );
         }
         await revokeCalendarFeed(projectId, feed.id);
         app.out.human(`revoked feed ${feed.id}`);
@@ -198,7 +201,9 @@ export const feedCommand = {
         // with text a filter cannot read. An empty --jq is no expression at
         // all, the same as everywhere else.
         if (changed.has("json") || app.out.filter !== undefined) {
-          throw new Error("--json and --jq do not apply to feed get; the iCalendar document is written to stdout as it arrives");
+          throw new Error(
+            "--json and --jq do not apply to feed get; the iCalendar document is written to stdout as it arrives",
+          );
         }
         const token = args[0]!.trim();
         if (token === "") throw new Error("a feed token cannot be blank");

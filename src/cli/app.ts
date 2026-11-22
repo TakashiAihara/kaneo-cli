@@ -18,8 +18,7 @@ export type App = {
 
 const NO_API_KEY = "no API key: set KANEO_API_KEY, or pass --api-key";
 
-const NO_WORKSPACE =
-  "no workspace: pass --workspace, set KANEO_WORKSPACE, or add one to .kaneo.json";
+const NO_WORKSPACE = "no workspace: pass --workspace, set KANEO_WORKSPACE, or add one to .kaneo.json";
 
 const NO_PROJECT = "no project: pass --project, set KANEO_PROJECT, or add one to .kaneo.json";
 

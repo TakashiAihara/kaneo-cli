@@ -53,12 +53,16 @@ describe("posting a session marker", () => {
 
   test("that the server refused is still an error to a caller outside fail-open", async () => {
     answers(500, '{"error":"down"}');
-    await expect(postMarker("t1", marker, 7, "kept nothing here", "run it again")).rejects.toThrow("POST /api/comment/t1: 500");
+    await expect(postMarker("t1", marker, 7, "kept nothing here", "run it again")).rejects.toThrow(
+      "POST /api/comment/t1: 500",
+    );
   });
 
   test("with a readable reply returns the comment", async () => {
     answers(200, JSON.stringify({ id: "c1", content: "x", userId: "u1", createdAt: "2026-09-30T00:00:00Z" }));
-    expect((await postMarker("t1", marker, 7, "kept nothing here", "run it again")).createdAt).toBe("2026-09-30T00:00:00.000Z");
+    expect((await postMarker("t1", marker, 7, "kept nothing here", "run it again")).createdAt).toBe(
+      "2026-09-30T00:00:00.000Z",
+    );
   });
 });
 
@@ -66,7 +70,15 @@ describe("posting a session marker", () => {
 // is c1, and content is whatever the server claims to have stored.
 const listedAs = (id: string, content: string) =>
   JSON.stringify([
-    { id, taskId: "t1", userId: "u1", content, createdAt: "2026-09-30T00:00:00Z", updatedAt: "2026-09-30T00:00:00Z", user: { name: "Claude", image: null } },
+    {
+      id,
+      taskId: "t1",
+      userId: "u1",
+      content,
+      createdAt: "2026-09-30T00:00:00Z",
+      updatedAt: "2026-09-30T00:00:00Z",
+      user: { name: "Claude", image: null },
+    },
   ]);
 
 const posted = { id: "c1", content: "sent", userId: "u1", userName: "", createdAt: "2026-09-30T00:00:00.000Z" };

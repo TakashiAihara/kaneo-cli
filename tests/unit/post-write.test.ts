@@ -34,7 +34,8 @@ beforeEach(() => {
         body: req.method === "GET" ? undefined : await req.text(),
       });
       const text = await reply.text();
-      const written = req.method === "POST" && (url.pathname.startsWith("/api/comment/") || url.pathname.startsWith("/api/task/"));
+      const written =
+        req.method === "POST" && (url.pathname.startsWith("/api/comment/") || url.pathname.startsWith("/api/task/"));
       if (written) posts.push(url.pathname);
       if (!(written && spoil)) return new Response(text, { status: reply.status, headers: reply.headers });
       return new Response(JSON.stringify({ ...JSON.parse(text), createdAt: "soon" }), {
@@ -50,7 +51,9 @@ beforeEach(() => {
     join(config, "kaneo", "config.json"),
     JSON.stringify({
       default_profile: "t",
-      profiles: { t: { api_url: `http://127.0.0.1:${proxy.port}`, api_key: "test-key", workspace_id: WS, project_id: P1 } },
+      profiles: {
+        t: { api_url: `http://127.0.0.1:${proxy.port}`, api_key: "test-key", workspace_id: WS, project_id: P1 },
+      },
     }),
   );
 });
@@ -67,9 +70,19 @@ const kaneo = async (...args: string[]) => {
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
-    env: { PATH: process.env.PATH ?? "", HOME: home, XDG_CONFIG_HOME: config, CLAUDE_CODE_SESSION_ID: "s1", NO_COLOR: "1" },
+    env: {
+      PATH: process.env.PATH ?? "",
+      HOME: home,
+      XDG_CONFIG_HOME: config,
+      CLAUDE_CODE_SESSION_ID: "s1",
+      NO_COLOR: "1",
+    },
   });
-  const [stdout, stderr, exit] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+  const [stdout, stderr, exit] = await Promise.all([
+    new Response(p.stdout).text(),
+    new Response(p.stderr).text(),
+    p.exited,
+  ]);
   return { exit, stdout, stderr };
 };
 
@@ -102,7 +115,9 @@ describe("a write whose reply cannot be read", () => {
     expect(r.exit).toBe(1);
     expect(r.stderr).toContain("posted the marker on #2 on the server");
     expect(r.stderr).toContain("this command keeps no local record");
-    expect(r.stderr).toContain("it can be run again, that would only post a second marker; `kaneo comment ls 'ALP#2'` shows it");
+    expect(r.stderr).toContain(
+      "it can be run again, that would only post a second marker; `kaneo comment ls 'ALP#2'` shows it",
+    );
     expect(posts).toEqual(["/api/comment/task-a2"]);
   }, 30_000);
 
@@ -115,7 +130,9 @@ describe("a write whose reply cannot be read", () => {
     expect(r.exit).toBe(1);
     expect(r.stderr).toContain("posted the marker on #2 on the server");
     expect(r.stderr).toContain("the attachment and history here are unchanged");
-    expect(r.stderr).toContain("`kaneo session close --task 'ALP#2'` again finishes closing here, and posts a second close marker");
+    expect(r.stderr).toContain(
+      "`kaneo session close --task 'ALP#2'` again finishes closing here, and posts a second close marker",
+    );
     expect(attachment()).toBe(true);
     expect(history()).toBe(before);
     expect(posts).toEqual(["/api/comment/task-a2", "/api/comment/task-a2"]);
@@ -135,7 +152,9 @@ describe("a write whose reply cannot be read", () => {
     const r = await kaneo("task", "create", "New one");
     expect(r.exit).toBe(1);
     expect(r.stderr).toContain('created "New one" on the server, but its reply could not be read');
-    expect(r.stderr).toContain("do not run it again, that would repeat the write; `kaneo task ls -p proj-alpha` shows it");
+    expect(r.stderr).toContain(
+      "do not run it again, that would repeat the write; `kaneo task ls -p proj-alpha` shows it",
+    );
     expect(posts).toEqual(["/api/task/proj-alpha"]);
   }, 30_000);
 

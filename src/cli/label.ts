@@ -71,7 +71,9 @@ export const labelCommand = {
         // and so does everything when no workspace is set to look names up in.
         const ref = args[0]!;
         const rows = app.cfg.workspaceId === "" ? [] : await listWorkspaceLabels(workspace(app));
-        const named = rows.some((l) => l.id === ref) ? undefined : rows.find((l) => l.taskId === null && l.name === ref);
+        const named = rows.some((l) => l.id === ref)
+          ? undefined
+          : rows.find((l) => l.taskId === null && l.name === ref);
         const label = await getLabel(named?.id ?? ref);
         app.out.human(labelLine(label));
         app.out.data(label);
@@ -82,16 +84,33 @@ export const labelCommand = {
       use: "create <name... | --name NAME>",
       short: "Create a label in the workspace",
       flags: [
-        { name: "name", type: "string" as const, usage: "label name, instead of the words after create", defaultValue: "" },
+        {
+          name: "name",
+          type: "string" as const,
+          usage: "label name, instead of the words after create",
+          defaultValue: "",
+        },
         {
           name: "color",
           type: "string" as const,
-          usage: "color; the web app's are gray, dark-gray, purple, teal, green, yellow, orange, pink, red, and a #hex works too",
+          usage:
+            "color; the web app's are gray, dark-gray, purple, teal, green, yellow, orange, pink, red, and a #hex works too",
           defaultValue: "gray",
         },
       ],
-      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
-        if (changed.has("name") && args.length > 0) throw new Error("give the name once: as words after create or as --name, not both");
+      run: async ({
+        args,
+        flags,
+        changed,
+        app,
+      }: {
+        args: string[];
+        flags: FlagValues;
+        changed: ReadonlySet<string>;
+        app: App;
+      }) => {
+        if (changed.has("name") && args.length > 0)
+          throw new Error("give the name once: as words after create or as --name, not both");
         if (!changed.has("name")) minimumArgs(1)(args);
         if (changed.has("name") && String(flags.name ?? "").trim() === "") throw new Error("empty --name");
         apiKey(app);
@@ -101,7 +120,11 @@ export const labelCommand = {
         const name = (changed.has("name") ? String(flags.name ?? "") : args.join(" ")).trim();
         const existed = (await workspaceLabels(app)).some((l) => l.name === name);
         const label = await createLabel(workspace(app), name, String(flags.color ?? "gray"));
-        app.out.human(existed ? `exists ${labelLine(label)}; use \`kaneo label update\` to change it` : `created ${labelLine(label)}`);
+        app.out.human(
+          existed
+            ? `exists ${labelLine(label)}; use \`kaneo label update\` to change it`
+            : `created ${labelLine(label)}`,
+        );
         app.out.data(label);
       },
     },
@@ -114,19 +137,31 @@ export const labelCommand = {
         { name: "name", type: "string" as const, usage: "new name", defaultValue: "" },
         { name: "color", type: "string" as const, usage: "new color", defaultValue: "" },
       ],
-      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+      run: async ({
+        args,
+        flags,
+        changed,
+        app,
+      }: {
+        args: string[];
+        flags: FlagValues;
+        changed: ReadonlySet<string>;
+        app: App;
+      }) => {
         apiKey(app);
         const changes: LabelChanges = {};
         if (changed.has("name")) changes.name = String(flags.name);
         if (changed.has("color")) changes.color = String(flags.color);
-        if (changes.name === undefined && changes.color === undefined) throw new Error("nothing to change: pass --name or --color");
+        if (changes.name === undefined && changes.color === undefined)
+          throw new Error("nothing to change: pass --name or --color");
         const all = await listWorkspaceLabels(workspace(app));
         const labels = all.filter((l) => l.taskId === null);
         const label = pick(labels, args[0]!, "in this workspace", "kaneo label list");
         // A workspace keeps one label per name, and the server reports the
         // collision as an internal error, so a taken name is refused here.
         const taken = labels.find((l) => l.id !== label.id && l.name === changes.name?.trim());
-        if (taken !== undefined) throw new Error(`label ${JSON.stringify(taken.name)} already exists (${taken.id}); pick another name`);
+        if (taken !== undefined)
+          throw new Error(`label ${JSON.stringify(taken.name)} already exists (${taken.id}); pick another name`);
         // The taken-name check above already ruled out a workspace label of the
         // new name. The server renames every copy of the old name in one
         // transaction and answers 500 when a task also carries a copy of the new
@@ -134,7 +169,9 @@ export const labelCommand = {
         const newName = changes.name?.trim();
         if (newName !== undefined && newName !== label.name) {
           const hasNew = new Set(all.filter((l) => l.name === newName).map((l) => l.taskId));
-          const clash = [...new Set(all.filter((l) => l.name === label.name && hasNew.has(l.taskId)).map((l) => l.taskId))];
+          const clash = [
+            ...new Set(all.filter((l) => l.name === label.name && hasNew.has(l.taskId)).map((l) => l.taskId)),
+          ];
           if (clash.length > 0) {
             throw new Error(
               `cannot rename ${JSON.stringify(label.name)} to ${JSON.stringify(newName)}: task${clash.length === 1 ? "" : "s"} ${clash.join(", ")} carr${clash.length === 1 ? "ies" : "y"} both labels; run \`kaneo label detach <task> <label>\` for one of them first`,
@@ -159,7 +196,9 @@ export const labelCommand = {
         // The deletion reaches every task the label is on, and there is no
         // undo: the copies are gone, not detached.
         if (flags.yes !== true) {
-          throw new Error(`refusing to delete label ${JSON.stringify(label.name)} without --yes; it is removed from every task that carries it`);
+          throw new Error(
+            `refusing to delete label ${JSON.stringify(label.name)} without --yes; it is removed from every task that carries it`,
+          );
         }
         const deleted = await deleteLabel(label.id);
         app.out.human(`deleted label ${label.name}`);
@@ -196,8 +235,14 @@ export const labelCommand = {
         const ref = args[1]!;
         const copies = await listTaskLabels(task.id);
         const byId = copies.some((c) => c.id === ref);
-        const asWorkspaceLabel = byId || app.cfg.workspaceId === "" ? undefined : (await workspaceLabels(app)).find((l) => l.id === ref);
-        const copy = pick(copies, asWorkspaceLabel?.name ?? ref, `on #${task.number}`, `kaneo label list ${shellWord(task.id)}`);
+        const asWorkspaceLabel =
+          byId || app.cfg.workspaceId === "" ? undefined : (await workspaceLabels(app)).find((l) => l.id === ref);
+        const copy = pick(
+          copies,
+          asWorkspaceLabel?.name ?? ref,
+          `on #${task.number}`,
+          `kaneo label list ${shellWord(task.id)}`,
+        );
         const removed = await detachLabel(copy.id);
         app.out.human(`unlabeled #${task.number} ${copy.name}`);
         app.out.data(removed);

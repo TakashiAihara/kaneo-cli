@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { Task } from "../../src/api/kaneo";
-import { sameReference, sharedReference, SIMILAR_TITLE, similarOpenTasks, titleSimilarity } from "../../src/cli/similar";
+import {
+  sameReference,
+  sharedReference,
+  SIMILAR_TITLE,
+  similarOpenTasks,
+  titleSimilarity,
+} from "../../src/cli/similar";
 
 // What `task create` reads the board for: work a title already names. A shared
 // reference refuses the create and alike wording only warns, so these pin the
@@ -32,7 +38,9 @@ describe("titleSimilarity", () => {
     expect(titleSimilarity("Write docs for the CLI", "Write code for the API")).toBeGreaterThan(0.5);
     expect(titleSimilarity("Write docs for the CLI", "Write code for the API")).toBeLessThan(0.6);
     expect(SIMILAR_TITLE).toBe(0.6);
-    expect(similarOpenTasks("Write docs for the CLI", [task(1, "Write code for the API", "to-do")], CLOSED)).toEqual([]);
+    expect(similarOpenTasks("Write docs for the CLI", [task(1, "Write code for the API", "to-do")], CLOSED)).toEqual(
+      [],
+    );
   });
 
   // Whitespace and case are how the same title is typed twice.
@@ -202,7 +210,9 @@ describe("sharedReference", () => {
   test("TestTheReferenceIsNamedAsTheNewTitleWroteIt", () => {
     const board = [task(7, "Fix ccx#165", "to-do")];
     expect(sharedReference("Follow up TakashiAihara/ccx#165", board, CLOSED)?.reference).toBe("TakashiAihara/ccx#165");
-    expect(sharedReference("Follow up ccx#165", [task(7, "Fix TakashiAihara/ccx#165", "to-do")], CLOSED)?.reference).toBe("ccx#165");
+    expect(
+      sharedReference("Follow up ccx#165", [task(7, "Fix TakashiAihara/ccx#165", "to-do")], CLOSED)?.reference,
+    ).toBe("ccx#165");
     expect(sharedReference("Follow up (CcX #165)", board, CLOSED)?.reference).toBe("CcX #165");
   });
 
@@ -216,16 +226,24 @@ describe("sharedReference", () => {
     for (const status of ["done", "archived"]) {
       expect(sharedReference("Follow up ccx#165", [task(7, "Fix ccx#165", status)], CLOSED)).toBeUndefined();
     }
-    expect(sharedReference("Follow up ccx#165", [task(7, "Fix ccx#165", "planned")], CLOSED)?.tasks.map((t) => t.number)).toEqual([7]);
-    expect(sharedReference("Follow up ccx#165", [task(7, "Fix ccx#165", "to-do")], CLOSED)?.tasks.map((t) => t.number)).toEqual([7]);
+    expect(
+      sharedReference("Follow up ccx#165", [task(7, "Fix ccx#165", "planned")], CLOSED)?.tasks.map((t) => t.number),
+    ).toEqual([7]);
+    expect(
+      sharedReference("Follow up ccx#165", [task(7, "Fix ccx#165", "to-do")], CLOSED)?.tasks.map((t) => t.number),
+    ).toEqual([7]);
   });
 
   test("TestTheClosedSetIsTheProjectsOwnColumns", () => {
     const custom = new Set(["released", "archived"]);
     expect(sharedReference("Follow up ccx#165", [task(7, "Fix ccx#165", "released")], custom)).toBeUndefined();
-    expect(sharedReference("Follow up ccx#165", [task(7, "Fix ccx#165", "done")], custom)?.tasks.map((t) => t.number)).toEqual([7]);
+    expect(
+      sharedReference("Follow up ccx#165", [task(7, "Fix ccx#165", "done")], custom)?.tasks.map((t) => t.number),
+    ).toEqual([7]);
     expect(similarOpenTasks("Write the parser", [task(1, "Write the parser", "released")], custom)).toEqual([]);
-    expect(similarOpenTasks("Write the parser", [task(1, "Write the parser", "done")], custom).map((t) => t.number)).toEqual([1]);
+    expect(
+      similarOpenTasks("Write the parser", [task(1, "Write the parser", "done")], custom).map((t) => t.number),
+    ).toEqual([1]);
   });
 
   // Lowest number first whatever order the board answered in, so the same board
@@ -272,16 +290,24 @@ describe("similarOpenTasks", () => {
     for (const status of ["done", "archived"]) {
       expect(similarOpenTasks("Write the parser", [task(1, "Write the parser", status)], CLOSED)).toEqual([]);
     }
-    expect(similarOpenTasks("Write the parser", [task(1, "Write the parser", "planned")], CLOSED).map((t) => t.number)).toEqual([1]);
-    expect(similarOpenTasks("Write the parser", [task(1, "Write the parser", "to-do")], CLOSED).map((t) => t.number)).toEqual([1]);
+    expect(
+      similarOpenTasks("Write the parser", [task(1, "Write the parser", "planned")], CLOSED).map((t) => t.number),
+    ).toEqual([1]);
+    expect(
+      similarOpenTasks("Write the parser", [task(1, "Write the parser", "to-do")], CLOSED).map((t) => t.number),
+    ).toEqual([1]);
   });
 
   test("TestTheMostSimilarComesFirst", () => {
-    const found = similarOpenTasks("Write the parser", [
-      task(1, "Write the parser again", "to-do"),
-      task(2, "Write the parser", "in-progress"),
-      task(3, "Ship it", "to-do"),
-    ], CLOSED);
+    const found = similarOpenTasks(
+      "Write the parser",
+      [
+        task(1, "Write the parser again", "to-do"),
+        task(2, "Write the parser", "in-progress"),
+        task(3, "Ship it", "to-do"),
+      ],
+      CLOSED,
+    );
     expect(found.map((t) => t.number)).toEqual([2, 1]);
   });
 

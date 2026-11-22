@@ -25,7 +25,10 @@ const isolatedEnv = (globalConfig = ""): Record<string, string | undefined> => {
 
 const repoWithOrigin = (origin: string, env: Record<string, string | undefined>): string => {
   const dir = tempDir("kaneo-repo-");
-  for (const args of [["init", "-q"], ["remote", "add", "origin", origin]]) {
+  for (const args of [
+    ["init", "-q"],
+    ["remote", "add", "origin", origin],
+  ]) {
     const git = Bun.spawnSync(["git", ...args], { cwd: dir, env });
     if (!git.success) throw new Error(`git ${args.join(" ")} failed`);
   }
@@ -53,13 +56,26 @@ describe("currentRepo", () => {
     expect(currentRepo(repoWithOrigin(origin, env), env)).toBe(expected);
   });
 
-  test.each(["C:x/y", "C:/x/y", "/home/me/acme/thing", "./acme/thing", "./foo:acme/thing", "/srv/x:acme/thing", "host:thing", "host:../x", "host:acme/..", "git@host:../x", "ssh://host/../x", "host:~/x", "host:a:b/c", "ftp://host/acme/thing", "file:///acme/thing"])(
-    "does not read %s as a repository",
-    (origin) => {
-      const env = isolatedEnv();
-      expect(currentRepo(repoWithOrigin(origin, env), env)).toBe("");
-    },
-  );
+  test.each([
+    "C:x/y",
+    "C:/x/y",
+    "/home/me/acme/thing",
+    "./acme/thing",
+    "./foo:acme/thing",
+    "/srv/x:acme/thing",
+    "host:thing",
+    "host:../x",
+    "host:acme/..",
+    "git@host:../x",
+    "ssh://host/../x",
+    "host:~/x",
+    "host:a:b/c",
+    "ftp://host/acme/thing",
+    "file:///acme/thing",
+  ])("does not read %s as a repository", (origin) => {
+    const env = isolatedEnv();
+    expect(currentRepo(repoWithOrigin(origin, env), env)).toBe("");
+  });
 
   test("runs git with the current process.env when given none", () => {
     const env = isolatedEnv('[url "git@example.com:other/"]\n\tinsteadOf = host:acme/\n');

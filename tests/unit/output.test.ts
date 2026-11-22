@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { displayWidth, padCells, resolveMode, sanitizeControl, sanitizeDocument, shellWord } from "../../src/output/output";
+import {
+  displayWidth,
+  padCells,
+  resolveMode,
+  sanitizeControl,
+  sanitizeDocument,
+  shellWord,
+} from "../../src/output/output";
 
 // Ported from the Go build's internal/output/output_test.go. The Writer talks
 // to fd 1 and 2 directly, so each Writer test runs it in a child process and
@@ -11,13 +18,25 @@ const JQ = join(import.meta.dir, "../../src/output/jq");
 
 const cleanEnv = () => {
   const env = { ...process.env };
-  for (const key of ["KANEO_API_KEY", "KANEO_API_URL", "KANEO_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "COPILOT_AGENT_SESSION_ID", "DEVIN_SESSION_ID"]) delete env[key];
+  for (const key of [
+    "KANEO_API_KEY",
+    "KANEO_API_URL",
+    "KANEO_SESSION_ID",
+    "CLAUDE_CODE_SESSION_ID",
+    "COPILOT_AGENT_SESSION_ID",
+    "DEVIN_SESSION_ID",
+  ])
+    delete env[key];
   return env;
 };
 
 const run = (json: boolean, body: string) => {
   const p = Bun.spawnSync(
-    ["bun", "-e", `import { Writer } from ${JSON.stringify(OUTPUT)}; const w = new Writer({ json: ${json}, color: false }, undefined, false); ${body}`],
+    [
+      "bun",
+      "-e",
+      `import { Writer } from ${JSON.stringify(OUTPUT)}; const w = new Writer({ json: ${json}, color: false }, undefined, false); ${body}`,
+    ],
     { env: cleanEnv(), stdout: "pipe", stderr: "pipe" },
   );
   if (p.exitCode !== 0) throw new Error(`child failed: ${p.stderr.toString()}`);
@@ -56,7 +75,10 @@ describe("resolveMode", () => {
 describe("Writer", () => {
   // Data is the only stdout producer in JSON mode; that is what makes `| jq` safe.
   test("TestJSONModeKeepsStdoutClean", () => {
-    const { out, err } = run(true, `w.status("fetching tasks"); w.human("this must not appear"); w.data({ count: 2 });`);
+    const { out, err } = run(
+      true,
+      `w.status("fetching tasks"); w.human("this must not appear"); w.data({ count: 2 });`,
+    );
     expect(JSON.parse(out)).toEqual({ count: 2 });
     expect(err).toBe("");
   });
@@ -184,15 +206,15 @@ describe("Writer with a --jq filter", () => {
   // The early check compiles without running, so an expression that would never
   // finish on null, or that halts on it on purpose, is accepted and only runs
   // over the real payload.
-  test.each([
-    ["until(.number != null; .) | .number"],
-    ["if . == null then halt_error(3) else .number end"],
-  ])("TestJQDoesNotRunTheExpressionToCheckIt(%j)", (expression) => {
-    const { out, err, exit } = runJq(expression, `w.data({ number: 7 });`);
-    expect(exit).toBe(0);
-    expect(err).toBe("");
-    expect(out).toBe("7\n");
-  });
+  test.each([["until(.number != null; .) | .number"], ["if . == null then halt_error(3) else .number end"]])(
+    "TestJQDoesNotRunTheExpressionToCheckIt(%j)",
+    (expression) => {
+      const { out, err, exit } = runJq(expression, `w.data({ number: 7 });`);
+      expect(exit).toBe(0);
+      expect(err).toBe("");
+      expect(out).toBe("7\n");
+    },
+  );
 
   // A picked-out string is raw, so on a terminal its control characters are
   // neutralised the way human() does it; a pipe gets the bytes.
@@ -218,7 +240,7 @@ describe("Writer with a --jq filter", () => {
     expect(out).toBe("");
     expect(err).toContain('["DEBUG:",{"title":"Ship it"}]');
     expect(err).toContain("--jq: jq: error");
-    expect(err).toContain('cannot be parsed as a number');
+    expect(err).toContain("cannot be parsed as a number");
     expect(err).not.toContain('--jq: ["DEBUG:"');
   });
 
@@ -249,7 +271,10 @@ describe("Writer with a --jq filter", () => {
   // halt_error(n) is how a jq program chooses its exit status, and the
   // JqFailure carries it through rather than collapsing every failure to 1.
   test("TestJQFailureKeepsJqExitCode", () => {
-    const { out } = runJq('"boom" | halt_error(2)', `try { w.data({}); } catch (e) { console.log("code=" + e.exitCode); }`);
+    const { out } = runJq(
+      '"boom" | halt_error(2)',
+      `try { w.data({}); } catch (e) { console.log("code=" + e.exitCode); }`,
+    );
     expect(out).toBe("code=2\n");
   });
 
@@ -266,8 +291,8 @@ describe("Writer with a --jq filter", () => {
   // What stderr prints can carry server text, so a terminal on stderr gets it with
   // control characters neutralised and a pipe gets the bytes.
   test.each([
-    [true, 'a�[2Jb\n'],
-    [false, 'a\u001b[2Jb\n'],
+    [true, "a�[2Jb\n"],
+    [false, "a\u001b[2Jb\n"],
   ])("TestJQSanitizesDebugOnAStderrTerminal(%p)", (stderrTerminal, want) => {
     const { err } = runJq(".title | stderr", `w.data({ title: "a\\x1b[2Jb" });`, false, stderrTerminal);
     expect(err).toBe(want);
@@ -300,7 +325,7 @@ describe("Writer with a --jq filter", () => {
     expect(exit).toBe(1);
     expect(out).toBe("");
     expect(err).toContain("--jq: jq: error");
-    expect(err).toContain('cannot be parsed as a number');
+    expect(err).toContain("cannot be parsed as a number");
   });
 
   // Refused while the filter loads, before the command has written anything: the

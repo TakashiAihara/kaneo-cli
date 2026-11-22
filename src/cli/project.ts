@@ -22,7 +22,16 @@ import {
 } from "../api/kaneo";
 import { exactArgs, maximumArgs, minimumArgs, noArgs, type FlagValues } from "./args";
 import { sourceName } from "./input";
-import { allProjects, firstMatch, resolveWorkspace, slugOr, unlistedMessage, withProject, type ProjectIn, type Unlisted } from "./lookup";
+import {
+  allProjects,
+  firstMatch,
+  resolveWorkspace,
+  slugOr,
+  unlistedMessage,
+  withProject,
+  type ProjectIn,
+  type Unlisted,
+} from "./lookup";
 import { ReportedError, shellWord } from "../output/output";
 import { KaneoApiError } from "../api/http";
 import * as store from "../session/store";
@@ -47,7 +56,9 @@ const archiveCommand = (verb: "archive" | "unarchive") => {
       const id = args[0] ?? project(app);
       const doing = archived ? "archiving a project" : "unarchiving a project";
       const projectId = await withProject(id, async (projectId) => {
-        await setProjectArchived(projectId, archived).catch(refused(doing, "update", () => projectWorkspace(projectId)));
+        await setProjectArchived(projectId, archived).catch(
+          refused(doing, "update", () => projectWorkspace(projectId)),
+        );
         return projectId;
       });
       app.out.human(`${archived ? "archived" : "unarchived"} ${id}`);
@@ -169,7 +180,8 @@ export const projectCommand = {
           name: "all-workspaces",
           shorthand: "A",
           type: "bool" as const,
-          usage: "list every workspace the key can reach, naming the workspace each project is in; cannot be combined with -w",
+          usage:
+            "list every workspace the key can reach, naming the workspace each project is in; cannot be combined with -w",
           defaultValue: "false",
         },
       ],
@@ -187,15 +199,17 @@ export const projectCommand = {
         if (acrossAll) {
           ({ found, unlisted } = await allProjects(includeArchived));
         } else {
-          found = (await listProjectsIn(await resolveWorkspace(workspace(app)), includeArchived)).map(
-            (project) => ({ project, workspaceName: "" }),
-          );
+          found = (await listProjectsIn(await resolveWorkspace(workspace(app)), includeArchived)).map((project) => ({
+            project,
+            workspaceName: "",
+          }));
         }
         for (const { project, workspaceName } of found) app.out.human(projectLine(project, workspaceName));
         app.out.data(acrossAll ? found.map(named) : found.map((entry) => entry.project));
         // After the listing, so what could be read is still printed; the exit
         // status and stderr say that it is not all there is.
-        if (unlisted.length > 0) throw new Error(`the projects listed above are incomplete: ${unlistedMessage(unlisted)}`);
+        if (unlisted.length > 0)
+          throw new Error(`the projects listed above are incomplete: ${unlistedMessage(unlisted)}`);
       },
     },
     {
@@ -229,17 +243,21 @@ export const projectCommand = {
         const wanted = args[0]!.toLowerCase();
         const everywhere = await allProjects(true);
         const found = everywhere.found.filter(
-          (p) =>
-            p.project.name.toLowerCase().includes(wanted) || p.project.slug.toLowerCase().includes(wanted),
+          (p) => p.project.name.toLowerCase().includes(wanted) || p.project.slug.toLowerCase().includes(wanted),
         );
         const { unlisted } = everywhere;
         if (found.length === 0) {
           const none = `no project matches ${JSON.stringify(args[0])}`;
-          throw new Error(unlisted.length === 0 ? none : `${none} in the workspaces that could be listed; ${unlistedMessage(unlisted)}`);
+          throw new Error(
+            unlisted.length === 0
+              ? none
+              : `${none} in the workspaces that could be listed; ${unlistedMessage(unlisted)}`,
+          );
         }
         for (const { project, workspaceName } of found) app.out.human(projectLine(project, workspaceName));
         app.out.data(found.map(named));
-        if (unlisted.length > 0) throw new Error(`the projects listed above are incomplete: ${unlistedMessage(unlisted)}`);
+        if (unlisted.length > 0)
+          throw new Error(`the projects listed above are incomplete: ${unlistedMessage(unlisted)}`);
       },
     },
     {
@@ -266,7 +284,12 @@ export const projectCommand = {
       // the other way to give it, as project update takes it, so the arguments
       // are checked in run, where the flag can be seen.
       flags: [
-        { name: "name", type: "string" as const, usage: "project name, instead of the words after create", defaultValue: "" },
+        {
+          name: "name",
+          type: "string" as const,
+          usage: "project name, instead of the words after create",
+          defaultValue: "",
+        },
         { name: "icon", type: "string" as const, usage: "icon name (default Layers)", defaultValue: "" },
         {
           name: "slug",
@@ -274,10 +297,27 @@ export const projectCommand = {
           usage: "url slug, the prefix of task identifiers (default: derived from the name, as the web app does)",
           defaultValue: "",
         },
-        { name: "description", shorthand: "d", type: "string" as const, usage: "project description", defaultValue: "" },
+        {
+          name: "description",
+          shorthand: "d",
+          type: "string" as const,
+          usage: "project description",
+          defaultValue: "",
+        },
       ],
-      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
-        if (changed.has("name") && args.length > 0) throw new Error("give the name once: as words after create or as --name, not both");
+      run: async ({
+        args,
+        flags,
+        changed,
+        app,
+      }: {
+        args: string[];
+        flags: FlagValues;
+        changed: ReadonlySet<string>;
+        app: App;
+      }) => {
+        if (changed.has("name") && args.length > 0)
+          throw new Error("give the name once: as words after create or as --name, not both");
         if (!changed.has("name")) minimumArgs(1)(args);
         const name = changed.has("name") ? String(flags.name ?? "") : args.join(" ");
         if (changed.has("name") && name.trim() === "") throw new Error("empty --name");
@@ -294,7 +334,9 @@ export const projectCommand = {
         if (given === "") {
           const taken = (await listProjectsIn(workspaceId, true)).find((p) => keyOf(p.slug) === keyOf(slug));
           if (taken !== undefined) {
-            throw new Error(`the slug ${slug} derived from the name is used by project ${taken.id} (${taken.name}): pass --slug`);
+            throw new Error(
+              `the slug ${slug} derived from the name is used by project ${taken.id} (${taken.name}): pass --slug`,
+            );
           }
         }
         const created = await createProject({
@@ -319,7 +361,7 @@ export const projectCommand = {
       long:
         "Change a project's name, slug, description or icon; the rest is kept.\n\n" +
         "With --json the report has from, to and unread: the fields the read before\n" +
-        "the write lacked, whose from is \"\". A description the read sent as null was\n" +
+        'the write lacked, whose from is "". A description the read sent as null was\n' +
         "read, and is not among them.",
       // The id is required rather than resolved like `project get`: resolution
       // falls back to .kaneo.json and the repos map, so an update typed inside a
@@ -342,7 +384,17 @@ export const projectCommand = {
         },
         { name: "icon", type: "string" as const, usage: "new icon name", defaultValue: "" },
       ],
-      run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+      run: async ({
+        args,
+        flags,
+        changed,
+        app,
+      }: {
+        args: string[];
+        flags: FlagValues;
+        changed: ReadonlySet<string>;
+        app: App;
+      }) => {
         // Only a flag that was passed is a change: `--description ""` clears the
         // description, and leaving the flag out has to keep it.
         const changes: ProjectChanges = {};
@@ -379,7 +431,9 @@ export const projectCommand = {
         // no before to compare with, and whether it changed is then unknown —
         // the write's reply having one does not say what it was.
         if (unread.includes("slug")) {
-          app.out.human(`  task identifiers may now start with ${after.slug}; the slug was not read, so whether it changed is unknown`);
+          app.out.human(
+            `  task identifiers may now start with ${after.slug}; the slug was not read, so whether it changed is unknown`,
+          );
         } else if (before.slug !== after.slug) app.out.human(`  task identifiers now start with ${after.slug}`);
         // A map's keys come out sorted, which is the order the report has.
         app.out.data({ from: before, to: after, unread });
@@ -401,7 +455,9 @@ export const projectCommand = {
         "would otherwise hit whichever project that repo maps to. --to is a\n" +
         "workspace id, slug or name, matched the way --workspace is.",
       args: exactArgs(1),
-      flags: [{ name: "to", type: "string" as const, usage: "destination workspace id, slug or name", defaultValue: "" }],
+      flags: [
+        { name: "to", type: "string" as const, usage: "destination workspace id, slug or name", defaultValue: "" },
+      ],
       run: async ({ args, flags, app }: { args: string[]; flags: FlagValues; app: App }) => {
         const target = String(flags.to ?? "");
         if (target === "") throw new Error("no destination: pass --to <workspace>");
@@ -413,9 +469,13 @@ export const projectCommand = {
         const moved = await withProject(args[0]!, (id) =>
           moveProject(id, workspaceId).catch(moveRefused(id, workspaceId)),
         );
-        app.out.human(`moved ${moved.id}  ${moved.name}${moved.slug === "" ? "" : ` [${moved.slug}]`}  to ${workspaceId}`);
+        app.out.human(
+          `moved ${moved.id}  ${moved.name}${moved.slug === "" ? "" : ` [${moved.slug}]`}  to ${workspaceId}`,
+        );
         if (moved.unassignedTaskCount > 0) {
-          app.out.human(`  ${moved.unassignedTaskCount} task(s) lost their assignee: not a member of the destination workspace`);
+          app.out.human(
+            `  ${moved.unassignedTaskCount} task(s) lost their assignee: not a member of the destination workspace`,
+          );
         }
         app.out.data(moved);
       },
@@ -457,7 +517,9 @@ export const projectCommand = {
             `refusing to delete project ${found.name}${found.slug === "" ? "" : ` [${found.slug}]`} (${found.id}) in workspace ${JSON.stringify(inWorkspace)} without --yes; \`kaneo project archive ${shellWord(found.id)}\` keeps it`,
           );
         }
-        const deleted = await deleteProject(found.id).catch(refused("deleting a project", "delete", async () => found.workspaceId));
+        const deleted = await deleteProject(found.id).catch(
+          refused("deleting a project", "delete", async () => found.workspaceId),
+        );
         // Named as it was read, since that is the project the confirmation spoke
         // for; the reply is the server's own record of what it removed, and that
         // is what the report carries.
@@ -474,9 +536,14 @@ export const projectCommand = {
         // An attached session keeps the project in its attachment the same way
         // the settings do; its next command fails on the task that went with
         // it, and `session close` is what releases the attachment.
-        const held = store.load(store.sessionStore(), store.currentId((name) => process.env[name] ?? ""));
+        const held = store.load(
+          store.sessionStore(),
+          store.currentId((name) => process.env[name] ?? ""),
+        );
         if (held?.projectId === found.id) {
-          app.out.status("note: this session is attached to a task on the project just deleted; `kaneo session close` releases the attachment");
+          app.out.status(
+            "note: this session is attached to a task on the project just deleted; `kaneo session close` releases the attachment",
+          );
         }
         app.out.data(deleted);
       },
@@ -532,13 +599,17 @@ export const projectCommand = {
             // with bytes a filter cannot read. An empty --jq is no expression
             // at all, the same as everywhere else.
             if (changed.has("json") || app.out.filter !== undefined) {
-              throw new Error("--json and --jq do not apply to project background get; the image is written to stdout as it arrives");
+              throw new Error(
+                "--json and --jq do not apply to project background get; the image is written to stdout as it arrives",
+              );
             }
             // The bytes are the server's to choose, so a terminal is refused
             // them the way curl refuses binary output: an image can carry
             // escape sequences, and only a file or a pipe should get them.
             if (app.out.terminal) {
-              throw new Error("refusing to write an image to a terminal; redirect it to a file (`> bg.png`) or pipe it on");
+              throw new Error(
+                "refusing to write an image to a terminal; redirect it to a file (`> bg.png`) or pipe it on",
+              );
             }
             // stdout is the image or nothing, so an error object has no place
             // in a file the bytes are being redirected into: failures are
@@ -552,9 +623,10 @@ export const projectCommand = {
             // so the rest goes out until the image is whole; a write that
             // takes nothing is a failure rather than a silently cut image.
             const image = new Uint8Array(await blob.arrayBuffer());
-            for (let offset = 0; offset < image.byteLength; ) {
+            for (let offset = 0; offset < image.byteLength;) {
               const written = writeSync(1, image, offset, image.byteLength - offset);
-              if (written === 0) throw new Error(`stdout accepted none of the remaining ${image.byteLength - offset} image bytes`);
+              if (written === 0)
+                throw new Error(`stdout accepted none of the remaining ${image.byteLength - offset} image bytes`);
               offset += written;
             }
           },
@@ -583,7 +655,17 @@ export const projectCommand = {
               defaultValue: "",
             },
           ],
-          run: async ({ args, flags, changed, app }: { args: string[]; flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
+          run: async ({
+            args,
+            flags,
+            changed,
+            app,
+          }: {
+            args: string[];
+            flags: FlagValues;
+            changed: ReadonlySet<string>;
+            app: App;
+          }) => {
             apiKey(app);
             const ref = args[0]!;
             const source = args[1]!;
@@ -593,7 +675,9 @@ export const projectCommand = {
             // type from, so for it the flag is the only source — checked
             // before the read, which on a terminal would wait for EOF before
             // reporting the missing flag.
-            const contentTypeFlag = changed.has("content-type") ? String(flags["content-type"] ?? "").trim() : undefined;
+            const contentTypeFlag = changed.has("content-type")
+              ? String(flags["content-type"] ?? "").trim()
+              : undefined;
             if (source === "-" && (contentTypeFlag === undefined || contentTypeFlag === "")) {
               throw new Error(`${named} gives no usable content type; pass --content-type`);
             }
@@ -624,9 +708,17 @@ export const projectCommand = {
                 refused("setting a project background", "update", () => projectWorkspace(id)),
               )),
             }));
-            app.out.human(`set the background of ${done.project} from ${named} (${contentType}, ${bytes.byteLength} bytes)`);
+            app.out.human(
+              `set the background of ${done.project} from ${named} (${contentType}, ${bytes.byteLength} bytes)`,
+            );
             app.out.human(`  ${done.url}`);
-            app.out.data({ project: done.project, url: done.url, version: done.version, contentType, size: bytes.byteLength });
+            app.out.data({
+              project: done.project,
+              url: done.url,
+              version: done.version,
+              contentType,
+              size: bytes.byteLength,
+            });
           },
         },
         {
@@ -654,7 +746,9 @@ export const projectCommand = {
                 `refusing to remove the background of ${found.name}${found.slug === "" ? "" : ` [${found.slug}]`} (${found.id}) without --yes`,
               );
             }
-            await deleteProjectBackground(found.id).catch(refused("removing a project background", "update", async () => found.workspaceId));
+            await deleteProjectBackground(found.id).catch(
+              refused("removing a project background", "update", async () => found.workspaceId),
+            );
             app.out.human(`removed the background of ${found.id}  ${found.name}`);
             app.out.data({ project: found.id, backgroundRemoved: true });
           },
@@ -803,7 +897,9 @@ const newProjectOrder = (projects: Project[], refs: string[]): Project[] => {
     const wanted = ref.trim();
     const found = findProject(active, wanted);
     if (found === undefined) {
-      const isShelved = firstMatch(shelved, wanted, (project) => project.id, [(project) => project.slug, (project) => project.name]).length > 0;
+      const isShelved =
+        firstMatch(shelved, wanted, (project) => project.id, [(project) => project.slug, (project) => project.name])
+          .length > 0;
       (isShelved ? kept : unknown).push(wanted);
     } else if (taken.has(found.id)) repeated.push(wanted);
     else {
@@ -820,7 +916,9 @@ const newProjectOrder = (projects: Project[], refs: string[]): Project[] => {
     ...(missing.length === 0 ? [] : [`missing: ${missing.join(", ")}`]),
   ];
   if (wrong.length > 0) {
-    throw new Error(`every project in this workspace that is not archived has to be named exactly once: ${wrong.join("; ")}`);
+    throw new Error(
+      `every project in this workspace that is not archived has to be named exactly once: ${wrong.join("; ")}`,
+    );
   }
   return ordered;
 };

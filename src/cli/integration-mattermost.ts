@@ -26,10 +26,7 @@ import {
 // credential is the webhook URL alone, so `set` has exactly one stdin flag,
 // with a `-file` sibling for the same value out of a file.
 
-export const mattermostCreateBody = (
-  flags: FlagValues,
-  changed: ReadonlySet<string>,
-): NewMattermostIntegration => {
+export const mattermostCreateBody = (flags: FlagValues, changed: ReadonlySet<string>): NewMattermostIntegration => {
   const wanted: NewMattermostIntegration = { webhookUrl: webhookUrlFlag(flags, changed, true) };
   const channelName = String(flags["channel-name"] ?? "");
   // An empty channel on create means none, which is what leaving it out says.
@@ -39,10 +36,7 @@ export const mattermostCreateBody = (
   return wanted;
 };
 
-export const mattermostUpdateBody = (
-  flags: FlagValues,
-  changed: ReadonlySet<string>,
-): MattermostIntegrationChanges => {
+export const mattermostUpdateBody = (flags: FlagValues, changed: ReadonlySet<string>): MattermostIntegrationChanges => {
   const changes: MattermostIntegrationChanges = {};
   const url = webhookUrlFlag(flags, changed, false);
   if (url !== undefined) changes.webhookUrl = url;
@@ -78,7 +72,10 @@ const MATTERMOST: IntegrationSpec<MattermostIntegration, NewMattermostIntegratio
     "reads it from a file (- reads stdin there too), one stdin reader per\n" +
     "command; the one line ending a pipe or file adds is not part of the value.",
   flags: [
-    stringFlag(WEBHOOK_URL_FLAG, `the Mattermost incoming webhook URL (HTTPS); - reads it from stdin, ${URL_T}-file reads it from a file`),
+    stringFlag(
+      WEBHOOK_URL_FLAG,
+      `the Mattermost incoming webhook URL (HTTPS); - reads it from stdin, ${URL_T}-file reads it from a file`,
+    ),
     stringFlag(`${WEBHOOK_URL_FLAG}-file`, "read the webhook URL from a file; - reads stdin"),
     stringFlag("channel-name", "the channel events are posted to; '' clears it"),
     boolFlag("active", "deliver events; =false pauses delivery"),
@@ -96,7 +93,8 @@ const MATTERMOST: IntegrationSpec<MattermostIntegration, NewMattermostIntegratio
   createBody: mattermostCreateBody,
   updateBody: mattermostUpdateBody,
   describe: (i) => {
-    const { channelName, webhookConfigured, maskedWebhookUrl, events, isActive, id, projectId, createdAt, updatedAt } = i;
+    const { channelName, webhookConfigured, maskedWebhookUrl, events, isActive, id, projectId, createdAt, updatedAt } =
+      i;
     return [
       `id         ${id}`,
       `project    ${projectId}`,

@@ -106,7 +106,10 @@ const secretFromStdin = async (flag: string): Promise<string> => {
   return text;
 };
 
-const preferenceChanges = async (flags: FlagValues, changed: ReadonlySet<string>): Promise<NotificationPreferenceChanges> => {
+const preferenceChanges = async (
+  flags: FlagValues,
+  changed: ReadonlySet<string>,
+): Promise<NotificationPreferenceChanges> => {
   const changes: NotificationPreferenceChanges = {};
   const piped = stdinFlags(flags);
   if (piped.length > 1) {
@@ -116,7 +119,8 @@ const preferenceChanges = async (flags: FlagValues, changed: ReadonlySet<string>
   for (const [flag, field] of SETTINGS) {
     if (!changed.has(flag)) continue;
     const value = piped[0] === flag ? await secretFromStdin(flag) : String(flags[flag] ?? "");
-    if (value === "" && !CLEARABLE.has(flag)) throw new Error(`--${flag} cannot be cleared; the server keeps the stored value`);
+    if (value === "" && !CLEARABLE.has(flag))
+      throw new Error(`--${flag} cannot be cleared; the server keeps the stored value`);
     changes[field] = value === "" ? null : value;
   }
   if (changed.has("reminder-lead")) {
@@ -277,7 +281,9 @@ const preferencesCommand = {
             const prefs = await setWorkspaceRule(workspaceId, ruleFor(before, workspaceId, flags, changed));
             const rule = (prefs.workspaces ?? []).find((r) => r.workspaceId === workspaceId);
             if (rule === undefined) {
-              throw new Error(`the server accepted the rule but does not list one for workspace ${JSON.stringify(workspaceId)}`);
+              throw new Error(
+                `the server accepted the rule but does not list one for workspace ${JSON.stringify(workspaceId)}`,
+              );
             }
             app.out.human(ruleLine(rule));
             app.out.data(rule as Json);
@@ -293,7 +299,9 @@ const preferencesCommand = {
             apiKey(app);
             const workspaceId = args[0]!;
             await removeWorkspaceRule(workspaceId);
-            app.out.human(`removed the rule for ${workspaceId}; it is sent nothing outside the app until a rule is set`);
+            app.out.human(
+              `removed the rule for ${workspaceId}; it is sent nothing outside the app until a rule is set`,
+            );
             app.out.data({ workspaceId });
           },
         },
@@ -363,7 +371,8 @@ export const notificationCommand = {
       run: async ({ flags, app }: RunContext<App>) => {
         apiKey(app);
         // The server deletes them all at once and keeps nothing to undo it with.
-        if (flags.yes !== true) throw new Error("refusing to delete every notification without --yes; this cannot be undone");
+        if (flags.yes !== true)
+          throw new Error("refusing to delete every notification without --yes; this cannot be undone");
         await clearNotifications();
         app.out.human("cleared every notification");
         app.out.data({ cleared: true });

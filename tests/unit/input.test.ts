@@ -17,9 +17,7 @@ describe("readInput", () => {
   // what has to arrive: a trailing newline belongs to it, and dropping it would
   // write text nobody typed.
   test("a file is read as it was written", async () => {
-    expect(await readInput(at("body.md", "# Heading\n\n$HOME and `ticks`\n"))).toBe(
-      "# Heading\n\n$HOME and `ticks`\n",
-    );
+    expect(await readInput(at("body.md", "# Heading\n\n$HOME and `ticks`\n"))).toBe("# Heading\n\n$HOME and `ticks`\n");
     expect(await readInput(at("one-line.txt", "no newline at the end"))).toBe("no newline at the end");
   });
 
@@ -85,7 +83,9 @@ describe("readCredential", () => {
   // writes to mark the encoding is part of the value here rather than a
   // signature to take off the way readInput takes it off prose.
   test("a leading UTF-8 BOM is kept", async () => {
-    expect(await readCredential(at("bom-secret.txt", new Uint8Array([0xef, 0xbb, 0xbf, 0x61, 0x0a])))).toBe("\uFEFFa\n");
+    expect(await readCredential(at("bom-secret.txt", new Uint8Array([0xef, 0xbb, 0xbf, 0x61, 0x0a])))).toBe(
+      "\uFEFFa\n",
+    );
     expect(await readCredential(at("bom-text.txt", "\uFEFFsigning-material\n"))).toBe("\uFEFFsigning-material\n");
   });
 

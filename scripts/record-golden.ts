@@ -20,7 +20,10 @@ import { SCENARIOS } from "../tests/parity/scenarios";
 // sit unwritten until an unrelated change rewrote the file and showed it there.
 
 export function slug(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 const USAGE = "usage: bun scripts/record-golden.ts [--bin <kaneo binary>]";
@@ -62,7 +65,12 @@ async function record(bin: string | undefined) {
     }
     writeFileSync(file, text);
     written++;
-    console.log(`${result.steps.map((x) => x.exit).join(",").padEnd(12)} ${s.name}`);
+    console.log(
+      `${result.steps
+        .map((x) => x.exit)
+        .join(",")
+        .padEnd(12)} ${s.name}`,
+    );
   }
   // A golden whose scenario was renamed or removed is never compared again, so
   // it would sit there looking like coverage.

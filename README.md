@@ -23,11 +23,11 @@ The script does two things that matter more than they sound:
 - the archive is checked against the release's `checksums.txt`, and refuses to install if it does not match
 - the new binary is staged, run, and only then moved into place — a bad download fails without costing you the copy you already had
 
-| variable | effect |
-| --- | --- |
-| `KANEO_VERSION` | install a specific tag instead of the latest release |
-| `KANEO_INSTALL_DIR` | install somewhere other than `$HOME/.local/bin` |
-| `KANEO_RELEASE_BASE` | fetch archives from a mirror |
+| variable             | effect                                               |
+| -------------------- | ---------------------------------------------------- |
+| `KANEO_VERSION`      | install a specific tag instead of the latest release |
+| `KANEO_INSTALL_DIR`  | install somewhere other than `$HOME/.local/bin`      |
+| `KANEO_RELEASE_BASE` | fetch archives from a mirror                         |
 
 ```bash
 # a specific version, somewhere else
@@ -63,12 +63,12 @@ Settings resolve from strongest to weakest:
 
 Not every layer answers every setting:
 
-| setting | comes from |
-| --- | --- |
-| api url | flag, environment, profile, then the hosted default |
-| api key | flag, environment, profile, profile's `api_key_command` |
-| workspace | flag, environment, `.kaneo.json`, profile, `owners` |
-| project | flag, environment, `.kaneo.json`, profile, `repos` |
+| setting   | comes from                                              |
+| --------- | ------------------------------------------------------- |
+| api url   | flag, environment, profile, then the hosted default     |
+| api key   | flag, environment, profile, profile's `api_key_command` |
+| workspace | flag, environment, `.kaneo.json`, profile, `owners`     |
+| project   | flag, environment, `.kaneo.json`, profile, `repos`      |
 
 `kaneo context` prints the resolved values and names the layer each one came from.
 

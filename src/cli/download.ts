@@ -22,13 +22,17 @@ export const emitDownload = async (
     // refused rather than silently answered with bytes a filter cannot read.
     // An empty --jq is no expression at all, the same as everywhere else.
     if (changed.has("json") || app.out.filter !== undefined) {
-      throw new Error(`--json and --jq do not apply to ${command} without --out; the bytes are written to stdout as they arrive`);
+      throw new Error(
+        `--json and --jq do not apply to ${command} without --out; the bytes are written to stdout as they arrive`,
+      );
     }
     // The bytes are the server's to choose, so a terminal is refused them the
     // way curl refuses binary output: an asset can be anything, and only a
     // file or a pipe should get it.
     if (app.out.terminal) {
-      throw new Error("refusing to write the bytes to a terminal; redirect them to a file (`> out.bin`) or pipe them on");
+      throw new Error(
+        "refusing to write the bytes to a terminal; redirect them to a file (`> out.bin`) or pipe them on",
+      );
     }
     // stdout is the bytes or nothing, so an error object has no place in a
     // file the bytes are being redirected into: failures are stderr-only from
@@ -48,7 +52,7 @@ export const emitDownload = async (
   // download is whole; a write that takes nothing is a failure rather than a
   // silently cut file.
   const bytes = download.data;
-  for (let offset = 0; offset < bytes.byteLength; ) {
+  for (let offset = 0; offset < bytes.byteLength;) {
     const written = writeSync(1, bytes, offset, bytes.byteLength - offset);
     if (written === 0) throw new Error(`stdout accepted none of the remaining ${bytes.byteLength - offset} bytes`);
     offset += written;

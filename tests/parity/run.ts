@@ -1,4 +1,13 @@
-import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { startFake, type Recorded } from "./fake";
@@ -72,7 +81,10 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     }
     if (s.local !== undefined) writeFileSync(join(home, ".kaneo.json"), JSON.stringify(s.local));
     if (s.repo !== undefined) {
-      for (const args of [["init", "-q"], ["remote", "add", "origin", `git@github.com:${s.repo}.git`]]) {
+      for (const args of [
+        ["init", "-q"],
+        ["remote", "add", "origin", `git@github.com:${s.repo}.git`],
+      ]) {
         const g = Bun.spawnSync(["git", ...args], { cwd, env: { PATH: process.env.PATH ?? "", HOME: home } });
         if (g.exitCode !== 0) throw new Error(`git ${args.join(" ")} failed: ${g.stderr}`);
       }
@@ -179,7 +191,12 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
         p.stdin!.end();
       }
       const [stdout, stderr, exit] = await Promise.all([streamText(p.stdout), new Response(p.stderr).text(), p.exited]);
-      steps.push({ args, exit, stdout: typeof stdout === "string" ? normalize(stdout) : stdout, stderr: normalize(stderr) });
+      steps.push({
+        args,
+        exit,
+        stdout: typeof stdout === "string" ? normalize(stdout) : stdout,
+        stderr: normalize(stderr),
+      });
     }
 
     const files: Record<string, string | Binary> = {};
@@ -196,7 +213,8 @@ export async function runScenario(bin: string[], s: Scenario): Promise<ScenarioR
     // passes build fresh records, so a binary file's object is never the
     // same reference twice — equality is by content, not identity.
     for (const [name, record] of cwdTree()) {
-      if (!sameRecord(cwdBefore.get(name), record)) files[join("work", name)] = typeof record === "string" ? normalize(record) : record;
+      if (!sameRecord(cwdBefore.get(name), record))
+        files[join("work", name)] = typeof record === "string" ? normalize(record) : record;
     }
 
     const requests = settle(JSON.parse(normalize(JSON.stringify(fake.requests))) as Recorded[]);
@@ -243,8 +261,7 @@ const settlePairs = (requests: Recorded[]): Recorded[] => {
 
 const isSearchPair = (a: Recorded, b: Recorded): boolean => {
   if (a.method !== "GET" || b.method !== "GET") return false;
-  const pair =
-    (a.path === "/search" && b.path === "/project") || (a.path === "/project" && b.path === "/search");
+  const pair = (a.path === "/search" && b.path === "/project") || (a.path === "/project" && b.path === "/search");
   if (!pair) return false;
   const project = a.path === "/project" ? a : b;
   if (new URLSearchParams(project.query).get("includeArchived") !== "true") return false;

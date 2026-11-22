@@ -23,7 +23,12 @@ const recorder = (reply: string) => {
   const seen: Seen = { method: "", path: "", query: "", body: "" };
   newServer(async (req) => {
     const url = new URL(req.url);
-    Object.assign(seen, { method: req.method, path: url.pathname, query: url.search.replace(/^\?/, ""), body: await req.text() });
+    Object.assign(seen, {
+      method: req.method,
+      path: url.pathname,
+      query: url.search.replace(/^\?/, ""),
+      body: await req.text(),
+    });
     return new Response(reply, { headers: { "content-type": "application/json" } });
   });
   return seen;
@@ -50,21 +55,47 @@ test("listGitlabProjects posts the query and maps the projects", async () => {
   const seen = recorder(
     JSON.stringify({
       projects: [
-        { id: 101, name: "Web", path_with_namespace: "acme/web", name_with_namespace: "Acme / Web", visibility: "private", web_url: "https://gitlab.example.com/acme/web" },
+        {
+          id: 101,
+          name: "Web",
+          path_with_namespace: "acme/web",
+          name_with_namespace: "Acme / Web",
+          visibility: "private",
+          web_url: "https://gitlab.example.com/acme/web",
+        },
       ],
     }),
   );
-  const projects = await api.listGitlabProjects({ projectId: "p1", baseUrl: "https://gitlab.example.com", accessToken: "tok", tokenType: "bearer" });
+  const projects = await api.listGitlabProjects({
+    projectId: "p1",
+    baseUrl: "https://gitlab.example.com",
+    accessToken: "tok",
+    tokenType: "bearer",
+  });
   expect([seen.method, seen.path]).toEqual(["POST", "/api/gitlab-integration/projects"]);
-  expect(JSON.parse(seen.body)).toEqual({ projectId: "p1", baseUrl: "https://gitlab.example.com", accessToken: "tok", tokenType: "bearer" });
+  expect(JSON.parse(seen.body)).toEqual({
+    projectId: "p1",
+    baseUrl: "https://gitlab.example.com",
+    accessToken: "tok",
+    tokenType: "bearer",
+  });
   expect(projects).toEqual([
-    { id: 101, name: "Web", path_with_namespace: "acme/web", name_with_namespace: "Acme / Web", visibility: "private", web_url: "https://gitlab.example.com/acme/web" },
+    {
+      id: 101,
+      name: "Web",
+      path_with_namespace: "acme/web",
+      name_with_namespace: "Acme / Web",
+      visibility: "private",
+      web_url: "https://gitlab.example.com/acme/web",
+    },
   ]);
 });
 
 test("listGitlabProjects reads a reply without the list as empty", async () => {
   recorder("{}");
-  expect(await api.listGitlabProjects({ projectId: "p1", baseUrl: "https://gitlab.example.com", accessToken: "tok" })).toEqual([]);
+  expect(
+    await api.listGitlabProjects({ projectId: "p1", baseUrl: "https://gitlab.example.com", accessToken: "tok" }),
+  ).toEqual([]);
 });
 
 test("verifyGitlabAccess posts the check and maps the verdict", async () => {
@@ -86,7 +117,12 @@ test("verifyGitlabAccess posts the check and maps the verdict", async () => {
     projectPath: "acme/web",
   });
   expect([seen.method, seen.path]).toEqual(["POST", "/api/gitlab-integration/verify"]);
-  expect(JSON.parse(seen.body)).toEqual({ projectId: "p1", baseUrl: "https://gitlab.example.com", accessToken: "tok", projectPath: "acme/web" });
+  expect(JSON.parse(seen.body)).toEqual({
+    projectId: "p1",
+    baseUrl: "https://gitlab.example.com",
+    accessToken: "tok",
+    projectPath: "acme/web",
+  });
   expect(verdict).toEqual({
     isInstalled: true,
     hasRequiredPermissions: false,
@@ -109,7 +145,12 @@ test("verifyGitlabAccess keeps a named failure reason and absent lists empty", a
       failureReason: "not_a_gitlab_instance",
     }),
   );
-  const verdict = await api.verifyGitlabAccess({ projectId: "p1", baseUrl: "https://example.com", accessToken: "tok", projectPath: "acme/web" });
+  const verdict = await api.verifyGitlabAccess({
+    projectId: "p1",
+    baseUrl: "https://example.com",
+    accessToken: "tok",
+    projectPath: "acme/web",
+  });
   expect(verdict.failureReason).toBe("not_a_gitlab_instance");
   expect(verdict.missingPermissions).toEqual([]);
 });
@@ -160,14 +201,22 @@ test("createGitlabIntegration posts the link and answers the stored one", async 
     tokenType: "private",
   });
   expect([seen.method, seen.path]).toEqual(["POST", "/api/gitlab-integration/project/p1"]);
-  expect(JSON.parse(seen.body)).toEqual({ baseUrl: "https://gitlab.example.com", projectPath: "acme/web", accessToken: "tok", tokenType: "private" });
+  expect(JSON.parse(seen.body)).toEqual({
+    baseUrl: "https://gitlab.example.com",
+    projectPath: "acme/web",
+    accessToken: "tok",
+    tokenType: "private",
+  });
   expect(created.id).toBe("gitl1");
 });
 
 // A write that answers null did not say what it stored; reporting that as a
 // link would be the opposite of what happened.
 test.each([
-  ["create", (_s: Seen) => api.createGitlabIntegration("p1", { baseUrl: "https://gitlab.example.com", projectPath: "acme/web" })],
+  [
+    "create",
+    (_s: Seen) => api.createGitlabIntegration("p1", { baseUrl: "https://gitlab.example.com", projectPath: "acme/web" }),
+  ],
   ["update", (_s: Seen) => api.updateGitlabIntegration("p1", { isActive: false })],
 ])("%s with a null reply fails rather than reporting no link", async (_name, call) => {
   const seen = recorder("null");

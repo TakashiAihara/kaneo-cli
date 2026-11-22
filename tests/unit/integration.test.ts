@@ -3,18 +3,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FlagValues } from "../../src/cli/args";
-import {
-  requireCreateWebhookUrl,
-  resolveCredentials,
-} from "../../src/cli/integration-shared";
-import {
-  mattermostCreateBody,
-  mattermostUpdateBody,
-} from "../../src/cli/integration-mattermost";
-import {
-  webhookCreateBody,
-  webhookUpdateBody,
-} from "../../src/cli/integration-webhook";
+import { requireCreateWebhookUrl, resolveCredentials } from "../../src/cli/integration-shared";
+import { mattermostCreateBody, mattermostUpdateBody } from "../../src/cli/integration-mattermost";
+import { webhookCreateBody, webhookUpdateBody } from "../../src/cli/integration-webhook";
 
 // The bodies `set` builds from the flags it was passed. `changed` is the set
 // of flags the parser saw, which is what keeps an omitted flag out of the
@@ -52,20 +43,20 @@ const reader = (texts: Record<string, string> = {}) => {
 describe("resolveCredentials", () => {
   test("a credential given as a value is refused before stdin is read", async () => {
     const { reads, read } = reader();
-    await expect(resolveCredentials(flags({ [WF]: "https://mm.example/in" }), changed(WF), [WF, SEC], [WF, SEC], read)).rejects.toThrow(
-      `--${WF} is a secret and takes - only`,
-    );
-    await expect(resolveCredentials(flags({ [SEC]: "signing-material" }), changed(SEC), [WF, SEC], [WF, SEC], read)).rejects.toThrow(
-      `--${SEC} is a secret and takes - only`,
-    );
+    await expect(
+      resolveCredentials(flags({ [WF]: "https://mm.example/in" }), changed(WF), [WF, SEC], [WF, SEC], read),
+    ).rejects.toThrow(`--${WF} is a secret and takes - only`);
+    await expect(
+      resolveCredentials(flags({ [SEC]: "signing-material" }), changed(SEC), [WF, SEC], [WF, SEC], read),
+    ).rejects.toThrow(`--${SEC} is a secret and takes - only`);
     expect(reads).toEqual([]);
   });
 
   test("two stdin flags in one command are refused before stdin is read", async () => {
     const { reads, read } = reader();
-    await expect(resolveCredentials(flags({ [WF]: "-", [SEC]: "-" }), changed(WF, SEC), [WF, SEC], [WF, SEC], read)).rejects.toThrow(
-      `only one of --${WF}, --${SEC} can read stdin`,
-    );
+    await expect(
+      resolveCredentials(flags({ [WF]: "-", [SEC]: "-" }), changed(WF, SEC), [WF, SEC], [WF, SEC], read),
+    ).rejects.toThrow(`only one of --${WF}, --${SEC} can read stdin`);
     expect(reads).toEqual([]);
   });
 
@@ -133,7 +124,13 @@ describe("resolveCredentials", () => {
 
   test("a -file flag's - still reads the one stdin", async () => {
     const { read } = reader({ "-": "whsec_pipe\n" });
-    const resolved = await resolveCredentials(flags({ [SEC_FILE]: "-" }), changed(SEC_FILE), [WF, SEC], [WF, SEC], read);
+    const resolved = await resolveCredentials(
+      flags({ [SEC_FILE]: "-" }),
+      changed(SEC_FILE),
+      [WF, SEC],
+      [WF, SEC],
+      read,
+    );
     expect(resolved.flags[SEC]).toBe("whsec_pipe");
     expect(resolved.changed.has(SEC)).toBe(true);
     expect(resolved.changed.has(SEC_FILE)).toBe(false);
@@ -194,7 +191,9 @@ describe("mattermostCreateBody", () => {
   });
 
   test("sends only what was passed", () => {
-    expect(mattermostCreateBody(flags({ [WF]: "https://mm.example/in" }), changed(WF))).toEqual({ webhookUrl: "https://mm.example/in" });
+    expect(mattermostCreateBody(flags({ [WF]: "https://mm.example/in" }), changed(WF))).toEqual({
+      webhookUrl: "https://mm.example/in",
+    });
   });
 
   test("an empty channel on create means none, so it stays out", () => {
@@ -261,7 +260,8 @@ describe("webhookCreateBody", () => {
   });
 
   test("the lead is whole minutes between 5 and 30 days", () => {
-    const at = (ms: number) => webhookCreateBody(flags({ [WF]: "https://wh.example/in", [LEAD]: ms }), changed(WF, LEAD));
+    const at = (ms: number) =>
+      webhookCreateBody(flags({ [WF]: "https://wh.example/in", [LEAD]: ms }), changed(WF, LEAD));
     expect(() => at(90_000)).toThrow("whole number of minutes");
     expect(() => at(4 * 60_000)).toThrow("between 5 minutes and 30 days");
     expect(() => at(721 * 3_600_000)).toThrow("between 5 minutes and 30 days");
@@ -273,7 +273,9 @@ describe("webhookCreateBody", () => {
 describe("webhookUpdateBody", () => {
   test("an empty secret is the schema's null clear", () => {
     expect(webhookUpdateBody(flags({ [SEC]: "" }), changed(SEC))).toEqual({ secret: null });
-    expect(webhookUpdateBody(flags({ [SEC]: "signing-material" }), changed(SEC))).toEqual({ secret: "signing-material" });
+    expect(webhookUpdateBody(flags({ [SEC]: "signing-material" }), changed(SEC))).toEqual({
+      secret: "signing-material",
+    });
     expect(webhookUpdateBody(flags({}), changed())).toEqual({});
   });
 

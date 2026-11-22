@@ -1,10 +1,5 @@
 import { apiKey, project, type App } from "./app";
-import {
-  deleteWorkflowRule,
-  listWorkflowRules,
-  setWorkflowRule,
-  type WorkflowRule,
-} from "../api/kaneo";
+import { deleteWorkflowRule, listWorkflowRules, setWorkflowRule, type WorkflowRule } from "../api/kaneo";
 import { KaneoApiError } from "../api/http";
 import { minimumArgs, noArgs, rangeArgs, type RunContext } from "./args";
 import { resolveColumn } from "./column";
@@ -122,14 +117,20 @@ export const workflowCommand = {
           // The server's middleware looks the rule up to place its workspace
           // before the route runs, so an unknown one is its 400 rather than
           // anything naming a rule.
-          if (err instanceof KaneoApiError && err.statusCode === 400 && err.messages.some((m) => m.includes("Workspace ID could not be determined"))) {
+          if (
+            err instanceof KaneoApiError &&
+            err.statusCode === 400 &&
+            err.messages.some((m) => m.includes("Workspace ID could not be determined"))
+          ) {
             throw new Error(`no workflow rule ${id}; kaneo workflow ls --json lists the ids`);
           }
           throw err;
         });
         // The id reaches a rule in any project the key can see, so the line says
         // which project it was in.
-        app.out.human(`deleted workflow rule ${deleted.integrationType} ${deleted.eventType} from ${deleted.projectId}`);
+        app.out.human(
+          `deleted workflow rule ${deleted.integrationType} ${deleted.eventType} from ${deleted.projectId}`,
+        );
         app.out.data(deleted);
       },
     },

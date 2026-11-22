@@ -39,7 +39,9 @@ export const sessionCommand = {
         apiKey(app);
         const task = await resolveTask(app, args[0]!);
         const attachment = await attachTask(app, sessionId, task, args.slice(1).join(" "));
-        app.out.human(`attached: ${taskRef(attachment.projectSlug, attachment.number, attachment.projectId, attachment.taskId)} ${attachment.title}`);
+        app.out.human(
+          `attached: ${taskRef(attachment.projectSlug, attachment.number, attachment.projectId, attachment.taskId)} ${attachment.title}`,
+        );
         app.out.data(attachment);
       }),
     },
@@ -205,7 +207,9 @@ export const sessionCommand = {
         } catch (e) {
           // Re-running close would post a second marker; what is left is only
           // the local file, so the message names that.
-          throw hard(`closed ${taskRef(closed.projectSlug, closed.number, closed.projectId, closed.taskId)} and recorded it, but could not remove the attachment: ${(e as Error).message}`);
+          throw hard(
+            `closed ${taskRef(closed.projectSlug, closed.number, closed.projectId, closed.taskId)} and recorded it, but could not remove the attachment: ${(e as Error).message}`,
+          );
         }
         await runHook(app, "close", hookEnv("close", sessionId, closed.taskId, closed.number, ""));
 
@@ -224,7 +228,9 @@ export const sessionCommand = {
         }
         await confirmMarker(closed.taskId, closed.number, posted, format(marker), "fail-open");
 
-        app.out.human(`closed: ${taskRef(closed.projectSlug, closed.number, closed.projectId, closed.taskId)} ${closed.title}`);
+        app.out.human(
+          `closed: ${taskRef(closed.projectSlug, closed.number, closed.projectId, closed.taskId)} ${closed.title}`,
+        );
         app.out.data({ number: closed.number, taskId: closed.taskId });
       }),
     },
@@ -248,7 +254,10 @@ export const sessionCommand = {
         const { entries, skipped } = store.readHistory(sessions, sessionId);
 
         if (attached === null) app.out.human("attached: none");
-        else app.out.human(`attached: ${taskRef(attached.projectSlug, attached.number, attached.projectId, attached.taskId)} ${attached.title}`);
+        else
+          app.out.human(
+            `attached: ${taskRef(attached.projectSlug, attached.number, attached.projectId, attached.taskId)} ${attached.title}`,
+          );
         for (const entry of entries) {
           const line = entry as Record<string, Json | undefined>;
           const slug = typeof line["projectSlug"] === "string" ? line["projectSlug"] : undefined;
@@ -283,7 +292,9 @@ const releaseHold = async (app: App, releasing: string, named: string): Promise<
   // an explicitly manual release that no hook invokes, and a refusal that
   // exited 0 would report a release that never ran.
   if (named === "") {
-    throw hard("--session releases another session's hold, which this machine has no record of; name the task with --task");
+    throw hard(
+      "--session releases another session's hold, which this machine has no record of; name the task with --task",
+    );
   }
   // This session's own hold is what a plain close is for; releasing it by name
   // here would post a second marker for a hold about to be let go anyway.
@@ -300,7 +311,12 @@ const releaseHold = async (app: App, releasing: string, named: string): Promise<
   const task = await resolveTask(app, releaseRef(held, named), slugs);
   const closed = attachmentOf(task);
   await describeBoard(task, closed, "close");
-  const reference = taskRef(closed.projectSlug ?? slugs.get(task.projectId), closed.number, closed.projectId, closed.taskId);
+  const reference = taskRef(
+    closed.projectSlug ?? slugs.get(task.projectId),
+    closed.number,
+    closed.projectId,
+    closed.taskId,
+  );
 
   const comments = await listComments(task.id);
   if (!holding(comments).some((marker) => marker.sessionId === releasing)) {
@@ -359,9 +375,7 @@ const targetTask = async (app: App, ref: string): Promise<{ taskId: string; numb
   const sessionId = requireSessionId();
   const attached = store.load(store.sessionStore(), sessionId);
   if (attached === undefined) {
-    throw new Error(
-      "this session is not attached to a task; name one, or run 'kaneo session attach' first",
-    );
+    throw new Error("this session is not attached to a task; name one, or run 'kaneo session attach' first");
   }
   return {
     taskId: attached.taskId,

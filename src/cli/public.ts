@@ -25,7 +25,12 @@ export const publicCommand = {
       flags: [
         { name: "status", type: "string" as const, usage: "only tasks in this column", defaultValue: "" },
         { name: "priority", type: "string" as const, usage: "only tasks of this priority", defaultValue: "" },
-        { name: "assignee-id", type: "string" as const, usage: "only tasks assigned to this user id", defaultValue: "" },
+        {
+          name: "assignee-id",
+          type: "string" as const,
+          usage: "only tasks assigned to this user id",
+          defaultValue: "",
+        },
         {
           name: "sort-by",
           type: "string" as const,
@@ -35,7 +40,12 @@ export const publicCommand = {
         { name: "sort-order", type: "string" as const, usage: "asc or desc", defaultValue: "" },
         { name: "due-before", type: "string" as const, usage: "only tasks due before this instant", defaultValue: "" },
         { name: "due-after", type: "string" as const, usage: "only tasks due after this instant", defaultValue: "" },
-        { name: "limit", type: "string" as const, usage: "tasks per page, 1 to 100 (the server decides the pages)", defaultValue: "" },
+        {
+          name: "limit",
+          type: "string" as const,
+          usage: "tasks per page, 1 to 100 (the server decides the pages)",
+          defaultValue: "",
+        },
       ],
       run: async ({ args, flags, changed, app }: RunContext<App>) => {
         const board = await getPublicBoard(args[0]!, publicFilters(flags, changed));
@@ -97,7 +107,9 @@ const publicFilters = (flags: FlagValues, changed: ReadonlySet<string>): PublicB
   ...(changed.has("priority") ? { priority: String(flags.priority ?? "") } : {}),
   ...(changed.has("assignee-id") ? { assigneeId: String(flags["assignee-id"] ?? "") } : {}),
   ...(changed.has("sort-by") ? { sortBy: wantedEnum("--sort-by", String(flags["sort-by"] ?? ""), SORT_BY) } : {}),
-  ...(changed.has("sort-order") ? { sortOrder: wantedEnum("--sort-order", String(flags["sort-order"] ?? ""), SORT_ORDER) } : {}),
+  ...(changed.has("sort-order")
+    ? { sortOrder: wantedEnum("--sort-order", String(flags["sort-order"] ?? ""), SORT_ORDER) }
+    : {}),
   ...(changed.has("due-before") ? { dueBefore: String(flags["due-before"] ?? "") } : {}),
   ...(changed.has("due-after") ? { dueAfter: String(flags["due-after"] ?? "") } : {}),
   ...(changed.has("limit") ? { limit: wantedLimit(String(flags.limit ?? "")) } : {}),

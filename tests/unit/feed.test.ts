@@ -16,7 +16,15 @@ const HTTP = join(import.meta.dir, "../../src/api/http");
 
 const cleanEnv = () => {
   const env = { ...process.env };
-  for (const key of ["KANEO_API_KEY", "KANEO_API_URL", "KANEO_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "COPILOT_AGENT_SESSION_ID", "DEVIN_SESSION_ID"]) delete env[key];
+  for (const key of [
+    "KANEO_API_KEY",
+    "KANEO_API_URL",
+    "KANEO_SESSION_ID",
+    "CLAUDE_CODE_SESSION_ID",
+    "COPILOT_AGENT_SESSION_ID",
+    "DEVIN_SESSION_ID",
+  ])
+    delete env[key];
   return env;
 };
 
@@ -58,7 +66,12 @@ server.stop(true);
 `;
 
 const feedGet = (ics: string, opts: GetOpts = {}) => {
-  const p = Bun.spawnSync(["bun", "-e", CHILD(ics, opts)], { env: cleanEnv(), stdout: "pipe", stderr: "pipe", timeout: 15_000 });
+  const p = Bun.spawnSync(["bun", "-e", CHILD(ics, opts)], {
+    env: cleanEnv(),
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: 15_000,
+  });
   return { out: p.stdout.toString(), err: p.stderr.toString(), exit: p.exitCode };
 };
 

@@ -83,7 +83,7 @@ const escaped = (char: string, delimiter: string): string => {
   // it, which is why it is here rather than in the table above.
   if ((code >= 0x20 && code <= 0x7e) || PRINTABLE.test(char)) return char;
   switch (char) {
-    case "\a":
+    case "\x07":
       return "\\a";
     case "\b":
       return "\\b";
@@ -132,7 +132,16 @@ const parseDuration = (text: string): number => {
   // Go returns zero for a bare "0" without asking for a unit.
   if (rest === "0") return 0;
   if (rest === "") throw invalid();
-  const UNITS: Record<string, number> = { ns: 1e-6, us: 1e-3, "µs": 1e-3, "μs": 1e-3, ms: 1, s: 1000, m: 60_000, h: 3_600_000 };
+  const UNITS: Record<string, number> = {
+    ns: 1e-6,
+    us: 1e-3,
+    µs: 1e-3,
+    μs: 1e-3,
+    ms: 1,
+    s: 1000,
+    m: 60_000,
+    h: 3_600_000,
+  };
   let ms = 0;
   while (rest !== "") {
     if (!(rest[0] === "." || (rest[0]! >= "0" && rest[0]! <= "9"))) throw invalid();
@@ -386,7 +395,12 @@ const wordsOf = (args: string[], flags: Flag[]): string[] => {
       i++;
       continue;
     }
-    if (token.startsWith("-") && !token.startsWith("--") && token.length === 2 && !hasShorthandNoValue(flags, token[1]!)) {
+    if (
+      token.startsWith("-") &&
+      !token.startsWith("--") &&
+      token.length === 2 &&
+      !hasShorthandNoValue(flags, token[1]!)
+    ) {
       if (args.length - i - 1 <= 0) break;
       i++;
       continue;
@@ -404,7 +418,12 @@ const dropFirst = (args: string[], word: string, flags: Flag[]): string[] => {
       i++;
       continue;
     }
-    if (token.startsWith("-") && !token.startsWith("--") && token.length === 2 && !hasShorthandNoValue(flags, token[1]!)) {
+    if (
+      token.startsWith("-") &&
+      !token.startsWith("--") &&
+      token.length === 2 &&
+      !hasShorthandNoValue(flags, token[1]!)
+    ) {
       i++;
       continue;
     }
@@ -443,10 +462,12 @@ export const find = <A>(root: Command<A>, argv: string[]): Found<A> => {
   return { chain, command: chain[chain.length - 1]!, calledAs, rest, words: wordsOf(rest, declaredFlags(chain)) };
 };
 
-export const noArgs = (path: string): ((args: string[]) => void) => (args) => {
-  const first = args[0];
-  if (first !== undefined) throw new Error(`unknown command ${quote(first)} for ${quote(path)}`);
-};
+export const noArgs =
+  (path: string): ((args: string[]) => void) =>
+  (args) => {
+    const first = args[0];
+    if (first !== undefined) throw new Error(`unknown command ${quote(first)} for ${quote(path)}`);
+  };
 
 export const minimumArgs =
   (count: number): ((args: string[]) => void) =>
@@ -486,12 +507,13 @@ export const unknownCommand = <A>(command: Command<A>, path: string, word: strin
   const suggestions = /^\d+$/.test(word)
     ? []
     : available(command)
-    .filter((child) => distance(word.toLowerCase(), child.name.toLowerCase()) <= 2 || child.name.toLowerCase().startsWith(word.toLowerCase()))
-    .map((child) => child.name);
-  const hint =
-    suggestions.length === 0
-      ? ""
-      : `\n\nDid you mean this?\n${suggestions.map((s) => `\t${s}\n`).join("")}`;
+        .filter(
+          (child) =>
+            distance(word.toLowerCase(), child.name.toLowerCase()) <= 2 ||
+            child.name.toLowerCase().startsWith(word.toLowerCase()),
+        )
+        .map((child) => child.name);
+  const hint = suggestions.length === 0 ? "" : `\n\nDid you mean this?\n${suggestions.map((s) => `\t${s}\n`).join("")}`;
   return new Error(`unknown command ${quote(word)} for ${quote(path)}${hint}`);
 };
 
@@ -500,11 +522,7 @@ const distance = (from: string, to: string): number => {
   for (let i = 1; i <= from.length; i++) {
     const next = [i];
     for (let j = 1; j <= to.length; j++) {
-      next[j] = Math.min(
-        row[j]! + 1,
-        next[j - 1]! + 1,
-        row[j - 1]! + (from[i - 1] === to[j - 1] ? 0 : 1),
-      );
+      next[j] = Math.min(row[j]! + 1, next[j - 1]! + 1, row[j - 1]! + (from[i - 1] === to[j - 1] ? 0 : 1));
     }
     row = next;
   }
@@ -561,7 +579,10 @@ const trimEnd = (text: string): string => text.replace(/\s+$/, "");
 const useLine = <A>(chain: Command<A>[]): string => {
   const command = chain[chain.length - 1]!;
   const use = command.use ?? command.name;
-  const line = `${chain.slice(0, -1).map((c) => c.name).join(" ")}${chain.length === 1 ? "" : " "}${use}`;
+  const line = `${chain
+    .slice(0, -1)
+    .map((c) => c.name)
+    .join(" ")}${chain.length === 1 ? "" : " "}${use}`;
   if (command.noFlagsInUse === true || line.includes("[flags]")) return line;
   return `${line} [flags]`;
 };
@@ -577,7 +598,8 @@ export const usageText = <A>(chain: Command<A>[]): string => {
   if (subcommands.length > 0) usage += `\n  ${path} [command]`;
   sections.push(usage);
 
-  if ((command.aliases?.length ?? 0) > 0) sections.push(`Aliases:\n  ${[command.name, ...command.aliases!].join(", ")}`);
+  if ((command.aliases?.length ?? 0) > 0)
+    sections.push(`Aliases:\n  ${[command.name, ...command.aliases!].join(", ")}`);
   if (subcommands.length > 0) {
     const padding = Math.max(11, ...subcommands.map((c) => c.name.length));
     const lines = subcommands.map((c) => `  ${c.name.padEnd(padding)} ${c.short}`);

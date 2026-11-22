@@ -35,8 +35,9 @@ permissions:
 # A hand-pushed tag and an automatic run for the same commit can still run side
 # by side. If the automatic run checked out after the tag was pushed, both
 # publish that tag, one after the other (the publish job's own group); if
-# before, it cuts the next rc for the same commit. A ci run that finishes after
-# a newer one can still replace that newer pending run (#57).
+# before, it cuts the next rc for the same commit. A ci run that finishes
+# after a newer one can still replace that newer pending run, so a superseded
+# run releases main's tip itself when its ci passed (#57).
 concurrency:
   group: release-${{ github.event_name == 'workflow_run' && (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository && 'auto' || github.run_id) || github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
@@ -52,8 +53,16 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # To look up the ci run of a hand-pushed or dispatched tag's commit, and
+      # of the main tip a superseded run falls back to.
+      actions: read
     outputs:
       tag: ${{ steps.decide.outputs.tag }}
+      # The commit that was checked, so publish builds that one even if the tag
+      # is moved while this run is between jobs.
+      sha: ${{ steps.decide.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -67,11 +76,29 @@ jobs:
         with:
           bun-version: "1.4.0"
 
+      # workflow_run is gated on ci by its trigger; a tag is not. Only a commit
+      # that passed ci as a push to main is released. This catches a tag put on
+      # an untested commit by mistake; it does not stop someone who can push
+      # tags, since a tag push runs the release.yml of the tagged commit.
+      - name: ci passed for this commit
+        if: github.event_name != 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          sha="$(git rev-parse HEAD)"
+          passed="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$sha&event=push&branch=main&status=success" --jq '.total_count')"
+          if ! printf '%s\n' "$passed" | grep -Eq '^[1-9][0-9]*$'; then
+            echo "::error::$sha has no successful ci run on a push to main (got: $passed); once ci passes, run this workflow by hand with the tag"
+            exit 1
+          fi
+
       - name: decide the tag
         id: decide
         env:
           EVENT: ${{ github.event_name }}
           GIVEN: ${{ github.event.inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
           if [ "$EVENT" != workflow_run ]; then
@@ -81,6 +108,8 @@ jobs:
               echo "::error::$GIVEN is not a vX.Y.Z or vX.Y.Z-rc.N tag"
               exit 1
             fi
+            sha="$(git rev-parse HEAD)"
+            echo "sha=$sha" >> "$GITHUB_OUTPUT"
             echo "tag=$GIVEN" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -93,8 +122,19 @@ jobs:
           main="$(git rev-parse origin/main)"
           built="$(git rev-parse HEAD)"
           if [ "$main" != "$built" ]; then
-            echo "main has moved past this commit; not releasing it"
-            exit 0
+            # This commit was superseded before its release ran, but the
+            # newest main commit is released only if its own run survives the
+            # concurrency group — a ci run finishing out of order can push the
+            # pending one out (#57). When main's tip passed ci, release it
+            # from here instead of skipping; when it has not, its own run
+            # releases it once ci completes. gh api failing fails the step
+            # rather than skipping quietly.
+            passed="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$main&event=push&branch=main&status=success" --jq '.total_count')"
+            if ! printf '%s\n' "$passed" | grep -Eq '^[1-9][0-9]*$'; then
+              echo "main has moved past this commit to $main, which has no successful ci run yet; not releasing"
+              exit 0
+            fi
+            git checkout --quiet "$main"
           fi
           # A re-run for the same commit reuses its tag rather than cutting another.
           # Assigned on its own line, and without a pipe: set -e sees neither a
@@ -114,6 +154,8 @@ jobs:
           if [ -z "$tag" ]; then
             tag="$(bun scripts/next-tag.ts)"
           fi
+          sha="$(git rev-parse HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   publish:
@@ -135,12 +177,11 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      # On a manual run inputs.tag and the default branch HEAD disagree. Without
-      # an explicit ref, binaries whose contents do not match the tag end up in
-      # the release. A missing tag fails here, so nothing is released for it.
+      # The commit the tag job checked, not the tag or the event again: a tag
+      # moved in between would otherwise release a commit nobody checked.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha || (github.event.inputs.tag && format('refs/tags/{0}', github.event.inputs.tag)) || github.ref }}
+          ref: ${{ needs.tag.outputs.sha }}
           fetch-depth: 0
           # The release is published through the API with GITHUB_TOKEN and
           # nothing is pushed over git, so the checkout needs no stored
@@ -184,6 +225,36 @@ jobs:
           TAG: ${{ needs.tag.outputs.tag }}
         run: bun scripts/build.ts "$TAG"
 
+      # Before publishing: a failed attestation must stop the release rather
+      # than leave it published without provenance. The predicate is written
+      # by hand because the action's provenance mode records the event's sha
+      # claim — the commit the run is for — which is not always the commit
+      # checked out and built: a dispatch can name another commit's tag, and
+      # a superseded run releases the newer main tip. The script takes every
+      # other field from the same OIDC claims and names the built commit.
+      - name: write the provenance predicate
+        env:
+          BUILT_SHA: ${{ needs.tag.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          # The script comes from the commit whose workflow file carries this
+          # step, not the built commit and not the ref's moving tip: a dispatch
+          # can name a tag on a commit that predates it, and a long run on
+          # main can outlive a change to the script's path.
+          gh api "repos/$GITHUB_REPOSITORY/contents/scripts/attest-provenance.ts?ref=$WORKFLOW_SHA" \
+            -H "Accept: application/vnd.github.raw" > "$RUNNER_TEMP/attest-provenance.ts"
+          bun "$RUNNER_TEMP/attest-provenance.ts" > provenance-predicate.json
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          # Every published file, checksums.txt included.
+          subject-path: "dist/*"
+          # The SLSA v1 type keeps the attestation the standard provenance
+          # shape; the predicate file carries the corrected gitCommit.
+          predicate-type: "https://slsa.dev/provenance/v1"
+          predicate-path: "${{ github.workspace }}/provenance-predicate.json"
+
       # A full release, not a prerelease, even for an rc tag: install.sh
       # installs whatever GitHub calls the latest release, and that has to be
       # what is on main. A re-run for the same tag replaces the assets.
@@ -193,14 +264,17 @@ jobs:
           TAG: ${{ needs.tag.outputs.tag }}
         run: |
           set -eu
-          # The tag was checked against the built commit when it was created
-          # or found, so a re-run here is for the same commit.
+          # The local tag was checked against the built commit when it was
+          # created or found; the remote one can still move until now. A moved
+          # tag would carry binaries of another commit. The peeled ref (the
+          # ^{} line) is the commit of an annotated tag.
+          remote="$(git ls-remote origin "refs/tags/$TAG" "refs/tags/$TAG^{}" | sort -k2 | tail -n 1 | cut -f1)"
+          if [ "$remote" != "$(git rev-parse HEAD)" ]; then
+            echo "::error::$TAG on the remote points at ${remote:-nothing}, not the built $(git rev-parse HEAD)"
+            exit 1
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.tar.gz dist/checksums.txt --clobber
           else
             gh release create "$TAG" dist/*.tar.gz dist/checksums.txt --verify-tag --generate-notes --latest
           fi
-
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: "dist/*.tar.gz"

@@ -36,8 +36,18 @@ export const searchCommand = {
   // Several words are one query, as a search box takes them.
   args: minimumArgs(1),
   flags: [
-    { name: "type", type: "string" as const, usage: "tasks, projects, workspaces, comments or activities (default every type)", defaultValue: "" },
-    { name: "limit", type: "string" as const, usage: `most results to return, at most ${MAX_LIMIT} (default ${DEFAULT_LIMIT})`, defaultValue: "" },
+    {
+      name: "type",
+      type: "string" as const,
+      usage: "tasks, projects, workspaces, comments or activities (default every type)",
+      defaultValue: "",
+    },
+    {
+      name: "limit",
+      type: "string" as const,
+      usage: `most results to return, at most ${MAX_LIMIT} (default ${DEFAULT_LIMIT})`,
+      defaultValue: "",
+    },
     { name: "in-project", type: "bool" as const, usage: "narrow to the resolved project", defaultValue: "false" },
     {
       name: "all-workspaces",
@@ -57,7 +67,8 @@ export const searchCommand = {
     // exist. Its workspace is the one searched, since a project is in exactly one.
     const narrow = flags["in-project"] === true || app.flags.projectId !== "";
     const acrossAll = flags["all-workspaces"] === true;
-    if (narrow && acrossAll) throw new Error("--all-workspaces searches every workspace, so it cannot be narrowed to a project");
+    if (narrow && acrossAll)
+      throw new Error("--all-workspaces searches every workspace, so it cannot be narrowed to a project");
     if (acrossAll && app.flags.workspaceId !== "") {
       throw new Error("--all-workspaces searches every workspace, so it cannot be narrowed with --workspace");
     }

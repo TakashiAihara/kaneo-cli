@@ -157,7 +157,15 @@ describe("task list --description", () => {
             archivedTasks: [],
             plannedTasks: [],
           },
-          pagination: { total: 4, totalPages: 1, page: 1, pageSize: 50, relatedPage: 1, relatedPageSize: 100, relatedTotalPages: 1 },
+          pagination: {
+            total: 4,
+            totalPages: 1,
+            page: 1,
+            pageSize: 50,
+            relatedPage: 1,
+            relatedPageSize: 100,
+            relatedTotalPages: 1,
+          },
         });
       }
       if (u.pathname === "/api/task/description-matches/p1") {
@@ -166,17 +174,30 @@ describe("task list --description", () => {
         return Response.json({ ids: ["task-huge"], nextCursor: null });
       }
       if (u.pathname === "/api/task/task-big") {
-        return Response.json(boardTask({ id: "task-big", number: 7, title: "Shrunken", description: "needle in the shortened text", projectId: "p1" }));
+        return Response.json(
+          boardTask({
+            id: "task-big",
+            number: 7,
+            title: "Shrunken",
+            description: "needle in the shortened text",
+            projectId: "p1",
+          }),
+        );
       }
       if (u.pathname === "/api/task/task-other") {
-        return Response.json(boardTask({ id: "task-other", number: 9, title: "Other", description: "nothing here", projectId: "p1" }));
+        return Response.json(
+          boardTask({ id: "task-other", number: 9, title: "Other", description: "nothing here", projectId: "p1" }),
+        );
       }
       return new Response("not found", { status: 404 });
     });
     using(url);
     let listed: { id: string }[] = [];
     const list = (
-      taskCommand.children as { name: string; run: (ctx: { flags: FlagValues; changed: ReadonlySet<string>; app: App }) => Promise<void> }[]
+      taskCommand.children as {
+        name: string;
+        run: (ctx: { flags: FlagValues; changed: ReadonlySet<string>; app: App }) => Promise<void>;
+      }[]
     ).find((c) => c.name === "list")!;
     const app = {
       cfg: { apiKey: "test-key", projectIds: ["p1"], repo: "" },
@@ -226,7 +247,11 @@ describe("task image upload", () => {
       return Response.json({ key: "k/1", uploadUrl: `${url}/uploads/k/1`, headers: { "Content-Type": "image/png" } });
     });
     using(url);
-    expect(await stageTaskImage("t1", wanted)).toEqual({ key: "k/1", uploadUrl: `${url}/uploads/k/1`, headers: { "Content-Type": "image/png" } });
+    expect(await stageTaskImage("t1", wanted)).toEqual({
+      key: "k/1",
+      uploadUrl: `${url}/uploads/k/1`,
+      headers: { "Content-Type": "image/png" },
+    });
     expect(request).toEqual({ method: "PUT", path: "/api/task/image-upload/t1", body: wanted });
   });
 
@@ -237,8 +262,15 @@ describe("task image upload", () => {
       return Response.json({ id: "asset1", url: `${url}/asset/asset1` });
     });
     using(url);
-    expect(await finalizeTaskImage("t1", { ...wanted, key: "k/1" })).toEqual({ id: "asset1", url: `${url}/asset/asset1` });
-    expect(request).toEqual({ method: "POST", path: "/api/task/image-upload/t1/finalize", body: { ...wanted, key: "k/1" } });
+    expect(await finalizeTaskImage("t1", { ...wanted, key: "k/1" })).toEqual({
+      id: "asset1",
+      url: `${url}/asset/asset1`,
+    });
+    expect(request).toEqual({
+      method: "POST",
+      path: "/api/task/image-upload/t1/finalize",
+      body: { ...wanted, key: "k/1" },
+    });
   });
 });
 
@@ -288,7 +320,10 @@ describe("external links", () => {
 describe("task upload's local file check", () => {
   const runUpload = (file: string): Promise<void> => {
     const upload = (
-      taskCommand.children as { name: string; run: (ctx: { args: string[]; flags: FlagValues; app: App }) => Promise<void> }[]
+      taskCommand.children as {
+        name: string;
+        run: (ctx: { args: string[]; flags: FlagValues; app: App }) => Promise<void>;
+      }[]
     ).find((c) => c.name === "upload")!;
     return upload.run({ args: ["1", file], flags: {}, app: { cfg: { apiKey: "" } } as unknown as App });
   };
@@ -350,7 +385,11 @@ describe("putUpload", () => {
       };
       return new Response(null, { status: 200 });
     });
-    await putUpload(`${url}/uploads/k`, { "Content-Type": "image/png", "x-amz-meta": "1" }, new Uint8Array([1, 2, 3, 4]));
+    await putUpload(
+      `${url}/uploads/k`,
+      { "Content-Type": "image/png", "x-amz-meta": "1" },
+      new Uint8Array([1, 2, 3, 4]),
+    );
     expect(seenReq).toEqual({ bytes: 4, type: "image/png", auth: null });
   });
 
@@ -396,7 +435,11 @@ describe("putUpload", () => {
   test("an https URL passes the check and is sent the bytes", async () => {
     const stub = stubFetch(() => new Response(null, { status: 200 }));
     try {
-      await putUpload("https://storage.example.invalid/uploads/k?sig=secret", { "x-amz-meta": "1" }, new Uint8Array([1, 2, 3]));
+      await putUpload(
+        "https://storage.example.invalid/uploads/k?sig=secret",
+        { "x-amz-meta": "1" },
+        new Uint8Array([1, 2, 3]),
+      );
     } finally {
       stub.restore();
     }

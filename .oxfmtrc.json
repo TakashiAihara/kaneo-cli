@@ -1,0 +1,8 @@
+{
+  // src/api/gen is Orval's output: the generated-client check in ci.yml owns
+  // its bytes, so a format finding there could only be fixed by changing the
+  // generator. The goldens and the pinned spec are compared byte for byte by
+  // their own checks for the same reason.
+  "printWidth": 120,
+  "ignorePatterns": ["src/api/gen/**", "tests/parity/golden/**", "openapi/*.json"]
+}

@@ -27,38 +27,42 @@ const stdinFlag = (command: Command<App>, name: string): string => {
 test.each([
   ["slack", stdinFlag(slackCommand, "set")],
   ["telegram", stdinFlag(telegramCommand, "set")],
-])("integration %s set reads the stdin secret before the existence check", async (provider, flag) => {
-  const home = mkdtempSync(join(tmpdir(), "kaneo-integration-set-"));
-  try {
-    const run = Bun.spawn([process.execPath, INDEX, "integration", provider, "set", flag, "-", "--json"], {
-      cwd: home,
-      env: {
-        PATH: process.env.PATH ?? "",
-        HOME: home,
-        XDG_CONFIG_HOME: join(home, ".config"),
-        KANEO_API_KEY: "test-key",
-        KANEO_WORKSPACE: "ws",
-        KANEO_PROJECT: "p1",
-        // Nothing listens there: the read precedes every request, and a
-        // regression that asked the server first would fail on it.
-        KANEO_API_URL: "http://127.0.0.1:9",
-        NO_COLOR: "1",
-      },
-      stdin: "pipe",
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const outcome = await Promise.race([
-      run.exited.then(() => "exited" as const),
-      Bun.sleep(8_000).then(() => "waiting" as const),
-    ]);
-    if (outcome === "exited") {
-      const stderr = await new Response(run.stderr).text();
-      throw new Error(`the command exited before reading stdin — the existence check ran first: ${stderr}`);
+])(
+  "integration %s set reads the stdin secret before the existence check",
+  async (provider, flag) => {
+    const home = mkdtempSync(join(tmpdir(), "kaneo-integration-set-"));
+    try {
+      const run = Bun.spawn([process.execPath, INDEX, "integration", provider, "set", flag, "-", "--json"], {
+        cwd: home,
+        env: {
+          PATH: process.env.PATH ?? "",
+          HOME: home,
+          XDG_CONFIG_HOME: join(home, ".config"),
+          KANEO_API_KEY: "test-key",
+          KANEO_WORKSPACE: "ws",
+          KANEO_PROJECT: "p1",
+          // Nothing listens there: the read precedes every request, and a
+          // regression that asked the server first would fail on it.
+          KANEO_API_URL: "http://127.0.0.1:9",
+          NO_COLOR: "1",
+        },
+        stdin: "pipe",
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const outcome = await Promise.race([
+        run.exited.then(() => "exited" as const),
+        Bun.sleep(8_000).then(() => "waiting" as const),
+      ]);
+      if (outcome === "exited") {
+        const stderr = await new Response(run.stderr).text();
+        throw new Error(`the command exited before reading stdin — the existence check ran first: ${stderr}`);
+      }
+      run.kill();
+      await run.exited;
+    } finally {
+      rmSync(home, { recursive: true, force: true });
     }
-    run.kill();
-    await run.exited;
-  } finally {
-    rmSync(home, { recursive: true, force: true });
-  }
-}, 20_000);
+  },
+  20_000,
+);

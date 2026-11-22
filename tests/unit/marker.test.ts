@@ -1,7 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CLOSED, format, latestPerSession, parse, RUNNING, running, sessionIds, type Marker } from "../../src/session/marker";
+import {
+  CLOSED,
+  format,
+  latestPerSession,
+  parse,
+  RUNNING,
+  running,
+  sessionIds,
+  type Marker,
+} from "../../src/session/marker";
 
 // Ported from the Go build's internal/session/marker_test.go and compat_test.go.
 
@@ -198,7 +207,10 @@ describe("marker", () => {
       { content: format(mk({ sessionId: "s-old1", host: "h", cwd: "/w", branch: "b", state: CLOSED })) },
       { content: "no marker here" },
       // Two markers in one comment are both seen.
-      { content: "<!-- kn:session id=s-a host=h cwd=/w branch=b state=running --><!-- kn:session id=s-b host=h cwd=/w branch=b state=closed -->" },
+      {
+        content:
+          "<!-- kn:session id=s-a host=h cwd=/w branch=b state=running --><!-- kn:session id=s-b host=h cwd=/w branch=b state=closed -->",
+      },
     ];
     expect(sessionIds(comments)).toEqual(["s-old1", "s-old2", "s-a", "s-b"]);
   });
@@ -206,7 +218,9 @@ describe("marker", () => {
   // A marker written by this build percent-encodes its values; the id a
   // migration reports has to be the decoded one, the way `parse` reads it.
   test("SessionIdsDecodesEncodedValues", () => {
-    const comments = [{ content: format(mk({ sessionId: "sess/my session", host: "h", cwd: "/w", branch: "b", state: RUNNING })) }];
+    const comments = [
+      { content: format(mk({ sessionId: "sess/my session", host: "h", cwd: "/w", branch: "b", state: RUNNING })) },
+    ];
     expect(sessionIds(comments)).toEqual(["sess/my session"]);
   });
 });

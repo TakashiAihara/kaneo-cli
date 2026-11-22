@@ -26,13 +26,20 @@ const stringFlag = (name: string, usage: string): Flag => ({ name, type: "string
 // list and the shell history. One trailing line ending is dropped, the way a
 // pipe or a heredoc carries it; empty stdin is refused rather than read as a
 // token, and a token that is exactly - cannot be passed as a value.
-const accessToken = async (flags: FlagValues, changed: ReadonlySet<string>, required: boolean): Promise<string | undefined> => {
+const accessToken = async (
+  flags: FlagValues,
+  changed: ReadonlySet<string>,
+  required: boolean,
+): Promise<string | undefined> => {
   if (!changed.has("access-token")) {
-    if (required) throw new Error("--access-token is required: pass --access-token - to read the GitLab token from stdin");
+    if (required)
+      throw new Error("--access-token is required: pass --access-token - to read the GitLab token from stdin");
     return undefined;
   }
   if (String(flags["access-token"] ?? "") !== "-") {
-    throw new Error("--access-token takes only -: the GitLab token is read from stdin so it never appears on the command line");
+    throw new Error(
+      "--access-token takes only -: the GitLab token is read from stdin so it never appears on the command line",
+    );
   }
   const token = (await readInput("-")).replace(/\r?\n$/, "");
   if (token === "") throw new Error("empty access token on stdin");
@@ -180,7 +187,8 @@ export const gitlabCommand = {
         nothingToChange(changed, ["active", "comment-task-link"]);
         const changes: GitlabLinkChanges = {};
         if (changed.has("active")) changes.isActive = flags.active === true;
-        if (changed.has("comment-task-link")) changes.commentTaskLinkOnGitlabIssue = flags["comment-task-link"] === true;
+        if (changed.has("comment-task-link"))
+          changes.commentTaskLinkOnGitlabIssue = flags["comment-task-link"] === true;
         const updated = await withProject(project(app), async (id) => {
           await guardProject(id, writeAccess(flags));
           return updateGitlabIntegration(id, changes);
@@ -202,7 +210,9 @@ export const gitlabCommand = {
       run: async ({ flags, app }: RunContext<App>) => {
         apiKey(app);
         if (flags.yes !== true) {
-          throw new Error("refusing to unlink the GitLab integration without --yes; the stored token and webhook secret are removed with it");
+          throw new Error(
+            "refusing to unlink the GitLab integration without --yes; the stored token and webhook secret are removed with it",
+          );
         }
         const result = await withProject(project(app), async (id) => {
           await guardProject(id, writeAccess(flags));

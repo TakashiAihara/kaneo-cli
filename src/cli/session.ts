@@ -370,7 +370,11 @@ export const releaseRef = (held: store.Attachment | undefined, named: string): s
 // this session attached to. reference is the task written the way a task
 // reference writes it — board and number — so a hint that asks the reader to
 // look at it or to run again names the board the write went to.
-const targetTask = async (app: App, ref: string, access: ProjectAccess = {}): Promise<{ taskId: string; number: number; reference: string }> => {
+const targetTask = async (
+  app: App,
+  ref: string,
+  access: ProjectAccess = {},
+): Promise<{ taskId: string; number: number; reference: string }> => {
   if (ref.trim() !== "") {
     const slugs = new Map<string, string>();
     const named = await resolveTask(app, ref, slugs, access);

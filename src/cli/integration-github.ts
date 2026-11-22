@@ -63,7 +63,9 @@ const integrationLines = (i: GitHubIntegration): string[] => {
   if (i.branchPattern !== null) lines.push(`branches     ${i.branchPattern}`);
   if (i.importProgress !== null) {
     const p = i.importProgress;
-    lines.push(`import       ${p.imported} imported, ${p.updated} updated, ${p.skipped} skipped${p.pending ? " (in progress)" : ""}`);
+    lines.push(
+      `import       ${p.imported} imported, ${p.updated} updated, ${p.skipped} skipped${p.pending ? " (in progress)" : ""}`,
+    );
   }
   return lines;
 };
@@ -101,7 +103,12 @@ export const githubCommand = {
       args: noArgs("kaneo integration github repos"),
       flags: [
         { name: "installation-page", type: "string" as const, usage: "installation page to read", defaultValue: "" },
-        { name: "repository-page", type: "string" as const, usage: "repository page within each installation to read", defaultValue: "" },
+        {
+          name: "repository-page",
+          type: "string" as const,
+          usage: "repository page within each installation to read",
+          defaultValue: "",
+        },
       ],
       run: async ({ flags, changed, app }: { flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
         apiKey(app);
@@ -115,12 +122,19 @@ export const githubCommand = {
           });
         });
         for (const installation of result.installations) {
-          const account = installation.account === null ? "an unknown account" : `${installation.account.login} (${installation.account.type})`;
+          const account =
+            installation.account === null
+              ? "an unknown account"
+              : `${installation.account.login} (${installation.account.type})`;
           const count = installation.repositories.length;
-          app.out.human(`installation ${installation.id}  ${account}  ${count} ${count === 1 ? "repository" : "repositories"}`);
+          app.out.human(
+            `installation ${installation.id}  ${account}  ${count} ${count === 1 ? "repository" : "repositories"}`,
+          );
         }
         for (const repo of result.repositories) {
-          app.out.human(`${repo.full_name}  ${repo.private ? "private" : "public"}  ${repo.owner.login}  ${repo.updated_at}`);
+          app.out.human(
+            `${repo.full_name}  ${repo.private ? "private" : "public"}  ${repo.owner.login}  ${repo.updated_at}`,
+          );
         }
         if (result.nextPage !== null) {
           app.out.status(
@@ -231,7 +245,8 @@ export const githubCommand = {
         apiKey(app);
         const changes: { isActive?: boolean; commentTaskLinkOnGitHubIssue?: boolean } = {};
         if (changed.has("active")) changes.isActive = flags.active === true;
-        if (changed.has("comment-task-link")) changes.commentTaskLinkOnGitHubIssue = flags["comment-task-link"] === true;
+        if (changed.has("comment-task-link"))
+          changes.commentTaskLinkOnGitHubIssue = flags["comment-task-link"] === true;
         if (changes.isActive === undefined && changes.commentTaskLinkOnGitHubIssue === undefined) {
           throw new Error("nothing to change: pass --active or --comment-task-link");
         }
@@ -258,7 +273,9 @@ export const githubCommand = {
         // The unlink cannot be undone from here: issue and pull request sync
         // stops, and linking a different repository means connecting again.
         if (flags.yes !== true) {
-          throw new Error("refusing to delete the GitHub integration without --yes; the project is unlinked from its repository");
+          throw new Error(
+            "refusing to delete the GitHub integration without --yes; the project is unlinked from its repository",
+          );
         }
         const deleted = await withProject(project(app), async (id) => {
           await guardProject(id, writeAccess(flags));
@@ -279,7 +296,12 @@ export const githubCommand = {
         "repeated or interrupted call picks up where it stopped.",
       args: noArgs("kaneo integration github import"),
       flags: [
-        { name: "run-id", type: "string" as const, usage: "resume a specific import run rather than the latest", defaultValue: "" },
+        {
+          name: "run-id",
+          type: "string" as const,
+          usage: "resume a specific import run rather than the latest",
+          defaultValue: "",
+        },
         allowArchivedFlag,
       ],
       run: async ({ flags, changed, app }: { flags: FlagValues; changed: ReadonlySet<string>; app: App }) => {
@@ -289,7 +311,9 @@ export const githubCommand = {
           await guardProject(id, writeAccess(flags));
           return importGitHubIssues(id, runId);
         });
-        app.out.human(`import ${result.runId}: ${result.imported} imported, ${result.updated} updated, ${result.skipped} skipped`);
+        app.out.human(
+          `import ${result.runId}: ${result.imported} imported, ${result.updated} updated, ${result.skipped} skipped`,
+        );
         app.out.data(result);
       },
     },

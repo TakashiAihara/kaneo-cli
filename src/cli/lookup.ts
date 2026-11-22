@@ -1,5 +1,13 @@
 import { KaneoApiError } from "../api/http";
-import { archived, getProject, lastTaskNumbers, listProjectsIn, listWorkspaces, type Project, type Workspace } from "../api/kaneo";
+import {
+  archived,
+  getProject,
+  lastTaskNumbers,
+  listProjectsIn,
+  listWorkspaces,
+  type Project,
+  type Workspace,
+} from "../api/kaneo";
 import type { Flag, FlagValues } from "./args";
 import { hard } from "./failopen";
 
@@ -67,7 +75,9 @@ const reasonOf = (e: unknown): string => {
 // that went ahead without them and by the lookups that missed or matched while
 // they were out.
 export const unlistedMessage = (unlisted: Unlisted[]): string =>
-  unlisted.map((u) => `could not list the projects of workspace ${JSON.stringify(u.workspaceName)} (${u.reason})`).join("; ");
+  unlisted
+    .map((u) => `could not list the projects of workspace ${JSON.stringify(u.workspaceName)} (${u.reason})`)
+    .join("; ");
 
 // Values already turned into an id in this run, so a command that names the same
 // project twice (`board` reads the project, then its board) looks it up once.
@@ -134,7 +144,10 @@ export const withProject = async <T>(
         everywhere.found.filter((f) => f.project.workspaceId !== home!.project.workspaceId),
         value,
       );
-      if (elsewhere.length > 0) throw new OnlyElsewhereError(`${e.message}: ${onlyElsewhere(value, elsewhere, home.workspaceName)}${explain === undefined ? "" : await explain()}`);
+      if (elsewhere.length > 0)
+        throw new OnlyElsewhereError(
+          `${e.message}: ${onlyElsewhere(value, elsewhere, home.workspaceName)}${explain === undefined ? "" : await explain()}`,
+        );
     }
     // A miss proves nothing while a workspace could not be listed: the project
     // may be in it. Saying it does not exist would send the reader to look for
@@ -146,7 +159,8 @@ export const withProject = async <T>(
         `${e.message}: ${noProject(value)} in the workspaces that could be listed; ${unlistedMessage(everywhere.unlisted)}${explain === undefined ? "" : await explain()}`,
       );
     }
-    if (found.length === 0) throw new Error(`${e.message}: ${noProject(value)}${explain === undefined ? "" : await explain()}`);
+    if (found.length === 0)
+      throw new Error(`${e.message}: ${noProject(value)}${explain === undefined ? "" : await explain()}`);
     if (found.length > 1) throw new Error(severalProjects(value, found));
     const only = found[0]!.project;
     // The value already was this project's id and the request failed anyway, so
@@ -262,7 +276,12 @@ export const slugOr = (slug: string, fallback: string): string => (slug === "" ?
 // the task's id is the only name that still resolves: a bare #N would read as
 // the current project's task, which is how a close hint once closed the wrong
 // board's task of the same number. Callers without the id keep the bare #N.
-export const taskRef = (slug: string | undefined, number: number | string, projectId?: string, taskId?: string): string => {
+export const taskRef = (
+  slug: string | undefined,
+  number: number | string,
+  projectId?: string,
+  taskId?: string,
+): string => {
   const board = slugOr(slug ?? "", projectId ?? "");
   return board === "" ? (taskId ?? `#${number}`) : `${board}#${number}`;
 };
@@ -276,7 +295,9 @@ export const workspaceInReference = async (value: string, number: number): Promi
   try {
     const named = workspacesNamed(await listWorkspaces(), value);
     if (named.length !== 1) return "";
-    const holding = (await lastTaskNumbers(named[0]!.id)).filter((p) => p.lastTaskNumber === null || p.lastTaskNumber >= number);
+    const holding = (await lastTaskNumbers(named[0]!.id)).filter(
+      (p) => p.lastTaskNumber === null || p.lastTaskNumber >= number,
+    );
     const listed =
       holding.length === 0
         ? `no active project in it has reached #${number}`
@@ -289,7 +310,10 @@ export const workspaceInReference = async (value: string, number: number): Promi
 
 const onlyElsewhere = (value: string, found: ProjectIn[], homeName: string): string =>
   `${JSON.stringify(value)} names no project in this task's workspace ${JSON.stringify(homeName)}, only ${found
-    .map((p) => `${p.project.slug === "" ? p.project.id : `${p.project.slug} (${p.project.id})`} in workspace ${JSON.stringify(p.workspaceName)}`)
+    .map(
+      (p) =>
+        `${p.project.slug === "" ? p.project.id : `${p.project.slug} (${p.project.id})`} in workspace ${JSON.stringify(p.workspaceName)}`,
+    )
     .join(", ")}; the server moves a task only within its own workspace`;
 
 const noProject = (value: string): string =>

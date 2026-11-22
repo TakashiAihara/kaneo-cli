@@ -127,7 +127,7 @@ const start = async (): Promise<void> => {
   // Only what the daemon lacks, so a second run needs no network.
   for (const image of IMAGES) {
     if (docker(["image", "ls", "--quiet", image], {}).trim() !== "") continue;
-    docker(["pull", "--quiet", image], { DOCKER_CONFIG: anonymous, DOCKER_HOST: daemon });
+    docker(["pull", "--quiet", image], { DOCKER_CONFIG: anonymous, DOCKER_HOST: daemon, DOCKER_CONTEXT: "" });
   }
   compose("up", "--detach", "--pull", "never", "--wait", "--wait-timeout", "120");
 

@@ -236,11 +236,13 @@ jobs:
         env:
           BUILT_SHA: ${{ needs.tag.outputs.sha }}
           GH_TOKEN: ${{ github.token }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
         run: |
-          # The script comes from the ref this workflow runs on, not the
-          # built commit: a dispatch can name a tag on a commit that predates
-          # it, while the workflow file carrying this step is newer.
-          gh api "repos/$GITHUB_REPOSITORY/contents/scripts/attest-provenance.ts?ref=$GITHUB_REF" \
+          # The script comes from the commit whose workflow file carries this
+          # step, not the built commit and not the ref's moving tip: a dispatch
+          # can name a tag on a commit that predates it, and a long run on
+          # main can outlive a change to the script's path.
+          gh api "repos/$GITHUB_REPOSITORY/contents/scripts/attest-provenance.ts?ref=$WORKFLOW_SHA" \
             -H "Accept: application/vnd.github.raw" > "$RUNNER_TEMP/attest-provenance.ts"
           bun "$RUNNER_TEMP/attest-provenance.ts" > provenance-predicate.json
 

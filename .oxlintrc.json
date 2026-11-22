@@ -5,6 +5,18 @@
   // generator.
   "ignorePatterns": ["src/api/gen/**"],
   "rules": {
+    // A switch over a union names every member, and `default` does not count:
+    // a member added later is then a lint error at each place that has to
+    // decide what it means, instead of falling into whatever came last.
+    "typescript/switch-exhaustiveness-check": "error",
+    // --type-aware turns these on with it. Each still reports in the tree
+    // (60 findings between them) and is switched on once its findings are
+    // read, rather than waved through or fixed blind here.
+    "typescript/await-thenable": "off",
+    "typescript/no-floating-promises": "off",
+    "typescript/no-base-to-string": "off",
+    "typescript/no-misused-spread": "off",
+    "typescript/restrict-template-expressions": "off",
     // Strings, templates and regexes are checked too: twice a raw U+FEFF
     // reached the tree inside one (kaneo-cli#289's comments).
     "no-irregular-whitespace": [

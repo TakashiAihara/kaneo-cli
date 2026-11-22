@@ -2526,7 +2526,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         }
         // The fake keeps no labels, so every label id is one the server would not
         // find.
-        default:
+        case "addLabel":
+        case "removeLabel":
           return fail(404, "Label not found");
       }
       return ok(M.BulkTaskResult, { success: true, updatedCount: found.length });

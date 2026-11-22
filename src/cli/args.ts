@@ -258,9 +258,17 @@ const parseFlags = (flags: Flag[], args: string[]): ParsedFlags => {
   const set = (flag: Flag, raw: string): void => {
     const name = flag.shorthand ? `-${flag.shorthand}, --${flag.name}` : `--${flag.name}`;
     try {
-      if (flag.type === "bool") values[flag.name] = parseBool(raw);
-      else if (flag.type === "string") values[flag.name] = raw;
-      else values[flag.name] = parseDuration(raw);
+      switch (flag.type) {
+        case "bool":
+          values[flag.name] = parseBool(raw);
+          break;
+        case "string":
+          values[flag.name] = raw;
+          break;
+        case "duration":
+          values[flag.name] = parseDuration(raw);
+          break;
+      }
     } catch (e) {
       throw new Error(`invalid argument ${quote(raw)} for ${quote(name)} flag: ${(e as Error).message}`);
     }
@@ -539,7 +547,7 @@ const isZero = (flag: Flag): boolean => {
       } catch {
         return false;
       }
-    default:
+    case "string":
       return flag.defaultValue === "";
   }
 };

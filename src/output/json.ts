@@ -40,14 +40,9 @@ const number = (value: number): string => (Object.is(value, -0) ? "-0" : String(
 
 const encode = (value: Json, depth = 0): string => {
   if (value === null) return "null";
-  switch (typeof value) {
-    case "boolean":
-      return value ? "true" : "false";
-    case "number":
-      return number(value);
-    case "string":
-      return string(value);
-  }
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return number(value);
+  if (typeof value === "string") return string(value);
   const pad = INDENT.repeat(depth + 1);
   const close = INDENT.repeat(depth);
   if (Array.isArray(value)) {
@@ -67,14 +62,9 @@ export const line = (value: Json): string => `${encode(value)}\n`;
 // way: the indentation above is for a person, and this is for the next read.
 export const compact = (value: Json): string => {
   if (value === null) return "null";
-  switch (typeof value) {
-    case "boolean":
-      return value ? "true" : "false";
-    case "number":
-      return number(value);
-    case "string":
-      return string(value);
-  }
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return number(value);
+  if (typeof value === "string") return string(value);
   if (Array.isArray(value)) return `[${value.map(compact).join(",")}]`;
   const members = Object.entries(value).filter((entry): entry is [string, Json] => entry[1] !== undefined);
   return `{${members.map(([key, item]) => `${string(key)}:${compact(item)}`).join(",")}}`;

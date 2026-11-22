@@ -363,6 +363,56 @@ describe("redirects", () => {
     expect(reached).toBe(0);
   });
 
+  // A password in the URL being dialled is the *** Go's url.Error prints, not
+  // the cleartext the header carried.
+  test("a password in the dialled URL prints as ***", async () => {
+    configureClient({ baseUrl: "http://user:secret@127.0.0.1:9", apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/project", { method: "GET" }))) as Error;
+    expect(e.message).toBe(
+      'GET /api/project: Get "http://user:***@127.0.0.1:9/api/project": dial tcp 127.0.0.1:9: connect: connection refused',
+    );
+  });
+
+  // The same dial failure on a credential-in-URL route names scheme and host
+  // only: the path is the credential, so it is not printed even here.
+  test("a credential-in-URL route's dial failure keeps scheme and host only", async () => {
+    configureClient({ baseUrl: "http://127.0.0.1:9", apiKey: "test-key" });
+    const e = (await failure(
+      kaneoFetch<string>("/calendar-feed/t/calendar.ics", {
+        method: "GET",
+        anonymous: true,
+        text: true,
+        credentialInUrl: true,
+      }),
+    )) as Error;
+    expect(e.message).toBe(
+      'GET /api/calendar-feed/t/calendar.ics: Get "http://127.0.0.1:9": dial tcp 127.0.0.1:9: connect: connection refused',
+    );
+  });
+
+  // The body-replay refusal names the redirect target the same way: a set
+  // password prints as *** rather than the cleartext the Location carried.
+  test("a password in a refused redirect target prints as ***", async () => {
+    const origin = serve(
+      () =>
+        new Response(null, {
+          status: 307,
+          headers: { location: "http://user:secret@127.0.0.1:9/api/elsewhere" },
+        }),
+    );
+    configureClient({ baseUrl: origin, apiKey: "test-key" });
+    const e = (await failure(
+      kaneoFetch("/gitlab-integration/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: "gitlab-token" }),
+      }),
+    )) as KaneoApiError;
+    expect(e.message).toBe(
+      "POST /api/gitlab-integration/verify: 307: refusing to follow the redirect to http://user:***@127.0.0.1:9/api/elsewhere: the request body may carry a credential",
+    );
+  });
+
   // The same hop on the origin the request was sent to is followed with the
   // body intact: the credential stays with the server it was meant for.
   test("follow a 307 on the same origin with the body", async () => {

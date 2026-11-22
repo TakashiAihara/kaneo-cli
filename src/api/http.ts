@@ -277,7 +277,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
         // still carry the key, and fetch decides that on its own.
         response = await fetch(target, { method, headers, body, signal, redirect: "manual" });
       } catch (e) {
-        throw new Error(`${called} ${served}: ${urlError(called, target, e)}`, { cause: e });
+        throw new Error(`${called} ${served}: ${urlError(called, target, e, credentialInUrl === true)}`, { cause: e });
       }
       const red = redirectTarget(response, target);
       if (red === undefined) break;
@@ -323,7 +323,7 @@ export const kaneoFetch = async <T>(url: string, init: KaneoInit<T>): Promise<T>
       // redacted the way the key can.
       if (body !== null && red.to.origin !== start.target.origin) {
         throw new KaneoApiError(called, served, response.status, [
-          `refusing to follow the redirect to ${red.to.href}: the request body may carry a credential`,
+          `refusing to follow the redirect to ${shownHref(red.to, credentialInUrl === true)}: the request body may carry a credential`,
         ]);
       }
       target = red.to;
@@ -538,9 +538,9 @@ const servedPath = (target: URL): string => {
 // Bun's own wording names none of that ("Unable to connect. Is the computer able
 // to access the url?"), which leaves nothing to act on and nothing to search
 // for, so both the shape and the reasons are rebuilt here from the error code.
-const urlError = (method: string, target: URL, e: unknown): string => {
+const urlError = (method: string, target: URL, e: unknown, credentialInUrl: boolean): string => {
   const code = (e as { code?: unknown } | null)?.code;
-  return `${goOp(method)} ${JSON.stringify(target.href)}: ${dialReason(target, code, e)}`;
+  return `${goOp(method)} ${JSON.stringify(shownHref(target, credentialInUrl))}: ${dialReason(target, code, e)}`;
 };
 
 // A method as url.Error names it. Go's client takes it from the first request of

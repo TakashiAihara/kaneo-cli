@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { appendFileSync, closeSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
+import { devinSessionId } from "./devin";
 import type { Marker, State } from "./marker";
 import { compact, type Json } from "../output/json";
 
@@ -50,13 +51,23 @@ const defaultStore = (home: string, env: (name: string) => string): Store => {
 export const sessionStore = (): Store =>
   defaultStore(process.env.HOME ?? ".", (name) => process.env[name] ?? "");
 
+// The variables that name the session, most explicit first. KANEO_SESSION_ID
+// comes first so the CLI is usable outside any particular agent; the
+// agent-specific ones are the fallbacks, in the order the agents are likely to
+// be met.
+const SESSION_ID_ENV = ["KANEO_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "COPILOT_AGENT_SESSION_ID", "DEVIN_SESSION_ID"];
+
 // Reports the session this process belongs to.
 //
-// KANEO_SESSION_ID comes first so the CLI is usable outside Claude Code; the
-// agent-specific variable is the fallback.
+// Every variable empty means either no agent or a Devin CLI session, which
+// exports none of them: its id is then resolved from the session lock an
+// ancestor of this process holds (see devin.ts).
 export const currentId = (env: (name: string) => string): string => {
-  const id = env("KANEO_SESSION_ID").trim();
-  return id === "" ? env("CLAUDE_CODE_SESSION_ID").trim() : id;
+  for (const name of SESSION_ID_ENV) {
+    const id = env(name).trim();
+    if (id !== "") return id;
+  }
+  return devinSessionId(env);
 };
 
 // Rejects anything that could escape the store.

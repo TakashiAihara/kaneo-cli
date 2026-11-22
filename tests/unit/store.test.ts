@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { appendHistory, clear, load, readHistory, save, type Attachment, type Store } from "../../src/session/store";
+import { appendHistory, clear, currentId, load, readHistory, save, type Attachment, type Store } from "../../src/session/store";
 
 // Ported from the Go build's internal/session/store_test.go.
 
@@ -251,4 +251,149 @@ describe("store", () => {
     expect(entries.length).toBe(1);
     expect(readHistory(store, "never-attached")).toEqual({ entries: [], skipped: 0 });
   });
+});
+
+describe("currentId", () => {
+  const envOf = (vars: Record<string, string>) => (name: string) => vars[name] ?? "";
+
+  // The variables are tried most explicit first; a blank one does not stop the
+  // chain, so an empty KANEO_SESSION_ID does not hide the agent's own.
+  test("session id variables resolve in order", () => {
+    const all = { KANEO_SESSION_ID: "k", CLAUDE_CODE_SESSION_ID: "c", COPILOT_AGENT_SESSION_ID: "p", DEVIN_SESSION_ID: "d" };
+    expect(currentId(envOf(all))).toBe("k");
+    expect(currentId(envOf({ ...all, KANEO_SESSION_ID: "  " }))).toBe("c");
+    expect(currentId(envOf({ CLAUDE_CODE_SESSION_ID: "c", COPILOT_AGENT_SESSION_ID: "p", DEVIN_SESSION_ID: "d" }))).toBe("c");
+    expect(currentId(envOf({ COPILOT_AGENT_SESSION_ID: "p", DEVIN_SESSION_ID: "d" }))).toBe("p");
+    expect(currentId(envOf({ DEVIN_SESSION_ID: "d" }))).toBe("d");
+  });
+
+  // With every variable empty the Devin lock lookup runs; a home with no data
+  // directory under it resolves to nothing rather than guessing.
+  test("no variable and no Devin lock resolves to empty", () => {
+    expect(currentId(envOf({ HOME: tmp() }))).toBe("");
+  });
+
+  // Devin CLI exports no session id variable. The session a command runs in is
+  // the one whose lock an ancestor holds, so the lookup is exercised end to
+  // end: flock plays the session's agent process, holding the lock while the
+  // CLI child resolves its id underneath it.
+  const devinChild = `import { currentId } from ${JSON.stringify(join(import.meta.dir, "../../src/session/store"))};` +
+    `console.log(currentId((n) => process.env[n] ?? ""));`;
+  const devinEnv = (dataHome: string, extra: Record<string, string> = {}) => ({
+    PATH: process.env.PATH ?? "",
+    HOME: tmp(),
+    XDG_DATA_HOME: dataHome,
+    NO_COLOR: "1",
+    ...extra,
+  });
+  const devinLocks = (dataHome: string): string => {
+    const dir = join(dataHome, "devin", "cli", "session_locks");
+    mkdirSync(dir, { recursive: true });
+    return dir;
+  };
+
+  // Holding a lock takes flock(1), and the lookup seeing it takes /proc —
+  // both Linux's. Everywhere else the held-lock tests are skipped; the
+  // unheld-lock test needs neither, since "" is the right answer off Linux too.
+  test.skipIf(process.platform !== "linux")("a Devin session resolves from the lock an ancestor holds", async () => {
+    const dataHome = join(tmp(), "data");
+    const lock = join(devinLocks(dataHome), "flint-otter.lock");
+    writeFileSync(lock, "");
+
+    const held = Bun.spawn(["flock", lock, process.execPath, "-e", devinChild], {
+      env: devinEnv(dataHome),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [out, err, code] = await Promise.all([
+      new Response(held.stdout).text(),
+      new Response(held.stderr).text(),
+      held.exited,
+    ]);
+    expect(err).toBe("");
+    expect(code).toBe(0);
+    expect(out.trim()).toBe("flint-otter");
+  }, 30_000);
+
+  // A lock file outlives its session, so the file being there is not enough:
+  // nothing held means nothing resolved.
+  test("an unheld Devin lock resolves to empty", async () => {
+    const dataHome = join(tmp(), "data");
+    writeFileSync(join(devinLocks(dataHome), "flint-otter.lock"), "");
+
+    const free = Bun.spawn([process.execPath, "-e", devinChild], {
+      env: devinEnv(dataHome),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [out, err, code] = await Promise.all([
+      new Response(free.stdout).text(),
+      new Response(free.stderr).text(),
+      free.exited,
+    ]);
+    expect(err).toBe("");
+    expect(code).toBe(0);
+    expect(out.trim()).toBe("");
+  }, 30_000);
+
+  // The lock being held is not enough either: it has to be an ancestor of
+  // this process holding it. A lock held by an unrelated process — here a
+  // flock sibling of the resolver, not a parent — resolves to nothing.
+  test.skipIf(process.platform !== "linux")("a Devin lock held by a non-ancestor resolves to empty", async () => {
+    const dataHome = join(tmp(), "data");
+    const lock = join(devinLocks(dataHome), "flint-otter.lock");
+    writeFileSync(lock, "");
+
+    // flock takes the lock before it runs the command, so the pid file
+    // existing means the lock is held. The holder is a child of this test
+    // process, a sibling rather than an ancestor of the resolver below.
+    const pidFile = join(tmp(), "holder.pid");
+    sleepers.push(pidFile);
+    const holder = Bun.spawn(["flock", lock, "sh", "-c", `echo $$ > "${pidFile}"; exec sleep 29.4`], {
+      stdout: "ignore",
+      stderr: "pipe",
+    });
+    const deadline = Date.now() + 10_000;
+    while (!existsSync(pidFile) && Date.now() < deadline) await Bun.sleep(20);
+    expect(existsSync(pidFile), "the lock holder never ran").toBe(true);
+
+    const free = Bun.spawn([process.execPath, "-e", devinChild], {
+      env: devinEnv(dataHome),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [out, err, code] = await Promise.all([
+      new Response(free.stdout).text(),
+      new Response(free.stderr).text(),
+      free.exited,
+    ]);
+    expect(err).toBe("");
+    expect(code).toBe(0);
+    expect(out.trim()).toBe("");
+
+    killRecorded(pidFile);
+    await holder.exited;
+  }, 30_000);
+
+  // An explicit variable still wins over the lock: KANEO_SESSION_ID is how the
+  // CLI is pinned to a session by hand.
+  test.skipIf(process.platform !== "linux")("a session variable wins over the Devin lock", async () => {
+    const dataHome = join(tmp(), "data");
+    const lock = join(devinLocks(dataHome), "flint-otter.lock");
+    writeFileSync(lock, "");
+
+    const held = Bun.spawn(["flock", lock, process.execPath, "-e", devinChild], {
+      env: devinEnv(dataHome, { KANEO_SESSION_ID: "explicit" }),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [out, err, code] = await Promise.all([
+      new Response(held.stdout).text(),
+      new Response(held.stderr).text(),
+      held.exited,
+    ]);
+    expect(err).toBe("");
+    expect(code).toBe(0);
+    expect(out.trim()).toBe("explicit");
+  }, 30_000);
 });

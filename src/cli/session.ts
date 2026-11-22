@@ -23,7 +23,9 @@ export const sessionCommand = {
     "Tie the current agent session to a task.\n\n" +
     "Tasks have no custom fields, so the association is written as a marker in a\n" +
     "task comment. The session is identified by KANEO_SESSION_ID, falling back to\n" +
-    "CLAUDE_CODE_SESSION_ID.",
+    "CLAUDE_CODE_SESSION_ID, COPILOT_AGENT_SESSION_ID, DEVIN_SESSION_ID, and the\n" +
+    "Devin CLI session this process runs under, detected on Linux only through\n" +
+    "the session lock an ancestor process holds.",
   children: [
     {
       name: "attach",

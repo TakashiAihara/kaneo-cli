@@ -126,8 +126,11 @@ export const sessionCommand = {
         },
         strictFlag,
       ],
-      run: failOpen(async ({ flags, app }: RunContext<App>) => {
+      run: failOpen(async ({ flags, changed, app }: RunContext<App>) => {
         const releasing = String(flags.session ?? "").trim();
+        // An explicitly passed --session that is empty must not fall through
+        // to a plain close, which would let go of this session's hold instead.
+        if (changed.has("session") && releasing === "") throw hard("--session needs a session id");
         if (releasing !== "") {
           await releaseHold(app, releasing, String(flags.task ?? "").trim());
           return;

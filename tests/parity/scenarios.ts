@@ -2307,6 +2307,18 @@ export const SCENARIOS: Scenario[] = [
       ["session", "close", "--session", "sess-gone", "--strict"],
     ],
   },
+  // An explicitly passed --session that is empty is refused: falling through
+  // to a plain close would let go of this session's hold instead.
+  {
+    name: "session close --session empty refuses rather than closing this session",
+    env: { KANEO_SESSION_ID: "sess-here" },
+    steps: [
+      ["session", "attach", "1", "--strict"],
+      ["session", "close", "--session", "", "--task", "1"],
+      ["session", "close", "--session", "", "--task", "1", "--strict"],
+      ["session", "status", "--json"],
+    ],
+  },
   // This session's own hold is a plain close's job; releasing it by name here
   // would post a second marker for a hold about to be let go anyway.
   {

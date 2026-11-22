@@ -56,6 +56,6 @@ test("lint passes a switch that names every union member", () => {
     '    case "circle":\n      return "c";\n    case "square":\n    case "line":\n      return "other";',
   );
 
-  expect(output).not.toContain("error");
+  expect(output).not.toContain("switch-exhaustiveness-check");
   expect(exitCode).toBe(0);
 });

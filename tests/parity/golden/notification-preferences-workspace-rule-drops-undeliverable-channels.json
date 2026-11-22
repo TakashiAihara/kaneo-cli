@@ -1,0 +1,251 @@
+{
+  "steps": [
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--gotify",
+        "--gotify-server",
+        "https://gotify.example",
+        "--gotify-token",
+        "fixture",
+        "--ntfy",
+        "--ntfy-server",
+        "https://ntfy.example",
+        "--ntfy-topic",
+        "kaneo",
+        "--webhook",
+        "--webhook-url",
+        "https://example.com/hook",
+        "--email",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "email               on   self@example.com\nntfy                on   https://ntfy.example  kaneo\ngotify              on   https://gotify.example  ••••\nwebhook             on   https://example.com/hook\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   1440m before\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "ws",
+        "set",
+        "ws-other",
+        "--active=false",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace ws-other  Other  inactive  channels: email,ntfy,gotify,webhook  projects: all\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy=false",
+        "--webhook=false",
+        "--gotify=false",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "email               on   self@example.com\nntfy                off  https://ntfy.example  kaneo\ngotify              off  https://gotify.example  ••••\nwebhook             off  https://example.com/hook\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   1440m before\nworkspace ws-other  Other  inactive  channels: email,ntfy,gotify,webhook  projects: all\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "ws",
+        "set",
+        "ws-other",
+        "--active",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace ws-other  Other  active  channels: email  projects: all\n",
+      "stderr": "dropped ntfy, gotify, webhook from the rule: cannot deliver globally\n"
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--email=false",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "email               off  self@example.com\nntfy                off  https://ntfy.example  kaneo\ngotify              off  https://gotify.example  ••••\nwebhook             off  https://example.com/hook\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   1440m before\nworkspace ws-other  Other  active  channels: none  projects: all\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "ws",
+        "set",
+        "ws-other",
+        "--projects",
+        "",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace ws-other  Other  active  channels: none  projects: all\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy",
+        "--ntfy-server",
+        "https://ntfy.example",
+        "--ntfy-topic",
+        "kaneo",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "email               off  self@example.com\nntfy                on   https://ntfy.example  kaneo\ngotify              off  https://gotify.example  ••••\nwebhook             off  https://example.com/hook\ntask-assignment     on\ntask-comment        on\ntask-status-change  on\ndue-date-reminder   on   1440m before\nworkspace ws-other  Other  active  channels: none  projects: all\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "notification",
+        "prefs",
+        "ws",
+        "set",
+        "ws-other",
+        "--ntfy",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "workspace ws-other  Other  active  channels: ntfy  projects: all\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "emailEnabled": true,
+        "ntfyEnabled": true,
+        "gotifyEnabled": true,
+        "webhookEnabled": true,
+        "ntfyServerUrl": "https://ntfy.example",
+        "ntfyTopic": "kaneo",
+        "gotifyServerUrl": "https://gotify.example",
+        "gotifyToken": "fixture",
+        "webhookUrl": "https://example.com/hook"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notification-preferences",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences/workspaces/ws-other",
+      "query": "",
+      "body": {
+        "isActive": false,
+        "emailEnabled": true,
+        "ntfyEnabled": true,
+        "gotifyEnabled": true,
+        "webhookEnabled": true,
+        "projectMode": "all",
+        "selectedProjectIds": []
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "ntfyEnabled": false,
+        "gotifyEnabled": false,
+        "webhookEnabled": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notification-preferences",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences/workspaces/ws-other",
+      "query": "",
+      "body": {
+        "isActive": true,
+        "emailEnabled": true,
+        "ntfyEnabled": false,
+        "gotifyEnabled": false,
+        "webhookEnabled": false,
+        "projectMode": "all",
+        "selectedProjectIds": []
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "emailEnabled": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notification-preferences",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences/workspaces/ws-other",
+      "query": "",
+      "body": {
+        "isActive": true,
+        "emailEnabled": false,
+        "ntfyEnabled": false,
+        "gotifyEnabled": false,
+        "webhookEnabled": false,
+        "projectMode": "all",
+        "selectedProjectIds": []
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences",
+      "query": "",
+      "body": {
+        "ntfyEnabled": true,
+        "ntfyServerUrl": "https://ntfy.example",
+        "ntfyTopic": "kaneo"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notification-preferences",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/notification-preferences/workspaces/ws-other",
+      "query": "",
+      "body": {
+        "isActive": true,
+        "emailEnabled": false,
+        "ntfyEnabled": true,
+        "gotifyEnabled": false,
+        "webhookEnabled": false,
+        "projectMode": "all",
+        "selectedProjectIds": []
+      }
+    }
+  ],
+  "files": {}
+}

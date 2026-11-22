@@ -1,0 +1,29 @@
+{
+  "steps": [
+    {
+      "args": [
+        "comment",
+        "edit",
+        "1",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"requires at least 2 arg(s), only received 1\"\n}\n",
+      "stderr": "Error: requires at least 2 arg(s), only received 1\n"
+    },
+    {
+      "args": [
+        "comment",
+        "edit",
+        "1",
+        "cmt0001",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"empty comment\"\n}\n",
+      "stderr": "Error: empty comment\n"
+    }
+  ],
+  "requests": [],
+  "files": {}
+}

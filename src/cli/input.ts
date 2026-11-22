@@ -29,10 +29,11 @@
 export const sourceName = (source: string): string => (source === "-" ? "stdin" : source === "" ? '""' : source);
 
 // fatal turns a byte that is not UTF-8 into an error instead of a U+FFFD that
-// hides which byte it was. ignoreBOM leaves a BOM as the character it decodes
-// to, so the one at the front can be recognised as a signature and taken off
-// rather than the decoder taking it off for good.
-const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+// hides which byte it was. UTF8's default BOM handling takes the one an editor
+// writes off the front, which is the signature prose drops; UTF8_KEPT leaves
+// it as the character it decodes to, for a credential stored byte for byte.
+const UTF8 = new TextDecoder("utf-8", { fatal: true });
+const UTF8_KEPT = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 const readText = async (source: string, keepBOM: boolean): Promise<string> => {
   const named = sourceName(source);
@@ -42,13 +43,11 @@ const readText = async (source: string, keepBOM: boolean): Promise<string> => {
   } catch (e) {
     throw new Error(`reading ${named}: ${e instanceof Error ? e.message : String(e)}`);
   }
-  let text: string;
   try {
-    text = UTF8.decode(bytes);
+    return (keepBOM ? UTF8_KEPT : UTF8).decode(bytes);
   } catch {
     throw new Error(`reading ${named}: not valid UTF-8`);
   }
-  return keepBOM || !text.startsWith("\uFEFF") ? text : text.slice(1);
 };
 
 // Prose — a description, a comment, a notification body — gets the editor's

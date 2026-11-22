@@ -78,7 +78,7 @@
       ],
       "exit": 0,
       "stdout": "workspace ws-other  Other  active  channels: none  projects: all\n",
-      "stderr": ""
+      "stderr": "dropped email from the rule: cannot deliver globally\n"
     },
     {
       "args": [

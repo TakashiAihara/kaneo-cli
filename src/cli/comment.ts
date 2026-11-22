@@ -178,9 +178,35 @@ export const commentCommand = {
       aliases: ["edit"],
       use: "update <task> <comment-id> <text...>",
       short: "Replace the text of a comment on a task",
-      args: minimumArgs(3),
-      flags: [allowArchivedFlag],
-      run: async ({ args, flags, app }: RunContext<App>) => {
+      // The new text can arrive on stdin or in a file, as `comment add` takes
+      // it, so the task and the comment id are all this requires.
+      args: minimumArgs(2),
+      flags: [
+        {
+          name: "file",
+          shorthand: "F",
+          type: "string" as const,
+          usage: "read the comment from a file; - reads stdin",
+          defaultValue: "",
+        },
+        allowArchivedFlag,
+      ],
+      run: async ({ args, flags, changed, app }: RunContext<App>) => {
+        const words = args.slice(2);
+        const fromFile = changed.has("file");
+        // A comment is written once: two sources would leave a reader unable to
+        // tell which of them is the comment.
+        if (fromFile && words.length > 0) {
+          throw new Error("pass the comment as arguments or with --file, not both");
+        }
+        const content = fromFile
+          ? await readInput(String(flags.file ?? ""))
+          : words.length === 1 && words[0] === "-"
+            ? await readInput("-")
+            : words.join(" ");
+        // Judged before the task is looked up, as `comment add` judges it: an
+        // empty rewrite is refused without a request.
+        if (content.trim() === "") throw new Error("empty comment");
         apiKey(app);
         const task = await resolveTask(app, args[0]!, undefined, writeAccess(flags));
         // The server edits by comment id alone. Checking the comment is on the
@@ -189,7 +215,7 @@ export const commentCommand = {
         if (found === undefined) {
           throw new Error(noComment(args[1]!, task));
         }
-        const comment = await editComment(found, args.slice(2).join(" "));
+        const comment = await editComment(found, content);
         app.out.human(`edited comment ${comment.id} on #${task.number}`);
         app.out.data(comment);
       },

@@ -148,11 +148,23 @@ export const activeProfile = (config: GlobalConfig): { name: string; profile: Pr
   return undefined;
 };
 
+// GitHub treats owner and repository names as case-insensitive, so a map is
+// matched folded: `acme/thing` answers `Acme/Thing` whichever side carries the
+// capitals. Keys that fold alike keep the file's order, the first one written
+// winning, so a config holding both spellings still answers one value.
+const folded = <T>(map: Record<string, T> | undefined, key: string): T | undefined => {
+  const wanted = key.toLowerCase();
+  for (const [name, value] of Object.entries(map ?? {})) {
+    if (name.toLowerCase() === wanted) return value;
+  }
+  return undefined;
+};
+
 export const workspaceForOwner = (config: GlobalConfig, repo: string): string => {
   const slash = repo.indexOf("/");
   if (slash <= 0) return "";
-  return config.owners?.[repo.slice(0, slash)] ?? "";
+  return folded(config.owners, repo.slice(0, slash)) ?? "";
 };
 
 export const projectsForRepo = (config: GlobalConfig, repo: string): string[] =>
-  repo === "" ? [] : projectIds(config.repos?.[repo]);
+  repo === "" ? [] : projectIds(folded(config.repos, repo));

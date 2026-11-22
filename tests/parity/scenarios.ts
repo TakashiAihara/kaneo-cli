@@ -1662,10 +1662,12 @@ export const SCENARIOS: Scenario[] = [
   },
   { name: "task update missing file", steps: [["task", "update", "1", "--description-file", "nope.md", "--json"]] },
   { name: "task update to archived", steps: [["task", "update", "1", "--status", "archived", "--json"]] },
+  { name: "task update to planned", steps: [["task", "update", "1", "--status", "planned", "--json"]] },
   {
+    // The fields after the failed one are named as never sent.
     name: "task update reports what landed",
     failOn: "^PUT /task/title/",
-    steps: [["task", "update", "1", "--status", "done", "--title", "x", "--json"]],
+    steps: [["task", "update", "1", "--status", "done", "--title", "x", "-d", "body", "--priority", "low", "--json"]],
   },
   {
     name: "task update read-back mismatch",
@@ -3324,6 +3326,42 @@ export const SCENARIOS: Scenario[] = [
   { name: "comment add empty stdin", stdin: "", steps: [["comment", "add", "1", "-", "--json"]] },
   { name: "comment add nothing", steps: [["comment", "add", "1", "--json"]] },
   { name: "comment add blank", steps: [["comment", "add", "1", "   ", "--json"]] },
+  {
+    name: "comment edit from a file",
+    files: { "c.md": "rewritten from a file\n" },
+    steps: [
+      ["comment", "edit", "1", "cmt0001", "--file", "c.md", "--json"],
+      ["comment", "edit", "1", "cmt0001", "-F", "c.md", "--human"],
+      ["comment", "ls", "1", "--human"],
+    ],
+  },
+  {
+    name: "comment edit from stdin",
+    stdin: "rewritten from stdin\n",
+    steps: [["comment", "edit", "1", "cmt0001", "-", "--json"]],
+  },
+  {
+    name: "comment edit --file - reads stdin",
+    stdin: "rewritten via the flag\n",
+    steps: [["comment", "edit", "1", "cmt0001", "--file", "-", "--json"]],
+  },
+  {
+    name: "comment edit with text and a file",
+    files: { "c.md": "x" },
+    steps: [["comment", "edit", "1", "cmt0001", "hi", "--file", "c.md", "--json"]],
+  },
+  {
+    name: "comment edit nothing",
+    steps: [
+      ["comment", "edit", "1", "--json"],
+      ["comment", "edit", "1", "cmt0001", "--json"],
+    ],
+  },
+  {
+    name: "comment edit empty file",
+    files: { "e.md": "" },
+    steps: [["comment", "edit", "1", "cmt0001", "--file", "e.md", "--json"]],
+  },
 
   ...both("notification list", ["notification", "list"]),
   {
@@ -3525,6 +3563,59 @@ export const SCENARIOS: Scenario[] = [
       ["notification", "prefs", "ws", "set", WS, "--email=false", "--human"],
       ["notification", "prefs", "set", "--email", "--human"],
       ["notification", "prefs", "set", "--gotify-token", "", "--json"],
+    ],
+  },
+  {
+    // Every channel's masking is pinned, not only email's: an inactive rule
+    // keeps the channels it had when they go off globally, and setting the
+    // rule again drops the ones that cannot deliver and says so on stderr.
+    name: "notification preferences workspace rule drops undeliverable channels",
+    steps: [
+      // Every channel on globally, each with what it needs configured.
+      [
+        "notification",
+        "prefs",
+        "set",
+        "--gotify",
+        "--gotify-server",
+        "https://gotify.example",
+        "--gotify-token",
+        "fixture",
+        "--ntfy",
+        "--ntfy-server",
+        "https://ntfy.example",
+        "--ntfy-topic",
+        "kaneo",
+        "--webhook",
+        WEBHOOK_URL_FLAG,
+        "https://example.com/hook",
+        "--email",
+        "--human",
+      ],
+      // An inactive rule holding all four.
+      ["notification", "prefs", "ws", "set", "ws-other", "--active=false", "--human"],
+      // The three go off globally; the inactive rule keeps them, email delivers.
+      ["notification", "prefs", "set", "--ntfy=false", "--webhook=false", "--gotify=false", "--human"],
+      // Reactivating drops what cannot deliver and says so; email stays.
+      ["notification", "prefs", "ws", "set", "ws-other", "--active", "--human"],
+      // The server's own carry-over already emptied the active rule, so
+      // setting it again drops nothing and says nothing.
+      ["notification", "prefs", "set", "--email=false", "--human"],
+      ["notification", "prefs", "ws", "set", "ws-other", "--projects", "", "--human"],
+      // ntfy back on globally does not reach a rule with no channel on; the
+      // rule can take it once it is set again.
+      [
+        "notification",
+        "prefs",
+        "set",
+        "--ntfy",
+        "--ntfy-server",
+        "https://ntfy.example",
+        "--ntfy-topic",
+        "kaneo",
+        "--human",
+      ],
+      ["notification", "prefs", "ws", "set", "ws-other", "--ntfy", "--human"],
     ],
   },
   {
@@ -4445,6 +4536,20 @@ export const SCENARIOS: Scenario[] = [
     steps: [
       ["context", "--json"],
       ["board", "--json"],
+    ],
+  },
+  {
+    // GitHub owner and repository names ignore case, so the maps fold case on
+    // lookup: a remote or a --repo written in another case still resolves.
+    name: "repo and owner maps fold case",
+    env: { KANEO_WORKSPACE: "", KANEO_PROJECT: "" },
+    repo: "Acme/Widget",
+    config: { repos: { "acme/widget": [P1, P2] }, owners: { ACME: WS } },
+    steps: [
+      ["context", "--json"],
+      ["context", "--repo", "acme/WIDGET", "--json"],
+      ["context", "--repo", "ACME/widget", "--json"],
+      ["context", "--repo", "acme/other", "--json"],
     ],
   },
   {

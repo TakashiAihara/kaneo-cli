@@ -9,11 +9,15 @@
         "done",
         "--title",
         "x",
+        "-d",
+        "body",
+        "--priority",
+        "low",
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"status was updated; title failed: PUT /api/task/title/task-a1: 500: injected failure\"\n}\n",
-      "stderr": "Error: status was updated; title failed: PUT /api/task/title/task-a1: 500: injected failure\n"
+      "stdout": "{\n  \"error\": \"status was updated; title failed: PUT /api/task/title/task-a1: 500: injected failure; description and priority not sent\"\n}\n",
+      "stderr": "Error: status was updated; title failed: PUT /api/task/title/task-a1: 500: injected failure; description and priority not sent\n"
     }
   ],
   "requests": [

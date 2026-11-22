@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // Rebases the current branch onto origin/main and rebuilds what a merge
@@ -15,10 +15,10 @@ import { join } from "node:path";
 // and is merged forward instead, so it does not need a force push it was
 // avoiding. Conflicts in the generated paths are taken from main's side and
 // rebuilt; any other conflict stops the run with the list, and re-running the
-// command resumes wherever it stopped. Before rewriting, the remote tip the
-// fetch saw must already be in local history, and the push leases on that
-// exact tip with --force-if-includes, so a coworker's push to the same branch
-// is refused rather than overwritten.
+// command resumes wherever it stopped. Before rewriting — on a fresh run and
+// again when one resumes — the remote tip the fetch saw must already be in
+// the branch's local history, and the push leases on that exact tip, so a
+// coworker's push to the same branch is refused rather than overwritten.
 //
 // Exit codes: 0 done, 1 error, 3 conflicts left for a human.
 
@@ -136,6 +136,54 @@ const resolveAndContinue = (mode: "rebase" | "merge"): void => {
   }
 };
 
+// True when the remote tip's commits are part of this branch's local story:
+// reachable from HEAD, or from any tip the branch's reflog still remembers.
+// The reflog arm is what a retry after this script's own rewrite needs — the
+// verified tip stopped being an ancestor of HEAD when history was rewritten,
+// but it was an ancestor of the pre-rewrite tip the reflog records. A
+// coworker's push is never in the reflog, so it still fails both arms. This
+// is the same reachability --force-if-includes checks at push time.
+const tipIntegrated = (tip: string, branch: string): boolean => {
+  const isAncestor = (rev: string) => capture(["git", "merge-base", "--is-ancestor", tip, rev]).code === 0;
+  if (isAncestor("HEAD")) return true;
+  const reflog = capture(["git", "reflog", "show", `refs/heads/${branch}`, "--format=%H"]);
+  return reflog.code === 0 && reflog.stdout.split("\n").some((rev) => rev !== "" && isAncestor(rev));
+};
+
+// The tip origin/<branch> had at the last fetch, once verified integrated;
+// "" when the remote has no such branch. Refuses before rewriting when the
+// tip has commits this branch's history never held — the push leases on this
+// same value, so proceeding would drop them.
+const verifiedRemoteTip = (branch: string): string => {
+  const tracking = capture(["git", "rev-parse", "--verify", `refs/remotes/origin/${branch}`]);
+  if (tracking.code !== 0) return "";
+  const tip = tracking.stdout.trim();
+  if (!tipIntegrated(tip, branch)) {
+    fail(`origin/${branch} has commits this branch does not (${tip}); merge or rebase them in first`);
+  }
+  return tip;
+};
+
+// The branch a stopped operation was rewriting, for the resume-time remote
+// check. A merge in progress keeps HEAD on the branch; a rebase records it in
+// its state dir because HEAD is detached mid-replay. null when neither names
+// one (a detached rebase run by hand), where there is no branch to lease.
+const resumedBranch = (): string | null => {
+  const dir = gitDir();
+  if (existsSync(join(dir, "MERGE_HEAD"))) {
+    const name = gitOut(["rev-parse", "--abbrev-ref", "HEAD"]);
+    return name === "HEAD" ? null : name;
+  }
+  for (const state of ["rebase-merge", "rebase-apply"]) {
+    const headName = join(dir, state, "head-name");
+    if (existsSync(headName)) {
+      const ref = readFileSync(headName, "utf8").trim();
+      return ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : null;
+    }
+  }
+  return null;
+};
+
 const main = () => {
   if (stream(["git", "rev-parse", "--is-inside-work-tree"]) !== 0) {
     fail("not inside a git repository");
@@ -143,14 +191,21 @@ const main = () => {
   gitOut(["remote", "get-url", "origin"]);
 
   let mode: "rebase" | "merge";
-  // The remote tip the push is allowed to replace, fixed at fetch time; null
-  // on a resumed run, where there is no fresh fetch to take it from.
-  let remoteTip: string | null = null;
+  // The remote tip the push is allowed to replace, fixed at fetch time; ""
+  // when the remote has no such branch.
+  let remoteTip = "";
   if (inProgress()) {
     // Resuming: the mode is whichever operation left its state behind.
     const dir = gitDir();
     mode = existsSync(join(dir, "MERGE_HEAD")) ? "merge" : "rebase";
     console.log(`resuming the ${mode} in progress`);
+    // The resume still force-pushes, so it owes the same fetch and remote-tip
+    // check a fresh run does: a coworker push that landed while the operation
+    // sat stopped must not be leased over. A rebase's HEAD is detached
+    // mid-replay, so its state dir names the branch.
+    gitOut(["fetch", "origin"]);
+    const branch = resumedBranch();
+    if (branch !== null) remoteTip = verifiedRemoteTip(branch);
   } else {
     if (gitOut(["status", "--porcelain"]) !== "") {
       fail("the working tree is not clean; commit or stash first");
@@ -164,18 +219,10 @@ const main = () => {
     }
 
     // fetch just moved origin/<branch> to the remote's tip. If that tip has
-    // commits this branch does not, the rewrite below would drop them: the
-    // push's lease compares the remote against the same tracking ref, so it
-    // would pass. Refuse before rewriting; --force-if-includes repeats the
-    // check at push time.
-    remoteTip = "";
-    const tracking = capture(["git", "rev-parse", "--verify", `refs/remotes/origin/${branch}`]);
-    if (tracking.code === 0) {
-      remoteTip = tracking.stdout.trim();
-      if (capture(["git", "merge-base", "--is-ancestor", remoteTip, "HEAD"]).code !== 0) {
-        fail(`origin/${branch} has commits this branch does not (${remoteTip}); merge or rebase them in first`);
-      }
-    }
+    // commits this branch's history never held, the rewrite below would drop
+    // them: the push's lease compares the remote against this same verified
+    // value. Refuse before rewriting.
+    remoteTip = verifiedRemoteTip(branch);
 
     const merges = Number(gitOut(["rev-list", "--merges", "--count", "origin/main..HEAD"]));
     if (merges > 0) {
@@ -235,23 +282,13 @@ const main = () => {
   bun(["run", "typecheck"], "typecheck");
 
   const branch = gitOut(["rev-parse", "--abbrev-ref", "HEAD"]);
-  // remoteTip is the remote tip verified against local history right after
-  // the fetch; on a resumed run there was no fetch, so the tracking ref is
-  // the same value a bare lease would compare. "" expects the remote to have
-  // no such branch. --force-if-includes additionally refuses a tracking tip
-  // that was never integrated locally — a coworker's push fetch moved
-  // origin/<branch> to without this branch containing it.
-  const tracked = capture(["git", "rev-parse", "--verify", `refs/remotes/origin/${branch}`]);
-  const expected = remoteTip ?? (tracked.code === 0 ? tracked.stdout.trim() : "");
+  // remoteTip is the remote tip verified against this branch's history right
+  // after the fetch — a resumed run fetches too, so both paths pin the same
+  // kind of value. "" expects the remote to have no such branch. The lease's
+  // explicit expect makes --force-if-includes a no-op (git-push(1)), and the
+  // integration check it would repeat already ran against this tip.
   must(
-    [
-      "push",
-      `--force-with-lease=refs/heads/${branch}:${expected}`,
-      "--force-if-includes",
-      "-u",
-      "origin",
-      `HEAD:refs/heads/${branch}`,
-    ],
+    ["push", `--force-with-lease=refs/heads/${branch}:${remoteTip}`, "-u", "origin", `HEAD:refs/heads/${branch}`],
     "push",
   );
 

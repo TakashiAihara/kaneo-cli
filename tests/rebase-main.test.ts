@@ -10,8 +10,12 @@ import { dirname, join } from "node:path";
 // expects it. The rebuild steps are stubbed by a minimal package.json so a
 // run stays offline and fast.
 
+// A git hook exports GIT_DIR and friends into the environment the tests run
+// in; inherited, they would point every scratch repo's git calls at another
+// repository, so all GIT_* variables are dropped and only the fixture's own
+// are set.
 const GIT_ENV = {
-  ...process.env,
+  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))),
   GIT_EDITOR: "true",
   GIT_AUTHOR_NAME: "test",
   GIT_AUTHOR_EMAIL: "test@example.com",
@@ -182,6 +186,105 @@ describe("rebase-main", () => {
     expect(must(work, ["show", "HEAD~1:f1.txt"])).toBe("one");
     expect(must(work, ["show", "HEAD:f2.txt"])).toBe("two");
     expect(remoteTip(work, "feat")).toBe(must(work, ["rev-parse", "HEAD"]));
+  });
+
+  test("a retry after a failed verify pushes over the rewritten-away remote tip", () => {
+    const root = scratch("rebase-main-retry-");
+    const { work } = seedRemote(root);
+
+    must(work, ["checkout", "-b", "feat"]);
+    put(work, "feat.txt", "f\n");
+    must(work, ["add", "-A"]);
+    must(work, ["commit", "-m", "feat work"]);
+    must(work, ["push", "-u", "origin", "feat"]);
+
+    // main moves so the rebase replays onto something new.
+    must(work, ["checkout", "main"]);
+    put(work, "src/api/gen/g.txt", "main-one\n");
+    must(work, ["add", "-A"]);
+    must(work, ["commit", "-m", "main one"]);
+    must(work, ["push", "origin", "main"]);
+    must(work, ["fetch", "origin"]);
+
+    // A failing test makes the first run stop after the rewrite but before
+    // the push, leaving the remote at the pre-rewrite tip.
+    must(work, ["checkout", "feat"]);
+    put(
+      work,
+      "smoke.test.ts",
+      'import { expect, test } from "bun:test";\n\ntest("smoke", () => {\n  expect(1).toBe(2);\n});\n',
+    );
+    must(work, ["add", "-A"]);
+    must(work, ["commit", "-m", "failing test"]);
+
+    const first = run(work);
+    expect(first.code).toBe(1);
+    expect(first.err).toContain("bun test failed");
+    expect(remoteTip(work, "feat")).not.toBe(must(work, ["rev-parse", "HEAD"]));
+
+    // The fix is an ordinary commit on the rewritten history; the remote tip
+    // the lease pins is no longer an ancestor of HEAD, only of a tip the
+    // branch's reflog remembers.
+    put(
+      work,
+      "smoke.test.ts",
+      'import { expect, test } from "bun:test";\n\ntest("smoke", () => {\n  expect(1).toBe(1);\n});\n',
+    );
+    must(work, ["add", "-A"]);
+    must(work, ["commit", "-m", "fix the test"]);
+
+    const second = run(work);
+    expect(second.code).toBe(0);
+    expect(second.err).not.toContain("has commits this branch does not");
+    expect(remoteTip(work, "feat")).toBe(must(work, ["rev-parse", "HEAD"]));
+    expect(must(work, ["show", "HEAD:feat.txt"])).toBe("f");
+  });
+
+  test("a resumed rebase refuses a coworker push that landed while stopped", () => {
+    const root = scratch("rebase-main-resume-remote-");
+    const { remote, work: seed } = seedRemote(root);
+
+    must(seed, ["checkout", "-b", "feat"]);
+    put(seed, "src/api/gen/g.txt", "feat-one\n");
+    put(seed, "feat.txt", "f\n");
+    must(seed, ["add", "-A"]);
+    must(seed, ["commit", "-m", "feat work"]);
+    must(seed, ["push", "-u", "origin", "feat"]);
+
+    must(seed, ["checkout", "main"]);
+    put(seed, "src/api/gen/g.txt", "main-one\n");
+    must(seed, ["add", "-A"]);
+    must(seed, ["commit", "-m", "main one"]);
+    must(seed, ["push", "origin", "main"]);
+    must(seed, ["fetch", "origin"]);
+
+    // The rebase stops on the generated-path conflict and is left for the
+    // script to resume, the way an interrupted run leaves it.
+    must(seed, ["checkout", "feat"]);
+    const reb = git(seed, ["rebase", "origin/main"]);
+    expect(reb.code).not.toBe(0);
+
+    // A coworker pushes to feat while the rebase sits stopped.
+    const coworker = join(root, "coworker");
+    must(root, ["clone", remote, coworker]);
+    must(coworker, ["checkout", "feat"]);
+    put(coworker, "cowork.txt", "b\n");
+    must(coworker, ["add", "-A"]);
+    must(coworker, ["commit", "-m", "coworker work"]);
+    must(coworker, ["push", "origin", "feat"]);
+    const coworkerTip = must(coworker, ["rev-parse", "HEAD"]);
+
+    // The user fetches before resuming, moving origin/feat to the coworker's
+    // tip — the value a bare lease would have compared against.
+    must(seed, ["fetch", "origin"]);
+
+    const r = run(seed);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("has commits this branch does not");
+    expect(must(seed, ["status"])).toContain("rebase in progress");
+
+    // Nothing was pushed: the remote still points at the coworker's commit.
+    expect(remoteTip(seed, "feat")).toBe(coworkerTip);
   });
 
   test("refuses to rewrite when the fetched remote tip is not integrated", () => {

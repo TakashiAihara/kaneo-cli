@@ -134,6 +134,8 @@ describe("titleSimilarity", () => {
     expect(sameReference("(PR #12 review)", "PR #12 merge")).toBe(false);
     expect(sameReference("(Phase #1)", "(Phase #1)")).toBe(false);
     expect(sameReference("(ccx #165a)", "ccx#165")).toBe(false);
+    expect(sameReference("(ccx#1a #2)", "1a#2")).toBe(false);
+    expect(sameReference("(ccx#1a #2)", "ccx#2")).toBe(false);
   });
 
   // A word character after the number says the number runs on into something

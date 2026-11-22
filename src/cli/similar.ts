@@ -40,7 +40,7 @@ const SIMILAR_REPORTED = 5;
 // name means the number already ran into another hash ("ccx#1a#2"), which is
 // not a name either.
 const REFERENCE = /(?<![A-Za-z0-9_./#-])([A-Za-z0-9_./-]+)#(\d+)(?![A-Za-z0-9_])/g;
-const SPACED_REFERENCE = /([A-Za-z0-9_./-]+) #(\d+)(?![A-Za-z0-9_])/g;
+const SPACED_REFERENCE = /(?<![A-Za-z0-9_./#-])([A-Za-z0-9_./-]+) #(\d+)(?![A-Za-z0-9_])/g;
 const PARENTHESISED = /[（(][^()（）]*/g;
 
 // One reference a title names. The owner is kept beside the repository rather

@@ -8,7 +8,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"query\": \"first\",\n  \"totalCount\": 1,\n  \"results\": [\n    {\n      \"id\": \"cmt0001\",\n      \"type\": \"comment\",\n      \"title\": \"Comment on Write the parser\",\n      \"description\": null,\n      \"content\": \"first comment\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"\",\n      \"createdAt\": \"2026-01-01T00:00:08.000Z\",\n      \"relevanceScore\": 1,\n      \"taskNumber\": 1,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stdout": "{\n  \"query\": \"first\",\n  \"totalCount\": 1,\n  \"results\": [\n    {\n      \"id\": \"cmt0001\",\n      \"type\": \"comment\",\n      \"title\": \"Comment on Write the parser\",\n      \"description\": null,\n      \"content\": \"first comment\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"Self\",\n      \"createdAt\": \"2026-01-01T00:00:08.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
       "stderr": ""
     },
     {
@@ -60,7 +60,7 @@
         "--json"
       ],
       "exit": 0,
-      "stdout": "{\n  \"query\": \"e\",\n  \"totalCount\": 1,\n  \"results\": [\n    {\n      \"id\": \"task-b1\",\n      \"type\": \"task\",\n      \"title\": \"Beta first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-beta\",\n      \"projectName\": \"Beta\",\n      \"projectSlug\": \"BET\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:07.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 1,\n      \"number\": 1,\n      \"priority\": \"urgent\",\n      \"status\": \"to-do\"\n    }\n  ]\n}\n",
+      "stdout": "{\n  \"query\": \"e\",\n  \"totalCount\": 1,\n  \"results\": [\n    {\n      \"id\": \"task-b1\",\n      \"type\": \"task\",\n      \"title\": \"Beta first\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-beta\",\n      \"projectName\": \"Beta\",\n      \"projectSlug\": \"BET\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:07.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": 1,\n      \"number\": 1,\n      \"priority\": \"urgent\",\n      \"status\": \"to-do\"\n    }\n  ]\n}\n",
       "stderr": ""
     },
     {
@@ -72,7 +72,7 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "project    BET    Beta\nworkspace         Other\ntask       BET#1  Beta first  (to-do)\ntask       ALP#3  Old news  (done)\ntask       ALP#1  Write the parser  (to-do)\ncomment    ALP#3  Comment on Old news\ncomment    ALP#1  Comment on Write the parser\n",
+      "stdout": "task       BET#1  Beta first  (to-do)\ntask       ALP#3  Old news  (done)\ntask       ALP#1  Write the parser  (to-do)\nproject    BET    Beta\nworkspace         Other\ncomment    ALP#3  Comment on Old news\ncomment    ALP#1  Comment on Write the parser\n",
       "stderr": ""
     },
     {
@@ -96,8 +96,64 @@
         "--human"
       ],
       "exit": 0,
-      "stdout": "project    BET  Beta\nworkspace       Other\n2 shown; there may be more (--limit up to 50)\n",
+      "stdout": "task  BET#1  Beta first  (to-do)\ntask  ALP#3  Old news  (done)\n2 shown; there may be more (--limit up to 50)\n",
       "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "x",
+        "--limit",
+        "0",
+        "--type",
+        "tasks",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/search: 400: limit: Limit must be at least 1\"\n}\n",
+      "stderr": "Error: GET /api/search: 400: limit: Limit must be at least 1\n"
+    },
+    {
+      "args": [
+        "search",
+        "x",
+        "--limit",
+        "1.5",
+        "--type",
+        "tasks",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/search: 400: limit: Limit must be an integer\n"
+    },
+    {
+      "args": [
+        "search",
+        "x",
+        "--limit",
+        "51",
+        "--type",
+        "tasks",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"GET /api/search: 400: limit: Limit must not exceed 50\"\n}\n",
+      "stderr": "Error: GET /api/search: 400: limit: Limit must not exceed 50\n"
+    },
+    {
+      "args": [
+        "search",
+        "x",
+        "--limit",
+        "abc",
+        "--type",
+        "tasks",
+        "--human"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error: GET /api/search: 400: limit: Invalid input: expected number, received NaN\n"
     },
     {
       "args": [
@@ -277,6 +333,46 @@
       "method": "GET",
       "path": "/project",
       "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=0&q=x&type=tasks&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=1.5&q=x&type=tasks&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=51&q=x&type=tasks&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=abc&q=x&type=tasks&workspaceId=ws-main"
     },
     {
       "method": "GET",

@@ -81,8 +81,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"PUT /api/notification-preferences: 400: Invalid key: dueDateReminderLeadTimeMinutes: Too small: expected number to be \\u003e=5\"\n}\n",
-      "stderr": "Error: PUT /api/notification-preferences: 400: Invalid key: dueDateReminderLeadTimeMinutes: Too small: expected number to be >=5\n"
+      "stdout": "{\n  \"error\": \"PUT /api/notification-preferences: 400: dueDateReminderLeadTimeMinutes: Too small: expected number to be \\u003e=5\"\n}\n",
+      "stderr": "Error: PUT /api/notification-preferences: 400: dueDateReminderLeadTimeMinutes: Too small: expected number to be >=5\n"
     }
   ],
   "requests": [

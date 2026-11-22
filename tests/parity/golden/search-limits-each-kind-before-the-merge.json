@@ -1,0 +1,138 @@
+{
+  "steps": [
+    {
+      "args": [
+        "search",
+        "match",
+        "--limit",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"match\",\n  \"totalCount\": 5,\n  \"results\": [\n    {\n      \"id\": \"task-x3\",\n      \"type\": \"task\",\n      \"title\": \"match task 3\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:12.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": 7,\n      \"number\": 7,\n      \"priority\": \"no-priority\",\n      \"status\": \"to-do\"\n    },\n    {\n      \"id\": \"task-x2\",\n      \"type\": \"task\",\n      \"title\": \"match task 2\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": 6,\n      \"number\": 6,\n      \"priority\": \"no-priority\",\n      \"status\": \"to-do\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "match",
+        "--type",
+        "tasks",
+        "--limit",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"match\",\n  \"totalCount\": 2,\n  \"results\": [\n    {\n      \"id\": \"task-x3\",\n      \"type\": \"task\",\n      \"title\": \"match task 3\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:12.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": 7,\n      \"number\": 7,\n      \"priority\": \"no-priority\",\n      \"status\": \"to-do\"\n    },\n    {\n      \"id\": \"task-x2\",\n      \"type\": \"task\",\n      \"title\": \"match task 2\",\n      \"description\": null,\n      \"content\": null,\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:11.000Z\",\n      \"relevanceScore\": 3,\n      \"taskNumber\": 6,\n      \"number\": 6,\n      \"priority\": \"no-priority\",\n      \"status\": \"to-do\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "match",
+        "--type",
+        "projects",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"match\",\n  \"totalCount\": 1,\n  \"results\": [\n    {\n      \"id\": \"proj-gamma\",\n      \"type\": \"project\",\n      \"title\": \"Gamma\",\n      \"description\": \"match inside\",\n      \"content\": null,\n      \"projectId\": \"proj-gamma\",\n      \"projectName\": null,\n      \"projectSlug\": \"GAM\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": null,\n      \"userName\": null,\n      \"createdAt\": \"2026-01-01T00:00:04.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": null,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "match",
+        "--type",
+        "comments",
+        "--limit",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"query\": \"match\",\n  \"totalCount\": 2,\n  \"results\": [\n    {\n      \"id\": \"cmt0004\",\n      \"type\": \"comment\",\n      \"title\": \"Comment on match task 2\",\n      \"description\": null,\n      \"content\": \"match note 2\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"Self\",\n      \"createdAt\": \"2026-01-01T00:00:17.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 6,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    },\n    {\n      \"id\": \"cmt0003\",\n      \"type\": \"comment\",\n      \"title\": \"Comment on match task 1\",\n      \"description\": null,\n      \"content\": \"match note 1\",\n      \"projectId\": \"proj-alpha\",\n      \"projectName\": \"Alpha\",\n      \"projectSlug\": \"ALP\",\n      \"workspaceId\": \"ws-main\",\n      \"workspaceName\": \"Main\",\n      \"userId\": \"user-self\",\n      \"userName\": \"Self\",\n      \"createdAt\": \"2026-01-01T00:00:16.000Z\",\n      \"relevanceScore\": 2,\n      \"taskNumber\": 5,\n      \"number\": null,\n      \"priority\": null,\n      \"status\": null\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "match",
+        "--limit",
+        "1",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "task  ALP#7  match task 3  (to-do)\n1 shown; there may be more (--limit up to 50)\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=2&q=match&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=2&q=match&type=tasks&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=1&q=match&type=projects&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=2&q=match&type=comments&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "query": "?limit=1&q=match&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    }
+  ],
+  "files": {}
+}

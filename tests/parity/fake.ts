@@ -2,6 +2,7 @@ import { z } from "zod";
 import * as M from "../../src/api/gen/model";
 import { SPEC_PATH } from "../../openapi/spec";
 import { readFileSync } from "node:fs";
+import { declaredErrorTypes } from "./spec-errors";
 
 // An in-memory Kaneo that answers the operations in src/api/registry.ts the
 // way the pinned release's server does. Behaviour checked against a release
@@ -39,6 +40,19 @@ export type Seed = {
   // A comment with a userId of its own was written by someone else, so only
   // the server's author check stands between it and a delete.
   comments?: { taskId: string; content: string; id?: string; userId?: string }[];
+  // Activity rows that are not comments — the system events a task's feed
+  // carries — so a search finds their eventData text and the rendered summary
+  // the server builds from it. type is the event's own ("status_changed",
+  // "task", ...); a comment belongs in comments.
+  activities?: {
+    taskId: string;
+    type: string;
+    content?: string | null;
+    eventData?: unknown;
+    userId?: string;
+    id?: string;
+    createdAt?: string;
+  }[];
   // Labels already on a task, for a board that carries one before anything runs.
   labels?: { taskId: string; name: string; color?: string }[];
   // Workspace labels whose deletion has already started: still listed, but a
@@ -483,6 +497,23 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     externalSource: null,
     externalUrl: null,
   });
+  for (const a of seed.activities ?? []) {
+    const at = a.createdAt ?? now();
+    events.push(
+      asActivity(
+        {
+          id: a.id ?? id("act"),
+          taskId: a.taskId,
+          userId: a.userId ?? "user-self",
+          content: a.content ?? null,
+          createdAt: at,
+          updatedAt: at,
+        },
+        a.type,
+        a.eventData ?? null,
+      ),
+    );
+  }
 
   const relations: z.input<typeof M.TaskRelation>[] = [];
   // One table for both kinds, as the server keeps them: a workspace label has
@@ -1187,6 +1218,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
   const ok = <S extends z.ZodTypeAny>(schema: S, body: z.input<S>, status = 200) =>
     Response.json(opts.legacy ? legacy(body) : schema.parse(body), { status });
+  // The JSON envelope stays for the replies that are not a route's error: the
+  // injected failure, which stands for whatever the server chose to send, the
+  // routes whose document declares a JSON error, and the fake's own "no route"
+  // marker for a path it does not serve.
   const fail = (status: number, message: string) => Response.json({ success: false, error: message }, { status });
   // What the real server sends for an HTTPException (its workspace middleware,
   // and the routes that throw one): the message as a text/plain body, with no
@@ -1652,8 +1687,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (failing === undefined || !failing.test(`${method} ${path}`)) return undefined;
     if (!(failingQuery?.test(query) ?? true)) return undefined;
     if (skipped++ < (opts.failOnSkip ?? 0)) return undefined;
+    // An injected failure stands in for the server's own error answer, which
+    // the document declares as text for the statuses scenarios inject; the
+    // CLI reads the same message out of either shape.
     return opts.failMessage === undefined
-      ? fail(opts.failStatus ?? 500, "injected failure")
+      ? failText(opts.failStatus ?? 500, "injected failure")
       : failText(opts.failStatus ?? 500, opts.failMessage);
   };
 
@@ -1773,7 +1811,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         /^\/asset\/[^/]+$/.test(path) ||
         /^\/user\/avatar\/[^/]+$/.test(path) ||
         /^\/calendar-feed\/[^/]+\/calendar\.ics$/.test(path));
-    if (!anonymous && req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
+    if (!anonymous && req.headers.get("authorization") !== "Bearer test-key") return failText(401, "Unauthorized");
     const injected = injectedFailure(req.method, path, url.search);
     if (injected !== undefined) return injected;
 
@@ -1852,8 +1890,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method !== method || !re.test(path)) continue;
       const r = schema.safeParse(body);
       if (!r.success) {
+        // The server's validation hook answers the first issue as
+        // "<field>: <message>" as plain text (openapi.ts's defaultHook).
         const i = r.error.issues[0]!;
-        return fail(400, `Invalid key: ${i.path.join(".")}: ${i.message}`);
+        return failText(400, `${i.path.join(".") || "request"}: ${i.message}`);
       }
     }
 
@@ -1909,7 +1949,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (req.method === "GET" && (p = m(/^\/workspace\/([^/]+)\/members$/))) {
       const ws = decodeURIComponent(p[1]);
-      if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
+      if (!workspaces.some((x) => x.id === ws)) return failText(403, "You don't have access to this workspace");
       return ok(
         z.array(M.WorkspaceMember),
         (seed.members ?? [])
@@ -1946,58 +1986,137 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (req.method === "GET" && path === "/search") {
       const ws = url.searchParams.get("workspaceId") ?? "";
-      if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
-      const type = url.searchParams.get("type") ?? "all";
-      // The server's validation hook reports the first issue as "<field>: <message>".
-      const typed = z.enum(["all", "tasks", "projects", "workspaces", "comments", "activities"]).safeParse(type);
-      if (!typed.success) return fail(400, `type: ${typed.error.issues[0]!.message}`);
-      const q = (url.searchParams.get("q") ?? "").toLowerCase();
-      const only = url.searchParams.get("projectId");
-      const hit = (...texts: (string | null | undefined)[]) => texts.some((t) => (t ?? "").toLowerCase().includes(q));
-      // As in v2.29.2, each type's query is limited on its own, totalCount is the
-      // sum of what they returned, and projects are not narrowed by projectId.
-      const limit = Number(url.searchParams.get("limit") ?? "20");
-      const capped = <T>(list: T[]) => list.slice(0, limit);
+      // The workspace middleware reads the raw query before the route's
+      // validators run: a missing workspaceId is its 400, an unreachable one
+      // its 403 (workspace-access-middleware.ts's fromQuery).
+      if (ws === "") return failText(400, "Workspace ID could not be determined");
+      if (!workspaces.some((x) => x.id === ws)) return failText(403, "You don't have access to this workspace");
+      // The query is checked by the route's own schema, so a bad value fails
+      // the way the server's validation hook answers it.
+      const query = searchQuerySchema.safeParse({
+        q: url.searchParams.get("q") ?? undefined,
+        type: url.searchParams.get("type") ?? undefined,
+        workspaceId: ws,
+        projectId: url.searchParams.get("projectId") ?? undefined,
+        limit: url.searchParams.get("limit") ?? undefined,
+        userEmail: url.searchParams.get("userEmail") ?? undefined,
+      });
+      if (!query.success) {
+        const i = query.error.issues[0]!;
+        return failText(400, `${i.path.join(".") || "request"}: ${i.message}`);
+      }
+      const { q: text, type, limit } = query.data;
+      // An empty projectId narrows nothing, as the server's falsy check does.
+      const only = query.data.projectId || undefined;
+      const q = text.toLowerCase();
+      // The server's match is LIKE '%query%', not a plain contains: % and _
+      // in the query are wildcards there, \ escapes the next character, and
+      // both sides are already lowered.
+      const likePattern = `%${q}%`;
+      const hit = (...texts: (string | null | undefined)[]) =>
+        texts.some((t) => likePatternMatch((t ?? "").toLowerCase(), likePattern));
       const inWorkspace = projects.filter((x) => x.workspaceId === ws);
-      const inScope = inWorkspace.filter((x) => only === null || x.id === only);
+      const inScope = inWorkspace.filter((x) => only === undefined || x.id === only);
+      const workspaceName = workspaces.find((w) => w.id === ws)!.name;
       const where = (x: (typeof projects)[number]) => ({
         projectId: x.id,
         projectName: x.name,
-        projectSlug: x.slug,
+        projectSlug: x.slug || undefined,
         workspaceId: ws,
-        workspaceName: workspaces.find((w) => w.id === ws)!.name,
+        workspaceName,
       });
+      const userName = (userId: string | null | undefined): string | undefined =>
+        userId === "user-self" ? "Self" : userId === null || userId === undefined ? undefined : users.get(userId);
       type Hit = z.input<typeof M.SearchResult>;
       const found: Hit[] = [];
       const taskHits: Hit[] = [];
-      const commentHits: Hit[] = [];
-      // Workspaces are matched across every one the key can reach whichever
-      // workspace is asked, and each once per member, as in v2.29.2 (it joins
-      // the members without narrowing them), so the same match comes back from a
-      // search of each, and more than once.
       const workspaceHits: Hit[] = [];
-      for (const w of workspaces) {
-        if ((type === "all" || type === "workspaces") && hit(w.name)) {
-          for (let n = 0; n < Math.max(1, seed.members?.length ?? 0); n++) {
-            workspaceHits.push({
-              id: w.id,
-              type: "workspace",
-              title: w.name,
-              createdAt: seededAt,
-              relevanceScore: 3,
-              workspaceId: w.id,
-              workspaceName: w.name,
+      const activityHits: Hit[] = [];
+      // global-search.ts at the pinned release: each type's query is ordered
+      // and limited on its own, the concatenation — tasks, projects,
+      // workspaces, then comments and activities — is ranked once more and
+      // cut to limit, and totalCount counts what the per-type queries
+      // returned, repeats included.
+      const take = (list: Hit[]) =>
+        list
+          .sort((a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt))
+          .slice(0, limit);
+
+      // Tasks first: a "<slug>-<number>" query is the task's short id,
+      // looked up by the project's slug and number ahead of the text matches
+      // and scored above them. The slug compare is the server's ilike — case
+      // folding with the pattern's wildcards escaped away.
+      if (type === "all" || type === "tasks") {
+        const seenTaskIds = new Set<string>();
+        const shortId = text.normalize("NFKC").match(TASK_SHORT_ID);
+        const shortNumber = Number(shortId?.[2]);
+        if (
+          shortId?.[1] !== undefined &&
+          Number.isSafeInteger(shortNumber) &&
+          shortNumber > 0 &&
+          shortNumber <= 2_147_483_647
+        ) {
+          const t = tasks.find((task) => {
+            const x = projects.find((p) => p.id === task.projectId);
+            return (
+              x !== undefined &&
+              x.workspaceId === ws &&
+              (only === undefined || task.projectId === only) &&
+              x.slug.toLowerCase() === shortId[1]!.toLowerCase() &&
+              task.number === shortNumber
+            );
+          });
+          if (t !== undefined) {
+            seenTaskIds.add(t.id);
+            const x = projects.find((p) => p.id === t.projectId)!;
+            taskHits.push({
+              id: t.id,
+              type: "task",
+              title: t.title,
+              ...(t.description ? { description: t.description } : {}),
+              createdAt: t.createdAt,
+              relevanceScore: 10,
+              userId: t.userId || undefined,
+              userName: userName(t.userId),
+              taskNumber: t.number || undefined,
+              priority: t.priority || undefined,
+              status: t.status,
+              ...where(x),
+            });
+          }
+        }
+        for (const x of inScope) {
+          for (const t of tasks.filter((t) => t.projectId === x.id)) {
+            if (seenTaskIds.has(t.id)) continue;
+            // A title match outranks a description-only one.
+            const score = hit(t.title) ? 3 : hit(t.description) ? 2 : 0;
+            if (score === 0) continue;
+            taskHits.push({
+              id: t.id,
+              type: "task",
+              title: t.title,
+              ...(t.description ? { description: t.description } : {}),
+              createdAt: t.createdAt,
+              relevanceScore: score,
+              userId: t.userId || undefined,
+              userName: userName(t.userId),
+              taskNumber: t.number || undefined,
+              priority: t.priority || undefined,
+              status: t.status,
+              ...where(x),
             });
           }
         }
       }
-      for (const x of inWorkspace) {
-        // The server's project query matches the name and the description,
-        // never the slug (global-search.ts in Kaneo); a name match outranks a
-        // description one. A project match names no projectName — it is the
-        // project — which `where` would add for the task-side hits.
-        const nameHit = hit(x.name);
-        if ((type === "all" || type === "projects") && (nameHit || hit(x.description))) {
+
+      // Projects match the name and the description, never the slug, a name
+      // match outranks a description one, and the query is not narrowed by
+      // projectId. A project match names no projectName — it is the project —
+      // which `where` would add for the task-side hits.
+      if (type === "all" || type === "projects") {
+        for (const x of inWorkspace) {
+          const nameHit = hit(x.name);
+          if (!nameHit && !hit(x.description)) continue;
           const { projectName: _, ...rest } = where(x);
           found.push({
             id: x.id,
@@ -2010,52 +2129,95 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           });
         }
       }
-      for (const x of inScope) {
-        for (const t of tasks.filter((t) => t.projectId === x.id)) {
-          if ((type === "all" || type === "tasks") && hit(t.title, t.description)) {
-            taskHits.push({
-              id: t.id,
-              type: "task",
-              title: t.title,
-              ...(t.description ? { description: t.description } : {}),
-              createdAt: t.createdAt,
-              relevanceScore: 2,
-              taskNumber: t.number ?? undefined,
-              priority: t.priority,
-              status: t.status,
-              ...where(x),
+
+      // Workspaces are matched across every one the key can reach whichever
+      // workspace is asked, by name or description, and the members join
+      // repeats each match once per member of that workspace — so the same
+      // match comes back from a search of each, and more than once.
+      if (type === "all" || type === "workspaces") {
+        for (const w of workspaces) {
+          const nameHit = hit(w.name);
+          const score = nameHit ? 3 : hit(w.description) ? 2 : 0;
+          if (score === 0) continue;
+          const members = Math.max(
+            1,
+            (seed.members ?? []).filter((m) => m.workspaceId === undefined || m.workspaceId === w.id).length,
+          );
+          for (let n = 0; n < members; n++) {
+            workspaceHits.push({
+              id: w.id,
+              type: "workspace",
+              title: w.name,
+              ...(w.description ? { description: w.description } : {}),
+              createdAt: seededAt,
+              relevanceScore: score,
+              workspaceId: w.id,
+              workspaceName: w.name,
             });
           }
-          for (const c of comments.filter((c) => c.taskId === t.id)) {
-            if ((type === "all" || type === "comments" || type === "activities") && hit(c.content)) {
-              commentHits.push({
-                id: c.id,
-                type: "comment",
-                title: `Comment on ${t.title}`,
-                content: c.content,
-                createdAt: c.createdAt,
-                relevanceScore: 1,
-                taskNumber: t.number ?? undefined,
-                userId: c.userId,
-                userName: users.get(c.userId) ?? "",
+        }
+      }
+
+      // Comments and activities are one query upstream: the activity's own
+      // text — its content, or the eventData the server casts to text — or
+      // the task's title, with "comments" alone narrowing to comment rows.
+      if (type === "all" || type === "comments" || type === "activities") {
+        for (const x of inScope) {
+          for (const t of tasks.filter((t) => t.projectId === x.id)) {
+            const rows = [
+              ...comments
+                .filter((c) => c.taskId === t.id)
+                .map((c) => ({
+                  id: c.id,
+                  kind: "comment" as const,
+                  type: "comment",
+                  content: c.content,
+                  eventData: null,
+                  userId: c.userId,
+                  createdAt: c.createdAt,
+                })),
+              ...events
+                .filter((e) => e.taskId === t.id)
+                .map((e) => ({
+                  id: e.id,
+                  kind: "activity" as const,
+                  type: e.type,
+                  content: e.content ?? null,
+                  eventData: e.eventData ?? null,
+                  userId: e.userId ?? null,
+                  createdAt: e.createdAt,
+                })),
+            ];
+            for (const a of rows) {
+              if (type === "comments" && a.type !== "comment") continue;
+              const body = a.content ?? (a.eventData === null ? "" : pgJsonText(a.eventData));
+              const score = hit(body) ? 2 : hit(t.title) ? 1 : 0;
+              if (score === 0) continue;
+              const content = activitySearchContent(a.type, a.content, a.eventData);
+              activityHits.push({
+                id: a.id,
+                type: a.kind,
+                title: a.kind === "comment" ? `Comment on ${t.title}` : `${a.type} on ${t.title}`,
+                ...(content === undefined ? {} : { content }),
+                createdAt: a.createdAt,
+                relevanceScore: score,
+                userId: a.userId || undefined,
+                userName: userName(a.userId),
+                taskNumber: t.number || undefined,
                 ...where(x),
               });
             }
           }
         }
       }
-      const ranked = (list: Hit[]) =>
-        list.sort((a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt));
-      const results = ranked([
-        ...capped(ranked(found)),
-        ...capped(ranked(taskHits)),
-        ...capped(workspaceHits),
-        ...capped(ranked(commentHits)),
-      ]);
+
+      const results = [...take(taskHits), ...take(found), ...take(workspaceHits), ...take(activityHits)].sort(
+        (a, b) => b.relevanceScore - a.relevanceScore || Date.parse(b.createdAt) - Date.parse(a.createdAt),
+      );
       return ok(M.SearchResponse, {
-        results: capped(results),
+        results: results.slice(0, limit),
         totalCount: results.length,
-        searchQuery: url.searchParams.get("q") ?? "",
+        searchQuery: text,
       });
     }
 
@@ -2064,7 +2226,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // A workspace the key has no access to and one that does not exist are the
       // same answer, which is what made --workspace <name> read as a permission
       // problem rather than as an unknown value.
-      if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
+      if (!workspaces.some((x) => x.id === ws)) return failText(403, "You don't have access to this workspace");
       const all = url.searchParams.get("includeArchived") === "true";
       // Sidebar order, as upstream's get-projects.ts sorts it.
       const list = [...projects]
@@ -2111,13 +2273,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // order, a project left out keeps its rank, and the requested ones fill the
       // slots around it. The whole workspace comes back, archived projects too.
       const ws = url.searchParams.get("workspaceId");
-      if (!workspaces.some((x) => x.id === ws)) return fail(403, "You don't have access to this workspace");
+      if (!workspaces.some((x) => x.id === ws)) return failText(403, "You don't have access to this workspace");
       const wanted = ((body as any)?.projects ?? []) as { id: string; position: number }[];
       const ids = wanted.map((x) => x.id);
-      if (new Set(ids).size !== ids.length) return fail(400, "Duplicate project ids in reorder payload");
+      if (new Set(ids).size !== ids.length) return failText(400, "Duplicate project ids in reorder payload");
       const existing = projects.filter((x) => x.workspaceId === ws).sort((a, b) => a.position - b.position);
       const foreign = ids.find((x) => !existing.some((e) => e.id === x));
-      if (foreign) return fail(400, `Project ${foreign} does not belong to this workspace`);
+      if (foreign) return failText(400, `Project ${foreign} does not belong to this workspace`);
       const requested = [...wanted]
         .sort((a, b) => a.position - b.position)
         .map((x) => x.id)
@@ -2311,11 +2473,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if ((p = m(/^\/column\/reorder\/([^/]+)$/)) && req.method === "PUT") {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj) return fail(404, "Project not found");
+      if (!proj) return failText(404, "Project not found");
       const mine = new Map(columnsOf(proj.id).map((c) => [c.id, c]));
       const wanted = (body as any)?.columns ?? [];
       const off = wanted.filter((c: any) => !mine.has(c.id));
-      if (off.length > 0) return fail(400, `Column not in this project: ${off.map((c: any) => c.id).join(", ")}`);
+      if (off.length > 0) return failText(400, `Column not in this project: ${off.map((c: any) => c.id).join(", ")}`);
       for (const c of wanted) mine.get(c.id)!.position = c.position;
       return ok(z.array(M.Column), columnsOf(proj.id));
     }
@@ -2330,15 +2492,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // The slug comes from the name, and one this project already holds is
         // refused rather than given a second column of the same name.
         const slug = slugOf(wanted.name);
-        if (slug === "") return fail(400, "Column name must contain at least one alphanumeric character");
+        if (slug === "") return failText(400, "Column name must contain at least one alphanumeric character");
         if (VIRTUAL_STATUSES.includes(slug))
-          return fail(409, `Column slug "${slug}" is reserved for virtual task statuses`);
+          return failText(409, `Column slug "${slug}" is reserved for virtual task statuses`);
         if (columnsOf(key).some((c) => c.slug === slug))
-          return fail(409, `Column with slug "${slug}" already exists in this project`);
+          return failText(409, `Column with slug "${slug}" already exists in this project`);
         return ok(M.Column, addColumn(key, wanted));
       }
       const column = columns.find((c) => c.id === key);
-      if (!column) return fail(404, "Column not found");
+      if (!column) return failText(404, "Column not found");
       // A field left out of the update keeps its value, which is what icon and
       // color take null for: clearing one is asking for it.
       if (req.method === "PUT") {
@@ -2348,7 +2510,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       if (req.method === "DELETE") {
         if (tasks.some((t) => t.projectId === column.projectId && t.status === column.slug)) {
-          return fail(409, "Cannot delete column that contains tasks. Move or delete tasks first.");
+          return failText(409, "Cannot delete column that contains tasks. Move or delete tasks first.");
         }
         // The rules that point at it go with it, as workflow_rule.column_id does
         // on delete: a rule cannot outlive its column.
@@ -2428,7 +2590,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "PUT" && (p = m(/^\/task\/due-date\/([^/]+)$/))) {
       const t = tasks.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!t) return fail(404, "Task not found");
+      if (!t) return failText(404, "Task not found");
       const given = (body as any)?.dueDate as string | undefined;
       // An empty string clears, as a missing one does: upstream reads the field
       // as `dueDate ? parse(dueDate) : null`.
@@ -2471,19 +2633,19 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "PATCH" && path === "/task/bulk") {
       const b = body as z.input<typeof M.BulkUpdateTasksBody>;
       const found = tasks.filter((t) => b.taskIds.includes(t.id));
-      if (found.length === 0) return fail(404, "No tasks found");
+      if (found.length === 0) return failText(404, "No tasks found");
       const spaces = new Set(found.map((t) => projects.find((x) => x.id === t.projectId)!.workspaceId));
-      if (spaces.size > 1) return fail(400, "All tasks must belong to the same workspace");
+      if (spaces.size > 1) return failText(400, "All tasks must belong to the same workspace");
       const value = b.value ?? null;
       switch (b.operation) {
         // One project at a time, checked and then written, with no transaction:
         // a status the second project lacks is refused after the first one's
         // tasks have moved, as upstream's bulk-update-tasks.ts does.
         case "updateStatus":
-          if (!value) return fail(400, "Status value is required");
+          if (!value) return failText(400, "Status value is required");
           for (const projectId of new Set(found.map((t) => t.projectId))) {
             if (!columnsOf(projectId).some((c) => c.slug === value) && !VIRTUAL_STATUSES.includes(value)) {
-              return fail(400, `Invalid status "${value}"`);
+              return failText(400, `Invalid status "${value}"`);
             }
             for (const t of found)
               if (t.projectId === projectId) {
@@ -2493,7 +2655,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           }
           break;
         case "updatePriority":
-          if (!value) return fail(400, "Priority value is required");
+          if (!value) return failText(400, "Priority value is required");
           for (const t of found) {
             t.priority = value;
             touch(t);
@@ -2501,7 +2663,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           break;
         case "updateAssignee": {
           const assignee = value?.trim() || null;
-          if (assignee && !users.has(assignee)) return fail(403, "Assignee is not a member of this workspace");
+          if (assignee && !users.has(assignee)) return failText(403, "Assignee is not a member of this workspace");
           for (const t of found) {
             t.userId = assignee;
             touch(t);
@@ -2527,13 +2689,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // The fake keeps no labels, so every label id is one the server would not
         // find.
         default:
-          return fail(404, "Label not found");
+          return failText(404, "Label not found");
       }
       return ok(M.BulkTaskResult, { success: true, updatedCount: found.length });
     }
     if (req.method === "GET" && (p = m(/^\/task\/export\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj) return fail(400, "Workspace ID could not be determined");
+      if (!proj) return failText(400, "Workspace ID could not be determined");
       return ok(M.TaskExport, {
         project: { name: proj.name, slug: proj.slug, description: proj.description, exportedAt: now() },
         tasks: tasks
@@ -2553,7 +2715,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "POST" && (p = m(/^\/task\/import\/([^/]+)$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!proj) return fail(400, "Workspace ID could not be determined");
+      if (!proj) return failText(400, "Workspace ID could not be determined");
       const results = ((body as any).tasks as z.input<typeof M.ImportTasksBody>["tasks"]).map((wanted) => {
         const assignee = wanted.userId?.trim() || null;
         if (assignee && !users.has(assignee))
@@ -2656,14 +2818,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if ((p = m(/^\/task\/(status|priority|assignee|move|title|description)\/([^/]+)$/)) && req.method === "PUT") {
       const t = tasks.find((x) => x.id === decodeURIComponent(p![2]));
-      if (!t) return fail(404, "Task not found");
+      if (!t) return failText(404, "Task not found");
       const b = body as any;
       // Every route below answers the shape its caller reads, and none of them
       // stores anything: what the server accepted is not what the task holds.
       if (opts.writesNotKept) {
         if (p[1] !== "move") return ok(M.Task, t);
         if (!b?.destinationProjectId)
-          return fail(400, 'Invalid key: Expected "destinationProjectId" but received undefined');
+          return failText(400, "destinationProjectId: Invalid input: expected string, received undefined");
         return ok(M.MoveTaskResult, {
           task: t,
           sourceProjectId: t.projectId,
@@ -2677,7 +2839,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // them all, the way apps/api/src/task/validate-task-fields.ts does.
         const statuses = [...columnsOf(t.projectId).map((c) => c.slug), ...VIRTUAL_STATUSES];
         if (!statuses.includes(b.status)) {
-          return fail(400, `Invalid status "${b.status}". Valid statuses for this project: ${statuses.join(", ")}`);
+          return failText(400, `Invalid status "${b.status}". Valid statuses for this project: ${statuses.join(", ")}`);
         }
         t.status = b.status;
       }
@@ -2686,19 +2848,20 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (p[1] === "title") t.title = altered ? `${b.title} (altered)` : b.title;
       if (p[1] === "description") t.description = altered ? `${b.description} (altered)` : b.description;
       if (p[1] === "assignee") {
-        if (!("userId" in (b ?? {}))) return fail(400, 'Invalid key: Expected "userId" but received undefined');
+        if (!("userId" in (b ?? {})))
+          return failText(400, "userId: Invalid input: expected string, received undefined");
         t.userId = b.userId;
       }
       if (p[1] === "move") {
         if (!b?.destinationProjectId)
-          return fail(400, 'Invalid key: Expected "destinationProjectId" but received undefined');
+          return failText(400, "destinationProjectId: Invalid input: expected string, received undefined");
         const from = t.projectId;
         const dest = projects.find((x) => x.id === b.destinationProjectId);
         // A destination in another workspace is answered as not found, per issue
         // #246; the status text of the same-project refusal is from there too.
         if (!dest || dest.workspaceId !== projects.find((x) => x.id === from)?.workspaceId)
           return failText(404, "Project not found");
-        if (dest.id === from) return fail(400, "Task is already in that project");
+        if (dest.id === from) return failText(400, "Task is already in that project");
         dest.lastTaskNumber += 1;
         Object.assign(t, {
           projectId: dest.id,
@@ -2735,7 +2898,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const after = url.searchParams.get("after");
       const needle = query === null ? "" : query.trim();
       if (needle === "" || needle.length > 256 || (after !== null && (after === "" || after.length > 128))) {
-        return fail(400, "Invalid search query or cursor");
+        return failText(400, "Invalid search query or cursor");
       }
       const found = tasks
         .filter(
@@ -2760,7 +2923,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const versionParam = url.searchParams.get("version");
       const offset = offsetParam === null ? 0 : /^\d+$/.test(offsetParam) ? Number(offsetParam) : -1;
       if (offset < 0 || offset > 2_000_000_000 || (versionParam !== null && !/^[0-9]{1,10}$/.test(versionParam))) {
-        return fail(400, "Invalid offset or version");
+        return failText(400, "Invalid offset or version");
       }
       const t = tasks.find((x) => x.id === decodeURIComponent(p![1]));
       const unavailable = "Description changed or is unavailable; refresh before loading it again";
@@ -2906,7 +3069,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if ((p = m(/^\/task\/([^/]+)$/))) {
       const i = tasks.findIndex((x) => x.id === decodeURIComponent(p![1]));
-      if (i < 0) return fail(404, "Task not found");
+      if (i < 0) return failText(404, "Task not found");
       const t = tasks[i]!;
       // The detail view of v2.32.0's get-task.ts. The fake keeps no column
       // reference on a task, so it is the column the status names; a virtual
@@ -2925,18 +3088,19 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // kept, and moving to another project is refused.
       if (req.method === "PUT") {
         const b = body as z.input<typeof M.UpdateTaskBody>;
-        if (b.projectId !== t.projectId) return fail(400, "Use the task move endpoint to move tasks between projects");
+        if (b.projectId !== t.projectId)
+          return failText(400, "Use the task move endpoint to move tasks between projects");
         if (!columnsOf(t.projectId).some((c) => c.slug === b.status) && !VIRTUAL_STATUSES.includes(b.status)) {
-          return fail(400, `Invalid status "${b.status}"`);
+          return failText(400, `Invalid status "${b.status}"`);
         }
         const assignee = b.userId?.trim() || null;
-        if (assignee && !users.has(assignee)) return fail(403, "Assignee is not a member of this workspace");
+        if (assignee && !users.has(assignee)) return failText(403, "Assignee is not a member of this workspace");
         const start = b.startDate === undefined ? null : parsedDate(b.startDate, "startDate");
         if (start !== null && typeof start !== "string") return start;
         const due = b.dueDate === undefined ? null : parsedDate(b.dueDate, "dueDate");
         if (due !== null && typeof due !== "string") return due;
         if (start !== null && due !== null && Date.parse(start) > Date.parse(due)) {
-          return fail(400, "Start date cannot be after due date. Please adjust the date range.");
+          return failText(400, "Start date cannot be after due date. Please adjust the date range.");
         }
         Object.assign(t, {
           title: b.title,
@@ -2966,7 +3130,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       // for it among the caller's own comments.
       const i = comments.findIndex((c) => c.id === decodeURIComponent(p![1]));
       if (i < 0) return failText(400, "Workspace ID could not be determined");
-      if (comments[i]!.userId !== "user-self") return fail(404, "Comment not found or you are not the author");
+      if (comments[i]!.userId !== "user-self") return failText(404, "Comment not found or you are not the author");
       const { user: _, ...c } = comments[i]!;
       const reply = ok(M.Activity, {
         ...c,
@@ -3004,8 +3168,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     // answers like DELETE for an unknown id and for someone else's comment.
     if ((p = m(/^\/comment\/([^/]+)$/)) && req.method === "PUT") {
       const c = comments.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!c) return fail(400, "Workspace ID could not be determined");
-      if (c.userId !== "user-self") return fail(404, "Comment not found or you are not the author");
+      if (!c) return failText(400, "Workspace ID could not be determined");
+      if (c.userId !== "user-self") return failText(404, "Comment not found or you are not the author");
       Object.assign(c, { content: (body as any).content, updatedAt: now() });
       return ok(M.Activity, asActivity(c));
     }
@@ -3023,9 +3187,13 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "POST" && path === "/activity/create") {
       const b = body as any;
-      // 400 for both, as the pinned document has it; comments are refused here from 2.27.0.
-      if (!tasks.some((t) => t.id === b.taskId)) return fail(400, "Task not found");
-      if (b.type === "comment") return fail(400, "Use the comment endpoint");
+      // The workspace middleware places the task before the route runs, so an
+      // unknown one is its 400 rather than the controller's. The comment
+      // refusal is the route's own: it answers JSON where its document allows
+      // both shapes, because it throws with `res:` set (activity/index.ts).
+      if (!tasks.some((t) => t.id === b.taskId)) return failText(400, "Workspace ID could not be determined");
+      if (b.type === "comment")
+        return Response.json({ message: "Use the comment endpoint to create comments" }, { status: 400 });
       const at = now();
       const e = asActivity(
         { id: id("act"), taskId: b.taskId, userId: "user-self", content: b.message, createdAt: at, updatedAt: at },
@@ -3040,7 +3208,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     // leaves out, and an end before the start is a 400. An unknown task or entry
     // never reaches a controller: the workspace-access middleware finds no
     // workspace for it first and says so. The duration cap is not modelled.
-    const noWorkspace = () => fail(400, "Workspace ID could not be determined");
+    const noWorkspace = () => failText(400, "Workspace ID could not be determined");
     const duration = (start: string, end: string | null | undefined) => {
       if (!end) return null;
       const d = Math.floor((Date.parse(end) - Date.parse(start)) / 1000);
@@ -3050,7 +3218,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const b = body as any;
       if (!tasks.some((t) => t.id === b.taskId)) return noWorkspace();
       const d = duration(b.startTime, b.endTime);
-      if (d === undefined) return fail(400, "Start time cannot be after end time. Please adjust the time range.");
+      if (d === undefined) return failText(400, "Start time cannot be after end time. Please adjust the time range.");
       const at = now();
       const e = {
         id: id("time"),
@@ -3083,7 +3251,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         const b = body as any;
         const end = b.endTime ? new Date(b.endTime).toISOString() : e.endTime;
         const d = duration(b.startTime, end);
-        if (d === undefined) return fail(400, "Start time cannot be after end time. Please adjust the time range.");
+        if (d === undefined) return failText(400, "Start time cannot be after end time. Please adjust the time range.");
         Object.assign(
           e,
           { startTime: new Date(b.startTime).toISOString(), endTime: end, duration: d, updatedAt: now() },
@@ -3099,7 +3267,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         // The workspace middleware looks the rule up first, so an unknown one is
         // its 400 rather than the controller's 404.
         const i = workflowRules.findIndex((r) => r.id === key);
-        if (i < 0) return fail(400, "Workspace ID could not be determined");
+        if (i < 0) return failText(400, "Workspace ID could not be determined");
         return ok(M.WorkflowRuleRow, workflowRules.splice(i, 1)[0]!);
       }
       if (!projects.some((x) => x.id === key)) return failText(400, "Workspace ID could not be determined");
@@ -3117,7 +3285,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "PUT") {
         const b = body as z.input<typeof M.UpsertWorkflowRuleBody>;
         if (!columnsOf(key).some((c) => c.id === b.columnId))
-          return fail(400, "Column does not belong to the provided project");
+          return failText(400, "Column does not belong to the provided project");
         const found = workflowRules.find(
           (r) => r.projectId === key && r.integrationType === b.integrationType && r.eventType === b.eventType,
         );
@@ -3139,7 +3307,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (req.method === "GET" && (p = m(/^\/external-link\/task\/([^/]+)$/))) {
       const taskId = decodeURIComponent(p[1]);
-      if (!tasks.some((t) => t.id === taskId)) return fail(400, "Workspace ID could not be determined");
+      if (!tasks.some((t) => t.id === taskId)) return failText(400, "Workspace ID could not be determined");
       return ok(
         z.array(M.ExternalLink),
         links.filter((l) => l.taskId === taskId),
@@ -3149,7 +3317,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     // external id is the URL itself, and only manual links can be removed.
     if (req.method === "POST" && (p = m(/^\/external-link\/task\/([^/]+)$/))) {
       const taskId = decodeURIComponent(p[1]);
-      if (!tasks.some((t) => t.id === taskId)) return fail(400, "Workspace ID could not be determined");
+      if (!tasks.some((t) => t.id === taskId)) return failText(400, "Workspace ID could not be determined");
       const b = body as z.input<typeof M.CreateExternalLinkBody>;
       // The document cannot say it, but the server's schema refines the URL
       // to http or https.
@@ -3175,7 +3343,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if (req.method === "DELETE" && (p = m(/^\/external-link\/task\/([^/]+)\/([^/]+)$/))) {
       const taskId = decodeURIComponent(p[1]);
       const linkId = decodeURIComponent(p[2]);
-      if (!tasks.some((t) => t.id === taskId)) return fail(400, "Workspace ID could not be determined");
+      if (!tasks.some((t) => t.id === taskId)) return failText(400, "Workspace ID could not be determined");
       // Only a manual link goes: an integration's own rows are not the
       // endpoint's to remove.
       const i = links.findIndex(
@@ -3215,7 +3383,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       if (req.method === "DELETE") {
         const i = relations.findIndex((r) => r.id === key);
-        if (i < 0) return fail(404, "Relation not found");
+        if (i < 0) return failText(404, "Relation not found");
         return ok(M.TaskRelation, relations.splice(i, 1)[0]!);
       }
     }
@@ -3252,7 +3420,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if (req.method === "PATCH" && (p = m(/^\/notification\/([^/]+)\/read$/))) {
       const n = notifications.find((x) => x.id === decodeURIComponent(p![1]));
-      if (!n) return new Response("Notification not found", { status: 404 });
+      if (!n) return failText(404, "Notification not found");
       n.isRead = true;
       return ok(M.Notification, n);
     }
@@ -3277,21 +3445,21 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         else if (v !== null) (next as any)[k] = v;
       }
       if (next.emailEnabled && !next.emailAddress)
-        return new Response("Email notifications require an account email address", { status: 400 });
+        return failText(400, "Email notifications require an account email address");
       if (
         (next.ntfyEnabled || "ntfyServerUrl" in b || "ntfyTopic" in b || "ntfyToken" in b) &&
         (!next.ntfyServerUrl || !next.ntfyTopic)
       ) {
-        return new Response("ntfy requires a server URL and topic", { status: 400 });
+        return failText(400, "ntfy requires a server URL and topic");
       }
       if (
         (next.gotifyEnabled || "gotifyServerUrl" in b || "gotifyToken" in b) &&
         (!next.gotifyServerUrl || !nextSecrets.gotifyToken)
       ) {
-        return new Response("Gotify requires a server URL and app token", { status: 400 });
+        return failText(400, "Gotify requires a server URL and app token");
       }
       if ((next.webhookEnabled || "webhookUrl" in b || "webhookSecret" in b) && !next.webhookUrl) {
-        return new Response("Webhook notifications require an endpoint URL", { status: 400 });
+        return failText(400, "Webhook notifications require an endpoint URL");
       }
       Object.assign(settings, next);
       Object.assign(secrets, nextSecrets);
@@ -3323,17 +3491,16 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     }
     if ((p = m(/^\/notification-preferences\/workspaces\/([^/]+)$/))) {
       const ws = workspaces.find((w) => w.id === decodeURIComponent(p![1]));
-      if (!ws) return new Response("No access to the workspace", { status: 403 });
+      if (!ws) return failText(403, "No access to the workspace");
       const i = rules.findIndex((r) => r.workspaceId === ws.id);
       if (req.method === "PUT") {
         const b = body as any;
         if (b.projectMode === "selected") {
           const ids: string[] = b.selectedProjectIds ?? [];
-          if (ids.length === 0)
-            return new Response("Select at least one project for selected project mode", { status: 400 });
+          if (ids.length === 0) return failText(400, "Select at least one project for selected project mode");
           // Counted as rows found, so a repeated id fails like an unknown one.
           if (projects.filter((x) => x.workspaceId === ws.id && ids.includes(x.id)).length !== ids.length) {
-            return new Response("One or more selected projects are invalid", { status: 400 });
+            return failText(400, "One or more selected projects are invalid");
           }
         }
         const can = usable();
@@ -3344,7 +3511,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           ["gotifyEnabled", "Gotify"],
         ] as const) {
           if (b[channel] && !can[channel])
-            return new Response(`Enable ${name} notifications globally before using them here`, { status: 400 });
+            return failText(400, `Enable ${name} notifications globally before using them here`);
         }
         const at = nnow();
         const rule = {
@@ -3361,7 +3528,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         return ok(M.NotificationPreferences, preferences());
       }
       if (req.method === "DELETE") {
-        if (i < 0) return new Response("Workspace rule not found", { status: 404 });
+        if (i < 0) return failText(404, "Workspace rule not found");
         rules.splice(i, 1);
         return ok(M.NotificationPreferences, preferences());
       }
@@ -3391,7 +3558,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if ((p = m(/^\/label\/([^/]+)(\/task)?$/))) {
       const l = labels.find((x) => x.id === decodeURIComponent(p![1]));
       // The server's workspace check runs first and cannot place an unknown id.
-      if (!l) return fail(400, "Workspace ID could not be determined");
+      if (!l) return failText(400, "Workspace ID could not be determined");
       if (req.method === "GET" && !p[2]) return ok(M.Label, l);
       if (req.method === "PUT" && !p[2]) {
         const b = body as any;
@@ -3417,15 +3584,16 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       }
       if (req.method === "PUT" && p[2]) {
         const taskId = (body as any).taskId;
-        if (workspaceOf(taskId) === undefined) return fail(404, "Task not found");
-        if (workspaceOf(taskId) !== l.workspaceId) return fail(400, "Label and task must belong to the same workspace");
+        if (workspaceOf(taskId) === undefined) return failText(404, "Task not found");
+        if (workspaceOf(taskId) !== l.workspaceId)
+          return failText(400, "Label and task must belong to the same workspace");
         if (l.taskId === taskId) return ok(M.Label, l);
         if (l.taskId !== null) labels.splice(labels.indexOf(l), 1);
         const have = labels.find((c) => c.taskId === taskId && c.name === l.name);
         return ok(M.Label, have ?? addLabel(l.name, l.color, l.workspaceId!, taskId));
       }
       if (req.method === "DELETE" && p[2]) {
-        if (l.taskId === null) return fail(400, "Label is not assigned to a task");
+        if (l.taskId === null) return failText(400, "Label is not assigned to a task");
         return ok(M.Label, labels.splice(labels.indexOf(l), 1)[0]!);
       }
     }
@@ -4076,7 +4244,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         try {
           new Intl.DateTimeFormat("en-US", { timeZone: b.timeZone ?? "UTC" });
         } catch {
-          return fail(400, "Invalid key: timeZone: Invalid time zone");
+          return failText(400, "timeZone: Invalid time zone");
         }
         // As createCalendarFeed in v2.32.0's service: the ids dedupe and must
         // all be live labels of the project's workspace, then resolve by name
@@ -4259,7 +4427,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       if (req.method === "GET") return ok(integrationSchema(kind), existing ? integrationResponse(existing) : null);
       if (opts.plainMember) return failText(403, "Insufficient permissions");
       if (req.method === "DELETE") {
-        if (!existing) return new Response("Project or integration not found", { status: 404 });
+        if (!existing) return failText(404, "Project or integration not found");
         integrations.splice(integrations.indexOf(existing), 1);
         dropLinksFor(existing.id);
         return ok(integrationDeleteSchema(kind), { success: true });
@@ -4285,14 +4453,14 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
           updatedAt: at,
         };
         if (kind === "mattermost" && !(row.webhookUrl ?? "").startsWith("https://")) {
-          return new Response("Webhook URL must be an HTTPS URL", { status: 400 });
+          return failText(400, "Webhook URL must be an HTTPS URL");
         }
         if (existing) integrations[integrations.indexOf(existing)] = row;
         else integrations.push(row);
         return ok(integrationSchema(kind), integrationResponse(row));
       }
       if (req.method === "PATCH") {
-        if (!existing) return new Response("Project or integration not found", { status: 404 });
+        if (!existing) return failText(404, "Project or integration not found");
         // Omitted fields keep their stored value; event toggles merge into the
         // stored set rather than replacing it. The merged row is validated
         // before anything is written, so a refused PATCH leaves the stored
@@ -4314,7 +4482,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
         if (kind === "generic-webhook" && b.dueDateReminderLeadTimeMinutes !== undefined)
           merged.dueDateReminderLeadTimeMinutes = b.dueDateReminderLeadTimeMinutes;
         if (kind === "mattermost" && !(merged.webhookUrl ?? "").startsWith("https://")) {
-          return new Response("Webhook URL must be an HTTPS URL", { status: 400 });
+          return failText(400, "Webhook URL must be an HTTPS URL");
         }
         Object.assign(existing, merged);
         return ok(integrationSchema(kind), integrationResponse(existing));
@@ -4398,7 +4566,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     const descriptionMiss = (gone: boolean): Response | undefined => {
       const version = url.searchParams.get("version");
       if (!gone && (version === null || version === DESCRIPTION_VERSION)) return undefined;
-      return fail(
+      return failText(
         version === null ? 404 : 409,
         "Description changed or is unavailable; refresh before loading it again",
       );
@@ -4428,8 +4596,8 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       // As get-public-project.ts answers: an unknown id is a 404, a project
       // that is not public a 403 — the board is not read for either.
-      if (!proj) return fail(404, "Project not found");
-      if (!proj.isPublic) return fail(403, "Project is not public");
+      if (!proj) return failText(404, "Project not found");
+      if (!proj.isPublic) return failText(403, "Project is not public");
       const filterStatus = url.searchParams.get("status");
       const filterPriority = url.searchParams.get("priority");
       const filterAssignee = url.searchParams.get("assigneeId");
@@ -4508,15 +4676,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if (req.method === "GET" && (p = m(/^\/asset\/([^/]+)$/))) {
       const asset = assets.get(decodeURIComponent(p![1]));
-      if (asset === undefined) return fail(404, "Asset not found");
+      if (asset === undefined) return failText(404, "Asset not found");
       // An asset of a private project answers only to a credential.
-      if (!asset.public && req.headers.get("authorization") !== "Bearer test-key") return fail(401, "Unauthorized");
+      if (!asset.public && req.headers.get("authorization") !== "Bearer test-key") return failText(401, "Unauthorized");
       return new Response(asset.body, { headers: { "content-type": asset.contentType } });
     }
     if (req.method === "GET" && (p = m(/^\/user\/avatar\/([^/]+)$/))) {
       const id = decodeURIComponent(p![1]);
       const avatar = avatars.get(id) ?? (id === "avatar-self" ? ownAvatar : undefined);
-      if (avatar === undefined) return fail(404, "Avatar not found");
+      if (avatar === undefined) return failText(404, "Avatar not found");
       return new Response(avatar.body, { headers: { "content-type": avatar.contentType } });
     }
     if (req.method === "PUT" && path === "/user/avatar") {
@@ -4537,11 +4705,20 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       return chatIntegration(p[1] as ChatKind, decodeURIComponent(p[2]), req.method, body);
     }
 
-    return fail(404, `no route: ${req.method} ${path}`);
+    // Hono's own not-found answer, which is also what an older server gives a
+    // route it does not have (noCurrentUser's /user/me): text, not the
+    // envelope, and the document declares the same for the paths it knows.
+    return failText(404, "404 Not Found");
   };
 
   const whitespace = opts.whitespaceOn ? new RegExp(opts.whitespaceOn) : undefined;
   const dropped = opts.dropCommentsMatching ? new RegExp(opts.dropCommentsMatching) : undefined;
+  // Every error reply is checked against the content type the pinned document
+  // declares for its operation and status, so a route answering the JSON
+  // envelope where the server answers text fails the run rather than passing
+  // quietly. Replies the document leaves untyped — a status it does not
+  // declare — are the server's own choice and are not checked.
+  const specViolations: string[] = [];
   const delayed = async (req: Request) => {
     if (opts.delayMs) await Bun.sleep(opts.delayMs);
     if (whitespace?.test(`${req.method} ${new URL(req.url).pathname.replace(/^\/api/, "")}`)) {
@@ -4553,12 +4730,26 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       });
       return new Response("  \n", { status: 200, headers: { "content-type": "application/json" } });
     }
-    return route(req);
+    const res = await route(req);
+    if (res.status >= 400) {
+      const path = new URL(req.url).pathname.replace(/^\/api/, "");
+      const declared = declaredErrorTypes(req.method, path, res.status);
+      if (declared !== undefined) {
+        const sent = res.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
+        if (!declared.includes(sent)) {
+          specViolations.push(
+            `${req.method} ${path} answered ${res.status} as ${sent === "" ? "no content type" : sent}; the document declares ${declared.join(" or ")}`,
+          );
+        }
+      }
+    }
+    return res;
   };
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: delayed });
   return {
     url: `http://127.0.0.1:${server.port}`,
     requests,
+    specViolations,
     stop: () => server.stop(true),
   };
 }
@@ -4725,7 +4916,105 @@ function legacy(body: unknown): unknown {
 const parsedDate = (given: string, field: string): string | Response => {
   const at = new Date(given);
   if (given.trim() === "" || Number.isNaN(at.getTime())) {
-    return Response.json({ success: false, error: `Invalid ${field} "${given}"` }, { status: 400 });
+    return new Response(`Invalid ${field} "${given}"`, {
+      status: 400,
+      headers: { "content-type": "text/plain;charset=UTF-8" },
+    });
   }
   return at.toISOString();
+};
+
+// The search route's query schema, mirroring apps/api/src/search/schema.ts at
+// the pinned release. The document cannot carry the transform and the custom
+// messages, so they are written out here: limit arrives as a string and is
+// narrowed to an integer 1–50, and each bound names itself in the 400.
+const searchQuerySchema = z.object({
+  q: z.string().min(1, "Query must be at least 1 character").max(512, "Query must not exceed 512 characters"),
+  type: z.enum(["all", "tasks", "projects", "workspaces", "comments", "activities"]).optional().default("all"),
+  workspaceId: z.string().min(1),
+  projectId: z.string().optional(),
+  limit: z
+    .string()
+    .optional()
+    .default("20")
+    .transform(Number)
+    .pipe(
+      z.number().int("Limit must be an integer").min(1, "Limit must be at least 1").max(50, "Limit must not exceed 50"),
+    ),
+  userEmail: z.email().optional(),
+});
+
+// A task's short id is its project key plus the task number, as
+// task-short-id.ts's TASK_SHORT_ID_PATTERN matches it: any script letter or
+// number starts the key, dashes and marks may follow, and the number is all
+// digits after the last dash.
+const TASK_SHORT_ID = /^([\p{L}\p{N}][\p{L}\p{N}\p{M}_-]*)-(\d+)$/u;
+
+// LIKE as Postgres reads it for the search queries: the whole string must
+// match the pattern, % any run of characters, _ any one, \ the next
+// character literally. Both sides arrive lowered, as LOWER() leaves them.
+const likePatternMatch = (text: string, pattern: string): boolean => {
+  let source = "^";
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i]!;
+    if (c === "\\" && i + 1 < pattern.length) source += escapeRegExp(pattern[++i]!);
+    else if (c === "%") source += "[\\s\\S]*";
+    else if (c === "_") source += "[\\s\\S]";
+    else source += escapeRegExp(c);
+  }
+  return new RegExp(`${source}$`).test(text);
+};
+
+const escapeRegExp = (c: string): string => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// jsonb's text form, which is what CAST(eventData AS text) searches: the
+// separators carry the space Postgres prints. Key order is kept as stored;
+// jsonb's own ordering only matters to a query spanning two keys.
+const pgJsonText = (value: unknown): string => {
+  if (value === null || value === undefined) return "null";
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") return String(value);
+  if (Array.isArray(value)) return `[${value.map(pgJsonText).join(", ")}]`;
+  return `{${Object.entries(value as Record<string, unknown>)
+    .map(([k, v]) => `${JSON.stringify(k)}: ${pgJsonText(v)}`)
+    .join(", ")}}`;
+};
+
+const toDisplayCase = (value: string): string =>
+  value
+    .replace(/[-_]/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+
+// The summary the server renders an activity's eventData into for a search
+// hit, from getActivitySearchContent in global-search.ts: the content column
+// wins when there is one, and an event type it does not know has none.
+const activitySearchContent = (type: string, content: string | null, eventData: unknown): string | undefined => {
+  if (content) return content;
+  if (!eventData || typeof eventData !== "object" || Array.isArray(eventData)) return undefined;
+  const data = eventData as Record<string, unknown>;
+  switch (type) {
+    case "status_changed":
+      return `changed status from ${toDisplayCase(String(data.oldStatus ?? ""))} to ${toDisplayCase(String(data.newStatus ?? ""))}`;
+    case "priority_changed":
+      return `changed priority from ${toDisplayCase(String(data.oldPriority ?? ""))} to ${toDisplayCase(String(data.newPriority ?? ""))}`;
+    case "unassigned":
+      return "unassigned the task";
+    case "assignee_changed":
+      return data.isSelfAssigned
+        ? "assigned the task to themselves"
+        : `assigned the task to ${String(data.newAssignee ?? "someone")}`;
+    case "due_date_changed":
+      if (!data.newDueDate) return "cleared the due date";
+      if (!data.oldDueDate) return `set due date to ${String(data.newDueDate)}`;
+      return `changed due date from ${String(data.oldDueDate)} to ${String(data.newDueDate)}`;
+    case "title_changed":
+      return `changed title from "${String(data.oldTitle ?? "")}" to "${String(data.newTitle ?? "")}"`;
+    case "task":
+      return "created the task";
+    default:
+      return undefined;
+  }
 };

@@ -10,8 +10,8 @@
         "--json"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"POST /api/task/proj-alpha: 400: Invalid key: priority: Invalid option: expected one of \\\"no-priority\\\"|\\\"low\\\"|\\\"medium\\\"|\\\"high\\\"|\\\"urgent\\\"\"\n}\n",
-      "stderr": "Error: POST /api/task/proj-alpha: 400: Invalid key: priority: Invalid option: expected one of \"no-priority\"|\"low\"|\"medium\"|\"high\"|\"urgent\"\n"
+      "stdout": "{\n  \"error\": \"POST /api/task/proj-alpha: 400: priority: Invalid option: expected one of \\\"no-priority\\\"|\\\"low\\\"|\\\"medium\\\"|\\\"high\\\"|\\\"urgent\\\"\"\n}\n",
+      "stderr": "Error: POST /api/task/proj-alpha: 400: priority: Invalid option: expected one of \"no-priority\"|\"low\"|\"medium\"|\"high\"|\"urgent\"\n"
     }
   ],
   "requests": [

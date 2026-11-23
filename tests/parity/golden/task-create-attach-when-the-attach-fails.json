@@ -57,6 +57,11 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
       "path": "/comment/task0002",
       "query": "",

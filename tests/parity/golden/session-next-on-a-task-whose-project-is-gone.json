@@ -31,8 +31,8 @@
         "--strict"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"POST /api/comment/task-a1: 400: Workspace ID could not be determined\"\n}\n",
-      "stderr": "Error: POST /api/comment/task-a1: 400: Workspace ID could not be determined\n"
+      "stdout": "{\n  \"error\": \"GET /api/task/task-a1: 404: Task not found\"\n}\n",
+      "stderr": "Error: GET /api/task/task-a1: 404: Task not found\n"
     },
     {
       "args": [
@@ -67,16 +67,39 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
-      "path": "/comment/task-a1",
+      "path": "/custom-field",
       "query": "",
       "body": {
-        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->"
+        "projectId": "proj-alpha",
+        "name": "kaneo-session",
+        "type": "text",
+        "required": false
       }
     },
     {
       "method": "GET",
-      "path": "/comment/task-a1",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "fieldId": "fld0001",
+        "value": "[{\"sessionId\":\"sess-test\",\"host\":\"<HOST>\",\"cwd\":\"<HOME>/work\",\"branch\":\"\",\"nextStep\":\"\",\"at\":\"<TIME>Z\"}]"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
       "query": ""
     },
     {
@@ -120,12 +143,9 @@
       "query": ""
     },
     {
-      "method": "POST",
-      "path": "/comment/task-a1",
-      "query": "",
-      "body": {
-        "content": "<!-- kn:session id=sess-test host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->\nonward"
-      }
+      "method": "GET",
+      "path": "/task/task-a1",
+      "query": ""
     }
   ],
   "files": {

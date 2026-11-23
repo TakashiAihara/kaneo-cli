@@ -28,6 +28,10 @@ beforeEach(() => {
     port: 0,
     fetch: async (req) => {
       const url = new URL(req.url);
+      // The custom-field routes answer as a server that predates them does,
+      // so the session writes these tests spoil are the marker posts they
+      // were written for: a field value's reply carries no time to spoil.
+      if (url.pathname.startsWith("/api/custom-field")) return new Response("404 Not Found", { status: 404 });
       const reply = await fetch(fake.url + url.pathname + url.search, {
         method: req.method,
         headers: req.headers,

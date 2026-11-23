@@ -92,6 +92,11 @@
       "method": "GET",
       "path": "/auth/organization/list",
       "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
     }
   ],
   "files": {

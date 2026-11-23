@@ -1,6 +1,7 @@
 import { writeSync } from "node:fs";
 import { basename } from "node:path";
-import { holding, sessionIds } from "../session/marker";
+import { sessionIds } from "../session/marker";
+import { fieldSessionIds, mergeHolds, moveSessionField, sessionBacking } from "../session/holds";
 import { apiKey, project, taskProject, workspace, type App } from "./app";
 import {
   addComment,
@@ -1017,6 +1018,19 @@ export const taskCommand = {
               `task moved, but the session records naming it could not be updated: ${e instanceof Error ? e.message : String(e)}`,
             );
           }
+          // The session holds live in the old project's field, and a value row
+          // is keyed to the field it was written to: without the copy below the
+          // move would leave them where the new board never looks. Best-effort
+          // like the attachment rewrite — a hold the server kept is still a
+          // hold the task had, and a field that cannot be written leaves the
+          // board showing it on the old project rather than failing the move.
+          try {
+            await moveSessionField(task.id, task.projectId, after.projectId);
+          } catch (e) {
+            app.out.status(
+              `task moved, but its session field could not be moved: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
           // The destination as it was typed: the read-back above has already
           // confirmed the task sits on the project the value resolved to, so a
           // reader is shown what they asked for rather than the id behind it.
@@ -1027,7 +1041,7 @@ export const taskCommand = {
         const migrated = await migrateAcrossWorkspaces(task, source, dest);
         app.out.human(`#${task.number} -> ${migrated.createdRef} ${migrated.task.title}`);
         app.out.human(
-          `sessions in the old comments: ${migrated.sessions.length === 0 ? "none" : migrated.sessions.join(", ")}`,
+          `sessions the old task held: ${migrated.sessions.length === 0 ? "none" : migrated.sessions.join(", ")}`,
         );
         app.out.data(migrated.report);
       },
@@ -1495,8 +1509,9 @@ const namedTasks = (tasks: Task[]): string => tasks.map((task) => `#${task.numbe
 
 // The sessions holding a task, as `board --json` reports them under sessions[]
 // but for the task fields, which the task around them already has. updatedAt is
-// the time of the session's newest marker, not of its first: a session that
-// attached, closed and attached again has no single attach time to give.
+// the time of the session's newest hold — its field entry's write, or its
+// newest marker's comment — not of its first: a session that attached, closed
+// and attached again has no single attach time to give.
 const heldBy = async (task: Task) => {
   let comments;
   try {
@@ -1504,7 +1519,13 @@ const heldBy = async (task: Task) => {
   } catch (e) {
     throw new Error(`comments for #${task.number}: ${e instanceof Error ? e.message : String(e)}`);
   }
-  return holding(comments).map((marker) => ({
+  let backing;
+  try {
+    backing = await sessionBacking(task.id, task.projectId, false);
+  } catch (e) {
+    throw new Error(`session field for #${task.number}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  return mergeHolds(backing?.holds ?? [], comments).map((marker) => ({
     sessionId: marker.sessionId,
     host: marker.host,
     branch: marker.branch,
@@ -1626,7 +1647,7 @@ const migrateAcrossWorkspaces = async (
   // The whole record, not the board's row of it: the listing can leave a
   // description out, and a migration that carried half of one would lose it.
   const full = await getTask(task.id);
-  const sessions = sessionIds(comments);
+  const sessions = [...new Set([...sessionIds(comments), ...(await fieldSessionIds(task.id, source.id))])];
   // A status is a column of the project, and the destination's columns are its
   // own: one it lacks would create a task no column shows, the failure task
   // import refuses before sending. Checked before anything is written.

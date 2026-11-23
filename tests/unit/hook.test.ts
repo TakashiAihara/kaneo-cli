@@ -82,6 +82,10 @@ beforeEach(() => {
     port: 0,
     fetch: async (req) => {
       const url = new URL(req.url);
+      // The custom-field routes answer as a server that predates them does,
+      // so the hold these tests observe and fail is the marker post they were
+      // written for.
+      if (url.pathname.startsWith("/api/custom-field")) return new Response("404 Not Found", { status: 404 });
       if (req.method === "POST" && url.pathname.startsWith("/api/comment/")) {
         beforeComment?.();
         if (commentStatus !== 200) return new Response('{"error":"nope"}', { status: commentStatus });

@@ -12,6 +12,7 @@ import { hard } from "../cli/failopen";
 import { hookEnv, runHook } from "../cli/hook";
 import { taskRef } from "../cli/lookup";
 import { format, RUNNING, type Marker } from "./marker";
+import { confirmFieldWrite, encodeHolds, holdOf, sessionBacking, upsertHold, writeHolds } from "./holds";
 import * as store from "./store";
 import { shellWord } from "../output/output";
 import type { Attachment } from "./store";
@@ -42,39 +43,51 @@ export const currentSessionId = (): string => store.currentId(env);
 // project and workspace it belongs to.
 export const attachmentOf = (task: Task): Attachment => ({ taskId: task.id, number: task.number, title: task.title });
 
-// Records this session as working on a task: the marker in a comment, the
-// attachment and the history line beside it, and the attach hook. nextStep is
-// what the marker records as the step to come, and may be empty.
+// Records this session as working on a task: the hold in the task's session
+// field or a marker in a comment, the attachment and the history line beside
+// it, and the attach hook. nextStep is what the hold records as the step to
+// come, and may be empty.
 //
 // The task is resolved by the caller, since `session attach` is given a reference
 // and `task create --attach` already holds what it made. Failing after the
-// marker is posted is a hard failure: the server has a marker for this session
+// hold is written is a hard failure: the server has a hold for this session
 // that nothing here knows about.
 export const attachTask = async (app: App, sessionId: string, task: Task, nextStep: string): Promise<Attachment> => {
-  // Looked up before the marker is posted, so the lookups do not widen the
-  // window where the server has a marker and this host has no record.
+  // Looked up before the hold is written, so the lookups do not widen the
+  // window where the server has a hold and this host has no record.
   const attachment = attachmentOf(task);
   const slug = await describeBoard(task, attachment, "attach");
 
   const marker = store.describe(env, cwd(), RUNNING);
   marker.nextStep = nextStep;
-  // Confirmed before anything is written here, so a marker this machine has no
-  // record of is one the server kept. A listing that could not be made is a hard
-  // failure here, since it would leave the attachment to say what it cannot show.
-  const posted = await postMarker(
-    task.id,
-    marker,
-    task.number,
-    "nothing is recorded here for it",
-    `\`kaneo session attach ${shellWord(taskRef(attachment.projectSlug, task.number, attachment.projectId, attachment.taskId))}\` records it here, and posts a second marker; \`kaneo session status\` shows what is held here`,
-  );
-  await confirmMarker(task.id, task.number, posted, format(marker), "hard");
+  // The hold's home is the task's session field where the server has custom
+  // fields; the comment marker is the only storage an older server has, and
+  // stays the fallback for projects that never got one. Either way it is
+  // confirmed before anything is written here, so a hold this machine has no
+  // record of is one the server kept — a listing that could not be made is a
+  // hard failure, since it would leave the attachment to say what it cannot
+  // show.
+  const backing = await sessionBacking(task.id, task.projectId, true);
+  if (backing !== undefined && backing.field !== undefined) {
+    const next = upsertHold(backing.holds, holdOf(marker, new Date().toISOString()));
+    await writeHolds(task.id, backing.field.id, next);
+    await confirmFieldWrite(task.id, task.number, backing.field.id, encodeHolds(next), "hard");
+  } else {
+    const posted = await postMarker(
+      task.id,
+      marker,
+      task.number,
+      "nothing is recorded here for it",
+      `\`kaneo session attach ${shellWord(taskRef(attachment.projectSlug, task.number, attachment.projectId, attachment.taskId))}\` records it here, and posts a second marker; \`kaneo session status\` shows what is held here`,
+    );
+    await confirmMarker(task.id, task.number, posted, format(marker), "hard");
+  }
   try {
     store.save(store.sessionStore(), sessionId, attachment);
   } catch (e) {
-    // The marker is already on the server. Reporting success here would
+    // The hold is already on the server. Reporting success here would
     // leave `session next` believing nothing is attached, and a retry
-    // would post a second marker.
+    // would write a second one.
     throw hard(
       `attached ${taskRef(attachment.projectSlug, attachment.number, attachment.projectId, attachment.taskId)} on the server, but could not record it locally: ${(e as Error).message}`,
     );

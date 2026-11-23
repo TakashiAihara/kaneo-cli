@@ -312,6 +312,10 @@ export type FakeOptions = {
   // How many matching requests are answered as usual before failOn starts, so
   // a scenario can set something up through the route it then breaks.
   failOnSkip?: number;
+  // Several routes failing at once, each with its own status, message and skip
+  // count — for a scenario that needs one route's refusal beside another's,
+  // which failOn's single status cannot say. Checked before failOn.
+  failures?: { match: string; status?: number; message?: string; skip?: number }[];
   // Answers this many workspace listings with better-auth's 429, asking the
   // caller to come back after rateLimitWaitMs.
   rateLimitTimes?: number;
@@ -1640,6 +1644,7 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
   const failing = opts.failOn ? new RegExp(opts.failOn) : undefined;
   const failingQuery = opts.failOnQuery ? new RegExp(opts.failOnQuery) : undefined;
+  const failureRules = (opts.failures ?? []).map((f) => ({ ...f, regex: new RegExp(f.match), seen: 0 }));
   let skipped = 0;
   let limited = 0;
   const misstoring = opts.misstoreOn ? new RegExp(opts.misstoreOn) : undefined;
@@ -1649,7 +1654,15 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   // /uploads/ storage route asks the same question itself, since it answers
   // before the /api checks below run.
   const injectedFailure = (method: string, path: string, query: string): Response | undefined => {
-    if (failing === undefined || !failing.test(`${method} ${path}`)) return undefined;
+    const key = `${method} ${path}`;
+    for (const rule of failureRules) {
+      if (!rule.regex.test(key)) continue;
+      if (rule.seen++ < (rule.skip ?? 0)) continue;
+      return rule.message === undefined
+        ? fail(rule.status ?? 500, "injected failure")
+        : failText(rule.status ?? 500, rule.message);
+    }
+    if (failing === undefined || !failing.test(key)) return undefined;
     if (!(failingQuery?.test(query) ?? true)) return undefined;
     if (skipped++ < (opts.failOnSkip ?? 0)) return undefined;
     return opts.failMessage === undefined

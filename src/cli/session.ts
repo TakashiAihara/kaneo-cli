@@ -3,8 +3,18 @@ import { minimumArgs, noArgs, type RunContext } from "./args";
 import { failOpen, hard, strictFlag } from "./failopen";
 import { hookEnv, runHook } from "./hook";
 import { resolveTask } from "./task";
-import { listComments } from "../api/kaneo";
+import { getTask, listComments, type Comment } from "../api/kaneo";
+import { KaneoApiError } from "../api/http";
 import { CLOSED, format, RUNNING, holding, shortId, type Marker } from "../session/marker";
+import {
+  confirmFieldWrite,
+  dropHold,
+  encodeHolds,
+  holdOf,
+  sessionBacking,
+  upsertHold,
+  writeHolds,
+} from "../session/holds";
 import * as store from "../session/store";
 import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
@@ -22,8 +32,10 @@ export const sessionCommand = {
   short: "Tie the current agent session to a task",
   long:
     "Tie the current agent session to a task.\n\n" +
-    "Tasks have no custom fields, so the association is written as a marker in a\n" +
-    "task comment. The session is identified by KANEO_SESSION_ID, falling back to\n" +
+    "The hold is kept in the task's kaneo-session custom field, created in its\n" +
+    "project on first use; a task on a server without custom fields, or a hold\n" +
+    "written before the field existed, is read from a marker in a task comment.\n" +
+    "The session is identified by KANEO_SESSION_ID, falling back to\n" +
     "CLAUDE_CODE_SESSION_ID, COPILOT_AGENT_SESSION_ID, DEVIN_SESSION_ID, and the\n" +
     "Devin CLI session this process runs under, detected on Linux only through\n" +
     "the session lock an ancestor process holds.",
@@ -67,28 +79,39 @@ export const sessionCommand = {
       ],
       run: failOpen(async ({ args, flags, app }: RunContext<App>) => {
         apiKey(app);
-        const { taskId, number, reference } = await targetTask(app, String(flags.task ?? ""), writeAccess(flags));
+        const target = await targetTask(app, String(flags.task ?? ""), writeAccess(flags));
         const step = args.join(" ").trim();
         if (step === "") throw new Error("no next step given");
 
         const marker = store.describe(env, cwd(), RUNNING);
         marker.nextStep = step;
-        // `session next` keeps no local record of the marker, so there is nothing
-        // here to disagree with the server over a listing that could not be made:
-        // the write landed and an unreachable board is what fail-open is for.
-        const posted = await postMarker(
-          taskId,
-          marker,
-          number,
-          "this command keeps no local record, so nothing here is out of step",
-          `it can be run again, that would only post a second marker; \`kaneo comment ls ${shellWord(reference)}\` shows it`,
-        );
-        await confirmMarker(taskId, number, posted, format(marker), "fail-open");
+        // The hold's home is the task's session field where the server has
+        // custom fields; the comment marker is the only storage an older
+        // server has. Either way the write is confirmed, but `session next`
+        // keeps no local record of it, so there is nothing here to disagree
+        // with the server over a listing that could not be made: the write
+        // landed and an unreachable board is what fail-open is for.
+        const projectId = target.fromAttachment ? (await getTask(target.taskId)).projectId : target.projectId;
+        const backing = await sessionBacking(target.taskId, projectId, true);
+        if (backing !== undefined && backing.field !== undefined) {
+          const next = upsertHold(backing.holds, holdOf(marker, new Date().toISOString()));
+          await writeHolds(target.taskId, backing.field.id, next);
+          await confirmFieldWrite(target.taskId, target.number, backing.field.id, encodeHolds(next), "fail-open");
+        } else {
+          const posted = await postMarker(
+            target.taskId,
+            marker,
+            target.number,
+            "this command keeps no local record, so nothing here is out of step",
+            `it can be run again, that would only post a second marker; \`kaneo comment ls ${shellWord(target.reference)}\` shows it`,
+          );
+          await confirmMarker(target.taskId, target.number, posted, format(marker), "fail-open");
+        }
 
-        app.out.human(`${reference} next: ${step}`);
+        app.out.human(`${target.reference} next: ${step}`);
         // A Go map, which its encoder writes with the keys sorted. The report is
         // built in that order rather than sorted here, for the same bytes.
-        app.out.data({ nextStep: step, number, taskId });
+        app.out.data({ nextStep: step, number: target.number, taskId: target.taskId });
       }),
     },
     {
@@ -109,7 +132,8 @@ export const sessionCommand = {
         "attached there, and a task this session attached earlier can be\n" +
         "closed with no attachment at all.\n\n" +
         "With --session <id>, the hold of another session is released instead:\n" +
-        "a closed marker is posted for that session id on the task --task names.\n" +
+        "its entry is dropped from the task's session field, or a closed marker\n" +
+        "is posted for that session id on the task --task names.\n" +
         "This is the way to let go of a session whose host can no longer run the\n" +
         "close itself — an imported board can carry markers for hosts that are\n" +
         "gone — since nothing on this machine records that session.",
@@ -180,19 +204,23 @@ export const sessionCommand = {
         const marker = store.describe(env, cwd(), CLOSED);
         marker.nextStep = `Session ended. Resume with \`claude --resume ${sessionId}\`.`;
         // A held task the server can no longer place (deleted, or not in any
-        // workspace the key reaches) can never take the marker, so the
+        // workspace the key reaches) can never take the hold's write, so the
         // attachment is released anyway rather than left for every later close
-        // to fail on. The marker is then never written, even if the task comes
-        // back. A task named but not held is not released: there is nothing of
-        // it here to release.
-        const posted = await postMarker(
+        // to fail on. The hold is then never ended there, even if the task
+        // comes back. A task named but not held is not released: there is
+        // nothing of it here to release. task?.projectId is fresh where it is
+        // set — it comes from the lookup of a named task — and the attachment's
+        // copy can name a project the task was on at attach time, so the held
+        // case asks the server instead.
+        const written = await closeOnServer(
           closed.taskId,
-          marker,
           closed.number,
-          "the attachment and history here are unchanged",
-          `\`kaneo session close --task ${shellWord(closing)}\` again finishes closing here, and posts a second close marker`,
+          sessionId,
+          marker,
+          task?.projectId,
+          closing,
         ).catch((e: unknown) => {
-          if (holds && placesNothing(e)) return undefined;
+          if (holds && unwritable(e)) return undefined;
           throw e;
         });
         // A task closed by name that the attachment does not hold has no board on
@@ -221,20 +249,31 @@ export const sessionCommand = {
         }
         await runHook(app, "close", hookEnv("close", sessionId, closed.taskId, closed.number, ""));
 
-        // Confirmed last of all, so a marker this close cannot confirm fails on a
+        // Confirmed last of all, so a hold this close cannot confirm fails on a
         // machine that no longer says it holds the task. The trade-off is that a
-        // marker the server did not keep leaves the board's last marker saying
+        // hold the server did not keep leaves the board's last record saying
         // running while this machine says closed; `session close --task <N>`
-        // posts it again. Held back the other way, a close whose marker was lost
+        // ends it again. Held back the other way, a close whose write was lost
         // would leave the session attached to a task it has left.
         // After the hook: the session has let go of the task, which is what the
         // hook follows. The exit is still 1, since the board was not told.
-        if (posted === undefined) {
+        if (written === undefined) {
           throw hard(
-            `released ${taskRef(closed.projectSlug, closed.number, closed.projectId, closed.taskId)} ${closed.title} here, but the server can no longer place its task (deleted, or out of this key's reach), so no close marker was written`,
+            `released ${taskRef(closed.projectSlug, closed.number, closed.projectId, closed.taskId)} ${closed.title} here, but the server can no longer place its task (deleted, or out of this key's reach), so its hold was not ended there`,
           );
         }
-        await confirmMarker(closed.taskId, closed.number, posted, format(marker), "fail-open");
+        if (written.field !== undefined) {
+          await confirmFieldWrite(
+            closed.taskId,
+            closed.number,
+            written.field.fieldId,
+            written.field.expected,
+            "fail-open",
+          );
+        }
+        if (written.marker !== undefined) {
+          await confirmMarker(closed.taskId, closed.number, written.marker, format(marker), "fail-open");
+        }
 
         app.out.human(
           `closed: ${taskRef(closed.projectSlug, closed.number, closed.projectId, closed.taskId)} ${closed.title}`,
@@ -284,16 +323,93 @@ export const sessionCommand = {
   ],
 };
 
-// Releases another session's hold on a task: the closed marker is posted for
-// the session id --session names, on the task --task resolves to.
+// What a close wrote on the server: the session field's new value, the
+// closed marker it posted for a running marker the session also had, or
+// both — a hold can live in both places while a board carries markers from
+// before the field existed.
+type CloseWrites = { field?: { fieldId: string; expected: string }; marker?: Comment };
+
+// Ends this session's hold on a task on the server, wherever it is held. A
+// server without custom fields has only the marker path it always had; a
+// field that names the session has its entry dropped, and a running comment
+// marker the session still has is retired with a closed one — but only when
+// there is one, since a hold that lives only in the field needs no comment.
+const closeOnServer = async (
+  taskId: string,
+  number: number,
+  sessionId: string,
+  marker: Marker,
+  knownProjectId: string | undefined,
+  closing: string,
+): Promise<CloseWrites> => {
+  // The project the field lives on is the task's own, read fresh: the
+  // attachment's copy can name the project the task was on at attach time.
+  const projectId = knownProjectId ?? (await getTask(taskId)).projectId;
+  const backing = await sessionBacking(taskId, projectId, false);
+  if (backing === undefined) {
+    return {
+      marker: await postMarker(
+        taskId,
+        marker,
+        number,
+        "the attachment and history here are unchanged",
+        `\`kaneo session close --task ${shellWord(closing)}\` again finishes closing here, and posts a second close marker`,
+      ),
+    };
+  }
+  // The marker state is read before anything is written: a task the server
+  // cannot place fails here with nothing ended, which is what releases the
+  // attachment below. A listing that fails any other way cannot rule a
+  // running marker out, so the close marker is posted the way it always was
+  // rather than skipped on a guess.
+  let comments: Comment[] | undefined;
+  try {
+    comments = await listComments(taskId);
+  } catch (e) {
+    if (unwritable(e)) throw e;
+    comments = undefined;
+  }
+  const writes: CloseWrites = {};
+  if (backing.field !== undefined) {
+    const next = dropHold(backing.holds, sessionId);
+    if (next.length !== backing.holds.length) {
+      await writeHolds(taskId, backing.field.id, next);
+      writes.field = { fieldId: backing.field.id, expected: encodeHolds(next) };
+    }
+  }
+  if (comments === undefined || holding(comments).some((m) => m.sessionId === sessionId)) {
+    writes.marker = await postMarker(
+      taskId,
+      marker,
+      number,
+      "the attachment and history here are unchanged",
+      `\`kaneo session close --task ${shellWord(closing)}\` again finishes closing here, and posts a second close marker`,
+    );
+  }
+  return writes;
+};
+
+// Whether the failure says the task cannot take the write: gone itself, or
+// in no project the key reaches. The field routes answer the placement
+// failures the comment route does, and the newer servers' 404s name the
+// task or project that is not there.
+const unwritable = (e: unknown): boolean =>
+  placesNothing(e) ||
+  (e instanceof KaneoApiError &&
+    e.statusCode === 404 &&
+    e.messages.some((m) => m === "Task not found" || m === "Project not found"));
+
+// Releases another session's hold on a task: the field entry or the closed
+// marker is written for the session id --session names, on the task --task
+// resolves to.
 //
 // This machine has no record of that session — it ran on a host that is gone,
-// or its marker arrived with an imported board — so there is no attachment to
-// clear and no history to append. What is left is the marker itself, which is
-// the whole of what the board reads a hold from. The hold is confirmed to be
-// there before the close is written: a closed marker for a session that was
-// never holding the task records an ending that never began, and the board
-// would then show the real hold as closed.
+// or its hold arrived with an imported board — so there is no attachment to
+// clear and no history to append. What is left is the hold itself, which is
+// the whole of what the board reads one from. The hold is confirmed to be
+// there before the close is written: ending a hold that was never there
+// records an ending that never began, and the board would then show the real
+// hold as closed.
 const releaseHold = async (app: App, releasing: string, named: string): Promise<void> => {
   apiKey(app);
   // The refusals here are hard errors rather than fail-open ones: --session is
@@ -327,29 +443,42 @@ const releaseHold = async (app: App, releasing: string, named: string): Promise<
   );
 
   const comments = await listComments(task.id);
-  if (!holding(comments).some((marker) => marker.sessionId === releasing)) {
+  const running = holding(comments);
+  const backing = await sessionBacking(task.id, task.projectId, false);
+  const inField =
+    backing !== undefined && backing.field !== undefined && backing.holds.some((h) => h.sessionId === releasing);
+  const inMarkers = running.some((marker) => marker.sessionId === releasing);
+  if (!inField && !inMarkers) {
     throw hard(`session ${releasing} is not holding ${reference}`);
   }
 
-  const marker: Marker = {
-    // The session being released, not this one: the marker is read back by the
-    // id it carries, which is the only thing that makes it that session's close.
-    sessionId: releasing,
-    host: "",
-    cwd: "",
-    branch: "",
-    state: CLOSED,
-    nextStep: `Session ended. Resume with \`claude --resume ${releasing}\`.`,
-    createdAt: "",
-  };
-  const posted = await postMarker(
-    task.id,
-    marker,
-    task.number,
-    "the task keeps showing that session as holding it",
-    `\`kaneo session close --session ${shellWord(releasing)} --task ${shellWord(reference)}\` again finishes it, and posts a second close marker`,
-  );
-  await confirmMarker(task.id, task.number, posted, format(marker), "fail-open");
+  if (backing !== undefined && backing.field !== undefined && inField) {
+    const next = dropHold(backing.holds, releasing);
+    await writeHolds(task.id, backing.field.id, next);
+    await confirmFieldWrite(task.id, task.number, backing.field.id, encodeHolds(next), "fail-open");
+  }
+  if (inMarkers) {
+    const marker: Marker = {
+      // The session being released, not this one: the marker is read back by
+      // the id it carries, which is the only thing that makes it that
+      // session's close.
+      sessionId: releasing,
+      host: "",
+      cwd: "",
+      branch: "",
+      state: CLOSED,
+      nextStep: `Session ended. Resume with \`claude --resume ${releasing}\`.`,
+      createdAt: "",
+    };
+    const posted = await postMarker(
+      task.id,
+      marker,
+      task.number,
+      "the task keeps showing that session as holding it",
+      `\`kaneo session close --session ${shellWord(releasing)} --task ${shellWord(reference)}\` again finishes it, and posts a second close marker`,
+    );
+    await confirmMarker(task.id, task.number, posted, format(marker), "fail-open");
+  }
 
   app.out.human(`released: session ${shortId(releasing)} on ${reference} ${task.title}`);
   app.out.data({ number: task.number, session: releasing, taskId: task.id });
@@ -369,12 +498,17 @@ export const releaseRef = (held: store.Attachment | undefined, named: string): s
 // Picks the task a command acts on: the one named explicitly, otherwise the one
 // this session attached to. reference is the task written the way a task
 // reference writes it — board and number — so a hint that asks the reader to
-// look at it or to run again names the board the write went to.
+// look at it or to run again names the board the write went to. projectId is
+// the project the write's field lives on: the lookup's for a named task,
+// undefined for an attached one, whose record can name a project the task
+// was on at attach time — the caller reads the task's own then.
+// fromAttachment marks which of the two the task came from, since only the
+// attached record carries the stale project.
 const targetTask = async (
   app: App,
   ref: string,
   access: ProjectAccess = {},
-): Promise<{ taskId: string; number: number; reference: string }> => {
+): Promise<{ taskId: string; number: number; reference: string; projectId: string; fromAttachment: boolean }> => {
   if (ref.trim() !== "") {
     const slugs = new Map<string, string>();
     const named = await resolveTask(app, ref, slugs, access);
@@ -382,6 +516,8 @@ const targetTask = async (
       taskId: named.id,
       number: named.number,
       reference: taskRef(slugs.get(named.projectId), named.number, named.projectId, named.id),
+      projectId: named.projectId,
+      fromAttachment: false,
     };
   }
   const sessionId = requireSessionId();
@@ -389,15 +525,17 @@ const targetTask = async (
   if (attached === undefined) {
     throw new Error("this session is not attached to a task; name one, or run 'kaneo session attach' first");
   }
-  // The marker this command posts is a comment write, so the project the
-  // attachment names is checked the way a named task's is. A record that
-  // never learned its project has none to check.
+  // The hold this command writes is a comment write on an old server, so the
+  // project the attachment names is checked the way a named task's is. A
+  // record that never learned its project has none to check.
   if (attached.projectId !== undefined && attached.projectId !== "")
     await guardProjectForMarker(attached.projectId, access);
   return {
     taskId: attached.taskId,
     number: attached.number,
     reference: taskRef(attached.projectSlug, attached.number, attached.projectId, attached.taskId),
+    projectId: attached.projectId ?? "",
+    fromAttachment: true,
   };
 };
 

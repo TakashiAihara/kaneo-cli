@@ -1,9 +1,11 @@
 // Which agent session is working on which task.
 //
-// Kaneo tasks carry no custom fields, so the association is stored in a task
-// comment as a machine-readable marker. The marker's wire format is fixed by
-// the Python `kn` that came first: both implementations read the same board
-// while one is being replaced by the other, so the format cannot drift.
+// New holds live in the task's kaneo-session custom field (see holds.ts);
+// this marker is the older storage, still written on servers without custom
+// fields and read everywhere for the holds written before the field existed.
+// The marker's wire format is fixed by the Python `kn` that came first: both
+// implementations read the same board while one is being replaced by the
+// other, so the format cannot drift.
 
 // The HTML comment carrying the session fields. The prefix is `kn:` rather than
 // `kaneo:` because that is what is already written on the board; changing it

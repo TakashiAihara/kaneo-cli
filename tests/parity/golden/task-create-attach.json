@@ -57,16 +57,39 @@
       "query": ""
     },
     {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
       "method": "POST",
-      "path": "/comment/task0002",
+      "path": "/custom-field",
       "query": "",
       "body": {
-        "content": "<!-- kn:session id=sess-create host=<HOST> cwd=<HOME>/work branch=- state=running enc=1 -->\nstart"
+        "projectId": "proj-alpha",
+        "name": "kaneo-session",
+        "type": "text",
+        "required": false
       }
     },
     {
       "method": "GET",
-      "path": "/comment/task0002",
+      "path": "/custom-field/task/task0002",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task0002",
+        "fieldId": "fld0001",
+        "value": "[{\"sessionId\":\"sess-create\",\"host\":\"<HOST>\",\"cwd\":\"<HOME>/work\",\"branch\":\"\",\"nextStep\":\"start\",\"at\":\"<TIME>Z\"}]"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task0002",
       "query": ""
     },
     {
@@ -77,6 +100,16 @@
     {
       "method": "GET",
       "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/values",
       "query": ""
     },
     {

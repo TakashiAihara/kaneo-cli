@@ -67,6 +67,11 @@
     },
     {
       "method": "GET",
+      "path": "/custom-field/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/task/tasks/ALP",
       "query": ""
     },

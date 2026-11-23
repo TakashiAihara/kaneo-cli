@@ -1,0 +1,286 @@
+{
+  "steps": [
+    {
+      "args": [
+        "session",
+        "attach",
+        "1",
+        "--strict"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"taskId\": \"task-a1\",\n  \"number\": 1,\n  \"title\": \"Write the parser\",\n  \"projectId\": \"proj-alpha\",\n  \"projectName\": \"Alpha\",\n  \"projectSlug\": \"ALP\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "session",
+        "attach",
+        "BET#1",
+        "--strict"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"taskId\": \"task-b1\",\n  \"number\": 1,\n  \"title\": \"Beta first\",\n  \"projectId\": \"proj-beta\",\n  \"projectName\": \"Beta\",\n  \"projectSlug\": \"BET\",\n  \"workspaceId\": \"ws-main\",\n  \"workspaceName\": \"Main\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "board",
+        "-p",
+        "ALP",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Alpha (open 2 / done 1)\n- [high] #1 Write the parser (to-do)\n- [no-priority] #2 Ship it (in-progress)\n\n### Sessions holding a task\n- #1 Write the parser — session sess-xpr @<HOST> branch=\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "board",
+        "-p",
+        "BET",
+        "--human"
+      ],
+      "exit": 0,
+      "stdout": "## Beta (open 1 / done 0)\n- [urgent] #1 Beta first (to-do)\n\n### Sessions holding a task\n- #1 Beta first — session sess-xpr @<HOST> branch=\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/custom-field",
+      "query": "",
+      "body": {
+        "projectId": "proj-alpha",
+        "name": "kaneo-session",
+        "type": "text",
+        "required": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-a1",
+        "fieldId": "fld0001",
+        "value": "[{\"sessionId\":\"sess-xproj\",\"host\":\"<HOST>\",\"cwd\":\"<HOME>/work\",\"branch\":\"\",\"nextStep\":\"\",\"at\":\"<TIME>Z\"}]"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "POST",
+      "path": "/custom-field",
+      "query": "",
+      "body": {
+        "projectId": "proj-beta",
+        "name": "kaneo-session",
+        "type": "text",
+        "required": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-b1",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/custom-field/value",
+      "query": "",
+      "body": {
+        "taskId": "task-b1",
+        "fieldId": "fld0003",
+        "value": "[{\"sessionId\":\"sess-xproj\",\"host\":\"<HOST>\",\"cwd\":\"<HOME>/work\",\"branch\":\"\",\"nextStep\":\"\",\"at\":\"<TIME>Z\"}]"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/task/task-b1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/ALP",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha/values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a1",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a2",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-a3",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project/BET",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/auth/organization/list",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-main"
+    },
+    {
+      "method": "GET",
+      "path": "/project",
+      "query": "?includeArchived=true&workspaceId=ws-other"
+    },
+    {
+      "method": "GET",
+      "path": "/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/task/tasks/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-beta",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-beta/values",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/comment/task-b1",
+      "query": ""
+    }
+  ],
+  "files": {
+    ".config/kaneo/sessions/sess-xproj.history.jsonl": "{\"event\":\"attach\",\"at\":\"<TIME>Z\",\"taskId\":\"task-a1\",\"number\":1,\"title\":\"Write the parser\",\"projectId\":\"proj-alpha\",\"projectName\":\"Alpha\",\"projectSlug\":\"ALP\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n{\"event\":\"attach\",\"at\":\"<TIME>Z\",\"taskId\":\"task-b1\",\"number\":1,\"title\":\"Beta first\",\"projectId\":\"proj-beta\",\"projectName\":\"Beta\",\"projectSlug\":\"BET\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}\n",
+    ".config/kaneo/sessions/sess-xproj.json": "{\"taskId\":\"task-b1\",\"number\":1,\"title\":\"Beta first\",\"projectId\":\"proj-beta\",\"projectName\":\"Beta\",\"projectSlug\":\"BET\",\"workspaceId\":\"ws-main\",\"workspaceName\":\"Main\"}"
+  }
+}

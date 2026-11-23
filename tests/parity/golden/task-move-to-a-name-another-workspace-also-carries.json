@@ -62,6 +62,11 @@
       "method": "GET",
       "path": "/task/task-a1",
       "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/custom-field/project/proj-alpha",
+      "query": ""
     }
   ],
   "files": {}

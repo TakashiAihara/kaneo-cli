@@ -182,6 +182,11 @@
     },
     {
       "method": "GET",
+      "path": "/custom-field/project/proj-old",
+      "query": ""
+    },
+    {
+      "method": "GET",
       "path": "/project/proj-old",
       "query": ""
     },

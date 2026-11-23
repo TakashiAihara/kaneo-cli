@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "args": [
+        "workflow",
+        "rm",
+        "rule9999",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"error\": \"no workflow rule rule9999; kaneo workflow ls --json lists the ids\"\n}\n",
+      "stderr": "Error: no workflow rule rule9999; kaneo workflow ls --json lists the ids\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "DELETE",
+      "path": "/workflow-rule/rule9999",
+      "query": ""
+    }
+  ],
+  "files": {}
+}

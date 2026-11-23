@@ -332,6 +332,11 @@ export type FakeOptions = {
   // Answers a comment post without the comment's id, so a marker that cannot be
   // looked for in the listing is exercised.
   commentReplyWithoutId?: boolean;
+  // Answers the workspace middleware's unknown-id lookups on the routes a
+  // scenario exercises the way Kaneo v2.50 does — 404 {message, code}
+  // "<Resource> not found" — rather than the older 400 "Workspace ID could not
+  // be determined".
+  notFoundV250?: boolean;
   // Serves the pinned document with createActivity requiring userId, as
   // Kaneo 2.20 does, and createTask without dueDate — a field the client does
   // send — the request drift api-check reports.
@@ -1193,6 +1198,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
   // JSON envelope around it.
   const failText = (status: number, message: string) =>
     new Response(message, { status, headers: { "content-type": "text/plain;charset=UTF-8" } });
+  // The {message, code} JSON Kaneo v2.50's not-found middleware answers with,
+  // where an older server sent the lookup's 400.
+  const notFound = (resource: string) =>
+    Response.json({ message: `${resource} not found`, code: "NOT_FOUND" }, { status: 404 });
 
   // A project's reply as a server older than the document sends it. The read
   // and the write's reply are the same row upstream, so readWithout leaves the
@@ -2132,8 +2141,9 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
     if ((p = m(/^\/project\/([^/]+)(\/(archive|unarchive))?$/))) {
       const proj = projects.find((x) => x.id === decodeURIComponent(p![1]));
       // Checked by the server's workspace middleware before the route runs, as on
-      // the task routes below.
-      if (!proj) return failText(400, "Workspace ID could not be determined");
+      // the task routes below: its 400 as text on an older server, a 404
+      // "Project not found" on Kaneo v2.50.
+      if (!proj) return opts.notFoundV250 ? notFound("Project") : failText(400, "Workspace ID could not be determined");
       if (req.method === "GET" && !p[2]) return projectReply(proj, opts.readAs);
       if (opts.plainMember) return failText(403, "Insufficient permissions");
       if (req.method === "PUT" && !p[2]) {
@@ -2983,9 +2993,10 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
 
     if ((p = m(/^\/comment\/([^/]+)$/)) && req.method !== "PUT") {
       const taskId = decodeURIComponent(p[1]);
-      // The workspace middleware finds no task before the controller runs, and
-      // its HTTPException is plain text.
-      if (!tasks.some((t) => t.id === taskId)) return failText(400, "Workspace ID could not be determined");
+      // The workspace middleware finds no task before the controller runs: its
+      // 400 as text on an older server, a 404 "Task not found" on Kaneo v2.50.
+      if (!tasks.some((t) => t.id === taskId))
+        return opts.notFoundV250 ? notFound("Task") : failText(400, "Workspace ID could not be determined");
       if (req.method === "GET") {
         return ok(
           z.array(M.Comment),
@@ -3098,9 +3109,11 @@ export function startFake(seed: Seed, opts: FakeOptions = {}) {
       const key = decodeURIComponent(p[1]);
       if (req.method === "DELETE") {
         // The workspace middleware looks the rule up first, so an unknown one is
-        // its 400 rather than the controller's 404.
+        // its 400 on an older server and a 404 "Workflow rule not found" on
+        // Kaneo v2.50, rather than the controller's own answer.
         const i = workflowRules.findIndex((r) => r.id === key);
-        if (i < 0) return fail(400, "Workspace ID could not be determined");
+        if (i < 0)
+          return opts.notFoundV250 ? notFound("Workflow rule") : fail(400, "Workspace ID could not be determined");
         return ok(M.WorkflowRuleRow, workflowRules.splice(i, 1)[0]!);
       }
       if (!projects.some((x) => x.id === key)) return failText(400, "Workspace ID could not be determined");

@@ -141,8 +141,8 @@
         "not-a-token"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/calendar-feed/not-a-token/calendar.ics: 400: Invalid feed token\"\n}\n",
-      "stderr": "Error: GET /api/calendar-feed/not-a-token/calendar.ics: 400: Invalid feed token\n"
+      "stdout": "{\n  \"error\": \"GET /api/calendar-feed/{token}/calendar.ics: 400: Invalid feed token\"\n}\n",
+      "stderr": "Error: GET /api/calendar-feed/{token}/calendar.ics: 400: Invalid feed token\n"
     },
     {
       "args": [
@@ -151,8 +151,8 @@
         "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0063"
       ],
       "exit": 1,
-      "stdout": "{\n  \"error\": \"GET /api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0063/calendar.ics: 404: Calendar feed not found\"\n}\n",
-      "stderr": "Error: GET /api/calendar-feed/feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0063/calendar.ics: 404: Calendar feed not found\n"
+      "stdout": "{\n  \"error\": \"GET /api/calendar-feed/{token}/calendar.ics: 404: Calendar feed not found\"\n}\n",
+      "stderr": "Error: GET /api/calendar-feed/{token}/calendar.ics: 404: Calendar feed not found\n"
     },
     {
       "args": [

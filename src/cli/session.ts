@@ -9,7 +9,16 @@ import * as store from "../session/store";
 import { attachmentOf, attachTask, confirmMarker, cwd, describeBoard, env, postMarker } from "../session/attach";
 import type { Json } from "../output/json";
 import { shellWord } from "../output/output";
-import { allowArchivedFlag, guardProject, placesNothing, taskRef, writeAccess, type ProjectAccess } from "./lookup";
+import {
+  allowArchivedFlag,
+  guardProject,
+  placesNothing,
+  resourceNotFound,
+  taskRef,
+  unknownProject,
+  writeAccess,
+  type ProjectAccess,
+} from "./lookup";
 
 const requireSessionId = (): string => {
   const id = store.currentId(env);
@@ -192,7 +201,9 @@ export const sessionCommand = {
           "the attachment and history here are unchanged",
           `\`kaneo session close --task ${shellWord(closing)}\` again finishes closing here, and posts a second close marker`,
         ).catch((e: unknown) => {
-          if (holds && placesNothing(e)) return undefined;
+          // The marker's task is what the workspace middleware places: an older
+          // server answers its 400, Kaneo v2.50 a 404 "Task not found".
+          if (holds && (placesNothing(e) || resourceNotFound(e, "Task"))) return undefined;
           throw e;
         });
         // A task closed by name that the attachment does not hold has no board on
@@ -403,15 +414,17 @@ const targetTask = async (
 
 // The archived check guardProject makes reads the project first, and a project
 // the server can no longer place fails that read before the marker post is
-// ever tried. A gone project has no archived state to check, and the post is
-// what knows how to report that its task cannot take the marker — for a held
-// task it is also what releases the attachment — so the read's "nothing here"
-// answer is left to it. Every other failure still stops the command here.
+// ever tried — the 400 an older server answers, or the 404 "Project not found"
+// Kaneo v2.50's does. A gone project has no archived state to check, and the
+// post is what knows how to report that its task cannot take the marker — for
+// a held task it is also what releases the attachment — so the read's
+// "nothing here" answer is left to it. Every other failure still stops the
+// command here.
 const guardProjectForMarker = async (projectId: string, access: ProjectAccess): Promise<void> => {
   try {
     await guardProject(projectId, access);
   } catch (e) {
-    if (!placesNothing(e)) throw e;
+    if (!unknownProject(e)) throw e;
   }
 };
 

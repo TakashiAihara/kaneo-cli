@@ -47,6 +47,16 @@ const captureStderr = async (fn: () => Promise<unknown>) => {
   return lines;
 };
 
+// The call calendarFeedIcs makes: anonymous, text, the token in the path, and
+// the template that marks which segment is the credential for masking.
+const feedCall = {
+  method: "GET",
+  anonymous: true,
+  text: true,
+  credentialInUrl: true,
+  servedAs: "/api/calendar-feed/{token}/calendar.ics",
+};
+
 describe("normalizeBaseUrl", () => {
   // The site root serves the web app and answers 200 with HTML for any path,
   // so a base that misses /api looks like a success that returns markup.
@@ -136,6 +146,34 @@ describe("requests", () => {
   });
 });
 
+// A body that cannot be read is reported the way Go's io.ReadAll failure was:
+// `read body: <reason>` after the request it belongs to. The only abort the
+// transport passes in is the --timeout cap, which Go reported as a deadline.
+describe("reading the body", () => {
+  test("a body that stalls past the timeout is a deadline exceeded", async () => {
+    const enc = new TextEncoder();
+    const url = serve(
+      () =>
+        new Response(
+          new ReadableStream({
+            start(c) {
+              // One byte flushes the headers; the rest of the body never comes.
+              c.enqueue(enc.encode("x"));
+            },
+          }),
+        ),
+    );
+    configureClient({ baseUrl: url, apiKey: "test-key", timeoutMs: 100 });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as Error;
+    // Bare, as the Go build printed it: its requests carry a context made
+    // with the same --timeout before they are sent, and that deadline always
+    // expires before the client's own, so Go's "(Client.Timeout ...)"
+    // parentheticals — gated on the client deadline having been the one that
+    // fired — never appeared.
+    expect(e.message).toBe("GET /api/x: read body: context deadline exceeded");
+  });
+});
+
 describe("the key over plain HTTP", () => {
   // Checked before the request, so nothing leaves the process.
   test("is refused with InsecureCredentialError, without the key in the message", async () => {
@@ -195,6 +233,19 @@ describe("a credential carried in the URL", () => {
     const e = (await failure(kaneoFetch<string>("/calendar-feed/t/calendar.ics", feedInit))) as Error;
     expect(e).toBeInstanceOf(InsecureCredentialError);
     expect(e.message).toContain("http://kaneo.example.invalid");
+  });
+
+  // A Location can make the token itself the refused hop's host, and the
+  // refusal names scheme and host — the token's spelling is masked there the
+  // way it is in the path fields.
+  test("a redirect naming the token as an insecure host is refused without printing it", async () => {
+    const url = serve(() => new Response(null, { status: 302, headers: { location: "//feed-token/" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", feedCall))) as Error;
+    expect(e).toBeInstanceOf(InsecureCredentialError);
+    expect(e.message).toBe(
+      "http://***: refusing to send credentials over plain HTTP; use https, or a loopback address for a local instance",
+    );
   });
 
   test("a redirect that stays on protected targets is followed", async () => {
@@ -335,6 +386,58 @@ describe("redirects", () => {
     expect(reached).toBe(0);
   });
 
+  // A password in the URL being dialled is the *** Go's url.Error prints, not
+  // the cleartext the header carried.
+  test("a password in the dialled URL prints as ***", async () => {
+    configureClient({ baseUrl: "http://user:secret@127.0.0.1:9", apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/project", { method: "GET" }))) as Error;
+    expect(e.message).toBe(
+      'GET /api/project: Get "http://user:***@127.0.0.1:9/api/project": dial tcp 127.0.0.1:9: connect: connection refused',
+    );
+  });
+
+  // The same dial failure on a credential-in-URL route names the route by
+  // template and scheme and host only: the path is the credential, so it is
+  // not printed even here.
+  test("a credential-in-URL route's dial failure keeps scheme and host only", async () => {
+    configureClient({ baseUrl: "http://127.0.0.1:9", apiKey: "test-key" });
+    const e = (await failure(
+      kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", {
+        method: "GET",
+        anonymous: true,
+        text: true,
+        credentialInUrl: true,
+        servedAs: "/api/calendar-feed/{token}/calendar.ics",
+      }),
+    )) as Error;
+    expect(e.message).toBe(
+      'GET /api/calendar-feed/{token}/calendar.ics: Get "http://127.0.0.1:9": dial tcp 127.0.0.1:9: connect: connection refused',
+    );
+  });
+
+  // The body-replay refusal names the redirect target the same way: a set
+  // password prints as *** rather than the cleartext the Location carried.
+  test("a password in a refused redirect target prints as ***", async () => {
+    const origin = serve(
+      () =>
+        new Response(null, {
+          status: 307,
+          headers: { location: "http://user:secret@127.0.0.1:9/api/elsewhere" },
+        }),
+    );
+    configureClient({ baseUrl: origin, apiKey: "test-key" });
+    const e = (await failure(
+      kaneoFetch("/gitlab-integration/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: "gitlab-token" }),
+      }),
+    )) as KaneoApiError;
+    expect(e.message).toBe(
+      "POST /api/gitlab-integration/verify: 307: refusing to follow the redirect to http://user:***@127.0.0.1:9/api/elsewhere: the request body may carry a credential",
+    );
+  });
+
   // The same hop on the origin the request was sent to is followed with the
   // body intact: the credential stays with the server it was meant for.
   test("follow a 307 on the same origin with the body", async () => {
@@ -402,6 +505,331 @@ describe("redirects", () => {
     )) as Error;
     expect(e.message).toContain(`target-type=${wantType}`);
     expect(e.message).toStartWith(`${method} /api${path}: error decoding response`);
+  });
+});
+
+// A 3xx whose Location net/url would refuse fails the call the way Go's client
+// reported it: the call, the request that answered it, and url.Parse's own
+// account of the refusal — not the 3xx handed back as the answer.
+describe("a Location that cannot be parsed", () => {
+  const badLocation = async (location: string) => {
+    const url = serve(() => new Response(null, { status: 302, headers: { location } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as Error;
+    return { e, dialled: `${url}/api/x` };
+  };
+
+  test.each([
+    ["http://exa mple.com/", 'invalid character " " in host name'],
+    ["http://e.com/%zz", 'invalid URL escape "%zz"'],
+    ["http://e.com/%", 'invalid URL escape "%"'],
+    // Go slices the bad escape as bytes: "%é" is three of them where "%éx"
+    // would be three UTF-16 units.
+    ["http://e.com/%éx", 'invalid URL escape "%é"'],
+    ["http://e.com:abc/", 'invalid port ":abc" after host'],
+    ["http://[::1", "missing ']' in host"],
+    // The zone an IPv6 literal's %25 introduces is looser than the host, but
+    // not loose enough for an escape the host rules would refuse.
+    ["//[::1%25%2f]:99999/", 'invalid URL escape "%2f"'],
+  ])("%p is refused: %p", async (location, why) => {
+    const { e, dialled } = await badLocation(location);
+    expect(e.message).toBe(
+      `GET /api/x: Get ${JSON.stringify(dialled)}: failed to parse Location header ${JSON.stringify(location)}: parse ${JSON.stringify(location)}: ${why}`,
+    );
+  });
+
+  // A fragment's bad escape is reported against the whole reference, where a
+  // path's is reported against the reference without it.
+  test("a bad escape in the fragment names the whole Location", async () => {
+    const { e, dialled } = await badLocation("http://e.com/path#%zz");
+    expect(e.message).toBe(
+      `GET /api/x: Get ${JSON.stringify(dialled)}: failed to parse Location header "http://e.com/path#%zz": parse "http://e.com/path#%zz": invalid URL escape "%zz"`,
+    );
+  });
+
+  // On a route whose path is the credential the failure still names the
+  // request that answered, but only its scheme and host: the path is the
+  // secret, so it is left out where Go's url.Error would have printed it.
+  test("a credential-in-URL route's parse failure keeps scheme and host only", async () => {
+    const url = serve(() => new Response(null, { status: 302, headers: { location: "http://e.com/%zz" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(
+      kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", {
+        method: "GET",
+        anonymous: true,
+        text: true,
+        credentialInUrl: true,
+        servedAs: "/api/calendar-feed/{token}/calendar.ics",
+      }),
+    )) as Error;
+    expect(e.message).toBe(
+      `GET /api/calendar-feed/{token}/calendar.ics: Get ${JSON.stringify(url)}: failed to parse Location header "http://e.com/%zz": parse "http://e.com/%zz": invalid URL escape "%zz"`,
+    );
+  });
+
+  // And when the server's own Location echoes the credential back — here
+  // inside a reference Go's parse then refuses — the diagnostic masks the
+  // token's spelling the way it masks a password.
+  test("a credential-in-URL route masks the token a Location echoes", async () => {
+    const url = serve(
+      () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: "/calendar-feed/feed-token/%zz" },
+        }),
+    );
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(
+      kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", {
+        method: "GET",
+        anonymous: true,
+        text: true,
+        credentialInUrl: true,
+        servedAs: "/api/calendar-feed/{token}/calendar.ics",
+      }),
+    )) as Error;
+    expect(e.message).toContain('failed to parse Location header "/calendar-feed/***/%zz"');
+    expect(e.message).not.toContain("feed-token");
+  });
+
+  // The reason Go gives for the refusal can carry the token too: an authority
+  // whose port is not digits is quoted whole in the error, and the echo is
+  // masked like the Location itself.
+  test("a credential-in-URL route masks the token in the refused port's reason", async () => {
+    const url = serve(() => new Response(null, { status: 302, headers: { location: "//h:feed-token" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", feedCall))) as Error;
+    expect(e.message).toContain('invalid port ":***" after host');
+    expect(e.message).not.toContain("feed-token");
+  });
+
+  // Go's resolvePath keeps an escaped dot segment literal — %2e is not "." to
+  // it — and its client sends the resolved path as resolved. This runtime's
+  // URL parser reads %2e%2e as the ".." it encodes and would fetch /api/b
+  // instead, so the hop is refused naming what Go resolved rather than
+  // silently fetching another path.
+  test("a Location with an escaped dot segment is refused rather than re-normalized", async () => {
+    let fetched = "";
+    const url = serve((req) => {
+      const u = new URL(req.url);
+      if (u.pathname === "/api/x") {
+        return new Response(null, { status: 302, headers: { location: "/api/a/%2e%2e/b" } });
+      }
+      fetched = u.pathname;
+      return new Response("ok");
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch<string>("/x", { method: "GET" }))) as Error;
+    expect(e.message).toBe(
+      `GET /api/x: Get ${JSON.stringify(`${url}/api/a/%2e%2e/b`)}: the resolved path's %2e escapes are re-normalized by this runtime's URL parser`,
+    );
+    expect(fetched).toBe("");
+  });
+
+  // Go's url.Error prints a set password as *** and keeps the username; the
+  // answering URL here carries both through a network-path reference.
+  test("a password in the answering URL prints as ***", async () => {
+    const url = serve((req) => {
+      const u = new URL(req.url);
+      if (u.pathname === "/api/x") {
+        return new Response(null, { status: 302, headers: { location: `//user:secret@${u.host}/api/y` } });
+      }
+      return new Response(null, { status: 302, headers: { location: "http://e.com/%zz" } });
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as Error;
+    expect(e.message).toBe(
+      `GET /api/x: Get ${JSON.stringify(`http://user:***@${new URL(url).host}/api/y`)}: failed to parse Location header "http://e.com/%zz": parse "http://e.com/%zz": invalid URL escape "%zz"`,
+    );
+  });
+
+  // Go's Header.Get reads the first of several Location headers; fetch's Headers
+  // joins them with ", ", so the first of those is what is followed.
+  test("of several Location headers the first is followed", async () => {
+    let reached = "";
+    const url = serve((req) => {
+      const path = new URL(req.url).pathname;
+      if (path === "/api/x") {
+        const headers = new Headers();
+        headers.append("location", "/api/good");
+        headers.append("location", "/api/bad");
+        return new Response(null, { status: 302, headers });
+      }
+      reached = path;
+      return Response.json({ ok: true });
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    await kaneoFetch("/x", { method: "GET" });
+    expect(reached).toBe("/api/good");
+  });
+});
+
+// Go's url.Parse accepts references WHATWG's URL cannot hold — a port above
+// 65535, an empty host on a special scheme — and its client resolved and
+// dialled them anyway, so the failure is the transport's own, not a parse
+// refusal. The resolved URL is the one url.Error names.
+describe("a Location that parses but cannot be dialled", () => {
+  const missed = async (location: string) => {
+    const url = serve(() => new Response(null, { status: 302, headers: { location } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    return (await failure(kaneoFetch("/x", { method: "GET" }))) as Error;
+  };
+
+  test.each([
+    ["http://e.com:99999/", "http://e.com:99999/", "dial tcp: address 99999: invalid port"],
+    ["http://e.com:65536/", "http://e.com:65536/", "dial tcp: address 65536: invalid port"],
+    [
+      "http://e.com:99999999999999999999/",
+      "http://e.com:99999999999999999999/",
+      "dial tcp: address 99999999999999999999: invalid port",
+    ],
+    ["http://", "http:", "http: no Host in request URL"],
+    ["http://?q=1", "http:?q=1", "http: no Host in request URL"],
+    ["https://", "https:", "http: no Host in request URL"],
+    ["http://#f", "http:#f", "http: no Host in request URL"],
+    ["//@", "http://@", "http: no Host in request URL"],
+    ["http://u@", "http://u@", "http: no Host in request URL"],
+    // A network-path reference takes the answering URL's scheme, and a set
+    // password is the *** url.Error prints.
+    ["//u:p@e.com:99999/", "http://u:***@e.com:99999/", "dial tcp: address 99999: invalid port"],
+    ["//e.com:99999/x", "http://e.com:99999/x", "dial tcp: address 99999: invalid port"],
+    ["//:99999/", "http://:99999/", "dial tcp: address 99999: invalid port"],
+    ["http://e.com:99999/a b", "http://e.com:99999/a%20b", "dial tcp: address 99999: invalid port"],
+    ["http://e.com:99999/%2e%2e/x", "http://e.com:99999/%2e%2e/x", "dial tcp: address 99999: invalid port"],
+    // A valid escape keeps its case through the resolution.
+    ["http://e.com:99999/%c3%a9", "http://e.com:99999/%c3%a9", "dial tcp: address 99999: invalid port"],
+    // Dot segments in the path are resolved, escaped ones are not.
+    ["http://e.com:99999/a/./b/../c", "http://e.com:99999/a/c", "dial tcp: address 99999: invalid port"],
+    ["http://e.com:99999/a/b/../../c", "http://e.com:99999/c", "dial tcp: address 99999: invalid port"],
+    ["http://e.com:99999/./x", "http://e.com:99999/x", "dial tcp: address 99999: invalid port"],
+    // A bare ? and a fragment survive into the URL url.Error names.
+    ["http://e.com:99999/x?", "http://e.com:99999/x?", "dial tcp: address 99999: invalid port"],
+    ["http://e.com:99999/x#f", "http://e.com:99999/x#f", "dial tcp: address 99999: invalid port"],
+    ["http://e.com:99999/x?#f", "http://e.com:99999/x?#f", "dial tcp: address 99999: invalid port"],
+    // A set password prints as *** with the username raw; without one the
+    // username is escaped, and an escaped letter decodes before printing.
+    ["//u%20@e.com:99999/", "http://u%20@e.com:99999/", "dial tcp: address 99999: invalid port"],
+    ["//%75:p@e.com:99999/", "http://u:***@e.com:99999/", "dial tcp: address 99999: invalid port"],
+    // With a password set the username prints decoded and unescaped.
+    ["//u%20:pw@e.com:99999/", "http://u :***@e.com:99999/", "dial tcp: address 99999: invalid port"],
+    ["foo://e.com:99999/", "foo://e.com:99999/", 'unsupported protocol scheme "foo"'],
+    ["a-b+c.d://h:99999/", "a-b+c.d://h:99999/", 'unsupported protocol scheme "a-b+c.d"'],
+    // A scheme this client cannot carry is refused before fetch sees it: file:
+    // included, which this runtime's fetch could otherwise read off the disk.
+    ["file:///etc/passwd", "file:///etc/passwd", 'unsupported protocol scheme "file"'],
+    ["FILE://host/path", "file://host/path", 'unsupported protocol scheme "file"'],
+    // An authority that parses to nothing leaves the request without a host.
+    ["http:///next/path", "http:///next/path", "http: no Host in request URL"],
+    // Go's url.Parse takes an IPv6 zone's %25 escapes under looser rules than
+    // the host's: %30 inside the zone decodes, where the host body stays strict.
+    ["//[fe80::1%25eth%30]:99999/", "http://[fe80::1%25eth0]:99999/", "dial tcp: address 99999: invalid port"],
+    ["http://[zzz]/", "http://[zzz]/", "dial tcp: lookup zzz: no such host"],
+    // resolvePath pops a .. that reaches the root and keeps the slashes it
+    // found: //..//x resolves to //x, not /x.
+    ["http://e.com:99999//..//x", "http://e.com:99999//x", "dial tcp: address 99999: invalid port"],
+  ])("%p fails as the transport's %p", async (location, resolved, why) => {
+    const e = await missed(location);
+    expect(e.message).toBe(`GET /api/x: Get ${JSON.stringify(resolved)}: ${why}`);
+  });
+
+  // An authority that is empty inherits the URL that answered: // is that URL
+  // itself, so the hop answers the same redirect until the client gives up.
+  test.each([["//"], ["//?q=1"], ["//#frag"], ["//?q=1#frag"]])(
+    "%p is followed until the hop limit",
+    async (location) => {
+      let hops = 0;
+      const url = serve(() => {
+        hops++;
+        return new Response(null, { status: 302, headers: { location } });
+      });
+      configureClient({ baseUrl: url, apiKey: "test-key" });
+      const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as Error;
+      expect(hops).toBe(10);
+      expect(e.message).toBe(`GET /api/x: Get ${JSON.stringify(location)}: stopped after 10 redirects`);
+    },
+  );
+
+  // /// and its family are paths, not an empty authority: Go resolves them
+  // against the answering URL and requests that path — /// on the wire, which
+  // this runtime's fetch can only collapse to / — where the base's query and
+  // fragment do not carry over.
+  test.each([
+    ["///", "/"],
+    ["///?q=1", "/?q=1"],
+    ["///#f", "/"],
+    ["////", "/"],
+  ])("%p is requested as the path Go resolves", async (location, want) => {
+    const seen: string[] = [];
+    const url = serve((req) => {
+      const u = new URL(req.url);
+      seen.push(`${u.pathname}${u.search}`);
+      return new Response(null, { status: 302, headers: { location } });
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as Error;
+    expect(seen).toEqual(["/api/x", ...Array(9).fill(want)]);
+    expect(e.message).toBe(`GET /api/x: Get ${JSON.stringify(location)}: stopped after 10 redirects`);
+  });
+
+  // ///next/path is a path too, not an authority whose host is "next": Go
+  // resolves it against the answering URL and requests that path on the same
+  // origin, where WHATWG's URL would have read next as the host.
+  test("///next/path is requested on the answering origin", async () => {
+    const seen: string[] = [];
+    const url = serve((req) => {
+      seen.push(new URL(req.url).pathname);
+      return new Response(null, { status: 302, headers: { location: "///next/path" } });
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as Error;
+    expect(seen).toEqual(["/api/x", ...Array(9).fill("/next/path")]);
+    expect(e.message).toBe(`GET /api/x: Get "///next/path": stopped after 10 redirects`);
+  });
+
+  // A query or forceQuery on the reference drops the answering URL's
+  // fragment, where an empty reference keeps both its query and its fragment.
+  test("a query-carrying reference drops the base fragment", async () => {
+    const seen: string[] = [];
+    const url = serve((req) => {
+      const u = new URL(req.url);
+      seen.push(u.href);
+      if (u.pathname === "/api/x") return new Response(null, { status: 302, headers: { location: "/api/y#f" } });
+      if (u.search === "?q") return new Promise<Response>(() => {});
+      return new Response(null, { status: 302, headers: { location: "//?q" } });
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key", timeoutMs: 100 });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as Error;
+    expect(seen[2]).toBe(`${url}/api/y?q`);
+    expect(e.message).toBe(`GET /api/x: Get ${JSON.stringify(`${url}/api/y?q`)}: context deadline exceeded`);
+  });
+
+  // //? is a forceQuery: Go's resolved URL keeps the bare ?, so the request
+  // target carries it where a cleared search would not.
+  test("a bare ? on the reference is sent as one", async () => {
+    const seen: string[] = [];
+    const url = serve((req) => {
+      seen.push(new URL(req.url).href);
+      return new Response(null, { status: 302, headers: { location: "//?" } });
+    });
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as Error;
+    expect(seen[0]).toBe(`${url}/api/x`);
+    expect(seen.slice(1).every((href) => href === `${url}/api/x?`)).toBe(true);
+    expect(e.message).toBe(`GET /api/x: Get "//?": stopped after 10 redirects`);
+  });
+
+  // The transport reasons can echo the credential too: the scheme Go cannot
+  // carry and the host it cannot dial are quoted in the error, and each is
+  // masked like the resolved URL beside it.
+  test.each([
+    ["feed-token:foo", 'unsupported protocol scheme "***"'],
+    ["//[feed-token]/", "dial tcp: lookup ***: no such host"],
+  ])("a credential-in-URL route masks the token in the reason for %p", async (location, why) => {
+    const url = serve(() => new Response(null, { status: 302, headers: { location } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch<string>("/calendar-feed/feed-token/calendar.ics", feedCall))) as Error;
+    expect(e.message).toContain(why);
+    expect(e.message).not.toContain("feed-token");
   });
 });
 
@@ -487,6 +915,25 @@ describe("failures", () => {
     expect(e.message).toBe(`GET /api/project: 500: ${"x".repeat(200)}...`);
   });
 
+  // Go cut the body at 200 bytes and appended "...", where a JavaScript string
+  // counts UTF-16 units: 100 euro signs are 100 units but 300 bytes, so the cut
+  // lands inside the 67th and the partial bytes read as a replacement.
+  test("a long body is cut at 200 bytes, not characters", async () => {
+    const url = serve(() => new Response("€".repeat(100), { status: 500 }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.message).toBe(`GET /api/x: 500: ${"€".repeat(66)}\uFFFD...`);
+  });
+
+  // The same cut keeps a leading byte order mark: Go's body[:200] kept the
+  // EF BB BF bytes where a default decode would have dropped the mark.
+  test("a long body keeps its leading byte order mark", async () => {
+    const url = serve(() => new Response("\uFEFF" + "x".repeat(300), { status: 500 }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.message).toBe(`GET /api/x: 500: \uFEFF${"x".repeat(197)}...`);
+  });
+
   // The server reports validation problems as a 2xx carrying success:false.
   // The shape of the message is the server's choice, so every shape it has
   // been seen in must keep the message.
@@ -507,6 +954,149 @@ describe("failures", () => {
     const url = serve(() => Response.json({ success: false }));
     configureClient({ baseUrl: url, apiKey: "test-key" });
     await failure(kaneoFetch("/project", { method: "GET" }));
+  });
+
+  // Go unmarshalled the envelope with encoding/json, which matches a field's
+  // key case-insensitively and lets a later duplicate win.
+  test("envelope keys match case-insensitively and a later duplicate wins", async () => {
+    const url = serve(() => Response.json({ SUCCESS: true, success: false, ERROR: [{ MESSAGE: "boom" }] }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual(["boom"]);
+    expect(e.message).toBe("GET /api/x: 200: boom");
+  });
+
+  // Go 1.23 unmarshals {"ſucceſſ":false,"error":"boom"} as the failure
+  // envelope: encoding/json's foldName folds U+017F (long s) onto S, where
+  // toLowerCase leaves it. The same fold reaches the message key.
+  test("envelope keys fold the way encoding/json's foldName does", async () => {
+    const url = serve(
+      () =>
+        new Response('{"ſucceſſ":false,"error":[{"meſſage":"boom"}]}', {
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual(["boom"]);
+    expect(e.message).toBe("GET /api/x: 200: boom");
+  });
+
+  // A key that only folds to the field's name plus more is not the field:
+  // "ſuccessX" folds to "SUCCESSX", so the body is the reply, not an envelope.
+  test("a key that folds past the field name is not the envelope", async () => {
+    const url = serve(() => Response.json({ ſuccessX: false, error: "boom" }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    expect(await kaneoFetch<unknown>("/x", { method: "GET" })).toEqual({ ſuccessX: false, error: "boom" });
+  });
+
+  // `success` is a *bool to Go: a boolean or null/absent is the envelope's
+  // verdict, and any other type fails the whole decode, so the body is kept.
+  test.each([
+    ["a string", "false"],
+    ["a number", 0],
+    ["an object", {}],
+  ])("success as %s is not the envelope", async (_name, success) => {
+    const url = serve(() => Response.json({ success, error: "nope" }, { status: 404 }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual([]);
+    expect(e.message).toBe(`GET /api/x: 404: ${JSON.stringify({ success, error: "nope" })}`);
+  });
+
+  // The error is tried as an array of {message} objects, then one object, then
+  // a string; an array holding an element that is not a {message} object fails
+  // as a whole rather than keeping the elements that could.
+  test("a malformed error array keeps no messages", async () => {
+    const url = serve(() => Response.json({ success: false, error: [{ message: "a" }, 42] }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual([]);
+    expect(e.message).toBe('GET /api/x: 200: {"success":false,"error":[{"message":"a"},42]}');
+  });
+
+  test("message keys inside the error match case-insensitively", async () => {
+    const url = serve(() => Response.json({ success: false, error: [{ MESSAGE: "a" }, { message: "b" }] }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual(["a", "b"]);
+    expect(e.message).toBe("GET /api/x: 200: a; b");
+  });
+
+  // encoding/json applies every member in the order it arrived, so a later
+  // duplicate wins across spellings too: {"success":false,"SUCCESS":true,
+  // "success":false} is a failure, where keeping one value per spelling read
+  // the surviving SUCCESS as the verdict.
+  test("envelope duplicates are applied in the order they arrive", async () => {
+    const url = serve(
+      () =>
+        new Response('{"success":false,"SUCCESS":true,"success":false,"error":"boom"}', {
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual(["boom"]);
+    expect(e.message).toBe("GET /api/x: 200: boom");
+  });
+
+  // The same order decides the error member: the last spelling's value is the
+  // one unmarshalled.
+  test("the last error spelling's value is the one read", async () => {
+    const url = serve(
+      () =>
+        new Response('{"success":false,"error":"first","ERROR":"last"}', {
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual(["last"]);
+    expect(e.message).toBe("GET /api/x: 200: last");
+  });
+
+  // A success that a later member overwrites back to true, or nulls out, is no
+  // failure: the body is the reply, not an envelope verdict.
+  test.each([
+    ['{"success":false,"SUCCESS":true,"error":"boom"}', { success: false, SUCCESS: true, error: "boom" }],
+    ['{"success":false,"success":null,"error":"boom"}', { success: null, error: "boom" }],
+  ])("a later success member decides the verdict: %p", async (body, parsed) => {
+    const url = serve(() => new Response(body, { headers: { "content-type": "application/json" } }));
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    expect(await kaneoFetch<unknown>("/x", { method: "GET" })).toEqual(parsed);
+  });
+
+  // Inside a {message} struct null is a no-op on the string, so an earlier
+  // message survives a later null however it is spelled.
+  test.each([
+    ['{"message":"boom","MESSAGE":null}', "boom"],
+    ['{"MESSAGE":"later","message":"boom"}', "boom"],
+    ['{"message":"a","message":null,"message":"b"}', "b"],
+  ])("message members apply in order and null is a no-op: %p", async (member, want) => {
+    const url = serve(
+      () =>
+        new Response(`{"success":false,"error":[${member}]}`, {
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual([want]);
+    expect(e.message).toBe(`GET /api/x: 200: ${want}`);
+  });
+
+  // The same no-op holds for the error object rather than the array.
+  test("a null message member keeps the earlier string in an error object", async () => {
+    const url = serve(
+      () =>
+        new Response('{"success":false,"error":{"message":"boom","MESSAGE":null}}', {
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    configureClient({ baseUrl: url, apiKey: "test-key" });
+    const e = (await failure(kaneoFetch("/x", { method: "GET" }))) as KaneoApiError;
+    expect(e.messages).toEqual(["boom"]);
+    expect(e.message).toBe("GET /api/x: 200: boom");
   });
 
   test("an error status carrying the server's envelope reports the server's message", async () => {

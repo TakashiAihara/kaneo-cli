@@ -3,7 +3,7 @@ import { deleteWorkflowRule, listWorkflowRules, setWorkflowRule, type WorkflowRu
 import { KaneoApiError } from "../api/http";
 import { minimumArgs, noArgs, rangeArgs, type RunContext } from "./args";
 import { resolveColumn } from "./column";
-import { allowArchivedFlag, guardProject, withProject, writeAccess } from "./lookup";
+import { allowArchivedFlag, guardProject, resourceNotFound, withProject, writeAccess } from "./lookup";
 
 // The integrations Kaneo ships a plugin for, and the events those plugins look a
 // column up by: upstream's plugins/*/utils/resolve-column.ts is the file their
@@ -123,12 +123,14 @@ export const workflowCommand = {
         if (id === "") throw new Error("a rule id cannot be blank");
         const deleted = await deleteWorkflowRule(id).catch((err: unknown) => {
           // The server's middleware looks the rule up to place its workspace
-          // before the route runs, so an unknown one is its 400 rather than
-          // anything naming a rule.
+          // before the route runs, so an unknown one is its 400 on an older
+          // server and a 404 "Workflow rule not found" on Kaneo v2.50, rather
+          // than anything else naming a rule.
           if (
-            err instanceof KaneoApiError &&
-            err.statusCode === 400 &&
-            err.messages.some((m) => m.includes("Workspace ID could not be determined"))
+            (err instanceof KaneoApiError &&
+              err.statusCode === 400 &&
+              err.messages.some((m) => m.includes("Workspace ID could not be determined"))) ||
+            resourceNotFound(err, "Workflow rule")
           ) {
             throw new Error(`no workflow rule ${id}; kaneo workflow ls --json lists the ids`);
           }

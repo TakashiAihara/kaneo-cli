@@ -164,10 +164,12 @@ describe("the other times a reply carries", () => {
   });
 });
 
-// A write has already happened by the time its reply is read, and the message
-// has to name that request, not the read that follows it.
+// A write has already happened by the time its reply is read, so its unreadable
+// time is a WriteReplyError: it says the write happened, warns that running it
+// again repeats it, and names a command that shows what it left. The request it
+// names is the write's, not a read that follows it.
 describe("a time that fails to read in the reply to a write", () => {
-  test("names the POST that was made", async () => {
+  test("names the POST that was made and says the write happened", async () => {
     answers(taskReply({ createdAt: "soon" }));
     const e = (await failure(
       api.createTask("p1", {
@@ -180,18 +182,54 @@ describe("a time that fails to read in the reply to a write", () => {
         assigneeId: "",
       }),
     )) as Error;
-    expect(e.message).toBe('POST /api/task/p1: createdAt "soon" is not a timestamp');
+    expect(e).toBeInstanceOf(api.WriteReplyError);
+    expect(e.message).toBe(
+      'POST /api/task/p1: the write already happened on the server, but its reply could not be read (createdAt "soon" is not a timestamp); do not run it again, that would repeat the write; kaneo task ls shows what it left',
+    );
+    // The timestamp failure the reply's mapping hit is kept for a wrapper that
+    // knows the write better.
+    expect((e as api.WriteReplyError).timestamp.message).toBe('POST /api/task/p1: createdAt "soon" is not a timestamp');
   });
 
   test("a comment's names the POST that was made", async () => {
     answers(JSON.stringify({ id: "c1", content: "x", userId: "u1", createdAt: "soon" }));
     const e = (await failure(api.addComment("t1", "x"))) as Error;
-    expect(e.message).toBe('POST /api/comment/t1: createdAt "soon" is not a timestamp');
+    expect(e).toBeInstanceOf(api.WriteReplyError);
+    expect(e.message).toBe(
+      'POST /api/comment/t1: the write already happened on the server, but its reply could not be read (createdAt "soon" is not a timestamp); do not run it again, that would repeat the write; kaneo comment ls t1 shows what it left',
+    );
+  });
+
+  // A write no command wraps still says the write happened and where to look:
+  // the request's resource names the command that reads it back.
+  test("a write no command wraps names its resource's reader", async () => {
+    answers(JSON.stringify({ id: "r1", createdAt: "soon" }));
+    const e = (await failure(
+      api.setWorkflowRule("p1", { integrationType: "github", eventType: "pr", columnId: "c" }),
+    )) as Error;
+    expect(e).toBeInstanceOf(api.WriteReplyError);
+    expect(e.message).toBe(
+      'PUT /api/workflow-rule/p1: the write already happened on the server, but its reply could not be read (createdAt "soon" is not a timestamp); do not run it again, that would repeat the write; kaneo workflow ls shows what it left',
+    );
   });
 
   test("is a TimestampError, which a caller can tell from a request that failed", async () => {
     answers(taskReply({ createdAt: "soon" }));
     expect(await failure(api.getTask("t1"))).toBeInstanceOf(api.TimestampError);
+    answers(taskReply({ createdAt: "soon" }));
+    expect(
+      await failure(
+        api.createTask("p1", {
+          title: "x",
+          description: "",
+          priority: "",
+          status: "",
+          startDate: "",
+          dueDate: "",
+          assigneeId: "",
+        }),
+      ),
+    ).toBeInstanceOf(api.TimestampError);
   });
 
   test("is passed on by afterWrite with the write named", async () => {
@@ -254,13 +292,6 @@ describe("every resource that carries a time names its request when the time is 
       [{ id: "r1", createdAt: TIME, updatedAt: BAD }],
       () => api.listWorkflowRules("p1"),
       "updatedAt",
-    ],
-    [
-      "a stored workflow rule",
-      "PUT /api/workflow-rule/p1",
-      { id: "r1", createdAt: BAD },
-      () => api.setWorkflowRule("p1", { integrationType: "github", eventType: "pr", columnId: "c" }),
-      "createdAt",
     ],
     [
       "a time entry",

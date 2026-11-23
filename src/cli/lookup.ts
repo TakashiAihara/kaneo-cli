@@ -218,21 +218,32 @@ const NO_PLACE = "Workspace ID could not be determined";
 // Whether a failure says the value named no project, rather than the server
 // refusing the request for some other reason.
 //
-// A project in the path is checked before the route runs, and the server answers
-// 400 with the complaint above when it cannot find it. A 400 is also what the
-// server says about a body it will not accept, so the message decides. A project
-// in a body (`task move`'s destination) is looked up by the route itself, which
-// answers 404 `Project not found`.
+// A project in the path is checked before the route runs, and the server
+// answers when it cannot find it — 400 with the complaint above on an older
+// server, 404 "Project not found" from Kaneo v2.50's workspace middleware,
+// which answers the lookup itself rather than letting the route report it. A
+// project in a body (`task move`'s destination) is looked up by the route
+// itself, which answers the 404. A 400 is also what the server says about a
+// body it will not accept, so the message decides.
 //
 // A 403 is a different answer — the key cannot reach the project — and a lookup
 // would not change that.
-const unknownProject = (e: unknown): e is KaneoApiError =>
+export const unknownProject = (e: unknown): e is KaneoApiError =>
   placesNothing(e) || (e instanceof KaneoApiError && e.statusCode === 404 && e.messages.includes("Project not found"));
 
 // Whether the server could not place the id in the path in any workspace: it
 // does not exist, or not in one the key reaches.
 export const placesNothing = (e: unknown): e is KaneoApiError =>
   e instanceof KaneoApiError && e.statusCode === 400 && e.messages.includes(NO_PLACE);
+
+// Whether the server answered that the id in the path names no <resource>: the
+// 404 {message, code} shape Kaneo v2.50's not-found middleware returns, where
+// <resource> is the noun the route's own lookup used ("Task not found",
+// "Workflow rule not found", "Label not found", ...). The message is the
+// server's own wording, so the noun is matched exactly. An older server answers
+// the same lookup with the 400 placesNothing reads.
+export const resourceNotFound = (e: unknown, resource: string): e is KaneoApiError =>
+  e instanceof KaneoApiError && e.statusCode === 404 && e.messages.includes(`${resource} not found`);
 
 // The projects a value names, by id, then by slug, then by name. An id is a
 // case-sensitive key; a slug or a name is tried exactly before ignoring case.
